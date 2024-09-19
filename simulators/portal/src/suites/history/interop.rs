@@ -1,6 +1,10 @@
+use std::str::FromStr;
+
 use crate::suites::history::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
 use crate::suites::utils::get_flair;
-use ethportal_api::types::history::ContentInfo;
+use alloy_primitives::Bytes;
+use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
 };
@@ -10,9 +14,6 @@ use itertools::Itertools;
 use serde_json::json;
 use serde_yaml::Value;
 use tokio::time::Duration;
-
-// This is taken from Trin. It should be fairly standard
-const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
 
 // Header with proof for block number 14764013
 const HEADER_WITH_PROOF_KEY: &str =
@@ -34,16 +35,21 @@ fn process_content(
 
     let mut result: Vec<ProcessedContent> = vec![];
     for history_content in content.into_iter() {
-        if let HistoryContentKey::BlockHeaderWithProof(_) = &history_content.0 {
+        if let HistoryContentKey::BlockHeaderByHash(_) = &history_content.0 {
             last_header = history_content.clone();
         }
         let (content_type, block_number, test_data) =
             if let HistoryContentValue::BlockHeaderWithProof(header_with_proof) = &last_header.1 {
                 match &history_content.0 {
-                    HistoryContentKey::BlockHeaderWithProof(_) => (
-                        "Block Header".to_string(),
+                    HistoryContentKey::BlockHeaderByHash(_) => (
+                        "Block Header by Hash".to_string(),
                         header_with_proof.header.number,
                         vec![last_header.clone()],
+                    ),
+                    HistoryContentKey::BlockHeaderByNumber(_) => (
+                        "Block Header by Number".to_string(),
+                        header_with_proof.header.number,
+                        vec![history_content],
                     ),
                     HistoryContentKey::BlockBody(_) => (
                         "Block Body".to_string(),
@@ -54,11 +60,6 @@ fn process_content(
                         "Block Receipt".to_string(),
                         header_with_proof.header.number,
                         vec![history_content, last_header.clone()],
-                    ),
-                    HistoryContentKey::EpochAccumulator(_) => (
-                        "Epoch Accumulator".to_string(),
-                        u64::MAX,
-                        vec![history_content],
                     ),
                 }
             } else {
@@ -93,9 +94,9 @@ dyn_async! {
         let values: Value = serde_yaml::from_str(&values).unwrap();
         let content: Vec<(HistoryContentKey, HistoryContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
             let content_key: HistoryContentKey =
-                serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
-            let content_value: HistoryContentValue =
-                serde_yaml::from_value(value.get("content_value").unwrap().clone()).unwrap();
+                serde_yaml::from_value(value["content_key"].clone()).unwrap();
+            let raw_content_value = Bytes::from_str(value["content_value"].as_str().unwrap()).unwrap();
+            let content_value = HistoryContentValue::decode(&content_key, raw_content_value.as_ref()).expect("unable to decode content value");
             (content_key, content_value)
         }).collect();
 
@@ -243,7 +244,7 @@ dyn_async! {
             }
         };
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value).await {
+            match client_b.rpc.store(optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for recursive find content");
                 },
@@ -261,13 +262,13 @@ dyn_async! {
             }
         };
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_value.clone()).await;
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_value.encode()).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
         match client_b.rpc.local_content(target_key).await {
             Ok(possible_content) => {
-                if possible_content != target_value {
+                if possible_content != target_value.encode() {
                     panic!("Error receiving content: Expected content: {target_value:?}, Received content: {possible_content:?}");
                 }
             }
@@ -364,7 +365,7 @@ dyn_async! {
             }
         };
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value).await {
+            match client_b.rpc.store(optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for recursive find content");
                 },
@@ -375,7 +376,7 @@ dyn_async! {
         }
 
         let (target_key, target_value) = test_data.first().cloned().expect("Target content is required for this test");
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for recursive find content");
             },
@@ -403,7 +404,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_value.encode() {
                             panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
                         }
 
@@ -437,7 +438,7 @@ dyn_async! {
             }
         };
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value).await {
+            match client_b.rpc.store(optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for find content");
                 },
@@ -448,7 +449,7 @@ dyn_async! {
         }
 
         let (target_key, target_value) = test_data.first().cloned().expect("Target content is required for this test");
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
@@ -468,7 +469,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_value.encode() {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
                         }
 
@@ -517,7 +518,7 @@ dyn_async! {
 
         // With default node settings nodes should be storing all content
         for (content_key, content_value) in test_data.clone() {
-            match client_a.rpc.gossip(content_key.clone(), content_value.clone()).await {
+            match client_a.rpc.gossip(content_key.clone(), content_value.encode()).await {
                 Ok(nodes_gossiped_to) => {
                    if nodes_gossiped_to != 1 {
                         panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
@@ -528,7 +529,7 @@ dyn_async! {
                 }
             }
 
-            if let HistoryContentKey::BlockHeaderWithProof(_) = content_key {
+            if let HistoryContentKey::BlockHeaderByHash(_) = content_key {
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }
@@ -541,16 +542,16 @@ dyn_async! {
         let mut last_header_seen: (HistoryContentKey, HistoryContentValue) = (first_header_key, first_header_value);
         let mut result = vec![];
         for (content_key, content_value) in test_data.into_iter() {
-            if let HistoryContentKey::BlockHeaderWithProof(_) = &content_key {
+            if let HistoryContentKey::BlockHeaderByHash(_) = &content_key {
                 last_header_seen = (content_key.clone(), content_value.clone());
             }
             let content_details =
                 if let HistoryContentValue::BlockHeaderWithProof(header_with_proof) = &last_header_seen.1 {
                     let content_type = match &content_key {
-                        HistoryContentKey::BlockHeaderWithProof(_) => "header".to_string(),
+                        HistoryContentKey::BlockHeaderByHash(_) => "header by hash".to_string(),
+                        HistoryContentKey::BlockHeaderByNumber(_) => "header by number".to_string(),
                         HistoryContentKey::BlockBody(_) => "body".to_string(),
                         HistoryContentKey::BlockReceipts(_) => "receipt".to_string(),
-                        HistoryContentKey::EpochAccumulator(_) => "epoch accumulator".to_string(),
                     };
                     format!(
                         "{} {}",
@@ -558,12 +559,12 @@ dyn_async! {
                         content_type
                     )
                 } else {
-                    unreachable!("History test data is formatted incorrectly. Header wasn't infront of data. Please refer to test data file for more information")
+                    unreachable!("History test data is formatted incorrectly. Header wasn't in front of data. Please refer to test data file for more information")
                 };
 
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(expected_value) => {
-                    if expected_value != content_value {
+                    if expected_value != content_value.encode() {
                         result.push(format!("Error content received for block {content_details} was different then expected"));
                     }
                 }

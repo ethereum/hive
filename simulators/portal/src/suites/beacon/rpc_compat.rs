@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::suites::beacon::constants::{
     CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::environment::PortalNetwork;
+use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
-use ethportal_api::BeaconContentValue;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
@@ -235,9 +236,9 @@ dyn_async! {
             }
         };
         let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let content_value: BeaconContentValue = serde_json::from_value(json!(CONSTANT_CONTENT_VALUE)).unwrap();
+        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
 
-        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key, content_value).await {
+        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key, raw_content_value).await {
             panic!("{}", &err.to_string());
         }
     }
@@ -252,18 +253,18 @@ dyn_async! {
             }
         };
         let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let content_value: BeaconContentValue = serde_json::from_value(json!(CONSTANT_CONTENT_VALUE)).unwrap();
+        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
 
         // seed CONTENT_KEY/content_value onto the local node to test local_content expect content present
-        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), content_value.clone()).await {
+        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
             panic!("{}", &err.to_string());
         }
 
         // Here we are calling local_content RPC to test if the content is present
         match BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
             Ok(possible_content) => {
-                if possible_content != content_value {
-                    panic!("Error receiving content: Expected content: {content_value:?}, Received content: {possible_content:?}");
+                if possible_content != raw_content_value {
+                    panic!("Error receiving content: Expected content: {raw_content_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {

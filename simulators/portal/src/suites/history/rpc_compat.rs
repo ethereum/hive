@@ -1,7 +1,10 @@
+use std::str::FromStr;
+
 use crate::suites::history::constants::TRIN_BRIDGE_CLIENT_TYPE;
+use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient};
+use ethportal_api::{HistoryContentKey, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use serde_json::json;
@@ -230,9 +233,9 @@ dyn_async! {
             }
         };
         let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let content_value: HistoryContentValue = serde_json::from_value(json!(CONTENT_VALUE)).unwrap();
+        let raw_content_value = Bytes::from_str(CONTENT_VALUE).expect("unable to convert content value to bytes");
 
-        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key, content_value).await {
+        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key, raw_content_value).await {
             panic!("{}", &err.to_string());
         }
     }
@@ -247,18 +250,18 @@ dyn_async! {
             }
         };
         let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let content_value: HistoryContentValue = serde_json::from_value(json!(CONTENT_VALUE)).unwrap();
+        let raw_content_value = Bytes::from_str(CONTENT_VALUE).expect("unable to convert content value to bytes");
 
         // seed content_key/content_value onto the local node to test local_content expect content present
-        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), content_value.clone()).await {
+        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
             panic!("{}", &err.to_string());
         }
 
         // Here we are calling local_content RPC to test if the content is present
         match HistoryNetworkApiClient::local_content(&client.rpc, content_key).await {
             Ok(possible_content) => {
-                if possible_content != content_value {
-                    panic!("Error receiving content: Expected content: {content_value:?}, Received content: {possible_content:?}");
+                if possible_content != raw_content_value {
+                    panic!("Error receiving content: Expected content: {raw_content_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {

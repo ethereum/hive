@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{CONTENT_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
@@ -8,7 +9,8 @@ use ethportal_api::jsonrpsee::http_client::HttpClient;
 use ethportal_api::types::execution::header_with_proof::{
     BlockHeaderProof, HeaderWithProof, SszNone,
 };
-use ethportal_api::types::state::ContentInfo;
+use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, Header, HistoryContentKey, HistoryContentValue, StateContentKey,
@@ -21,9 +23,6 @@ use serde_json::json;
 use serde_yaml::Value;
 use tokio::time::Duration;
 
-// This is taken from Trin. It should be fairly standard
-const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
-
 #[derive(Clone, Debug)]
 struct TestData {
     pub header: Header,
@@ -33,12 +32,14 @@ struct TestData {
 }
 
 async fn store_header(header: Header, client: &HttpClient) -> bool {
-    let content_key = HistoryContentKey::BlockHeaderWithProof(header.hash().into());
+    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
     let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
         header,
         proof: BlockHeaderProof::None(SszNone::default()),
     });
-    match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value).await {
+    match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value.encode())
+        .await
+    {
         Ok(stored) => stored,
         Err(err) => panic!("{}", &err.to_string()),
     }
@@ -108,10 +109,11 @@ dyn_async! {
             let header = Header::decode(&mut header_bytes.as_ref()).unwrap();
             let key: StateContentKey =
                 serde_yaml::from_value(value["content_key"].clone()).unwrap();
-            let offer_value: StateContentValue =
-                serde_yaml::from_value(value["content_value_offer"].clone()).unwrap();
-            let lookup_value: StateContentValue =
-                serde_yaml::from_value(value["content_value_retrieval"].clone()).unwrap();
+            let raw_offer_value = Bytes::from_str(value["content_value_offer"].as_str().unwrap()).unwrap();
+            let offer_value = StateContentValue::decode(&key, raw_offer_value.as_ref()).expect("unable to decode content value");
+            let raw_lookup_value = Bytes::from_str(value["content_value_retrieval"].as_str().unwrap()).unwrap();
+            let lookup_value = StateContentValue::decode(&key, raw_lookup_value.as_ref()).expect("unable to decode content value");
+
             TestData { header, key, offer_value, lookup_value }
         }).collect();
 
@@ -275,13 +277,13 @@ dyn_async! {
 
         store_header(header, &client_b.rpc).await;
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_offer_value.clone()).await;
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_offer_value.encode()).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
         match client_b.rpc.local_content(target_key).await {
             Ok(possible_content) => {
-                if possible_content != target_lookup_value {
+                if possible_content != target_lookup_value.encode() {
                     panic!("Error receiving content: Expected content: {target_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
@@ -385,7 +387,7 @@ dyn_async! {
             ..
         } = test_data;
 
-        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_offer_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for recursive find content");
             },
@@ -413,7 +415,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_lookup_value {
+                        if content != target_lookup_value.encode() {
                             panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
                         }
 
@@ -454,7 +456,7 @@ dyn_async! {
             ..
         } = test_data;
 
-        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_offer_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
@@ -474,7 +476,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_lookup_value {
+                        if content != target_lookup_value.encode() {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
                         }
 
@@ -525,7 +527,7 @@ dyn_async! {
         for TestData { header, key: content_key, offer_value: content_offer_value, .. } in test_data.clone() {
             store_header(header, &client_b.rpc).await;
 
-            match client_a.rpc.gossip(content_key.clone(), content_offer_value.clone()).await {
+            match client_a.rpc.gossip(content_key.clone(), content_offer_value.encode()).await {
                 Ok(nodes_gossiped_to) => {
                    if nodes_gossiped_to != 1 {
                         panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
@@ -560,7 +562,7 @@ dyn_async! {
 
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(expected_value) => {
-                    if expected_value != content_lookup_value {
+                    if expected_value != content_lookup_value.encode() {
                         result.push(format!("Error content received for block {content_details} was different then expected"));
                     }
                 }

@@ -1,12 +1,14 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{
     CONTENT_KEY, CONTENT_LOOKUP_VALUE, CONTENT_OFFER_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
 };
+use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{StateContentKey, StateContentValue, StateNetworkApiClient};
+use ethportal_api::{StateContentKey, StateNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use serde_json::json;
@@ -234,9 +236,9 @@ dyn_async! {
             }
         };
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let content_value: StateContentValue = serde_json::from_value(json!(CONTENT_OFFER_VALUE)).unwrap();
+        let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
 
-        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key, content_value).await {
+        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key, raw_content_offer_value).await {
             panic!("{}", &err.to_string());
         }
     }
@@ -251,18 +253,19 @@ dyn_async! {
             }
         };
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let content_offer_value: StateContentValue = serde_json::from_value(json!(CONTENT_OFFER_VALUE)).unwrap();
-        let content_lookup_value: StateContentValue = serde_json::from_value(json!(CONTENT_LOOKUP_VALUE)).unwrap();
+        let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
+        let raw_content_lookup_value = Bytes::from_str(CONTENT_LOOKUP_VALUE).unwrap();
 
-        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), content_offer_value).await {
+
+        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_offer_value).await {
             panic!("{}", &err.to_string());
         }
 
         // Here we are calling local_content RPC to test if the content is present
         match StateNetworkApiClient::local_content(&client.rpc, content_key).await {
             Ok(possible_content) => {
-                if possible_content != content_lookup_value {
-                    panic!("Error receiving content: Expected content: {content_lookup_value:?}, Received content: {possible_content:?}");
+                if possible_content != raw_content_lookup_value {
+                    panic!("Error receiving content: Expected content: {raw_content_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {
