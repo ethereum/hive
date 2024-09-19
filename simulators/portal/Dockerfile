@@ -1,4 +1,4 @@
-FROM rust:1.79.0 AS builder
+FROM rust:1.81.0 AS builder
 
 # create a new empty shell project
 RUN USER=root cargo new --bin portal

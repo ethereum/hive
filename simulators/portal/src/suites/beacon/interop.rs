@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::suites::beacon::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
 use crate::suites::environment::PortalNetwork;
-use ethportal_api::types::beacon::ContentInfo;
+use alloy_primitives::Bytes;
+use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
     BeaconContentKey, BeaconContentValue, BeaconNetworkApiClient, ContentValue, Discv5ApiClient,
@@ -13,8 +16,6 @@ use itertools::Itertools;
 use serde_json::json;
 use serde_yaml::Value;
 
-// This is taken from Trin. It should be fairly standard
-const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
 const BOOTSTRAP_KEY: &str = "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258acb7bcc7f567b6e3af1";
 
 type TestData = (BeaconContentKey, BeaconContentValue);
@@ -83,9 +84,9 @@ dyn_async! {
         let values: Value = serde_yaml::from_str(&values).unwrap();
         let content: Vec<(BeaconContentKey, BeaconContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
             let content_key: BeaconContentKey =
-                serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
-            let content_value: BeaconContentValue =
-                serde_yaml::from_value(value.get("content_value").unwrap().clone()).unwrap();
+                serde_yaml::from_value(value["content_key"].clone()).unwrap();
+            let raw_content_value = Bytes::from_str(value["content_value"].as_str().unwrap()).unwrap();
+            let content_value = BeaconContentValue::decode(&content_key, raw_content_value.as_ref()).expect("unable to decode content value");
             (content_key, content_value)
         }).collect();
 
@@ -285,7 +286,7 @@ dyn_async! {
             }
         };
         let (target_key, target_value) = test_data;
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for recursive find content");
             },
@@ -313,7 +314,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_value.encode() {
                             panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
                         }
 
@@ -347,7 +348,7 @@ dyn_async! {
             }
         };
         let (target_key, target_value) = test_data;
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
@@ -367,7 +368,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_value.encode() {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
                         }
 

@@ -1,15 +1,15 @@
 use crate::suites::history::constants::TRIN_BRIDGE_CLIENT_TYPE;
+use alloy_primitives::Bytes;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Metric, XorMetric};
-use ethportal_api::types::history::ContentInfo;
-use ethportal_api::{
-    Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
-};
+use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::{Discv5ApiClient, HistoryContentKey, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use serde_json::json;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 // Header with proof for block number 14764013
 const HEADER_WITH_PROOF_KEY: &str =
@@ -81,7 +81,7 @@ dyn_async! {
         };
 
         let header_with_proof_key: HistoryContentKey = serde_json::from_value(json!(HEADER_WITH_PROOF_KEY)).unwrap();
-        let header_with_proof_value: HistoryContentValue = serde_json::from_value(json!(HEADER_WITH_PROOF_VALUE)).unwrap();
+        let raw_header_with_proof_value = Bytes::from_str(HEADER_WITH_PROOF_VALUE).expect("unable to convert content value to bytes");
 
         // get enr for b and c to seed for the jumps
         let client_b_enr = match client_b.rpc.node_info().await {
@@ -113,7 +113,7 @@ dyn_async! {
         }
 
         // seed the data into client_c
-        match client_c.rpc.store(header_with_proof_key.clone(), header_with_proof_value.clone()).await {
+        match client_c.rpc.store(header_with_proof_key.clone(), raw_header_with_proof_value.clone()).await {
             Ok(result) => if !result {
                 panic!("Unable to store header with proof for find content immediate return test");
             },
@@ -146,7 +146,7 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != header_with_proof_value {
+                        if content != raw_header_with_proof_value {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected header with proof value");
                         }
 
