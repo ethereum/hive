@@ -39,6 +39,13 @@ func init() {
 			gasLimit: 100000,
 		}
 	})
+	
+	register("tx-emit-eip7702", func() blockModifier {
+		return &modInvokeEmit{
+			txType:   types.SetCodeTxType,
+			gasLimit: 100000,
+		}
+	})
 }
 
 // modInvokeEmit creates transactions that invoke the 'emit' contract.
@@ -151,6 +158,47 @@ func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
 			BlobHashes: sidecar.BlobHashes(),
 			Sidecar:    sidecar,
 		}
+	
+	case types.SetCodeTxType:
+			if !ctx.ChainConfig().IsPrague(ctx.Number(), ctx.Timestamp()) {
+				return false
+			}
+
+			auth := &types.Authorization{
+				ChainID: big.NewInt(1),
+				Address: recipient,
+				Nonce:   uint64(1),
+				V:       big.NewInt(1),
+				R:       big.NewInt(1),
+				S:       big.NewInt(1),
+			}
+			
+			signedAuth, err := types.SignAuth(auth, sender.key)
+		    if err != nil {
+		        return false
+		    }
+
+			authList := types.AuthorizationList{signedAuth}
+
+			txdata = &types.SetCodeTx{
+				Nonce:     ctx.AccountNonce(sender.addr),
+				GasTipCap: uint256.NewInt(1),
+				GasFeeCap: uint256.MustFromBig(ctx.TxGasFeeCap()),
+				Gas:       m.gasLimit,
+				To:        recipient,
+				Value:     uint256.NewInt(3),
+				Data:      calldata,
+				AccessList: types.AccessList{
+					{
+						Address:     recipient,
+						StorageKeys: []common.Hash{{}, datahash},
+					},
+				},
+				AuthList: authList,
+				V:        uint256.NewInt(1),
+				R:        uint256.NewInt(1),
+				S:        uint256.NewInt(1),
+			}
 
 	default:
 		panic(fmt.Errorf("unhandled tx type %d", m.txType))
