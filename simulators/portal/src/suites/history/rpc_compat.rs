@@ -2,6 +2,7 @@ use crate::suites::history::constants::{
     HEADER_WITH_PROOF_KEY, HEADER_WITH_PROOF_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::types::portal::GetContentInfo;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::HistoryNetworkApiClient;
 use hivesim::types::ClientDefinition;
@@ -183,6 +184,18 @@ dyn_async! {
                     clients: vec![client.clone()],
                 }
             ).await;
+
+            test.run(
+                NClientTestSpec {
+                    name: "portal_historyGetContent Content Present Locally".to_string(),
+                    description: "".to_string(),
+                    always_run: false,
+                    run: test_get_content_content_present_locally,
+                    environments: None,
+                    test_data: (),
+                    clients: vec![client.clone()],
+                }
+            ).await;
         }
     }
 }
@@ -240,7 +253,7 @@ dyn_async! {
 
         // seed content_key/content_value onto the local node to test local_content expect content present
         if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
-            panic!("{}", &err.to_string());
+            panic!("Failed to store data: {err:?}");
         }
 
         // Here we are calling local_content RPC to test if the content is present
@@ -474,6 +487,35 @@ dyn_async! {
 
         if let Ok(content) = HistoryNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
+        }
+    }
+}
+
+dyn_async! {
+    // test that a node will return a PresentContent via GetContent when the data is stored locally
+    async fn test_get_content_content_present_locally<'a>(clients: Vec<Client>, _: ()) {
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
+            None => {
+                panic!("Unable to get expected amount of clients from NClientTestSpec");
+            }
+        };
+
+
+        let content_key = HEADER_WITH_PROOF_KEY.clone();
+        let raw_content_value = HEADER_WITH_PROOF_VALUE.clone();
+
+        // seed content_key/content_value onto the local node to test get_content expect content present
+        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
+            panic!("Failed to store data: {err:?}");
+        }
+
+        match HistoryNetworkApiClient::get_content(&client.rpc, content_key).await {
+            Ok(GetContentInfo { content, utp_transfer }) => {
+                assert!(!utp_transfer, "Error: Expected utp_transfer to be false");
+                assert_eq!(content, raw_content_value, "Error receiving content");
+            }
+            Err(err) => panic!("Expected GetContent to not throw an error {err:?}"),
         }
     }
 }
