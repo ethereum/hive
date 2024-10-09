@@ -24,6 +24,17 @@ ethereum_rust=./ethereum_rust
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
+# Configure log level
+LOG=info
+case "$HIVE_LOGLEVEL" in
+    0|1) LOG=error ;;
+    2)   LOG=warn  ;;
+    3)   LOG=info  ;;
+    4)   LOG=debug ;;
+    5)   LOG=trace ;;
+esac
+FLAGS="$FLAGS --log.level=$LOG"
+
 # Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
