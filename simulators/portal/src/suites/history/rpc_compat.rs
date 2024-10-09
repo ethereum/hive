@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::suites::history::constants::TRIN_BRIDGE_CLIENT_TYPE;
 use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::types::portal::ContentInfo;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::{HistoryContentKey, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
@@ -189,6 +190,18 @@ dyn_async! {
                     clients: vec![client.clone()],
                 }
             ).await;
+
+            test.run(
+                NClientTestSpec {
+                    name: "portal_historyRecursiveFindContent Content Present Locally".to_string(),
+                    description: "".to_string(),
+                    always_run: false,
+                    run: test_recursive_find_content_content_present_locally,
+                    environments: None,
+                    test_data: (),
+                    clients: vec![client.clone()],
+                }
+            ).await;
         }
     }
 }
@@ -254,7 +267,7 @@ dyn_async! {
 
         // seed content_key/content_value onto the local node to test local_content expect content present
         if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
-            panic!("{}", &err.to_string());
+            panic!("Failed to store data: {}", &err.to_string());
         }
 
         // Here we are calling local_content RPC to test if the content is present
@@ -517,6 +530,44 @@ dyn_async! {
 
         if let Ok(content) = HistoryNetworkApiClient::recursive_find_content(&client.rpc, header_with_proof_key).await {
             panic!("Error: Unexpected RecursiveFindContent expected to not get the content and instead get an error: {content:?}");
+        }
+    }
+}
+
+dyn_async! {
+    // test that a node will return a PresentContent via RecursiveFindContent when the data is stored locally
+    async fn test_recursive_find_content_content_present_locally<'a>(clients: Vec<Client>, _: ()) {
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
+            None => {
+                panic!("Unable to get expected amount of clients from NClientTestSpec");
+            }
+        };
+
+
+        let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let raw_content_value = Bytes::from_str(CONTENT_VALUE).expect("unable to convert content value to bytes");
+
+        // seed content_key/content_value onto the local node to test recursive_find_content expect content present
+        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
+            panic!("Failed to store data: {}", &err.to_string());
+        }
+
+        match HistoryNetworkApiClient::recursive_find_content(&client.rpc, content_key).await {
+            Ok(ContentInfo::Content { content, utp_transfer }) => {
+                if utp_transfer {
+                    panic!("Error: Expected utp_transfer to be false");
+                }
+                if content != raw_content_value {
+                    panic!("Error receiving content: Expected content: {raw_content_value:?}, Received content: {content:?}");
+                }
+            }
+            Err(err) => {
+                panic!("Expected RecursiveFindContent to not throw an error {}", &err.to_string());
+            }
+            _ => {
+                panic!("Error: Expected RecursiveFindContent to return ContentInfo::Content");
+            }
         }
     }
 }
