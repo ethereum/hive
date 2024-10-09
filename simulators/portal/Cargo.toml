@@ -6,10 +6,10 @@ edition = "2021"
 
 [dependencies]
 alloy-rlp = "0.3.8"
-alloy-primitives = "0.8.0"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "c416cd9faf933f89b44a517ca7ada144bf2baee9" }
+alloy-primitives = "0.8.3"
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "627189e570d5750cc0e9b009df13921b2973f99b" }
 futures = "0.3.25"
-hivesim = { git = "https://github.com/ethereum/hive", rev = "5c589295dae3eb896a5cb71ee639ab01add911a5" }
+hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
 itertools = "0.10.5"
 serde_json = "1.0.95"
 serde_yaml = "0.9.33"
