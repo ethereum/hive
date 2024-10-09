@@ -33,7 +33,7 @@ case "$HIVE_LOGLEVEL" in
     4)   LOG=debug ;;
     5)   LOG=trace ;;
 esac
-FLAGS="$FLAGS --log-level=$LOG"
+FLAGS="$FLAGS --log.level=$LOG"
 
 # Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
