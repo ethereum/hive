@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.68"
 dyn-clone = "1.0.11"
-jsonrpsee = {version="0.20.0", features = ["client"]}
+jsonrpsee = {version="0.24.4", features = ["client"]}
 regex = "1.10.5"
 reqwest = { version = "0.12.7", default-features = false, features = ["json", "multipart"] }
 serde = { version = "1.0.150", features = ["derive"] }
