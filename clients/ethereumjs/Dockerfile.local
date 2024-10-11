@@ -26,7 +26,7 @@ COPY ${local_path}/packages/evm/package.json ethereumjs-monorepo/packages/evm/pa
 COPY ${local_path}/packages/genesis/package.json ethereumjs-monorepo/packages/genesis/package.json
 COPY ${local_path}/packages/rlp/package.json ethereumjs-monorepo/packages/rlp/package.json
 COPY ${local_path}/packages/statemanager/package.json ethereumjs-monorepo/packages/statemanager/package.json
-COPY ${local_path}/packages/trie/package.json ethereumjs-monorepo/packages/trie/package.json
+COPY ${local_path}/packages/mpt/package.json ethereumjs-monorepo/packages/mpt/package.json
 COPY ${local_path}/packages/tx/package.json ethereumjs-monorepo/packages/tx/package.json
 COPY ${local_path}/packages/util/package.json ethereumjs-monorepo/packages/util/package.json
 COPY ${local_path}/packages/verkle/package.json ethereumjs-monorepo/packages/verkle/package.json
@@ -49,7 +49,7 @@ COPY ${local_path}/packages/wallet ethereumjs-monorepo/packages/wallet
 COPY ${local_path}/packages/common ethereumjs-monorepo/packages/common
 COPY ${local_path}/packages/devp2p ethereumjs-monorepo/packages/devp2p
 COPY ${local_path}/packages/genesis ethereumjs-monorepo/packages/genesis
-COPY ${local_path}/packages/trie ethereumjs-monorepo/packages/trie
+COPY ${local_path}/packages/mpt ethereumjs-monorepo/packages/mpt
 COPY ${local_path}/packages/statemanager ethereumjs-monorepo/packages/statemanager
 COPY ${local_path}/packages/tx ethereumjs-monorepo/packages/tx
 COPY ${local_path}/packages/evm ethereumjs-monorepo/packages/evm
