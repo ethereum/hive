@@ -2,20 +2,19 @@
   nametag: prague-git
   build_args:
       github: ethereumjs/ethereumjs-monorepo
-      tag: t8ntool
+      tag: master
 
 - client: nethermind
-  nametag: prague-git
-  dockerfile: git
+  nametag: prague
   build_args:
-      github: NethermindEth/nethermind
+      baseimage: nethermindeth/nethermind
       tag: pectra
 
 - client: erigon
   nametag: prague
   build_args:
       baseimage: thorax/erigon
-      tag: docker_pectra
+      tag: docker_pectra_temp
 
 - client: reth
   nametag: prague-git
@@ -23,3 +22,17 @@
   build_args:
     github: paradigmxyz/reth
     tag: onbjerg/devnet-3
+
+- client: go-ethereum
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+    github: lightclient/go-ethereum
+    tag: prague-devnet-3
+
+- client: besu
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+      github: daniellehrner/besu
+      tag: fix/issue-7706/warmup_to_when_delegated
