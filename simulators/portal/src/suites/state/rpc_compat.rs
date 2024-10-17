@@ -183,10 +183,10 @@ dyn_async! {
 
             test.run(
                 NClientTestSpec {
-                    name: "portal_stateRecursiveFindContent Content Absent".to_string(),
+                    name: "portal_stateGetContent Content Absent".to_string(),
                     description: "".to_string(),
                     always_run: false,
-                    run: test_recursive_find_content_content_absent,
+                    run: test_get_content_content_absent,
                     environments: environments.clone(),
                     test_data: (),
                     clients: vec![client.clone()],
@@ -509,8 +509,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    // test that a node will return a AbsentContent via RecursiveFindContent when the data doesn't exist
-    async fn test_recursive_find_content_content_absent<'a>(clients: Vec<Client>, _: ()) {
+    // test that a node will return a AbsentContent via GetContent when the data doesn't exist
+    async fn test_get_content_content_absent<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -519,8 +519,8 @@ dyn_async! {
         };
         let header_with_proof_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
-        if let Ok(content) = StateNetworkApiClient::recursive_find_content(&client.rpc, header_with_proof_key).await {
-            panic!("Error: Unexpected RecursiveFindContent expected to not get the content and instead get an error: {content:?}");
+        if let Ok(content) = StateNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
+            panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
         }
     }
 }
