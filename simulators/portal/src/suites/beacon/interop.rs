@@ -95,10 +95,10 @@ dyn_async! {
             for ProcessedContent { content_type, identifier, test_data } in process_content(content.clone()) {
                 test.run(
                     NClientTestSpec {
-                        name: format!("RecursiveFindContent {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
+                        name: format!("GetContent {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
-                        run: test_recursive_find_content,
+                        run: test_get_content,
                         environments: environments.clone(),
                         test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
@@ -277,8 +277,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: TestData) {
+    // test that a node will return a content via GETCONTENT template that it has stored locally
+    async fn test_get_content<'a>(clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -288,7 +288,7 @@ dyn_async! {
         let (target_key, target_value) = test_data;
         match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
-                panic!("Error storing target content for recursive find content");
+                panic!("Error storing target content for get content");
             },
             Err(err) => {
                 panic!("Error storing target content: {err:?}");
@@ -310,29 +310,29 @@ dyn_async! {
             Err(err) => panic!("{}", &err.to_string()),
         }
 
-        match client_a.rpc.recursive_find_content(target_key.clone()).await {
+        match client_a.rpc.get_content(target_key.clone()).await {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
                         if content != target_value.encode() {
-                            panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
+                            panic!("Error: Unexpected GETCONTENT response: didn't return expected target content");
                         }
 
                         if target_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
                             if utp_transfer {
-                                panic!("Error: Unexpected RECURSIVEFINDCONTENT response: utp_transfer was supposed to be false");
+                                panic!("Error: Unexpected GETCONTENT response: utp_transfer was supposed to be false");
                             }
                         } else if !utp_transfer {
-                            panic!("Error: Unexpected RECURSIVEFINDCONTENT response: utp_transfer was supposed to be true");
+                            panic!("Error: Unexpected GETCONTENT response: utp_transfer was supposed to be true");
                         }
                     },
                     other => {
-                        panic!("Error: Unexpected RECURSIVEFINDCONTENT response: {other:?}");
+                        panic!("Error: Unexpected GETCONTENT response: {other:?}");
                     }
                 }
             },
             Err(err) => {
-                panic!("Error: Unable to get response from RECURSIVEFINDCONTENT request: {err:?}");
+                panic!("Error: Unable to get response from GETCONTENT request: {err:?}");
             }
         }
     }

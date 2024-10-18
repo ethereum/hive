@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 alloy-rlp = "0.3.8"
 alloy-primitives = "0.8.3"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "627189e570d5750cc0e9b009df13921b2973f99b" }
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "72f144e8e63751eac5c667753b47a4eda9cb9fea" }
 futures = "0.3.25"
 hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
 itertools = "0.10.5"
