@@ -1423,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "ethportal-api"
 version = "0.2.2"
-source = "git+https://github.com/ethereum/trin?rev=72f144e8e63751eac5c667753b47a4eda9cb9fea#72f144e8e63751eac5c667753b47a4eda9cb9fea"
+source = "git+https://github.com/ethereum/trin?rev=4b212d4f3e8afa7b3298eebd4b4b6e3ec04d680f#4b212d4f3e8afa7b3298eebd4b4b6e3ec04d680f"
 dependencies = [
  "alloy",
  "alloy-rlp",
@@ -4092,7 +4092,7 @@ dependencies = [
 [[package]]
 name = "trin-utils"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/ethereum/trin?rev=72f144e8e63751eac5c667753b47a4eda9cb9fea#72f144e8e63751eac5c667753b47a4eda9cb9fea"
+source = "git+https://github.com/ethereum/trin?rev=4b212d4f3e8afa7b3298eebd4b4b6e3ec04d680f#4b212d4f3e8afa7b3298eebd4b4b6e3ec04d680f"
 dependencies = [
  "ansi_term",
  "atty",
