@@ -200,9 +200,7 @@ dyn_async! {
     async fn test_node_info<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         if let Err(err) = Discv5ApiClient::node_info(&client.rpc).await {
@@ -215,9 +213,7 @@ dyn_async! {
     async fn test_local_content_expect_content_absent<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
@@ -231,9 +227,7 @@ dyn_async! {
     async fn test_store<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
         let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
@@ -248,9 +242,7 @@ dyn_async! {
     async fn test_local_content_expect_content_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
         let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
@@ -268,9 +260,7 @@ dyn_async! {
                     panic!("Error receiving content: Expected content: {raw_content_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
-            Err(err) => {
-                panic!("Expected content returned from local_content to be present {}", &err.to_string());
-            }
+            Err(err) => panic!("Expected content returned from local_content to be present {}", &err.to_string()),
         }
     }
 }
@@ -279,9 +269,7 @@ dyn_async! {
     async fn test_add_enr_expect_true<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
         match StateNetworkApiClient::add_enr(&client.rpc, enr).await {
@@ -298,9 +286,7 @@ dyn_async! {
     async fn test_get_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
 
@@ -314,16 +300,12 @@ dyn_async! {
     async fn test_get_enr_local_enr<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         // get our local enr from NodeInfo
         let target_enr = match Discv5ApiClient::node_info(&client.rpc).await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         // check if we can fetch data from routing table
@@ -342,9 +324,7 @@ dyn_async! {
     async fn test_get_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
 
@@ -373,9 +353,7 @@ dyn_async! {
     async fn test_delete_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
         match StateNetworkApiClient::delete_enr(&client.rpc, enr.node_id()).await {
@@ -392,9 +370,7 @@ dyn_async! {
     async fn test_delete_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
 
@@ -437,9 +413,7 @@ dyn_async! {
     async fn test_lookup_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
 
@@ -453,9 +427,7 @@ dyn_async! {
     async fn test_lookup_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let (_, enr) = generate_random_remote_enr();
 
@@ -484,16 +456,12 @@ dyn_async! {
     async fn test_lookup_enr_local_enr<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         // get our local enr from NodeInfo
         let target_enr = match Discv5ApiClient::node_info(&client.rpc).await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         // check if we can fetch data from routing table
@@ -513,9 +481,7 @@ dyn_async! {
     async fn test_get_content_content_absent<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let header_with_proof_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 

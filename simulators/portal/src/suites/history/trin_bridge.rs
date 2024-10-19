@@ -75,16 +75,12 @@ dyn_async! {
     async fn test_bridge<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let client_enr = match client.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
         client.test.start_client(TRIN_BRIDGE_CLIENT_TYPE.to_string(), Some(HashMap::from([(BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_enr.to_base64()), (HIVE_CHECK_LIVE_PORT.to_string(), 0.to_string())]))).await;
 
@@ -112,9 +108,7 @@ dyn_async! {
                         result.push(format!("Error content received for block {} was different then expected: Provided: {content:?} Expected: {content_value:?}", comments[index]));
                     }
                 }
-                Err(err) => {
-                    panic!("Unable to get received content: {err:?}");
-                }
+                Err(err) => panic!("Unable to get received content: {err:?}"),
             }
         }
 

@@ -6,7 +6,7 @@ use crate::suites::environment::PortalNetwork;
 use alloy_primitives::Bytes;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Metric, XorMetric};
-use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::portal::FindContentInfo;
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient, Discv5ApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
@@ -85,9 +85,7 @@ dyn_async! {
     async fn test_find_content_two_jumps<'a> (clients: Vec<Client>, _: ()) {
         let (client_a, client_b, client_c) = match clients.iter().collect_tuple() {
             Some((client_a, client_b, client_c)) => (client_a, client_b, client_c),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
@@ -96,16 +94,12 @@ dyn_async! {
         // get enr for b and c to seed for the jumps
         let client_b_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         let client_c_enr = match client_c.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         // seed client_c_enr into routing table of client_b
@@ -119,7 +113,7 @@ dyn_async! {
 
         // send a ping from client B to C to connect the clients
         if let Err(err) = client_b.rpc.ping(client_c_enr.clone()).await {
-                panic!("Unable to receive pong info: {err:?}");
+            panic!("Unable to receive pong info: {err:?}");
         }
 
         // seed the data into client_c
@@ -127,25 +121,13 @@ dyn_async! {
             Ok(result) => if !result {
                 panic!("Unable to store header with proof for find content immediate return test");
             },
-            Err(err) => {
-                panic!("Error storing header with proof for find content immediate return test: {err:?}");
-            }
+            Err(err) => panic!("Error storing header with proof for find content immediate return test: {err:?}"),
         }
 
         let enrs = match client_a.rpc.find_content(client_b_enr.clone(), content_key.clone()).await {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Enrs{ enrs } => {
-                        enrs
-                    },
-                    other => {
-                        panic!("Error: (Enrs) Unexpected FINDCONTENT response not: {other:?}");
-                    }
-                }
-            },
-            Err(err) => {
-                panic!("Error: (Enrs) Unable to get response from FINDCONTENT request: {err:?}");
-            }
+            Ok(FindContentInfo::Enrs{ enrs }) => enrs,
+            Ok(FindContentInfo::Content { .. }) => panic!("Error: Expected Enrs response, instead got Content response"),
+            Err(err) => panic!("Error: (Enrs) Unable to get response from FINDCONTENT request: {err:?}"),
         };
 
         if enrs.len() != 1 {
@@ -153,25 +135,17 @@ dyn_async! {
         }
 
         match client_a.rpc.find_content(enrs[0].clone(), content_key.clone()).await {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Content{ content, utp_transfer } => {
-                        if content != raw_content_value {
-                            panic!("Error: Unexpected FINDCONTENT response: didn't return expected header with proof value");
-                        }
+            Ok(FindContentInfo::Content { content, utp_transfer }) => {
+                if content != raw_content_value {
+                    panic!("Error: Unexpected FINDCONTENT response: didn't return expected header with proof value");
+                }
 
-                        if !utp_transfer {
-                            panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be true");
-                        }
-                    },
-                    other => {
-                        panic!("Error: Unexpected FINDCONTENT response: {other:?}");
-                    }
+                if !utp_transfer {
+                    panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be false");
                 }
             },
-            Err(err) => {
-                panic!("Error: Unable to get response from FINDCONTENT request: {err:?}");
-            }
+            Ok(FindContentInfo::Enrs { .. }) => panic!("Error: Expected Content response, instead got Enrs response"),
+            Err(err) => panic!("Error: Unable to get response from FINDCONTENT request: {err:?}"),
         }
     }
 }
@@ -180,24 +154,18 @@ dyn_async! {
     async fn test_find_nodes_distance_of_client_c<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b, client_c) = match clients.iter().collect_tuple() {
             Some((client_a, client_b, client_c)) => (client_a, client_b, client_c),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         // We are adding client C to our list so we then can assume only one client per bucket
         let client_c_enr = match client_c.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         // seed enr into routing table
