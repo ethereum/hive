@@ -117,7 +117,7 @@ dyn_async! {
 
         let enrs = match client_a.rpc.find_content(client_b_enr.clone(), header_with_proof_key.clone()).await {
             Ok(FindContentInfo::Enrs{ enrs }) => enrs,
-            Ok(FindContentInfo::Content{ content: _, utp_transfer: _ }) => panic!("Error: Unexpected FINDCONTENT response: expected Enrs instead got Content"),
+            Ok(FindContentInfo::Content{ .. }) => panic!("Error: Unexpected FINDCONTENT response: expected Enrs instead got Content"),
             Err(err) => panic!("Error: Unable to get response from FINDCONTENT request: {err:?}"),
         };
 
