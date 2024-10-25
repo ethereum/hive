@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": "fcu500",
+  "method": "engine_forkchoiceUpdatedV3",
+  "params": [
+    {
+      "headBlockHash": "0x235909e4b6fa85b750a1e04460a5733508346bcacc7ee05a1b522bb2f8a9a5f6",
+      "safeBlockHash": "0x235909e4b6fa85b750a1e04460a5733508346bcacc7ee05a1b522bb2f8a9a5f6",
+      "finalizedBlockHash": "0x235909e4b6fa85b750a1e04460a5733508346bcacc7ee05a1b522bb2f8a9a5f6"
+    },
+    null
+  ]
+}

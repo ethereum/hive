@@ -21,6 +21,6 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=geth-builder /go-ethereum/devp2p ./devp2p
-COPY --from=geth-builder /go-ethereum/cmd/devp2p/internal/ethtest/testdata /testchain
+COPY --from=sim-builder /source/testdata /testchain
 COPY --from=sim-builder /source/devp2p-simulator .
 ENTRYPOINT ["./devp2p-simulator"]
