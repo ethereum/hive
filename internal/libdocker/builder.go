@@ -52,7 +52,7 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 }
 
 // BuildSimulatorImage builds a docker image of a simulator.
-func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string, error) {
+func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArgs []docker.BuildArg) (string, error) {
 	dir := b.config.Inventory.SimulatorDirectory(name)
 	buildContextPath := dir
 	buildDockerfile := "Dockerfile"
@@ -69,7 +69,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 		}
 	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, nil)
+	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, buildArgs)
 	return tag, err
 }
 

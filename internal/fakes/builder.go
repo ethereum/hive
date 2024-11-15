@@ -5,12 +5,13 @@ import (
 	"io/fs"
 
 	"github.com/ethereum/hive/internal/libhive"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 // BuilderHooks can be used to override the behavior of the fake builder.
 type BuilderHooks struct {
 	BuildClientImage    func(context.Context, libhive.ClientDesignator) (string, error)
-	BuildSimulatorImage func(context.Context, string) (string, error)
+	BuildSimulatorImage func(context.Context, string, []docker.BuildArg) (string, error)
 	ReadFile            func(ctx context.Context, image string, file string) ([]byte, error)
 }
 
@@ -35,9 +36,9 @@ func (b *fakeBuilder) BuildClientImage(ctx context.Context, client libhive.Clien
 	return "fakebuild/client/" + client.Client + ":latest", nil
 }
 
-func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string) (string, error) {
+func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string, buildArgs []docker.BuildArg) (string, error) {
 	if b.hooks.BuildSimulatorImage != nil {
-		return b.hooks.BuildSimulatorImage(ctx, sim)
+		return b.hooks.BuildSimulatorImage(ctx, sim, buildArgs)
 	}
 	return "fakebuild/simulator/" + sim + ":latest", nil
 }

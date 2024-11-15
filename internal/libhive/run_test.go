@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/internal/fakes"
 	"github.com/ethereum/hive/internal/libhive"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 func TestRunner(t *testing.T) {
@@ -48,7 +49,12 @@ func TestRunner(t *testing.T) {
 		simOpt  = libhive.SimEnv{LogDir: t.TempDir(), ClientList: simClients}
 		ctx     = context.Background()
 	)
-	if err := runner.Build(ctx, allClients, simList); err != nil {
+	if err := runner.Build(ctx, allClients, simList, []docker.BuildArg{
+		{
+			Name:  "SomeArg",
+			Value: "SomeValue",
+		},
+	}); err != nil {
 		t.Fatal("Build() failed:", err)
 	}
 	if _, err := runner.Run(context.Background(), "sim-1", simOpt); err != nil {
