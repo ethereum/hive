@@ -68,12 +68,7 @@ fi
 # Load the remainder of the test chain
 if [ -d /blocks ]; then
     echo "Loading remaining individual blocks..."
-    for file in $(ls /blocks | sort -n); do
-        echo "Importing " $file
-        FLAGS="$FLAGS --import_dir /blocks"
-
-        # $ethereum_rust import $FLAGS /blocks/$file
-    done
+    FLAGS="$FLAGS --import_dir /blocks"
 else
     echo "Warning: blocks folder not found."
 fi
