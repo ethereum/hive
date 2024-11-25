@@ -6,10 +6,10 @@ set -ex
 # no ansi colors
 export RUST_LOG_STYLE=never
 
-ethereum_rust=./ethereum_rust
+ethrex=./ethrex
 
 # Create the data directory.
-# DATADIR="/ethereum-rust-hive-datadir"
+# DATADIR="/ethrex-hive-datadir"
 # mkdir $DATADIR
 # FLAGS="$FLAGS --datadir $DATADIR"
 
@@ -49,7 +49,7 @@ echo $FLAGS
 
 # Initialize the local testchain with the genesis state
 # echo "Initializing database with genesis state..."
-# $ethereum_rust init $FLAGS --chain /genesis.json
+# $ethrex init $FLAGS --chain /genesis.json
 FLAGS="$FLAGS --network /genesis.json"
 
 # Don't immediately abort, some imports are meant to fail
@@ -60,7 +60,7 @@ echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     echo "Importing chain.rlp..."
     FLAGS="$FLAGS --import /chain.rlp"
-    # $ethereum_rust import $FLAGS /chain.rlp
+    # $ethrex import $FLAGS /chain.rlp
 else
     echo "Warning: chain.rlp not found."
 fi
@@ -110,5 +110,5 @@ fi
 # FLAGS="$FLAGS --nat none"
 
 # Launch the main client.
-echo "Running ethereum_rust with flags: $FLAGS"
-RUST_LOG=info $ethereum_rust $FLAGS
+echo "Running ethrex with flags: $FLAGS"
+RUST_LOG=info $ethrex $FLAGS
