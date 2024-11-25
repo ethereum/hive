@@ -75,9 +75,9 @@ fi
 
 # Only set boot nodes in online steps
 # It doesn't make sense to dial out, use only a pre-set bootnode.
-# if [ "$HIVE_BOOTNODE" != "" ]; then
-#     FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
-# fi
+if [ "$HIVE_BOOTNODE" != "" ]; then
+    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+fi
 
 # Configure any mining operation
 if [ "$HIVE_MINER" != "" ]; then
