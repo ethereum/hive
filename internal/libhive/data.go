@@ -22,11 +22,12 @@ func (tsID TestID) String() string {
 
 // TestSuite is a single run of a simulator, a collection of testcases.
 type TestSuite struct {
-	ID             TestSuiteID          `json:"id"`
-	Name           string               `json:"name"`
-	Description    string               `json:"description"`
-	ClientVersions map[string]string    `json:"clientVersions"`
-	TestCases      map[TestID]*TestCase `json:"testCases"`
+	ID                TestSuiteID          `json:"id"`
+	Name              string               `json:"name"`
+	Description       string               `json:"description"`
+	ClientVersions    map[string]string    `json:"clientVersions"`
+	SimulatorsVersion *string              `json:"simulatorsVersion,omitempty"`
+	TestCases         map[TestID]*TestCase `json:"testCases"`
 
 	SimulatorLog   string `json:"simLog"`         // path to simulator log-file simulator. (may be shared with multiple suites)
 	TestDetailsLog string `json:"testDetailsLog"` // the test details output file
@@ -74,9 +75,10 @@ type ClientInfo struct {
 
 // HiveInstance contains information about hive itself.
 type HiveInstance struct {
-	SourceCommit string `json:"sourceCommit"`
-	SourceDate   string `json:"sourceDate"`
-	BuildDate    string `json:"buildDate"`
+	SourceCommit      string  `json:"sourceCommit"`
+	SourceDate        string  `json:"sourceDate"`
+	BuildDate         string  `json:"buildDate"`
+	SimulatorsVersion *string `json:"simulatorsVersion,omitempty"`
 }
 
 // ClientDefinition is served by the /clients API endpoint to list the available clients
