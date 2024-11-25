@@ -1,6 +1,8 @@
 ;;; -*- mode: asm -*-
 ;;; This contract returns EVM environment data.
 
+#pragma target "london"
+
 #define %store {                ; [value, ptr]
     dup2                        ; [ptr, value, ptr]
     mstore                      ; [ptr]
@@ -8,7 +10,6 @@
     add                         ; [newptr]
 }
 
-.start:
     push 0                      ; [ptr]
 
     number                      ; [v, ptr]

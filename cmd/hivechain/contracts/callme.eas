@@ -2,19 +2,11 @@
 ;;; This contract returns value `theOutput` if calldata is exactly equal to `theInput`.
 ;;; Otherwise, reverts with an error message.
 
-#define theInput 0xff01
-#define theOutput 0xffee
+#pragma target "constantinople"
 
-#define %revert(error) {        ; []
-    push $error                 ; [value]
-    push 0                      ; [offset, value]
-    mstore                      ; []
-    push .bytelen($error)       ; [size]
-    push 32-.bytelen($error)    ; [offset, size]
-    revert
-}
+#define theInput  = 0xff01
+#define theOutput = 0xffee
 
-.start:
     calldatasize                ; [size]
     push .bytelen(theInput)     ; [exp, iszero]
     eq                          ; [size==exp]
@@ -38,3 +30,13 @@ return:
     push .bytelen(theOutput)    ; [size]
     push 32-.bytelen(theInput)  ; [offset, size]
     return                      ; []
+
+
+#define %revert(error) {        ; []
+    push $error                 ; [value]
+    push 0                      ; [offset, value]
+    mstore                      ; []
+    push .bytelen($error)       ; [size]
+    push 32-.bytelen($error)    ; [offset, size]
+    revert
+}

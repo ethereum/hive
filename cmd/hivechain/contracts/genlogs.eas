@@ -1,9 +1,10 @@
 ;;; -*- mode: asm -*-
 ;;; creates random logs until less than 10k gas remaining.
 
+#pragma target "frontier"
+
 #include "rng.eas"
 
-.start:
     %RngInit(0)                 ; []
 
 genlogs:

@@ -1,15 +1,16 @@
 ;;; -*- mode: asm -*-
 ;;; creates a contract with code based on block number.
 
+#pragma target "frontier"
+
 #include "rng.eas"
 
-#define outputSize 256
+#define outputSize = 256
 
-#define p_rng        0
-#define p_output     p_rng + RngSize
-#define p_outputEnd  p_output + outputSize
+#define p_rng        = 0
+#define p_output     = p_rng + RngSize
+#define p_outputEnd  = p_output + outputSize
 
-.start:
     %RngInit(p_rng)             ; []
 
     ;; loop to create the code using rng

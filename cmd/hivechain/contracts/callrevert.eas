@@ -2,8 +2,9 @@
 ;;; This contract is for testing two common Solidity revert encodings:
 ;;; Panic(uint) and Error(string).
 
+#pragma target "constantinople"
+
 ;;; Dispatch
-.start:
     push 0                      ; [offset]
     calldataload                ; [word]
 
@@ -13,15 +14,14 @@
     jumpi @error                ; [word]
 
 
-#define s_panic .selector("Panic(uint256)")
-#define panicv 0x01 ;; == assert(false)
-
 ;;; Solidity ABI `Panic(17)`
 ;;; Revert data layout:
 ;;;
 ;;;     selector :: 4  ||  value :: 32
 ;;;
-.panic:
+#define s_panic = .selector("Panic(uint256)")
+#define panicv = 0x01 ;; == assert(false)
+
     push s_panic << (28*8)      ; [sel]
     push 0                      ; [offset, sel]
     mstore                      ; []
@@ -34,15 +34,15 @@
     revert                      ; []
 
 
-#define s_error .selector("Error(string)")
-#define errmsg "user error"
-#define errmsg_word errmsg << (255-.bitlen(errmsg))
-
 ;;; Solidity ABI `Error(string)`
 ;;; Revert data layout:
 ;;;
 ;;;     selector :: 4  ||  0x20 :: 32  ||  len :: 32  ||  data :: len
 ;;;
+#define s_error = .selector("Error(string)")
+#define errmsg = "user error"
+#define errmsg_word = errmsg << 255-.bitlen(errmsg)
+
 error:
     push s_error << (28*8)      ; [sel]
     push 0                      ; [offset, sel]
