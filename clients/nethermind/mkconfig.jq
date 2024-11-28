@@ -84,7 +84,6 @@ def txpool_config:
 def base_config:
   {
     "Init": {
-      "PubSubEnabled": true,
       "WebSocketsEnabled": true,
       "IsMining": (env.HIVE_MINER != null),
       "UseMemDb": true,
