@@ -2,7 +2,7 @@
 ### Requires a copy of nethermind/ -> hive/clients/nethermind/
 
 ## Builder stage: Compiles nethermind from a local directory
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 
 # Default local client path: clients/nethermind/<nethermind>
 ARG local_path=nethermind
@@ -11,7 +11,7 @@ ADD $local_path /nethermind
 RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
 
 ## Final stage: Sets up the environment for running nethermind
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
@@ -36,5 +36,5 @@ RUN chmod +x /nethermind.sh /hive-bin/enode.sh
 # Expose networking ports
 EXPOSE 8545 30303 30303/udp
 
-ENV NETHERMIND_HIVE_ENABLED true
+ENV NETHERMIND_HIVECONFIG_ENABLED true
 ENTRYPOINT ["/nethermind.sh"]
