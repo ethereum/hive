@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,27 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 	"gopkg.in/inconshreveable/log15.v2"
 )
+
+type buildArgs map[string]string
+
+func (args *buildArgs) String() string {
+	var kv []string
+	for k, v := range *args {
+		kv = append(kv, k+"="+v)
+	}
+	sort.Strings(kv)
+	return strings.Join(kv, ",")
+}
+
+// Set implements flag.Value.
+func (args *buildArgs) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return errors.New("invalid build argument format, expected ARG=VALUE")
+	}
+	(*args)[parts[0]] = parts[1]
+	return nil
+}
 
 func main() {
 	var (
@@ -48,6 +70,10 @@ func main() {
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
 	)
+
+	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
+	var simBuildArgs buildArgs
+	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
 
 	// Parse the flags and configure the logger.
 	flag.Parse()
@@ -138,7 +164,7 @@ func main() {
 	}
 
 	// Build clients and simulators.
-	if err := runner.Build(ctx, clientList, simList); err != nil {
+	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {

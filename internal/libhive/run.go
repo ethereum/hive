@@ -42,14 +42,14 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 }
 
 // Build builds client and simulator images.
-func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string) error {
+func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string, simBuildArgs map[string]string) error {
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
 	if err := r.buildClients(ctx, clientList); err != nil {
 		return err
 	}
-	return r.buildSimulators(ctx, simList)
+	return r.buildSimulators(ctx, simList, simBuildArgs)
 }
 
 // buildClients builds client images.
@@ -86,12 +86,12 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 }
 
 // buildSimulators builds simulator images.
-func (r *Runner) buildSimulators(ctx context.Context, simList []string) error {
+func (r *Runner) buildSimulators(ctx context.Context, simList []string, buildArgs map[string]string) error {
 	r.simImages = make(map[string]string)
 
 	log15.Info(fmt.Sprintf("building %d simulators...", len(simList)))
 	for _, sim := range simList {
-		image, err := r.builder.BuildSimulatorImage(ctx, sim)
+		image, err := r.builder.BuildSimulatorImage(ctx, sim, buildArgs)
 		if err != nil {
 			return err
 		}
