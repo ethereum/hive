@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -42,20 +43,16 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 	dir := b.config.Inventory.ClientDirectory(client)
 	tag := fmt.Sprintf("hive/clients/%s:latest", client.Name())
 	dockerFile := client.Dockerfile()
-	buildArgs := make([]docker.BuildArg, 0)
-	for key, value := range client.BuildArgs {
-		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
-	}
-
-	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs)
+	err := b.buildImage(ctx, dir, dockerFile, tag, client.BuildArgs)
 	return tag, err
 }
 
 // BuildSimulatorImage builds a docker image of a simulator.
-func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArgs []docker.BuildArg) (string, error) {
+func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArgs map[string]string) (string, error) {
 	dir := b.config.Inventory.SimulatorDirectory(name)
 	buildContextPath := dir
 	buildDockerfile := "Dockerfile"
+
 	// build context dir of simulator can be overridden with "hive_context.txt" file containing the desired build path
 	if contextPathBytes, err := os.ReadFile(filepath.Join(filepath.FromSlash(dir), "hive_context.txt")); err == nil {
 		buildContextPath = filepath.Join(dir, strings.TrimSpace(string(contextPathBytes)))
@@ -213,7 +210,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
-func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs []docker.BuildArg) error {
+func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs map[string]string) error {
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
@@ -226,10 +223,11 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageT
 	opts.Dockerfile = dockerFile
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
 	if len(buildArgs) > 0 {
-		for _, arg := range buildArgs {
+		args := convertBuildArgs(buildArgs)
+		for _, arg := range args {
 			logctx = append(logctx, arg.Name, arg.Value)
 		}
-		opts.BuildArgs = buildArgs
+		opts.BuildArgs = args
 	}
 
 	logger.Info("building image", logctx...)
@@ -238,4 +236,15 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageT
 		return err
 	}
 	return nil
+}
+
+func convertBuildArgs(m map[string]string) []docker.BuildArg {
+	args := make([]docker.BuildArg, 0, len(m))
+	for key, value := range m {
+		args = append(args, docker.BuildArg{Name: key, Value: value})
+	}
+	slices.SortFunc(args, func(a, b docker.BuildArg) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return args
 }

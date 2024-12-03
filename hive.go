@@ -8,29 +8,33 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-type buildArgs []docker.BuildArg
+type buildArgs map[string]string
 
-func (i *buildArgs) String() string {
-	return fmt.Sprintf("%v", *i)
+func (args *buildArgs) String() string {
+	var kv []string
+	for k, v := range *args {
+		kv = append(kv, k+"="+v)
+	}
+	sort.Strings(kv)
+	return strings.Join(kv, ",")
 }
 
-// Set a single docker build argument that is parsed from the command line.
-func (i *buildArgs) Set(value string) error {
+// Set implements flag.Value.
+func (args *buildArgs) Set(value string) error {
 	parts := strings.SplitN(value, "=", 2)
 	if len(parts) != 2 {
 		return errors.New("invalid build argument format, expected ARG=VALUE")
 	}
-	arg := docker.BuildArg{Name: parts[0], Value: parts[1]}
-	*i = append(*i, arg)
+	(*args)[parts[0]] = parts[1]
 	return nil
 }
 
