@@ -3,6 +3,7 @@ package libhive
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,7 +12,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -141,7 +141,7 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		case strings.HasPrefix(file, "Dockerfile."):
 			client, ok := clients[clientName]
 			if !ok {
-				log15.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
+				slog.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
 				return nil
 			}
 			client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
@@ -149,7 +149,7 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		case file == "hive.yaml":
 			client, ok := clients[clientName]
 			if !ok {
-				log15.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
+				slog.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
 				return nil
 			}
 			md, err := loadClientMetadata(path)
@@ -333,7 +333,7 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 		// Check build arguments.
 		for key := range c.BuildArgs {
 			if _, ok := knownBuildArgs[key]; !ok {
-				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
+				slog.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
 			}
 		}
 		clientTags[c.Client] = clientTags[c.Client].add(c.BuildArgs["tag"])
