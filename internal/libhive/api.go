@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/ethereum/hive/internal/simapi"
 	"github.com/gorilla/mux"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // hiveEnvvarPrefix is the prefix of the environment variables names that should
@@ -77,10 +77,10 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 
 	suiteID, err := api.tm.StartTestSuite(suite.Name, suite.Description)
 	if err != nil {
-		log15.Error("API: StartTestSuite failed", "error", err)
+		slog.Error("API: StartTestSuite failed", "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 	}
-	log15.Info("API: suite started", "suite", suiteID, "name", suite.Name)
+	slog.Info("API: suite started", "suite", suiteID, "name", suite.Name)
 	serveJSON(w, suiteID)
 }
 
@@ -92,11 +92,11 @@ func (api *simAPI) endSuite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := api.tm.EndTestSuite(suiteID); err != nil {
-		log15.Error("API: EndTestSuite failed", "suite", suiteID, "error", err)
+		slog.Error("API: EndTestSuite failed", "suite", suiteID, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: suite ended", "suite", suiteID)
+	slog.Info("API: suite ended", "suite", suiteID)
 	serveOK(w)
 }
 
@@ -123,7 +123,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: test started", "suite", suiteID, "test", testID, "name", test.Name)
+	slog.Info("API: test started", "suite", suiteID, "test", testID, "name", test.Name)
 	serveJSON(w, testID)
 }
 
@@ -138,7 +138,7 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 
 	var result TestResult
 	if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
-		log15.Error("API: invalid result data in endTest", "suite", suiteID, "test", testID, "error", err)
+		slog.Error("API: invalid result data in endTest", "suite", suiteID, "test", testID, "error", err)
 		err := fmt.Errorf("can't unmarshal result: %v", err)
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -146,13 +146,13 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 
 	err = api.tm.EndTest(suiteID, testID, &result)
 	if err != nil {
-		log15.Error("API: EndTest failed", "suite", suiteID, "test", testID, "error", err)
+		slog.Error("API: EndTest failed", "suite", suiteID, "test", testID, "error", err)
 		err := fmt.Errorf("can't end test case: %v", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	log15.Info("API: test ended", "suite", suiteID, "test", testID, "pass", result.Pass)
+	slog.Info("API: test ended", "suite", suiteID, "test", testID, "pass", result.Pass)
 	serveOK(w)
 }
 
@@ -167,7 +167,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Client launch parameters are given as multipart/form-data.
 	const maxMemory = 8 * 1024 * 1024
 	if err := r.ParseMultipartForm(maxMemory); err != nil {
-		log15.Error("API: could not parse node request", "error", err)
+		slog.Error("API: could not parse node request", "error", err)
 		err := fmt.Errorf("could not parse node request")
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -175,14 +175,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	defer r.MultipartForm.RemoveAll()
 
 	if !r.Form.Has("config") {
-		log15.Error("API: missing 'config' parameter in node request", "error", err)
+		slog.Error("API: missing 'config' parameter in node request", "error", err)
 		err := fmt.Errorf("missing 'config' parameter in node request")
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	var clientConfig simapi.NodeConfig
 	if err := json.Unmarshal([]byte(r.Form.Get("config")), &clientConfig); err != nil {
-		log15.Error("API: invalid 'config' parameter in node request", "error", err)
+		slog.Error("API: invalid 'config' parameter in node request", "error", err)
 		err := fmt.Errorf("invalid 'config' parameter in node request")
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -191,14 +191,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Get the client name.
 	clientDef, err := api.checkClient(&clientConfig)
 	if err != nil {
-		log15.Error("API: " + err.Error())
+		slog.Error("API: " + err.Error())
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	// Get the network names, if any, for the container to be connected to at start.
 	networks, err := api.checkClientNetworks(&clientConfig, suiteID)
 	if err != nil {
-		log15.Error("API: "+err.Error(), "client", clientDef.Name)
+		slog.Error("API: "+err.Error(), "client", clientDef.Name)
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
@@ -242,7 +242,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	options := ContainerOptions{Env: env, Files: files}
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
-		log15.Error("API: client container create failed", "client", clientDef.Name, "error", err)
+		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
 		err := fmt.Errorf("client container create failed (%v)", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
@@ -256,7 +256,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Connect to the networks if requested, so it is started already joined to each one.
 	for _, network := range networks {
 		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
-			log15.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+			slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
 			serveError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -267,7 +267,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
 		v, err := strconv.ParseUint(portStr, 10, 16)
 		if err != nil {
-			log15.Error("API: could not parse check-live port", "error", err)
+			slog.Error("API: could not parse check-live port", "error", err)
 			serveError(w, err, http.StatusBadRequest)
 			return
 		}
@@ -298,14 +298,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		log15.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
+		slog.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
 		err := fmt.Errorf("client did not start: %v", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	// It's started.
-	log15.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+	slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
 	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
 }
 
@@ -413,7 +413,7 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 	node := mux.Vars(r)["node"]
 	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
 	if err != nil {
-		log15.Error("API: can't find node", "node", node, "error", err)
+		slog.Error("API: can't find node", "node", node, "error", err)
 		serveError(w, err, http.StatusNotFound)
 		return
 	}
@@ -431,7 +431,7 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 	node := mux.Vars(r)["node"]
 	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
 	if err != nil {
-		log15.Error("API: can't find node", "node", node, "error", err)
+		slog.Error("API: can't find node", "node", node, "error", err)
 		serveError(w, err, http.StatusNotFound)
 		return
 	}
@@ -439,13 +439,13 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 	// Parse and validate the exec request.
 	commandline, err := parseExecRequest(r.Body)
 	if err != nil {
-		log15.Error("API: invalid exec request", "node", node, "error", err)
+		slog.Error("API: invalid exec request", "node", node, "error", err)
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
 	if err != nil {
-		log15.Error("API: client script exec error", "node", node, "error", err)
+		slog.Error("API: client script exec error", "node", node, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -480,11 +480,11 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 	networkName := mux.Vars(r)["network"]
 	err = api.tm.CreateNetwork(suiteID, networkName)
 	if err != nil {
-		log15.Error("API: failed to create network", "network", networkName, "error", err)
+		slog.Error("API: failed to create network", "network", networkName, "error", err)
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
-	log15.Info("API: network created", "name", networkName)
+	slog.Info("API: network created", "name", networkName)
 	serveOK(w)
 }
 
@@ -499,11 +499,11 @@ func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
 	network := mux.Vars(r)["network"]
 	err = api.tm.RemoveNetwork(suiteID, network)
 	if err != nil {
-		log15.Error("API: failed to remove network", "network", network, "error", err)
+		slog.Error("API: failed to remove network", "network", network, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: docker network removed", "network", network)
+	slog.Info("API: docker network removed", "network", network)
 	serveOK(w)
 }
 
@@ -519,11 +519,11 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	network := mux.Vars(r)["network"]
 	ipAddr, err := api.tm.ContainerIP(suiteID, network, node)
 	if err != nil {
-		log15.Error("API: failed to get container IP", "container", node, "error", err)
+		slog.Error("API: failed to get container IP", "container", node, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: container IP requested", "network", network, "container", node, "ip", ipAddr)
+	slog.Info("API: container IP requested", "network", network, "container", node, "ip", ipAddr)
 	serveJSON(w, ipAddr)
 }
 
@@ -538,11 +538,11 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
 	if err := api.tm.ConnectContainer(suiteID, name, containerID); err != nil {
-		log15.Error("API: failed to connect container", "network", name, "container", containerID, "error", err)
+		slog.Error("API: failed to connect container", "network", name, "container", containerID, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: container connected to network", "network", name, "container", containerID)
+	slog.Info("API: container connected to network", "network", name, "container", containerID)
 	serveOK(w)
 }
 
@@ -557,11 +557,11 @@ func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 	network := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
 	if err := api.tm.DisconnectContainer(suiteID, network, containerID); err != nil {
-		log15.Error("API: disconnecting container failed", "network", network, "container", containerID, "error", err)
+		slog.Error("API: disconnecting container failed", "network", network, "container", containerID, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: container disconnected", "network", network, "container", containerID)
+	slog.Info("API: container disconnected", "network", network, "container", containerID)
 	serveOK(w)
 }
 
@@ -610,7 +610,7 @@ func (api *simAPI) requestSuiteAndTest(r *http.Request) (TestSuiteID, TestID, er
 func serveJSON(w http.ResponseWriter, value interface{}) {
 	resp, err := json.Marshal(value)
 	if err != nil {
-		log15.Error("API: internal error while encoding response", "error", err)
+		slog.Error("API: internal error while encoding response", "error", err)
 		serveError(w, errors.New("internal error"), http.StatusInternalServerError)
 		return
 	}

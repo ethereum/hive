@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,14 +15,13 @@ import (
 
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // Builder takes care of building docker images.
 type Builder struct {
 	client        *docker.Client
 	config        *Config
-	logger        log15.Logger
+	logger        *slog.Logger
 	authenticator Authenticator
 }
 
@@ -33,7 +33,7 @@ func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder
 		authenticator: auth,
 	}
 	if b.logger == nil {
-		b.logger = log15.Root()
+		b.logger = slog.Default()
 	}
 	return b
 }
@@ -211,7 +211,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
 func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs map[string]string) error {
-	logger := b.logger.New("image", imageTag)
+	logger := b.logger.With("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
 		logger.Error("can't find path to context directory", "err", err)

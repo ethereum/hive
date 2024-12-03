@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -13,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 var (
@@ -61,7 +60,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 	r.clientDefs = make([]*ClientDefinition, 0, len(clientList))
 
 	var anyBuilt bool
-	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
+	slog.Info(fmt.Sprintf("building %d clients...", len(clientList)))
 	for _, client := range clientList {
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
@@ -70,7 +69,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		anyBuilt = true
 		version, err := r.builder.ReadFile(ctx, image, "/version.txt")
 		if err != nil {
-			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
+			slog.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
 		r.clientDefs = append(r.clientDefs, &ClientDefinition{
 			Name:    client.Name(),
@@ -89,7 +88,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 func (r *Runner) buildSimulators(ctx context.Context, simList []string, buildArgs map[string]string) error {
 	r.simImages = make(map[string]string)
 
-	log15.Info(fmt.Sprintf("building %d simulators...", len(simList)))
+	slog.Info(fmt.Sprintf("building %d simulators...", len(simList)))
 	for _, sim := range simList {
 		image, err := r.builder.BuildSimulatorImage(ctx, sim, buildArgs)
 		if err != nil {
@@ -124,22 +123,22 @@ func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) er
 	tm := NewTestManager(env, r.container, clientDefs)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
+			slog.Error("could not terminate test manager", "error", err)
 		}
 	}()
 
-	log15.Debug("starting simulator API proxy")
+	slog.Debug("starting simulator API proxy")
 	proxy, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
-		log15.Error("can't start proxy", "err", err)
+		slog.Error("can't start proxy", "err", err)
 		return err
 	}
 	defer shutdownServer(proxy)
 
-	log15.Debug("starting local API server")
+	slog.Debug("starting local API server")
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
-		log15.Error("can't start TCP server", "err", err)
+		slog.Error("can't start TCP server", "err", err)
 		return err
 	}
 	httpsrv := &http.Server{Handler: tm.API()}
@@ -160,7 +159,7 @@ HIVE_SIMULATOR=http://%v
 
 // run runs one simulation.
 func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
-	log15.Info(fmt.Sprintf("running simulation: %s", sim))
+	slog.Info(fmt.Sprintf("running simulation: %s", sim))
 
 	clientDefs := make([]*ClientDefinition, 0)
 	if env.ClientList == nil {
@@ -186,14 +185,14 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 	tm := NewTestManager(env, r.container, clientDefs)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
+			slog.Error("could not terminate test manager", "error", err)
 		}
 	}()
 
-	log15.Debug("starting simulator API server")
+	slog.Debug("starting simulator API server")
 	server, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
-		log15.Error("can't start API server", "err", err)
+		slog.Error("can't start API server", "err", err)
 		return SimResult{}, err
 	}
 	defer shutdownServer(server)
@@ -218,12 +217,12 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 	opts.LogFile = filepath.Join(env.LogDir, logbasename)
 	tm.SetSimContainerInfo(containerID, logbasename)
 
-	log15.Debug("starting simulator container")
+	slog.Debug("starting simulator container")
 	sc, err := r.container.StartContainer(ctx, containerID, opts)
 	if err != nil {
 		return SimResult{}, err
 	}
-	slogger := log15.New("sim", sim, "container", sc.ID[:8])
+	slogger := slog.With("sim", sim, "container", sc.ID[:8])
 	slogger.Debug("started simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
@@ -278,9 +277,9 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 
 // shutdownServer gracefully terminates the HTTP server.
 func shutdownServer(server APIServer) {
-	log15.Debug("terminating simulator API server")
+	slog.Debug("terminating simulator API server")
 	if err := server.Close(); err != nil {
-		log15.Debug("API server shutdown failed", "err", err)
+		slog.Debug("API server shutdown failed", "err", err)
 	}
 }
 
@@ -289,10 +288,10 @@ func createWorkspace(logdir string) error {
 	stat, err := os.Stat(logdir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log15.Info("creating output directory", "folder", logdir)
+			slog.Info("creating output directory", "folder", logdir)
 			err = os.MkdirAll(logdir, 0755)
 			if err != nil {
-				log15.Crit("failed to create output directory", "err", err)
+				slog.Error("failed to create output directory", "err", err)
 			}
 		}
 		return err
@@ -314,7 +313,7 @@ func writeInstanceInfo(logdir string) {
 	enc, _ := json.Marshal(&obj)
 	err := os.WriteFile(filepath.Join(logdir, "hive.json"), enc, 0644)
 	if err != nil {
-		log15.Warn("can't write hive.json", "err", err)
+		slog.Warn("can't write hive.json", "err", err)
 	}
 }
 

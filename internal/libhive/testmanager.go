@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 var (
@@ -230,7 +229,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	var errs []error
 	for name := range manager.networks[testSuite] {
-		log15.Info("removing docker network", "name", name)
+		slog.Info("removing docker network", "name", name)
 		if err := manager.RemoveNetwork(testSuite, name); err != nil {
 			errs = append(errs, err)
 		}
@@ -361,7 +360,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	// remove the test suite's left-over docker networks.
 	if errs := manager.PruneNetworks(testSuite); len(errs) > 0 {
 		for _, err := range errs {
-			log15.Error("could not remove network", "err", err)
+			slog.Error("could not remove network", "err", err)
 		}
 	}
 	// Move the suite to results.
@@ -489,7 +488,7 @@ func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCas
 	suite.testLogOffset += int64(n)
 
 	if err != nil {
-		log15.Error("could not write details file", "err", err)
+		slog.Error("could not write details file", "err", err)
 		// Write was incomplete, so play it safe with the offsets.
 		offsets.Begin = begin
 		offsets.End = begin + int64(n)

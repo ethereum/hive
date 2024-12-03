@@ -3,11 +3,11 @@ package libdocker
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
 
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const apiVersion = "1.25"
@@ -16,7 +16,7 @@ const apiVersion = "1.25"
 type Config struct {
 	Inventory libhive.Inventory
 
-	Logger log15.Logger
+	Logger *slog.Logger
 
 	// When building containers, any client or simulator image build matching the pattern
 	// will avoid the docker cache.
@@ -36,7 +36,7 @@ type Config struct {
 func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, error) {
 	logger := cfg.Logger
 	if logger == nil {
-		logger = log15.Root()
+		logger = slog.Default()
 	}
 	var client *docker.Client
 	var err error
