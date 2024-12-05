@@ -73,7 +73,7 @@ func main() {
 	)
 
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
-	var simBuildArgs buildArgs
+	simBuildArgs := make(buildArgs)
 	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
 
 	// Parse the flags and configure the logger.
