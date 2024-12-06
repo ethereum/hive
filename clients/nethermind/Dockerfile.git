@@ -1,7 +1,7 @@
 ### Build Nethermind From Git:
 
 ## Builder stage: Compiles nethermind from a git repository
-FROM mcr.microsoft.com/dotnet/sdk:9.0-jammy AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS build
 
 ARG github=nethermindeth/nethermind
 ARG tag=master
