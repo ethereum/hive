@@ -152,7 +152,7 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 	cacheconfig := core.DefaultCacheConfigWithScheme("hash")
 	cacheconfig.Preimages = true
 	vmconfig := vm.Config{EnablePreimageRecording: true}
-	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil, nil)
+	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("can't create blockchain: %v", err)
 	}
