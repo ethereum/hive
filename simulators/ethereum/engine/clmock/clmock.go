@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
-	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -111,7 +109,6 @@ type CLMocker struct {
 
 	// Merge related
 	FirstPoSBlockNumber             *big.Int
-	TTDReached                      bool
 	TransitionPayloadTimestamp      *big.Int
 	SafeSlotsToImportOptimistically *big.Int
 	ChainTotalDifficulty            *big.Int
@@ -148,18 +145,16 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkCon
 		LatestHeader:        nil,
 		FirstPoSBlockNumber: nil,
 		LatestHeadNumber:    nil,
-		TTDReached:          false,
 		NextFeeRecipient:    common.Address{},
 		LatestForkchoice: api.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
-		ChainTotalDifficulty: genesis.Difficulty,
-		ForkConfig:           forkConfig,
-		Genesis:              genesis,
-		TestContext:          context.Background(),
-		Rand:                 randSource,
+		ForkConfig:  forkConfig,
+		Genesis:     genesis,
+		TestContext: context.Background(),
+		Rand:        randSource,
 	}
 
 	// Create header history
@@ -262,7 +257,7 @@ func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumb
 }
 
 // Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
-func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
+func (cl *CLMocker) InitChain(ec client.EngineClient) {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
@@ -273,21 +268,9 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	}
 	cl.HeaderHistory[cl.LatestHeader.Number.Uint64()] = cl.LatestHeader
 
-	ctx, cancel = context.WithTimeout(cl.TestContext, globals.RPCTimeout)
-	defer cancel()
-
-	if td, err := ec.GetTotalDifficulty(ctx); err != nil {
-		cl.Fatalf("CLMocker: Error getting total difficulty from engine client: %v", err)
-	} else if td.Cmp(ec.TerminalTotalDifficulty()) < 0 {
-		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %d > %d", ec.TerminalTotalDifficulty(), td)
-	} else {
-		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, td, ec.TerminalTotalDifficulty())
-		jsH, _ := json.MarshalIndent(cl.LatestHeader, "", " ")
-		cl.Logf("CLMocker: Client: %s, Block %d: %s\n", ec.ID(), cl.LatestHeader.Number, jsH)
-		cl.ChainTotalDifficulty = td
+	if cl.LatestHeader.Difficulty.Sign() != 0 {
+		cl.Fatalf("CLMocker: invalid difficulty on latest header: %d", cl.LatestHeader.Difficulty)
 	}
-
-	cl.TTDReached = true
 
 	// Reset transition values
 	cl.LatestHeadNumber = cl.LatestHeader.Number
@@ -297,18 +280,6 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	// Prepare initial forkchoice, to be sent to the transition payload producer
 	cl.LatestForkchoice = api.ForkchoiceStateV1{}
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestHeader.Hash()
-
-}
-
-// This method waits for TTD in at least one of the clients, then sends the
-// initial forkchoiceUpdated with the info obtained from the client.
-func (cl *CLMocker) WaitForTTD() {
-	ec, err := helper.WaitAnyClientForTTD(cl.EngineClients, cl.TestContext)
-	if ec == nil || err != nil {
-		cl.Fatalf("CLMocker: Error while waiting for TTD: %v", err)
-	}
-	// One of the clients has reached TTD, send the initial fcU with this client as head
-	cl.SetTTDBlockClient(ec)
 }
 
 // Check whether a block number is a PoS block
@@ -599,11 +570,6 @@ type BlockProcessCallbacks struct {
 }
 
 func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
-
-	if !cl.TTDReached {
-		cl.Fatalf("CLMocker: Attempted to create a block when the TTD had not yet been reached")
-	}
-
 	// Lock needed to ensure EngineClients is not modified mid block production
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()

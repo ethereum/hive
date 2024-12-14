@@ -49,9 +49,6 @@ func (s ForkIDSpec) GetForkConfig() *config.ForkConfig {
 }
 
 func (ft ForkIDSpec) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test if required
 	t.CLMock.ProduceBlocks(ft.ProduceBlocksBeforePeering, clmock.BlockProcessCallbacks{})
 

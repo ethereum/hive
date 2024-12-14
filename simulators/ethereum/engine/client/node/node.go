@@ -32,7 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 	"github.com/pkg/errors"
 )
@@ -53,8 +52,7 @@ type GethNodeTestConfiguration struct {
 }
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
-	ChainFile               string
-	TerminalTotalDifficulty *big.Int
+	ChainFile string
 
 	// Test specific configuration
 	Config GethNodeTestConfiguration
@@ -69,29 +67,7 @@ func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Con
 }
 
 func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
-	var (
-		ttd = s.TerminalTotalDifficulty
-		err error
-	)
-
-	if ttd == nil {
-		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
-			// Retrieve TTD from parameters
-			ttd, ok = new(big.Int).SetString(ttdStr, 10)
-			if !ok {
-				return nil, fmt.Errorf("Unable to parse TTD from parameters")
-			}
-		}
-	} else {
-		ttd = big.NewInt(helper.CalculateRealTTD(genesis, ttd.Int64()))
-		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
-	}
-
-	// Not sure if this hack works
-	genesisCopy := *genesis
-	configCopy := *genesisCopy.Config
-	configCopy.TerminalTotalDifficulty = ttd
-	genesisCopy.Config = &configCopy
+	var err error
 
 	var enodes []string
 	if bootClients != nil && len(bootClients) > 0 {
@@ -116,7 +92,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		}
 	}
 
-	g, err := newNode(s.Config, enodes, &genesisCopy)
+	g, err := newNode(s.Config, enodes, genesis)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +114,7 @@ type AccountTransactionInfo struct {
 	PreviousBlock common.Hash
 	PreviousNonce uint64
 }
+
 type GethNode struct {
 	node *node.Node
 	eth  *eth.Ethereum
@@ -146,7 +123,6 @@ type GethNode struct {
 
 	datadir    string
 	genesis    *core.Genesis
-	ttd        *big.Int
 	api        *ethcatalyst.ConsensusAPI
 	running    context.Context
 	closing    context.CancelFunc
@@ -248,7 +224,6 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		eth:          ethBackend,
 		datadir:      datadir,
 		genesis:      genesis,
-		ttd:          genesis.Config.TerminalTotalDifficulty,
 		api:          ethcatalyst.NewConsensusAPI(ethBackend),
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 		// Test related configuration
@@ -722,28 +697,6 @@ func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx 
 
 func (n *GethNode) PendingTransactionCount(ctx context.Context) (uint, error) {
 	panic("NOT IMPLEMENTED")
-}
-
-func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
-	block := n.eth.BlockChain().GetBlockByHash(hash)
-	if block == nil {
-		return big.NewInt(0), nil
-	}
-	return n.eth.BlockChain().GetTd(hash, block.NumberU64()), nil
-}
-
-func (n *GethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
-	if n.mustHeadBlock != nil {
-		return n.GetBlockTotalDifficulty(ctx, n.mustHeadBlock.Hash())
-	}
-	return n.GetBlockTotalDifficulty(ctx, n.eth.BlockChain().CurrentHeader().Hash())
-}
-
-func (n *GethNode) TerminalTotalDifficulty() *big.Int {
-	if n.ttd != nil {
-		return n.ttd
-	}
-	return n.genesis.Config.TerminalTotalDifficulty
 }
 
 func (n *GethNode) EnodeURL() (string, error) {

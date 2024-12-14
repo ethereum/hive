@@ -32,9 +32,6 @@ func (s ReExecutePayloadTest) GetName() string {
 
 // Consecutive Payload Execution: Secondary client should be able to set the forkchoiceUpdated to payloads received consecutively
 func (spec ReExecutePayloadTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// How many Payloads we are going to re-execute
 	var payloadReExecCount = 10
 
@@ -105,9 +102,6 @@ func (s InOrderPayloadExecutionTest) GetName() string {
 
 // Consecutive Payload Execution: Secondary client should be able to set the forkchoiceUpdated to payloads received consecutively
 func (spec InOrderPayloadExecutionTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Send a single block to allow sending newer transaction types on the payloads
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
@@ -232,9 +226,6 @@ func (s MultiplePayloadsExtendingCanonicalChainTest) GetName() string {
 
 // Consecutive Payload Execution: Secondary client should be able to set the forkchoiceUpdated to payloads received consecutively
 func (spec MultiplePayloadsExtendingCanonicalChainTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -337,9 +328,6 @@ func (spec NewPayloadOnSyncingClientTest) Execute(t *test.Env) {
 		}
 		t.CLMock.AddEngineClient(secondaryClient)
 	}
-
-	// Wait until TTD is reached by all clients
-	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
@@ -473,9 +461,6 @@ func (s NewPayloadWithMissingFcUTest) GetName() string {
 
 // Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
 func (spec NewPayloadWithMissingFcUTest) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Get last genesis block hash
 	genesisHash := t.TestEngine.TestHeaderByNumber(Head).Header.Hash()
 

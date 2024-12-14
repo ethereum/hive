@@ -111,10 +111,6 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 
 // Client Sync tests
 func postMergeSync(t *test.Env) {
-	// Launch another client after the PoS transition has happened in the main client.
-	// Sync should eventually happen without issues.
-	t.CLMock.WaitForTTD()
-
 	// Speed up block production
 	t.CLMock.PayloadProductionClientDelay = 0
 
@@ -162,10 +158,6 @@ func postMergeSync(t *test.Env) {
 
 // Performs a test where sync is done incrementally by sending incremental newPayload/fcU calls
 func incrementalPostMergeSync(t *test.Env) {
-	// Launch another client after the PoS transition has happened in the main client.
-	// Sync should eventually happen without issues.
-	t.CLMock.WaitForTTD()
-
 	var (
 		N uint64 = 500 // Total number of PoS blocks
 		S uint64 = 5   // Number of incremental steps to sync

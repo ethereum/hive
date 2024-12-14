@@ -41,9 +41,6 @@ func (s NonZeroPreMergeFork) GetForkConfig() *config.ForkConfig {
 }
 
 func (b NonZeroPreMergeFork) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Simply produce a couple of blocks without transactions (if London is not active at genesis
 	// we can't send type-2 transactions) and check that the chain progresses without issues
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
