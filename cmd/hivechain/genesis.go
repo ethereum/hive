@@ -1,14 +1,13 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/exp/slices"
 )
@@ -18,20 +17,15 @@ var initialBalance, _ = new(big.Int).SetString("10000000000000000000000000000000
 const (
 	genesisBaseFee = params.InitialBaseFee
 	blocktimeSec   = 10 // hard-coded in core.GenerateChain
-	cliqueEpoch    = 30000
-)
-
-var (
-	cliqueSignerKey  = knownAccounts[8].key
-	cliqueSignerAddr = crypto.PubkeyToAddress(cliqueSignerKey.PublicKey)
 )
 
 // Ethereum mainnet forks in order of introduction.
 var (
-	allForkNames = append(numberBasedForkNames, timeBasedForkNames...)
+	allForkNames = append(preMergeForkNames, posForkNames...)
 	lastFork     = allForkNames[len(allForkNames)-1]
 
-	numberBasedForkNames = []string{
+	// these are block-number based:
+	preMergeForkNames = []string{
 		"homestead",
 		"tangerinewhistle",
 		"spuriousdragon",
@@ -47,7 +41,8 @@ var (
 		"merge",
 	}
 
-	timeBasedForkNames = []string{
+	// forks after the merge are timestamp-based:
+	posForkNames = []string{
 		"shanghai",
 		"cancun",
 		"prague",
@@ -62,14 +57,7 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 	chaincfg.ChainID = chainid
 
 	// Set consensus algorithm.
-	if cfg.clique {
-		chaincfg.Clique = &params.CliqueConfig{
-			Period: blocktimeSec,
-			Epoch:  cliqueEpoch,
-		}
-	} else {
-		chaincfg.Ethash = new(params.EthashConfig)
-	}
+	chaincfg.Ethash = new(params.EthashConfig)
 
 	// Apply forks.
 	forks := cfg.forkBlocks()
@@ -105,7 +93,6 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.GrayGlacierBlock = new(big.Int).SetUint64(b)
 		case "merge":
 			chaincfg.MergeNetsplitBlock = new(big.Int).SetUint64(b)
-			chaincfg.TerminalTotalDifficultyPassed = true
 		// time-based forks
 		case "shanghai":
 			chaincfg.ShanghaiTime = &timestamp
@@ -128,9 +115,6 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 }
 
 func (cfg *generatorConfig) genesisDifficulty() *big.Int {
-	if cfg.clique {
-		return big.NewInt(1)
-	}
 	return new(big.Int).Set(params.MinimumDifficulty)
 }
 
@@ -141,11 +125,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 
 	// Block attributes.
 	g.Difficulty = cfg.genesisDifficulty()
-	if cfg.clique {
-		g.ExtraData = cliqueInit(cliqueSignerKey)
-	} else {
-		g.ExtraData = []byte("hivechain")
-	}
+	g.ExtraData = []byte("hivechain")
 	g.GasLimit = params.GenesisGasLimit * 8
 	zero := new(big.Int)
 	if g.Config.IsLondon(zero) {
@@ -154,9 +134,9 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 
 	// Initialize allocation.
 	// Here we add balance to known accounts and initialize built-in contracts.
-	g.Alloc = make(core.GenesisAlloc)
+	g.Alloc = make(types.GenesisAlloc)
 	for _, acc := range knownAccounts {
-		g.Alloc[acc.addr] = core.GenesisAccount{Balance: initialBalance}
+		g.Alloc[acc.addr] = types.Account{Balance: initialBalance}
 	}
 	add4788Contract(g.Alloc)
 	addSnapTestContract(g.Alloc)
@@ -203,12 +183,29 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	lastIndex := cfg.lastForkIndex()
 	forks := allForkNames[:lastIndex+1]
 	forkBlocks := make(map[string]uint64)
+
+	// If merged chain is specified, schedule all pre-merge forks at block zero.
+	if cfg.merged {
+		for _, fork := range preMergeForkNames {
+			if len(forks) == 0 {
+				break
+			}
+			forkBlocks[fork] = 0
+			if forks[0] != fork {
+				panic("unexpected fork in allForkNames: " + forks[0])
+			}
+			forks = forks[1:]
+		}
+	}
+	// Schedule remaining forks according to interval.
 	for block := 0; block <= cfg.chainLength && len(forks) > 0; {
 		fork := forks[0]
 		forks = forks[1:]
 		forkBlocks[fork] = uint64(block)
 		block += cfg.forkInterval
 	}
+	// If the chain length cannot accomodate the spread of forks with the chosen
+	// interval, schedule the remaining forks at the last block.
 	for _, f := range forks {
 		forkBlocks[f] = uint64(cfg.chainLength)
 	}
@@ -229,13 +226,4 @@ func (cfg *generatorConfig) lastForkIndex() int {
 
 func (cfg *generatorConfig) blockTimestamp(num uint64) uint64 {
 	return num * blocktimeSec
-}
-
-// cliqueInit creates the genesis extradata for a clique network with one signer.
-func cliqueInit(signer *ecdsa.PrivateKey) []byte {
-	vanity := make([]byte, 32)
-	copy(vanity, "hivechain")
-	d := append(vanity, cliqueSignerAddr[:]...)
-	d = append(d, make([]byte, 65)...) // signature
-	return d
 }
