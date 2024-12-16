@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
@@ -159,7 +158,6 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	}
 	config := &node.Config{
 		Name:    startConfig.Name,
-		Version: params.Version,
 		DataDir: datadir,
 		P2P: p2p.Config{
 			ListenAddr:  "0.0.0.0:0",
@@ -176,22 +174,16 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	if genesis == nil || genesis.Config == nil {
 		return nil, fmt.Errorf("genesis configuration is nil")
 	}
-	if genesis.Config.TerminalTotalDifficultyPassed == false {
-		return nil, fmt.Errorf("genesis configuration is has not passed terminal total difficulty")
-	}
 	econfig := &ethconfig.Config{
-		Genesis:          genesis,
-		NetworkId:        genesis.Config.ChainID.Uint64(),
-		SyncMode:         downloader.FullSync,
-		DatabaseCache:    256,
-		DatabaseHandles:  256,
-		StateScheme:      rawdb.PathScheme,
-		TxPool:           ethconfig.Defaults.TxPool,
-		GPO:              ethconfig.Defaults.GPO,
-		Miner:            ethconfig.Defaults.Miner,
-		LightServ:        100,
-		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
-		LightNoSyncServe: true,
+		Genesis:         genesis,
+		NetworkId:       genesis.Config.ChainID.Uint64(),
+		SyncMode:        downloader.FullSync,
+		DatabaseCache:   256,
+		DatabaseHandles: 256,
+		StateScheme:     rawdb.PathScheme,
+		TxPool:          ethconfig.Defaults.TxPool,
+		GPO:             ethconfig.Defaults.GPO,
+		Miner:           ethconfig.Defaults.Miner,
 	}
 	ethBackend, err := eth.New(stack, econfig)
 	if err != nil {
@@ -327,7 +319,7 @@ type validator struct{}
 func (v *validator) ValidateBody(block *types.Block) error {
 	return nil
 }
-func (v *validator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64, stateless bool) error {
+func (v *validator) ValidateState(block *types.Block, state *state.StateDB, result *core.ProcessResult, stateless bool) error {
 	return nil
 }
 func (v *validator) ValidateWitness(witness *stateless.Witness, receiptRoot common.Hash, stateRoot common.Hash) error {
@@ -336,8 +328,8 @@ func (v *validator) ValidateWitness(witness *stateless.Witness, receiptRoot comm
 
 type processor struct{}
 
-func (p *processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	return types.Receipts{}, []*types.Log{}, 21000, nil
+func (p *processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (*core.ProcessResult, error) {
+	return &core.ProcessResult{GasUsed: 21000}, nil
 }
 
 var headerPrefix = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
@@ -371,17 +363,17 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	bc := n.eth.BlockChain()
 	bc.SetBlockValidatorAndProcessorForTesting(new(validator), n.eth.BlockChain().Processor())
 
-	statedb, err := state.New(parentRoot, bc.StateCache(), bc.Snapshots())
+	statedb, err := state.New(parentRoot, bc.StateCache())
 	if err != nil {
 		return errors.Wrap(err, "failed to create state db")
 	}
 	statedb.StartPrefetcher("chain", nil)
 	var failedProcessing bool
-	receipts, _, _, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
+	result, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
 	if err != nil {
 		failedProcessing = true
 	}
-	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), receipts)
+	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), result.Receipts)
 	root, err := statedb.Commit(block.NumberU64(), false)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit state")
@@ -656,7 +648,7 @@ func (n *GethNode) getStateDB(ctx context.Context, blockNumber *big.Int) (*state
 	if err != nil {
 		return nil, err
 	}
-	return state.New(b.Root(), n.eth.BlockChain().StateCache(), n.eth.BlockChain().Snapshots())
+	return state.New(b.Root(), n.eth.BlockChain().StateCache())
 }
 
 func (n *GethNode) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
