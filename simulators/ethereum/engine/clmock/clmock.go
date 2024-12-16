@@ -270,8 +270,8 @@ func (cl *CLMocker) InitChain(ec client.EngineClient) {
 	}
 	cl.HeaderHistory[cl.LatestHeader.Number.Uint64()] = cl.LatestHeader
 
-	if cl.LatestHeader.Difficulty.Sign() != 0 {
-		cl.Fatalf("CLMocker: invalid difficulty on latest header: %d", cl.LatestHeader.Difficulty)
+	if cl.LatestHeader.Difficulty.Cmp(cl.Genesis.Difficulty) != 0 {
+		cl.Fatalf("CLMocker: invalid difficulty %d on latest header, expected", cl.LatestHeader.Difficulty, cl.Genesis.Difficulty)
 	}
 
 	// Reset transition values
