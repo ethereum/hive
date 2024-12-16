@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -813,14 +812,6 @@ var Tests = []test.Spec{
 				Start: 17,
 				End:   17 + 32,
 			},
-		},
-	},
-
-	// TODO: Remove since this will be automatically inherited when this test suite is refactored
-	suite_engine.NonZeroPreMergeFork{
-		BaseSpec: test.BaseSpec{
-			MainFork:   config.Shanghai,
-			ForkHeight: 1,
 		},
 	},
 }
