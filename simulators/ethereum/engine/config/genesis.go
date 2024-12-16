@@ -9,12 +9,6 @@ import (
 )
 
 func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
-	if f.ParisNumber != nil {
-		genesis.Config.MergeNetsplitBlock = f.ParisNumber
-		if genesis.Number >= f.ParisNumber.Uint64() {
-			removePoW(genesis)
-		}
-	}
 	if f.ShanghaiTimestamp != nil {
 		shanghaiTime := f.ShanghaiTimestamp.Uint64()
 		genesis.Config.ShanghaiTime = &shanghaiTime

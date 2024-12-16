@@ -147,24 +147,17 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 			}
 
 			// Configure Forks
-			newParams := globals.DefaultClientEnv
-			if forkConfig.LondonNumber != nil {
-				newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
-			}
-			if forkConfig.ParisNumber != nil {
-				newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", fmt.Sprintf("%d", forkConfig.ParisNumber))
-			}
+			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED", "1")
+			newParams = newParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty))
+			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
 			if forkConfig.ShanghaiTimestamp != nil {
 				newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", forkConfig.ShanghaiTimestamp))
-				// Ensure merge transition is activated before shanghai if not already
-				if forkConfig.ParisNumber == nil {
-					newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
-				}
 				if forkConfig.CancunTimestamp != nil {
 					newParams = newParams.Set("HIVE_CANCUN_TIMESTAMP", fmt.Sprintf("%d", forkConfig.CancunTimestamp))
 				}
 			}
 
+			// Configure node type.
 			if nodeType != "" {
 				newParams = newParams.Set("HIVE_NODETYPE", nodeType)
 			}
