@@ -65,6 +65,7 @@ func (h ExecutableDataHistory) LatestWithdrawalsIndex() uint64 {
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	*hivesim.T
+
 	// List of Engine Clients being served by the CL Mocker
 	EngineClients []client.EngineClient
 	// Lock required so no client is offboarded during block production.
@@ -175,6 +176,7 @@ func (cl *CLMocker) GenesisBlock() *types.Block {
 func (cl *CLMocker) AddEngineClient(ec client.EngineClient) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
+
 	cl.Logf("CLMocker: Adding engine client %v", ec.ID())
 	cl.EngineClients = append(cl.EngineClients, ec)
 }
@@ -256,7 +258,7 @@ func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumb
 	return headers, nil
 }
 
-// Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
+// InitChain sets the test chain head block and initial forkchoiceUpdated.
 func (cl *CLMocker) InitChain(ec client.EngineClient) {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
@@ -280,14 +282,6 @@ func (cl *CLMocker) InitChain(ec client.EngineClient) {
 	// Prepare initial forkchoice, to be sent to the transition payload producer
 	cl.LatestForkchoice = api.ForkchoiceStateV1{}
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestHeader.Hash()
-}
-
-// Check whether a block number is a PoS block
-func (cl *CLMocker) IsBlockPoS(bn *big.Int) bool {
-	if cl.FirstPoSBlockNumber == nil || cl.FirstPoSBlockNumber.Cmp(bn) > 0 {
-		return false
-	}
-	return true
 }
 
 // Return the per-block timestamp value increment
@@ -492,7 +486,6 @@ func (cl *CLMocker) GetNextPayload() {
 }
 
 func (cl *CLMocker) broadcastNextNewPayload() {
-
 	// Broadcast the executePayload to all clients
 	version := cl.ForkConfig.NewPayloadVersion(cl.LatestPayloadBuilt.Timestamp)
 	validations := 0

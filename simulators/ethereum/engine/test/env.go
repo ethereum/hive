@@ -108,6 +108,9 @@ func Run(testSpec Spec, timeout time.Duration, t *hivesim.T, c *hivesim.Client, 
 		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
 	}
 
+	// Setup clMocker with client head.
+	clMocker.InitChain(ec)
+
 	// Full test context has a few more seconds to finish up after timeout happens
 	ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
 	defer cancel()
