@@ -146,11 +146,8 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				panic("unable to inject genmsis")
 			}
 
-			// Calculate and set the TTD for this test
-			ttd := genesis.Config.TerminalTotalDifficulty
-
 			// Configure Forks
-			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+			newParams := globals.DefaultClientEnv
 			if forkConfig.LondonNumber != nil {
 				newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
 			}
@@ -173,7 +170,7 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 			}
 
 			testFiles := hivesim.Params{}
-			if genesis.Difficulty.Cmp(ttd) < 0 {
+			if genesis.Difficulty.Sign() > 0 {
 				if currentTest.GetChainFile() != "" {
 					// We are using a Proof of Work chain file, remove all clique-related settings
 					// TODO: Nethermind still requires HIVE_MINER for the Engine API
@@ -191,7 +188,6 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
 				delete(newParams, "HIVE_CLIQUE_PERIOD")
 				delete(newParams, "HIVE_MINER")
-				newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "true")
 			}
 
 			if clientTypes, err := t.Sim.ClientTypes(); err == nil {
