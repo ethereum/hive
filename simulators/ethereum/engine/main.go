@@ -146,7 +146,8 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				panic("unable to inject genmsis")
 			}
 
-			// Configure Forks
+			// Configure Forks.
+			// Note merge is hard-coded at genesis.
 			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED", "1")
 			newParams = newParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty))
 			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
