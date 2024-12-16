@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"math/rand"
 	"os"
 	"strconv"
@@ -220,7 +219,6 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 							// Run the test case
 							test.Run(
 								currentTest,
-								new(big.Int).Set(ttd),
 								timeout,
 								t,
 								c,
