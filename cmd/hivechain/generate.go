@@ -31,6 +31,7 @@ type generatorConfig struct {
 	forkInterval int    // number of blocks between forks
 	lastFork     string // last enabled fork
 	clique       bool   // create a clique chain
+	merged       bool   // create a proof-of-stake chain
 
 	// chain options
 	txInterval  int // frequency of blocks containing transactions

@@ -28,10 +28,11 @@ var (
 
 // Ethereum mainnet forks in order of introduction.
 var (
-	allForkNames = append(numberBasedForkNames, timeBasedForkNames...)
+	allForkNames = append(preMergeForkNames, posForkNames...)
 	lastFork     = allForkNames[len(allForkNames)-1]
 
-	numberBasedForkNames = []string{
+	// these are block-number based:
+	preMergeForkNames = []string{
 		"homestead",
 		"tangerinewhistle",
 		"spuriousdragon",
@@ -47,7 +48,8 @@ var (
 		"merge",
 	}
 
-	timeBasedForkNames = []string{
+	// forks after the merge are timestamp-based:
+	posForkNames = []string{
 		"shanghai",
 		"cancun",
 		"prague",
@@ -203,12 +205,29 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	lastIndex := cfg.lastForkIndex()
 	forks := allForkNames[:lastIndex+1]
 	forkBlocks := make(map[string]uint64)
+
+	// If merged chain is specified, schedule all pre-merge forks at block zero.
+	if cfg.merged {
+		for _, fork := range preMergeForkNames {
+			if len(forks) == 0 {
+				break
+			}
+			forkBlocks[fork] = 0
+			if forks[0] != fork {
+				panic("unexpected fork in allForkNames: " + forks[0])
+			}
+			forks = forks[1:]
+		}
+	}
+	// Schedule remaining forks according to interval.
 	for block := 0; block <= cfg.chainLength && len(forks) > 0; {
 		fork := forks[0]
 		forks = forks[1:]
 		forkBlocks[fork] = uint64(block)
 		block += cfg.forkInterval
 	}
+	// If the chain length cannot accomodate the spread of forks with the chosen
+	// interval, schedule the remaining forks at the last block.
 	for _, f := range forks {
 		forkBlocks[f] = uint64(cfg.chainLength)
 	}

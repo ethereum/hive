@@ -68,6 +68,7 @@ func generateCommand(args []string) {
 	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
 	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
 	flag.BoolVar(&cfg.clique, "clique", false, "Create a clique chain")
+	flag.BoolVar(&cfg.merged, "pos", false, "Create a PoS (merged) chain")
 	flag.CommandLine.Parse(args)
 
 	if *outlist != "" {
@@ -75,6 +76,10 @@ func generateCommand(args []string) {
 			cfg.outputs = outputFunctionNames()
 		}
 		cfg.outputs = splitAndTrim(*outlist)
+	}
+
+	if cfg.clique && cfg.merged {
+		fatal(fmt.Errorf("can't use -clique and -pos at the same time"))
 	}
 
 	cfg, err := cfg.withDefaults()
