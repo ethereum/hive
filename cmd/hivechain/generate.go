@@ -8,18 +8,14 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/triedb"
 	"golang.org/x/exp/slices"
@@ -30,7 +26,6 @@ type generatorConfig struct {
 	// genesis options
 	forkInterval int    // number of blocks between forks
 	lastFork     string // last enabled fork
-	clique       bool   // create a clique chain
 	merged       bool   // create a proof-of-stake chain
 
 	// chain options
@@ -134,18 +129,7 @@ func (g *generator) run() error {
 }
 
 func (g *generator) createConsensusEngine(db ethdb.Database) consensus.Engine {
-	var inner consensus.Engine
-	if g.genesis.Config.Clique != nil {
-		cliqueEngine := clique.New(g.genesis.Config.Clique, db)
-		cliqueEngine.Authorize(cliqueSignerAddr, func(signer accounts.Account, mimeType string, message []byte) ([]byte, error) {
-			sig, err := crypto.Sign(crypto.Keccak256(message), cliqueSignerKey)
-			return sig, err
-		})
-		inner = instaSeal{cliqueEngine}
-	} else {
-		inner = ethash.NewFaker()
-	}
-	return beacon.New(inner)
+	return beacon.New(ethash.NewFaker())
 }
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
@@ -153,7 +137,7 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 	cacheconfig := core.DefaultCacheConfigWithScheme("hash")
 	cacheconfig.Preimages = true
 	vmconfig := vm.Config{EnablePreimageRecording: true}
-	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil, nil)
+	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -168,25 +152,9 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 
 func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
-	if g.genesis.Config.Clique != nil {
-		g.setClique(i, gen)
-	}
 	g.setDifficulty(i, gen)
 	g.setParentBeaconRoot(i, gen)
 	g.runModifiers(i, gen)
-}
-
-func (g *generator) setClique(i int, gen *core.BlockGen) {
-	mergeblock := g.genesis.Config.MergeNetsplitBlock
-	if mergeblock != nil && gen.Number().Cmp(mergeblock) >= 0 {
-		return
-	}
-
-	gen.SetCoinbase(cliqueSignerAddr)
-	// Add a positive vote to keep the signer in the set.
-	gen.SetNonce(types.BlockNonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
-	// The clique engine requires the block to have blank extra-data of the correct length before sealing.
-	gen.SetExtra(make([]byte, 32+65))
 }
 
 func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
@@ -256,22 +224,4 @@ func (g *generator) runModifiers(i int, gen *core.BlockGen) {
 		run(g.mods[index])
 		g.modOffset++
 	}
-}
-
-// instaSeal wraps a consensus engine with instant block sealing. When a block is produced
-// using FinalizeAndAssemble, it also applies Seal.
-type instaSeal struct{ consensus.Engine }
-
-// FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
-// setting the final state and assembling the block.
-func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, body *types.Body, receipts []*types.Receipt) (*types.Block, error) {
-	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, body, receipts)
-	if err != nil {
-		return nil, err
-	}
-	sealedBlock := make(chan *types.Block, 1)
-	if err = e.Engine.Seal(chain, block, sealedBlock, nil); err != nil {
-		return nil, err
-	}
-	return <-sealedBlock, nil
 }
