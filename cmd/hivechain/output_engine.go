@@ -41,8 +41,7 @@ func (g *generator) writeEngineFcU() error {
 // writeEngineHeadNewPayload writes an engine API newPayload request for the head block.
 func (g *generator) writeEngineHeadNewPayload() error {
 	h := g.blockchain.CurrentBlock()
-	blockhash := h.Hash()
-	b := g.blockchain.GetBlock(blockhash, h.Number.Uint64())
+	b := g.blockchain.GetBlock(h.Hash(), h.Number.Uint64())
 	np := g.block2newpayload(b)
 	return g.writeJSON("headnewpayload.json", np)
 }
