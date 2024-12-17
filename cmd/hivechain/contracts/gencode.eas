@@ -3,7 +3,7 @@
 
 #pragma target "frontier"
 
-#include "rng.eas"
+#include "lib/rng.eas"
 
 #define outputSize = 256
 

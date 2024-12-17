@@ -35,12 +35,7 @@ func (m *modDeploy) apply(ctx *genBlockContext) bool {
 		return false // already deployed
 	}
 
-	var code []byte
-	code = append(code, deployerCode...)
-	code = append(code, m.code...)
-	gas := ctx.TxCreateIntrinsicGas(code)
-	gas += uint64(len(m.code)) * params.CreateDataGas
-	gas += 15000 // extra gas for constructor execution
+	code, gas := codeToDeploy(ctx, m.code)
 	if !ctx.HasGas(gas) {
 		return false
 	}
@@ -62,4 +57,13 @@ func (m *modDeploy) apply(ctx *genBlockContext) bool {
 
 func (m *modDeploy) txInfo() any {
 	return m.info
+}
+
+func codeToDeploy(ctx *genBlockContext, code []byte) (constructor []byte, gas uint64) {
+	constructor = append(constructor, deployerCode...)
+	constructor = append(constructor, code...)
+	gas = ctx.TxCreateIntrinsicGas(code)
+	gas += uint64(len(code)) * params.CreateDataGas
+	gas += 15000 // extra gas for constructor execution
+	return
 }

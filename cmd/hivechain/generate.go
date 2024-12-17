@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/triedb"
 	"golang.org/x/exp/slices"
 )
@@ -67,6 +66,7 @@ type generator struct {
 
 	// for write/export
 	blockchain *core.BlockChain
+	clRequests map[uint64][][]byte
 }
 
 type modifierInstance struct {
@@ -82,12 +82,13 @@ type genAccount struct {
 func newGenerator(cfg generatorConfig) *generator {
 	genesis := cfg.createGenesis()
 	return &generator{
-		cfg:      cfg,
-		genesis:  genesis,
-		rand:     rand.New(rand.NewSource(10)),
-		td:       new(big.Int).Set(genesis.Difficulty),
-		virgins:  cfg.createBlockModifiers(),
-		accounts: slices.Clone(knownAccounts),
+		cfg:        cfg,
+		genesis:    genesis,
+		rand:       rand.New(rand.NewSource(10)),
+		td:         new(big.Int).Set(genesis.Difficulty),
+		virgins:    cfg.createBlockModifiers(),
+		accounts:   slices.Clone(knownAccounts),
+		clRequests: make(map[uint64][][]byte),
 	}
 }
 
@@ -107,13 +108,14 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 // run produces a chain and writes it.
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
-	engine := g.createConsensusEngine(db)
+	engine := beacon.New(ethash.NewFaker())
 
 	// Init genesis block.
 	trieconfig := *triedb.HashDefaults
 	trieconfig.Preimages = true
 	triedb := triedb.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
+	g.clRequests[0] = [][]byte{}
 
 	// Create the blocks.
 	chain, _ := core.GenerateChain(g.genesis.Config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
@@ -126,10 +128,6 @@ func (g *generator) run() error {
 
 	g.blockchain = bc
 	return g.write()
-}
-
-func (g *generator) createConsensusEngine(db ethdb.Database) consensus.Engine {
-	return beacon.New(ethash.NewFaker())
 }
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
@@ -152,12 +150,13 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 
 func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
-	g.setDifficulty(i, gen)
-	g.setParentBeaconRoot(i, gen)
+	g.setDifficulty(gen)
+	g.setParentBeaconRoot(gen)
 	g.runModifiers(i, gen)
+	g.clRequests[gen.Number().Uint64()] = gen.ConsensusLayerRequests()
 }
 
-func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
+func (g *generator) setDifficulty(gen *core.BlockGen) {
 	chaincfg := g.genesis.Config
 	mergeblock := chaincfg.MergeNetsplitBlock
 	if mergeblock == nil {
@@ -174,7 +173,7 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 	}
 }
 
-func (g *generator) setParentBeaconRoot(i int, gen *core.BlockGen) {
+func (g *generator) setParentBeaconRoot(gen *core.BlockGen) {
 	if g.genesis.Config.IsCancun(gen.Number(), gen.Timestamp()) {
 		var h common.Hash
 		g.rand.Read(h[:])
