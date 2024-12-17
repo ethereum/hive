@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/triedb"
 	"golang.org/x/exp/slices"
 )
@@ -107,7 +106,7 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 // run produces a chain and writes it.
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
-	engine := g.createConsensusEngine(db)
+	engine := beacon.New(ethash.NewFaker())
 
 	// Init genesis block.
 	trieconfig := *triedb.HashDefaults
@@ -126,10 +125,6 @@ func (g *generator) run() error {
 
 	g.blockchain = bc
 	return g.write()
-}
-
-func (g *generator) createConsensusEngine(db ethdb.Database) consensus.Engine {
-	return beacon.New(ethash.NewFaker())
 }
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
@@ -152,12 +147,12 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 
 func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
-	g.setDifficulty(i, gen)
-	g.setParentBeaconRoot(i, gen)
+	g.setDifficulty(gen)
+	g.setParentBeaconRoot(gen)
 	g.runModifiers(i, gen)
 }
 
-func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
+func (g *generator) setDifficulty(gen *core.BlockGen) {
 	chaincfg := g.genesis.Config
 	mergeblock := chaincfg.MergeNetsplitBlock
 	if mergeblock == nil {
@@ -174,7 +169,7 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 	}
 }
 
-func (g *generator) setParentBeaconRoot(i int, gen *core.BlockGen) {
+func (g *generator) setParentBeaconRoot(gen *core.BlockGen) {
 	if g.genesis.Config.IsCancun(gen.Number(), gen.Timestamp()) {
 		var h common.Hash
 		g.rand.Read(h[:])
