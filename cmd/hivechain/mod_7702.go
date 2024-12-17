@@ -10,6 +10,19 @@ import (
 	"github.com/holiman/uint256"
 )
 
+// mod7702 creates an EIP-7702 interaction in the chain.
+//
+// It's a multi-step process:
+//
+//  - (1) a contract that will later serve as the account code is deployed.
+//  - (2) Then a SetCode transaction is added which creates a delegation from the
+//        EOA to the deployed code.
+//  - (3) Finally, a contract call to the EOA is published, which triggers the
+//        delegated code.
+//
+// The account contract (contracts/7702account.eas) writes to storage when invoked with
+// input. For no input, it returns the current address and the storage value.
+
 func init() {
 	register("tx-eip7702", func() blockModifier {
 		return &mod7702{}
@@ -22,9 +35,6 @@ type mod7702TxInfo struct {
 	AuthorizeTx common.Hash    `json:"authorizeTx"`
 }
 
-// mod7702 first deploys a 7702 proxy.
-// It then publishes an authorization for the proxy.
-// In a third transaction, the proxy is invoked.
 type mod7702 struct {
 	stage       int
 	proxyAddr   common.Address
@@ -47,15 +57,15 @@ func (m *mod7702) apply(ctx *genBlockContext) bool {
 	for ; m.stage < mod7702stageDone; m.stage++ {
 		switch m.stage {
 		case mod7702stageDeploy:
-			if err := m.deployProxy(ctx); err != nil {
+			if err := m.deployAccountCode(ctx); err != nil {
 				return false
 			}
 		case mod7702stageAuthorize:
-			if err := m.authorizeProxy(ctx); err != nil {
+			if err := m.authorizeCode(ctx); err != nil {
 				return false
 			}
 		case mod7702stageInvoke:
-			if err := m.invokeProxy(ctx); err != nil {
+			if err := m.invokeAccount(ctx); err != nil {
 				return false
 			}
 		}
@@ -63,7 +73,7 @@ func (m *mod7702) apply(ctx *genBlockContext) bool {
 	return m.stage > prevStage
 }
 
-func (m *mod7702) deployProxy(ctx *genBlockContext) error {
+func (m *mod7702) deployAccountCode(ctx *genBlockContext) error {
 	code, gas := codeToDeploy(ctx, mod7702AccountCode)
 	if !ctx.HasGas(gas) {
 		return fmt.Errorf("not enough gas to deploy")
@@ -81,7 +91,7 @@ func (m *mod7702) deployProxy(ctx *genBlockContext) error {
 	return nil
 }
 
-func (m *mod7702) authorizeProxy(ctx *genBlockContext) error {
+func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 	auth := types.Authorization{
 		ChainID: ctx.ChainConfig().ChainID.Uint64(),
 		Address: m.proxyAddr,
@@ -115,7 +125,7 @@ func (m *mod7702) authorizeProxy(ctx *genBlockContext) error {
 	return nil
 }
 
-func (m *mod7702) invokeProxy(ctx *genBlockContext) error {
+func (m *mod7702) invokeAccount(ctx *genBlockContext) error {
 	const gas = 70000
 	if !ctx.HasGas(gas) {
 		return fmt.Errorf("not enough gas to invoke")
