@@ -177,7 +177,10 @@ const emitAddr = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
 
 func addEmitContract(ga types.GenesisAlloc) {
 	addr := common.HexToAddress(emitAddr)
-	ga[addr] = types.Account{Code: emitCode}
+	ga[addr] = types.Account{
+		Code:    emitCode,
+		Balance: new(big.Int),
+	}
 }
 
 // forkBlocks computes the block numbers where forks occur. Forks get enabled based on the
