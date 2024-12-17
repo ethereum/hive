@@ -29,25 +29,38 @@ type mod7702 struct {
 	stage       int
 	proxyAddr   common.Address
 	authorizeTx common.Hash
-	ran         bool
 }
 
+const (
+	mod7702stageDeploy = iota
+	mod7702stageAuthorize
+	mod7702stageInvoke
+	mod7702stageDone
+)
+
 func (m *mod7702) apply(ctx *genBlockContext) bool {
-	if m.ran || !ctx.ChainConfig().IsPrague(ctx.Number(), ctx.Timestamp()) {
+	if !ctx.ChainConfig().IsPrague(ctx.Number(), ctx.Timestamp()) {
 		return false
 	}
 
-	if err := m.deployProxy(ctx); err != nil {
-		return false
+	prevStage := m.stage
+	for ; m.stage < mod7702stageDone; m.stage++ {
+		switch m.stage {
+		case mod7702stageDeploy:
+			if err := m.deployProxy(ctx); err != nil {
+				return false
+			}
+		case mod7702stageAuthorize:
+			if err := m.authorizeProxy(ctx); err != nil {
+				return false
+			}
+		case mod7702stageInvoke:
+			if err := m.invokeProxy(ctx); err != nil {
+				return false
+			}
+		}
 	}
-	if err := m.authorizeProxy(ctx); err != nil {
-		return false
-	}
-	if err := m.invokeProxy(ctx); err != nil {
-		return false
-	}
-	m.ran = true
-	return true
+	return m.stage > prevStage
 }
 
 func (m *mod7702) deployProxy(ctx *genBlockContext) error {
@@ -76,7 +89,7 @@ func (m *mod7702) authorizeProxy(ctx *genBlockContext) error {
 	}
 	signedAuth, err := types.SignAuth(auth, mod7702Account.key)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sender := ctx.TxSenderAccount()
@@ -93,12 +106,21 @@ func (m *mod7702) authorizeProxy(ctx *genBlockContext) error {
 		panic(err)
 	}
 	txdata.Gas = gas
-	ctx.AddNewTx(sender, txdata)
+	if !ctx.HasGas(gas) {
+		return fmt.Errorf("not enough gas to authorize")
+	}
+	tx := ctx.AddNewTx(sender, txdata)
+	m.authorizeTx = tx.Hash()
 
 	return nil
 }
 
 func (m *mod7702) invokeProxy(ctx *genBlockContext) error {
+	const gas = 70000
+	if !ctx.HasGas(gas) {
+		return fmt.Errorf("not enough gas to invoke")
+	}
+
 	sender := ctx.TxSenderAccount()
 	ctx.AddNewTx(sender, &types.LegacyTx{
 		Nonce:    ctx.AccountNonce(sender.addr),
@@ -111,7 +133,7 @@ func (m *mod7702) invokeProxy(ctx *genBlockContext) error {
 }
 
 func (m *mod7702) txInfo() any {
-	if m.proxyAddr == (common.Address{}) || m.authorizeTx == (common.Hash{}) {
+	if m.stage < mod7702stageDone {
 		return nil
 	}
 	return &mod7702TxInfo{

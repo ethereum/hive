@@ -41,7 +41,8 @@ func (g *generator) writeEngineFcU() error {
 // writeEngineHeadNewPayload writes an engine API newPayload request for the head block.
 func (g *generator) writeEngineHeadNewPayload() error {
 	h := g.blockchain.CurrentBlock()
-	b := g.blockchain.GetBlock(h.Hash(), h.Number.Uint64())
+	blockhash := h.Hash()
+	b := g.blockchain.GetBlock(blockhash, h.Number.Uint64())
 	np := g.block2newpayload(b)
 	return g.writeJSON("headnewpayload.json", np)
 }
@@ -82,17 +83,21 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 			panic(err)
 		}
 		ed.Transactions = append(ed.Transactions, bin)
-
 		// Collect blob hashes for post-Cancun blocks.
-		for _, bh := range tx.BlobHashes() {
-			blobHashes = append(blobHashes, bh)
-		}
+		blobHashes = append(blobHashes, tx.BlobHashes()...)
 	}
 
 	var method string
 	var params = []any{ed}
 	cfg := g.genesis.Config
 	switch {
+	case cfg.IsPrague(b.Number(), b.Time()):
+		method = "engine_newPayloadV4"
+		requests, ok := g.clRequests[b.NumberU64()]
+		if !ok {
+			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
+		}
+		params = append(params, blobHashes, b.BeaconRoot(), requests)
 	case cfg.IsCancun(b.Number(), b.Time()):
 		method = "engine_newPayloadV3"
 		params = append(params, blobHashes, b.BeaconRoot())

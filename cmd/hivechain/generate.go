@@ -66,6 +66,7 @@ type generator struct {
 
 	// for write/export
 	blockchain *core.BlockChain
+	clRequests map[uint64][][]byte
 }
 
 type modifierInstance struct {
@@ -81,12 +82,13 @@ type genAccount struct {
 func newGenerator(cfg generatorConfig) *generator {
 	genesis := cfg.createGenesis()
 	return &generator{
-		cfg:      cfg,
-		genesis:  genesis,
-		rand:     rand.New(rand.NewSource(10)),
-		td:       new(big.Int).Set(genesis.Difficulty),
-		virgins:  cfg.createBlockModifiers(),
-		accounts: slices.Clone(knownAccounts),
+		cfg:        cfg,
+		genesis:    genesis,
+		rand:       rand.New(rand.NewSource(10)),
+		td:         new(big.Int).Set(genesis.Difficulty),
+		virgins:    cfg.createBlockModifiers(),
+		accounts:   slices.Clone(knownAccounts),
+		clRequests: make(map[uint64][][]byte),
 	}
 }
 
@@ -113,6 +115,7 @@ func (g *generator) run() error {
 	trieconfig.Preimages = true
 	triedb := triedb.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
+	g.clRequests[0] = [][]byte{}
 
 	// Create the blocks.
 	chain, _ := core.GenerateChain(g.genesis.Config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
@@ -150,6 +153,7 @@ func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	g.setDifficulty(gen)
 	g.setParentBeaconRoot(gen)
 	g.runModifiers(i, gen)
+	g.clRequests[gen.Number().Uint64()] = gen.ConsensusLayerRequests()
 }
 
 func (g *generator) setDifficulty(gen *core.BlockGen) {

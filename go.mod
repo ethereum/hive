@@ -6,13 +6,13 @@ toolchain go1.23.4
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/ethereum/go-ethereum v1.14.6-0.20241216131008-bc1ec6900817
+	github.com/ethereum/go-ethereum v1.14.6-0.20241217141617-71c28d8d2b20
 	github.com/ethereum/hive/hiveproxy v0.0.0-20240610172618-786a798a0cfe
 	github.com/evanw/esbuild v0.18.11
 	github.com/fsouza/go-dockerclient v1.11.2
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/gorilla/mux v1.8.1
-	github.com/holiman/uint256 v1.3.1
+	github.com/holiman/uint256 v1.3.2
 	github.com/lithammer/dedent v1.1.0
 	github.com/lmittmann/tint v1.0.5
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
