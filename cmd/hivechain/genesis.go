@@ -138,24 +138,31 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	for _, acc := range knownAccounts {
 		g.Alloc[acc.addr] = types.Account{Balance: initialBalance}
 	}
-	add4788Contract(g.Alloc)
+	addCancunSystemContracts(g.Alloc)
+	addPragueSystemContracts(g.Alloc)
 	addSnapTestContract(g.Alloc)
 	addEmitContract(g.Alloc)
 
 	return &g
 }
 
-func add4788Contract(ga core.GenesisAlloc) {
-	ga[params.BeaconRootsAddress] = core.GenesisAccount{
+func addCancunSystemContracts(ga types.GenesisAlloc) {
+	ga[params.BeaconRootsAddress] = types.Account{
 		Balance: big.NewInt(42),
-		Code:    common.FromHex("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
+		Code:    params.BeaconRootsCode,
 	}
 }
 
-func addSnapTestContract(ga core.GenesisAlloc) {
+func addPragueSystemContracts(ga types.GenesisAlloc) {
+	ga[params.HistoryStorageAddress] = types.Account{Balance: big.NewInt(1), Code: params.HistoryStorageCode}
+	ga[params.WithdrawalQueueAddress] = types.Account{Balance: big.NewInt(1), Code: params.WithdrawalQueueCode}
+	ga[params.ConsolidationQueueAddress] = types.Account{Balance: big.NewInt(1), Code: params.ConsolidationQueueCode}
+}
+
+func addSnapTestContract(ga types.GenesisAlloc) {
 	addr := common.HexToAddress("0x8bebc8ba651aee624937e7d897853ac30c95a067")
 	h := common.HexToHash
-	ga[addr] = core.GenesisAccount{
+	ga[addr] = types.Account{
 		Balance: big.NewInt(1),
 		Nonce:   1,
 		Storage: map[common.Hash]common.Hash{
@@ -168,12 +175,9 @@ func addSnapTestContract(ga core.GenesisAlloc) {
 
 const emitAddr = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
 
-func addEmitContract(ga core.GenesisAlloc) {
+func addEmitContract(ga types.GenesisAlloc) {
 	addr := common.HexToAddress(emitAddr)
-	ga[addr] = core.GenesisAccount{
-		Balance: new(big.Int),
-		Code:    emitCode,
-	}
+	ga[addr] = types.Account{Code: emitCode}
 }
 
 // forkBlocks computes the block numbers where forks occur. Forks get enabled based on the
