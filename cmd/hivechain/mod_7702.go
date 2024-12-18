@@ -92,12 +92,11 @@ func (m *mod7702) deployAccountCode(ctx *genBlockContext) error {
 }
 
 func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
-	auth := types.Authorization{
+	auth, err := types.SignSetCode(mod7702Account.key, types.SetCodeAuthorization{
 		ChainID: ctx.ChainConfig().ChainID.Uint64(),
 		Address: m.proxyAddr,
 		Nonce:   ctx.AccountNonce(mod7702Account.addr),
-	}
-	signedAuth, err := types.SignAuth(auth, mod7702Account.key)
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +108,7 @@ func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 		GasTipCap: uint256.MustFromDecimal("1"),
 		GasFeeCap: uint256.MustFromBig(ctx.TxGasFeeCap()),
 		To:        common.Address{},
-		AuthList:  []types.Authorization{signedAuth},
+		AuthList:  []types.SetCodeAuthorization{auth},
 	}
 	gas, err := core.IntrinsicGas(txdata.Data, txdata.AccessList, txdata.AuthList, false, true, true, true)
 	if err != nil {
