@@ -11,3 +11,4 @@ USER root
 ADD samba.sh /opt/samba/bin/samba.sh
 RUN chmod +x /opt/samba/bin/samba.sh
 ENTRYPOINT ["/opt/samba/bin/samba.sh"]
+
