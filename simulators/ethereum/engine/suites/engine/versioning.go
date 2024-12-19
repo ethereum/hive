@@ -37,9 +37,6 @@ func (tc ForkchoiceUpdatedOnPayloadRequestTest) GetName() string {
 }
 
 func (tc ForkchoiceUpdatedOnPayloadRequestTest) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadAttributesGenerated: func() {
 			var (

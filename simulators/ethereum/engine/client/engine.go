@@ -72,10 +72,6 @@ type EngineClient interface {
 	GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error)
 	UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error
 
-	// TTD Methods
-	TerminalTotalDifficulty() *big.Int
-	GetTotalDifficulty(context.Context) (*big.Int, error)
-
 	// Test Methods
 	PostRunVerifications() error
 

@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -815,14 +814,6 @@ var Tests = []test.Spec{
 			},
 		},
 	},
-
-	// TODO: Remove since this will be automatically inherited when this test suite is refactored
-	suite_engine.NonZeroPreMergeFork{
-		BaseSpec: test.BaseSpec{
-			MainFork:   config.Shanghai,
-			ForkHeight: 1,
-		},
-	},
 }
 
 // Helper types to convert gwei into wei more easily
@@ -1124,8 +1115,6 @@ func (ws *WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
 func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
-
-	t.CLMock.WaitForTTD()
 
 	// Check if we have pre-Shanghai blocks
 	if ws.GetWithdrawalsForkTime() > uint64(globals.GenesisTimestamp) {
@@ -1554,8 +1543,6 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
 
-	t.CLMock.WaitForTTD()
-
 	// Spawn a secondary client which will produce the sidechain
 	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
@@ -1821,7 +1808,6 @@ type MaxInitcodeSizeSpec struct {
 }
 
 func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
-	t.CLMock.WaitForTTD()
 	invalidTxSender := globals.TestAccounts[0]
 	invalidTxCreator := &helper.BigInitcodeTransactionCreator{
 		InitcodeLength: MAX_INITCODE_SIZE + 1,

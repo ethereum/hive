@@ -53,11 +53,6 @@ type BaseSpec struct {
 	// Test procedure to execute the test
 	Run func(*Env)
 
-	// TerminalTotalDifficulty delta value.
-	// Actual TTD is genesis.Difficulty + this value
-	// Default: 0
-	TTD int64
-
 	// CL Mocker configuration for time increments
 	BlockTimestampIncrement uint64
 
@@ -201,12 +196,6 @@ func (s BaseSpec) GetGenesis() *core.Genesis {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
 	}
 	genesis := helper.LoadGenesis(genesisPath)
-
-	// Set the terminal total difficulty
-	genesis.Config.TerminalTotalDifficulty = big.NewInt(genesis.Difficulty.Int64() + s.TTD)
-	if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
-		genesis.Config.TerminalTotalDifficultyPassed = true
-	}
 
 	// Set the genesis timestamp if provided
 	if s.GenesisTimestamp != nil {

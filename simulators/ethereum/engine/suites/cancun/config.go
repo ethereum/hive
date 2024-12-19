@@ -16,9 +16,6 @@ type CancunBaseSpec struct {
 
 // Base test case execution procedure for blobs tests.
 func (cs *CancunBaseSpec) Execute(t *test.Env) {
-
-	t.CLMock.WaitForTTD()
-
 	blobTestCtx := NewTestContext(t)
 	defer blobTestCtx.Close()
 

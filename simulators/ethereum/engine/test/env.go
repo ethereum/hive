@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"math/big"
 	"math/rand"
 	"net/http"
 	"time"
@@ -55,7 +54,7 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, randSource *rand.Rand, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec Spec, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, randSource *rand.Rand, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	forkConfig := testSpec.GetForkConfig()
 	clMocker := clmock.NewCLMocker(
@@ -74,7 +73,7 @@ func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hi
 	}()
 
 	// Create Engine client from main hivesim.Client to be used by tests
-	ec := hive_rpc.NewHiveRPCEngineClient(c, globals.EnginePortHTTP, globals.EthPortHTTP, globals.DefaultJwtTokenSecretBytes, ttd, &helper.LoggingRoundTrip{
+	ec := hive_rpc.NewHiveRPCEngineClient(c, globals.EnginePortHTTP, globals.EthPortHTTP, globals.DefaultJwtTokenSecretBytes, &helper.LoggingRoundTrip{
 		Logger: t,
 		ID:     c.Container,
 		Inner:  http.DefaultTransport,
@@ -109,6 +108,9 @@ func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hi
 		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
 	}
 
+	// Setup clMocker with client head.
+	clMocker.InitChain(ec)
+
 	// Full test context has a few more seconds to finish up after timeout happens
 	ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
 	defer cancel()
@@ -127,17 +129,13 @@ func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hi
 	// Defer producing one last block to verify Execution client did not break after the test
 	defer func() {
 		// Only run if the TTD was reached during test, and test had not failed at this point.
-		if clMocker.TTDReached && !t.Failed() {
+		if !t.Failed() {
 			clMocker.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 		}
 	}()
 
 	// Run the test
 	testSpec.Execute(env)
-}
-
-func (t *Env) MainTTD() *big.Int {
-	return t.Engine.TerminalTotalDifficulty()
 }
 
 func (t *Env) HandleClientPostRunVerification(ec client.EngineClient) {
