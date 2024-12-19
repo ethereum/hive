@@ -34,9 +34,6 @@ func (s SidechainReOrgTest) GetName() string {
 
 // Reorg to a Sidechain using ForkchoiceUpdated
 func (spec SidechainReOrgTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -146,9 +143,6 @@ func (s TransactionReOrgTest) GetName() string {
 
 // Test transaction status after a forkchoiceUpdated re-orgs to an alternative hash where a transaction is not present
 func (spec TransactionReOrgTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -442,9 +436,6 @@ func (s ReOrgBackToCanonicalTest) GetDepth() uint64 {
 // Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
 // is still capable of progressing.
 func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Check the CLMock configured safe and finalized
 	if t.CLMock.SlotsToSafe.Cmp(new(big.Int).SetUint64(spec.ReOrgDepth)) <= 0 {
 		t.Fatalf("FAIL (%s): [TEST ISSUE] CLMock configured slots to safe less than re-org depth: %v <= %v", t.TestName, t.CLMock.SlotsToSafe, spec.ReOrgDepth)
@@ -566,9 +557,6 @@ func (s ReOrgBackFromSyncingTest) GetName() string {
 
 // Test that performs a re-org back to the canonical chain after re-org to syncing/unavailable chain.
 func (spec ReOrgBackFromSyncingTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce an alternative chain
 	sidechainPayloads := make([]*typ.ExecutableData, 0)
 	t.CLMock.ProduceBlocks(10, clmock.BlockProcessCallbacks{
@@ -655,9 +643,6 @@ func (s ReOrgPrevValidatedPayloadOnSideChainTest) GetName() string {
 
 // Test that performs a re-org to a previously validated payload on a side chain.
 func (spec ReOrgPrevValidatedPayloadOnSideChainTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -772,9 +757,6 @@ func (s SafeReOrgToSideChainTest) GetName() string {
 
 // Test that performs a re-org of the safe block to a side chain.
 func (s SafeReOrgToSideChainTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Produce an alternative chain
 	sidechainPayloads := make([]*typ.ExecutableData, 0)
 

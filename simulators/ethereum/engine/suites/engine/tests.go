@@ -415,14 +415,4 @@ func init() {
 			}
 		}
 	}
-
-	// Misc Tests
-	Tests = append(Tests,
-		// Pre-merge & merge fork occur at block 1, post-merge forks occur at block 2
-		NonZeroPreMergeFork{
-			BaseSpec: test.BaseSpec{
-				ForkHeight: 2,
-			},
-		},
-	)
 }

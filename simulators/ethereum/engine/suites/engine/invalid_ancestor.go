@@ -52,10 +52,6 @@ func (tc InvalidMissingAncestorReOrgTest) GetName() string {
 }
 
 func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
-
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -249,9 +245,6 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 		// Remove the original client so that it does not receive the payloads created on the canonical chain
 		t.CLMock.RemoveEngineClient(t.Engine)
 	}
-
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
 	// Default is to produce 5 PoS blocks before the common ancestor

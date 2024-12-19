@@ -55,9 +55,6 @@ func (b BadHashOnNewPayload) GetName() string {
 }
 
 func (b BadHashOnNewPayload) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
@@ -163,9 +160,6 @@ func (p ParentHashOnNewPayload) GetName() string {
 // Copy the parentHash into the blockHash, client should reject the payload
 // (from Kintsugi Incident Report: https://notes.ethereum.org/@ExXcnR0-SJGthjz1dwkA1A/BkkdHWXTY)
 func (b ParentHashOnNewPayload) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 

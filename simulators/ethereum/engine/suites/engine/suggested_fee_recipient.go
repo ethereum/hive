@@ -29,9 +29,6 @@ func (t SuggestedFeeRecipientTest) GetName() string {
 }
 
 func (tc SuggestedFeeRecipientTest) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
 	// Create a single block to not having to build on top of genesis
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 

@@ -90,7 +90,7 @@ func (authTestSpec AuthTestSpec) Execute(t *test.Env) {
 	var (
 		// All test cases send a simple TransitionConfigurationV1 to check the Authentication mechanism (JWT)
 		tConf = api.TransitionConfigurationV1{
-			TerminalTotalDifficulty: (*hexutil.Big)(t.MainTTD()),
+			TerminalTotalDifficulty: new(hexutil.Big), // zero
 			TerminalBlockHash:       common.Hash{},
 			TerminalBlockNumber:     0,
 		}

@@ -223,5 +223,5 @@ func ExecutableDataToBlock(ed ExecutableData) (*types.Block, error) {
 	if ed.VersionedHashes != nil {
 		versionedHashes = *ed.VersionedHashes
 	}
-	return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, ed.ParentBeaconBlockRoot)
+	return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, ed.ParentBeaconBlockRoot, nil)
 }
