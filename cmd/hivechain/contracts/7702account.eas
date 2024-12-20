@@ -20,3 +20,6 @@ return:
     sload                       ; [value]
     push 32                     ; [ptr, value]
     mstore                      ; []
+    push 64                     ; [64]
+    push 0                      ; [0, 64]
+    return
