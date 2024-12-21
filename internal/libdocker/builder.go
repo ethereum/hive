@@ -115,7 +115,7 @@ func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS)
 		if err != nil {
 			return err
 		}
-		if ctx.Err() != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 
