@@ -4,6 +4,8 @@ FROM python:3.10-slim
 ## Default fixtures
 ARG fixtures=latest-stable-release
 ENV INPUT=${fixtures}
+ARG branch=main
+ENV BRANCH=${branch}
 
 ## Install dependencies
 RUN apt-get update && \
@@ -12,7 +14,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ## Clone and install EEST
-RUN git clone https://github.com/ethereum/execution-spec-tests.git --branch main --single-branch --depth 1
+RUN git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1
 WORKDIR execution-spec-tests
 RUN pip install uv && uv sync
 
