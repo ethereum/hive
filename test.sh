@@ -57,7 +57,7 @@ mkdir $RESULTS
 # Sync are quick tests
 #
 
-# These can succsessfully sync with themselves
+# These can successfully sync with themselves
 #testsync go-ethereum_latest
 
 # These two are failing - even against themselves
