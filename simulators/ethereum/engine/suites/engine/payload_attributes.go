@@ -67,7 +67,7 @@ func (tc InvalidPayloadAttributesTest) Execute(t *test.Env) {
 			// 3) Check payloadAttributes, if invalid respond with error: code: Invalid payload attributes
 			// 4) Start payload build process and respond with VALID
 			if tc.Syncing {
-				// If we are SYNCING, the outcome should be SYNCING regardless of the validity of the payload atttributes
+				// If we are SYNCING, the outcome should be SYNCING regardless of the validity of the payload attributes
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&fcu, attr, t.CLMock.LatestPayloadBuilt.Timestamp)
 				r.ExpectPayloadStatus(test.Syncing)
 				r.ExpectPayloadID(nil)
