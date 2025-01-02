@@ -9,7 +9,7 @@ use ethportal_api::jsonrpsee::http_client::HttpClient;
 use ethportal_api::types::execution::header_with_proof::{
     BlockHeaderProof, HeaderWithProof, SszNone,
 };
-use ethportal_api::types::portal::{FindContentInfo, GetContentInfo};
+use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
@@ -196,10 +196,10 @@ dyn_async! {
             // Test gossiping a collection of blocks to node B (B will gossip back to A)
             test.run(
                 NClientTestSpec {
-                    name: format!("GOSSIP blocks from A:{} --> B:{}", client_a.name, client_b.name),
+                    name: format!("PUT CONTENT blocks from A:{} --> B:{}", client_a.name, client_b.name),
                     description: "".to_string(),
                     always_run: false,
-                    run: test_gossip_two_nodes,
+                    run: test_put_content_two_nodes,
                     environments: environments.clone(),
                     test_data: content.clone(),
                     clients: vec![client_a.clone(), client_b.clone()],
@@ -439,7 +439,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Vec<TestData>) {
+    async fn test_put_content_two_nodes<'a> (clients: Vec<Client>, test_data: Vec<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
@@ -461,10 +461,10 @@ dyn_async! {
         for TestData { header, key: content_key, offer_value: content_offer_value, .. } in test_data.clone() {
             store_header(header, &client_b.rpc).await;
 
-            match client_a.rpc.gossip(content_key.clone(), content_offer_value.encode()).await {
-                Ok(nodes_gossiped_to) => {
-                   if nodes_gossiped_to != 1 {
-                        panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
+            match client_a.rpc.put_content(content_key.clone(), content_offer_value.encode()).await {
+                Ok(PutContentInfo { peer_count, .. }) => {
+                   if peer_count != 1 {
+                        panic!("We expected to gossip to 1 node instead we gossiped to: {peer_count}");
                     }
                 }
                 Err(err) => panic!("Unable to get received content: {err:?}"),
