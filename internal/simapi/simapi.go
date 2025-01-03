@@ -16,7 +16,7 @@ type NodeConfig struct {
 	Environment map[string]string `json:"environment"`
 }
 
-// StartNodeReponse is returned by the client startup endpoint.
+// StartNodeResponse is returned by the client startup endpoint.
 type StartNodeResponse struct {
 	ID string `json:"id"` // Container ID.
 	IP string `json:"ip"` // IP address in bridge network
