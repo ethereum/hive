@@ -58,11 +58,20 @@ type SimResult struct {
 	TestsFailed  int
 }
 
+// HiveInfo contains information about the hive instance running the simulation.
+type HiveInfo struct {
+	Command    []string           `json:"command"`
+	ClientFile []ClientDesignator `json:"clientFile"`
+	Commit     string             `json:"commit"`
+	Date       string             `json:"date"`
+}
+
 // TestManager collects test results during a simulation run.
 type TestManager struct {
 	config     SimEnv
 	backend    ContainerBackend
 	clientDefs []*ClientDefinition
+	hiveInfo   HiveInfo
 
 	simContainerID string
 	simLogFile     string
@@ -81,11 +90,15 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
-func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefinition) *TestManager {
+func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefinition, hiveInfo HiveInfo) *TestManager {
+	if hiveInfo.Commit == "" && hiveInfo.Date == "" {
+		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
+	}
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,
 		backend:           b,
+		hiveInfo:          hiveInfo,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
 		results:           make(map[TestSuiteID]*TestSuite),
@@ -115,7 +128,7 @@ func (manager *TestManager) Results() map[TestSuiteID]*TestSuite {
 
 // API returns the simulation API handler.
 func (manager *TestManager) API() http.Handler {
-	return newSimulationAPI(manager.backend, manager.config, manager)
+	return newSimulationAPI(manager.backend, manager.config, manager, manager.hiveInfo)
 }
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so

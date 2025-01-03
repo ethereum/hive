@@ -183,19 +183,19 @@ func loadClientMetadata(path string) (m ClientMetadata, err error) {
 type ClientDesignator struct {
 	// Client is the client name.
 	// This must refer to a subdirectory of clients/
-	Client string `yaml:"client"`
+	Client string `yaml:"client" json:"client"`
 
 	// Nametag is used in the name of the client image.
 	// This is for assigning meaningful names to different builds of the same client.
 	// If unspecified, a default value is chosen to make client names unique.
-	Nametag string `yaml:"nametag,omitempty"`
+	Nametag string `yaml:"nametag,omitempty" json:"nametag,omitempty"`
 
 	// DockerfileExt is the extension of the Docker that should be used to build the
 	// client. Example: setting this to "git" will build using "Dockerfile.git".
-	DockerfileExt string `yaml:"dockerfile,omitempty"`
+	DockerfileExt string `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty"`
 
 	// Arguments passed to the docker build.
-	BuildArgs map[string]string `yaml:"build_args,omitempty"`
+	BuildArgs map[string]string `yaml:"build_args,omitempty" json:"build_args,omitempty"`
 }
 
 func (c ClientDesignator) buildString() string {
