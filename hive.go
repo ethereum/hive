@@ -168,20 +168,24 @@ func main() {
 			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
+	hiveInfo := libhive.HiveInfo{
+		Command:    os.Args,
+		ClientFile: clientList,
+	}
 
 	// Build clients and simulators.
 	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
-		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint, hiveInfo)
 		return
 	}
 
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env)
+		result, err := runner.Run(ctx, sim, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}
