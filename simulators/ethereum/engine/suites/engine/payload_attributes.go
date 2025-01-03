@@ -34,9 +34,6 @@ func (tc InvalidPayloadAttributesTest) GetName() string {
 }
 
 func (tc InvalidPayloadAttributesTest) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
