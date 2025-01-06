@@ -211,7 +211,7 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 		forkBlocks[fork] = uint64(block)
 		block += cfg.forkInterval
 	}
-	// If the chain length cannot accomodate the spread of forks with the chosen
+	// If the chain length cannot accommodate the spread of forks with the chosen
 	// interval, schedule the remaining forks at the last block.
 	for _, f := range forks {
 		forkBlocks[f] = uint64(cfg.chainLength)
