@@ -163,27 +163,6 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				newParams = newParams.Set("HIVE_NODETYPE", nodeType)
 			}
 
-			testFiles := hivesim.Params{}
-			if genesis.Difficulty.Sign() > 0 {
-				if currentTest.GetChainFile() != "" {
-					// We are using a Proof of Work chain file, remove all clique-related settings
-					// TODO: Nethermind still requires HIVE_MINER for the Engine API
-					// delete(newParams, "HIVE_MINER")
-					delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
-					delete(newParams, "HIVE_CLIQUE_PERIOD")
-					// Add the new file to be loaded as chain.rlp
-					testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
-				}
-				if currentTest.IsMiningDisabled() {
-					delete(newParams, "HIVE_MINER")
-				}
-			} else {
-				// This is a post-merge test
-				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
-				delete(newParams, "HIVE_CLIQUE_PERIOD")
-				delete(newParams, "HIVE_MINER")
-			}
-
 			if clientTypes, err := t.Sim.ClientTypes(); err == nil {
 				for _, clientType := range clientTypes {
 					test := hivesim.TestSpec{
@@ -195,7 +174,6 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 								clientType.Name,
 								newParams,
 								genesisStartOption,
-								hivesim.WithStaticFiles(testFiles),
 							)
 							t.Logf("Start test (%s): %s", c.Type, currentTestName)
 							defer func() {
@@ -215,7 +193,7 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 								genesis,
 								rand.New(rand.NewSource(random_seed)),
 								newParams,
-								testFiles,
+								hivesim.Params{},
 							)
 						},
 					}

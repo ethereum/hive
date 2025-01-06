@@ -9,6 +9,7 @@ import (
 )
 
 func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
+	genesis.Config.TerminalTotalDifficulty = genesis.Difficulty
 	genesis.Config.MergeNetsplitBlock = big.NewInt(0)
 	if f.ShanghaiTimestamp != nil {
 		shanghaiTime := f.ShanghaiTimestamp.Uint64()
