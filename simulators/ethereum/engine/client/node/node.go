@@ -370,10 +370,11 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	statedb.StartPrefetcher("chain", nil)
 	var failedProcessing bool
 	result, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
-	if err != nil {
+	if err != nil || result == nil {
 		failedProcessing = true
+	} else {
+		rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), result.Receipts)
 	}
-	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), result.Receipts)
 	root, err := statedb.Commit(block.NumberU64(), false)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit state")

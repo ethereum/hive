@@ -361,9 +361,6 @@ loop:
 				return nil, fmt.Errorf("wrong head block in status, want:  %#x (block %d) have %#x",
 					want, c.consensusEngine.LatestHeader.Number.Uint64(), have)
 			}
-			if have, want := msg.TD.Cmp(c.consensusEngine.ChainTotalDifficulty), 0; have != want {
-				return nil, fmt.Errorf("wrong TD in status: have %d want %d", have, want)
-			}
 			if have, want := msg.ForkID, localForkID; !reflect.DeepEqual(have, want) {
 				return nil, fmt.Errorf("wrong fork ID in status: have (hash=%#x, next=%d), want (hash=%#x, next=%d)", have.Hash, have.Next, want.Hash, want.Next)
 			}
