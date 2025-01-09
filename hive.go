@@ -84,7 +84,10 @@ func main() {
 		NoColor: terminal == "" || terminal == "dumb",
 	})
 	slog.SetDefault(slog.New(tintHandler))
-
+	// See: https://github.com/ethereum/hive/issues/1200.
+	if err := os.Setenv("GODEBUG", "multipartmaxparts=20000"); err != nil {
+		fatal(err)
+	}
 	if *simTestLimit > 0 {
 		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
