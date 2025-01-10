@@ -1,37 +1,6 @@
-@import "../extlib/bootstrap-5.2.3.css";
+@import "../extlib/bootstrap-5.3.3.css";
 @import "../extlib/dataTables-1.13.1.bootstrap5.css";
 @import "../extlib/responsive-2.4.0.bootstrap5.css";
-
-:root {
-    --bg-color: #fff;
-    --text-color: #000;
-    --border-color: #bbb;
-    --link-color: #0d6efd;
-    --highlight-bg: #fffaea;
-    --error-color: #dc3545;
-    --gutter-bg: #f8f9fa;
-    --code-border: #777;
-}
-
-[data-theme="dark"] {
-    --bg-color: #1a1a1a;
-    --text-color: #e0e0e0;
-    --border-color: #444;
-    --link-color: #6ea8fe;
-    --highlight-bg: #2c2c1c;
-    --error-color: #ff6b6b;
-    --gutter-bg: #2d2d2d;
-    --code-border: #666;
-}
-
-[data-theme="dark"] #hive-logo {
-    filter: brightness(500%);
-}
-
-body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-}
 
 main {
     margin: 8px 8px;
@@ -41,7 +10,7 @@ main {
 }
 
 #hive-header {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid;
     padding-bottom: 0px;
     margin-bottom: 8px;
     display: flex;
@@ -51,6 +20,10 @@ main {
 
 #hive-logo {
     margin: 0 8px 3px 1px;
+}
+
+[data-bs-theme="dark"] #hive-logo {
+  filter: brightness(500%);
 }
 
 #hive-static-nav {
@@ -65,22 +38,19 @@ main {
 #hive-static-nav a {
     text-decoration: none;
     white-space: nowrap;
-    color: var(--link-color);
 }
 
 .theme-toggle {
     cursor: pointer;
     padding: 4px 12px;
     user-select: none;
-    background: var(--gutter-bg);
     border-radius: 20px;
     transition: all 0.2s ease;
-    border: 1px solid var(--border-color);
+    border: 1px solid;
     margin: 0 !important;
 }
 
 .theme-toggle:hover {
-    background: var(--border-color);
     transform: translateY(-1px);
 }
 
@@ -146,9 +116,8 @@ td.ellipsis {
 }
 
 .test-output code {
-    color: var(--text-color);
     white-space: pre;
-    border-left: 2px solid var(--code-border);
+    border-left: 2px solid;
     display: block;
     padding-left: 5px;
 }
@@ -157,7 +126,7 @@ td.ellipsis {
 .test-output .output-suffix::after {
     content: "";
     width: 20px;
-    border-top: 2px solid var(--code-border);
+    border-top: 2px solid;
     display: block;
     padding-left: 5px;
     margin-left: -5px;
@@ -165,8 +134,6 @@ td.ellipsis {
 
 .test-output .output-trunc {
     display: inline-block;
-    background-color: var(--code-border);
-    color: var(--bg-color);
     padding: 0 10px;
     text-decoration: none;
     white-space: nowrap;
@@ -174,7 +141,6 @@ td.ellipsis {
 
 .test-output .output-error {
     font-weight: bold;
-    color: var(--error-color);
 }
 
 .dataTable tr {
@@ -182,26 +148,9 @@ td.ellipsis {
 }
 
 .dataTable tr.highlighted {
-    background-color: var(--highlight-bg);
+    background-color: var(--bs-table-bg);
 }
 
-table.dataTable {
-    color: var(--text-color);
-}
-
-table.dataTable tbody tr {
-    background-color: var(--bg-color);
-}
-
-.table {
-    --bs-table-color: var(--text-color);
-    --bs-table-bg: var(--bg-color);
-    --bs-table-border-color: var(--border-color);
-}
-
-#gutter {
-    background: var(--gutter-bg);
-}
 
 /* workaround for weird DataTables controls styling at small screen size */
 @media screen and (max-width: 767px) {
