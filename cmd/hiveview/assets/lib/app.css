@@ -50,7 +50,7 @@ main {
 }
 
 #hive-static-nav {
-    margin: 0 16px 10px auto;
+    margin: 0 0 10px auto;
     font-size: 80%;
 }
 
@@ -72,6 +72,7 @@ main {
     border-radius: 20px;
     transition: all 0.2s ease;
     border: 1px solid var(--border-color);
+    margin: 0 !important;
 }
 
 .theme-toggle:hover {
