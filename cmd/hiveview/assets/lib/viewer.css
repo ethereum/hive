@@ -86,8 +86,19 @@ h3 {
     background: #f9f2dc;
 }
 
+[data-bs-theme="dark"] .num.highlighted {
+    background-color: var(--bs-gray-dark);
+}
+
 pre.highlighted {
     background-color: #f9f2dc;
+}
+
+
+
+[data-bs-theme="dark"] pre.highlighted {
+    background-color: var(--bs-gray-dark);
+    color: var(--bs-gray-100);
 }
 
 .num.highlighted::before {
@@ -113,4 +124,8 @@ pre.highlighted {
     transform: rotate(-45deg);
     clip-path: inset(4px 0 0 4px);
     background: linear-gradient(to bottom right, #f9f2dc00 15px, #f9f2dc 16px, #f9f2dc);
+}
+
+[data-bs-theme="dark"] .num.highlighted::before,.num.highlighted::after {
+    border-color: var(--bs-dark);
 }
