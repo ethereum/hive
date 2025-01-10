@@ -9,7 +9,6 @@ h3 {
 #viewer {
     display: flex;
     flex-wrap: nowrap;
-    background-color: #fff;
     border: 1px solid #d1d5da;
     border-radius: 0 0 3px 3px;
     width: 100%;
@@ -18,7 +17,6 @@ h3 {
 #viewer-header {
     margin: 8px 0 0 0;
     padding: 8px 16px;
-    background-color: #f6f8fa;
     border: 1px solid #d1d5da;
     border-bottom: none;
     border-radius: 3px 3px 0 0;

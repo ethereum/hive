@@ -2,6 +2,33 @@
 @import "../extlib/dataTables-1.13.1.bootstrap5.css";
 @import "../extlib/responsive-2.4.0.bootstrap5.css";
 
+:root {
+    --bg-color: #fff;
+    --text-color: #000;
+    --border-color: #bbb;
+    --link-color: #0d6efd;
+    --highlight-bg: #fffaea;
+    --error-color: #dc3545;
+    --gutter-bg: #f8f9fa;
+    --code-border: #777;
+}
+
+[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --border-color: #444;
+    --link-color: #6ea8fe;
+    --highlight-bg: #2c2c1c;
+    --error-color: #ff6b6b;
+    --gutter-bg: #2d2d2d;
+    --code-border: #666;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
 main {
     margin: 8px 8px;
     font-size: 12pt;
@@ -10,7 +37,7 @@ main {
 }
 
 #hive-header {
-    border-bottom: 1px solid #bbb;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 0px;
     margin-bottom: 8px;
     display: flex;
@@ -23,7 +50,7 @@ main {
 }
 
 #hive-static-nav {
-    margin: 0 16px 0 auto;
+    margin: 0 16px 10px auto;
     font-size: 80%;
 }
 
@@ -34,14 +61,26 @@ main {
 #hive-static-nav a {
     text-decoration: none;
     white-space: nowrap;
+    color: var(--link-color);
+}
+
+.theme-toggle {
+    cursor: pointer;
+    padding: 4px 12px;
+    user-select: none;
+    background: var(--gutter-bg);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+}
+
+.theme-toggle:hover {
+    background: var(--border-color);
+    transform: translateY(-1px);
 }
 
 .dataTables_wrapper {
     margin-top: 10px;
-}
-
-#sim-log-link {
-    color: black;
 }
 
 td.test-name-column {
@@ -97,14 +136,14 @@ td.ellipsis {
       first and set the width of the table based on that. This behavior is disabled by
       width: 0. However, we do want the element to expand to the available width.
       The min-width: 100% does that.
-   */
-    width: 0; min-width: 100%;
+    */
+   width: 0; min-width: 100%;
 }
 
 .test-output code {
-    color: black;
+    color: var(--text-color);
     white-space: pre;
-    border-left: 2px solid #777;
+    border-left: 2px solid var(--code-border);
     display: block;
     padding-left: 5px;
 }
@@ -113,7 +152,7 @@ td.ellipsis {
 .test-output .output-suffix::after {
     content: "";
     width: 20px;
-    border-top: 2px solid #777;
+    border-top: 2px solid var(--code-border);
     display: block;
     padding-left: 5px;
     margin-left: -5px;
@@ -121,8 +160,8 @@ td.ellipsis {
 
 .test-output .output-trunc {
     display: inline-block;
-    background-color: #777;
-    color: #fff;
+    background-color: var(--code-border);
+    color: var(--bg-color);
     padding: 0 10px;
     text-decoration: none;
     white-space: nowrap;
@@ -130,6 +169,7 @@ td.ellipsis {
 
 .test-output .output-error {
     font-weight: bold;
+    color: var(--error-color);
 }
 
 .dataTable tr {
@@ -137,12 +177,33 @@ td.ellipsis {
 }
 
 .dataTable tr.highlighted {
-    background-color: #fffaea;
+    background-color: var(--highlight-bg);
+}
+
+table.dataTable {
+    color: var(--text-color);
+}
+
+table.dataTable tbody tr {
+    background-color: var(--bg-color);
+}
+
+.table {
+    --bs-table-color: var(--text-color);
+    --bs-table-bg: var(--bg-color);
+    --bs-table-border-color: var(--border-color);
+}
+
+#gutter {
+    background: var(--gutter-bg);
 }
 
 /* workaround for weird DataTables controls styling at small screen size */
 @media screen and (max-width: 767px) {
-    div.dataTables_wrapper div.dataTables_length, div.dataTables_wrapper div.dataTables_filter, div.dataTables_wrapper div.dataTables_info, div.dataTables_wrapper div.dataTables_paginate {
+    div.dataTables_wrapper div.dataTables_length,
+    div.dataTables_wrapper div.dataTables_filter,
+    div.dataTables_wrapper div.dataTables_info,
+    div.dataTables_wrapper div.dataTables_paginate {
         text-align: left !important;
         margin-top: 5px;
     }

@@ -4,6 +4,22 @@ import $ from 'jquery';
 import * as routes from './routes.js';
 import { makeLink } from './html.js';
 
+// Initialize theme
+const storedTheme = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+document.documentElement.setAttribute('data-theme', storedTheme);
+
+// Theme toggle handler
+$(document).ready(function() {
+    $('.theme-toggle').text(storedTheme === 'dark' ? '☀️' : '🌙');
+    $('.theme-toggle').on('click', function() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        $('.theme-toggle').text(newTheme === 'dark' ? '☀️' : '🌙');
+    });
+});
+
 // updateHeader populates the page header with version information from hive.json.
 export function updateHeader() {
     $.ajax({
