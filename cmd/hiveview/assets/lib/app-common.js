@@ -41,7 +41,7 @@ function hiveInfoHTML(data) {
     var txt = '';
     if (data.buildDate) {
         let date = new Date(data.buildDate).toLocaleString();
-        txt += '<span>built: ' + date + '</span>';
+        txt += '<span>hiveview (UI) built: ' + date + '</span>';
     }
     if (data.sourceCommit) {
         let url = 'https://github.com/ethereum/hive/commits/' + escape(data.sourceCommit);
