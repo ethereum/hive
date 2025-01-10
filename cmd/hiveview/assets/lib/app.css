@@ -2,6 +2,10 @@
 @import "../extlib/dataTables-1.13.1.bootstrap5.css";
 @import "../extlib/responsive-2.4.0.bootstrap5.css";
 
+:root {
+    --highlight-bg: #fffaea;
+}
+
 main {
     margin: 8px 8px;
     font-size: 12pt;
@@ -147,8 +151,9 @@ td.ellipsis {
     scroll-margin: 8em 0 0 0;
 }
 
-.dataTable tr.highlighted {
-    background-color: var(--bs-table-bg);
+.dataTable tr.highlighted,
+.dataTable tr.highlighted td {
+    background-color: color-mix(in srgb, var(--bs-warning-border-subtle) 15%, transparent);
 }
 
 
