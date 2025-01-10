@@ -24,6 +24,10 @@
     --code-border: #666;
 }
 
+[data-theme="dark"] #hive-logo {
+    filter: brightness(500%);
+}
+
 body {
     background-color: var(--bg-color);
     color: var(--text-color);
