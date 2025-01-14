@@ -60,8 +60,8 @@ def to_bool:
     "terminalTotalDifficultyPassed": true,
     "blobSchedule": {
       "prague": {
-        "target": (env.HIVE_PRAGUE_BLOB_TARGET|to_int // 6),
-        "max": (env.HIVE_PRAGUE_BLOB_MAX|to_int // 9)
+        "target": (if env.HIVE_PRAGUE_BLOB_TARGET then env.HIVE_PRAGUE_BLOB_TARGET|to_int else 6 end),
+        "max": (if env.HIVE_PRAGUE_BLOB_MAX then env.HIVE_PRAGUE_BLOB_MAX|to_int else 9 end)
       }
     },
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa"
