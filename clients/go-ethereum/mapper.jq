@@ -58,6 +58,12 @@ def to_bool:
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
     "terminalTotalDifficultyPassed": true,
+    "blobSchedule": {
+      "prague": {
+        "target": (env.HIVE_PRAGUE_BLOB_TARGET|to_int // 6),
+        "max": (env.HIVE_PRAGUE_BLOB_MAX|to_int // 9)
+      }
+    },
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   }|remove_empty
 }

@@ -58,5 +58,11 @@ def to_bool:
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
+    "blobSchedule": {
+      "prague": {
+        "target": (env.HIVE_PRAGUE_BLOB_TARGET|to_int // 6),
+        "max": (env.HIVE_PRAGUE_BLOB_MAX|to_int // 9)
+      }
+    },
   }|remove_empty
 }

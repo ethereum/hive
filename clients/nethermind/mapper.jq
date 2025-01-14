@@ -163,6 +163,13 @@ def clique_engine:
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
+
+    "blobSchedule": {
+      "prague": {
+        "target": (env.HIVE_PRAGUE_BLOB_TARGET|to_int // 6),
+        "max": (env.HIVE_PRAGUE_BLOB_MAX|to_int // 9)
+      }
+    },
   },
   "genesis": {
     "seal": {

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -100,6 +102,16 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.CancunTime = &timestamp
 		case "prague":
 			chaincfg.PragueTime = &timestamp
+			if cfg.blobSchedule != nil {
+				chaincfg.BlobSchedule = cfg.blobSchedule
+			} else {
+				chaincfg.BlobSchedule = &params.BlobSchedule{
+					Prague: params.BlobScheduleConfig{
+						Target: 6,
+						Max:    9,
+					},
+				}
+			}
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
