@@ -159,6 +159,7 @@ def clique_engine:
     "eip7251TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
     "eip7685TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
     "eip7702TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
+    "eip7623TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
 
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
