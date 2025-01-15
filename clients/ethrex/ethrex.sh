@@ -111,4 +111,4 @@ fi
 
 # Launch the main client.
 echo "Running ethrex with flags: $FLAGS"
-RUST_LOG=info $ethrex $FLAGS
+$ethrex $FLAGS
