@@ -1,4 +1,4 @@
-ARG baseimage=ghcr.io/optimism-java/shisui
+ARG baseimage=ghcr.io/zen-eth/shisui
 ARG tag=latest
 
 FROM $baseimage:$tag
