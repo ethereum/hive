@@ -129,7 +129,7 @@ function showFileListing(data) {
                 render: function(data) {
                     let url = routes.suite(data.fileName, data.name);
                     let loadText = 'Load (' + formatBytes(data.size) + ')';
-                    return makeButton(url, loadText).outerHTML;
+                    return makeButton(url, loadText, "btn-load-results").outerHTML;
                 },
             },
         ],
