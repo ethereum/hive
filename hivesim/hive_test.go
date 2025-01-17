@@ -407,7 +407,10 @@ func newFakeAPI(hooks *fakes.BackendHooks) (*libhive.TestManager, *httptest.Serv
 	}
 	env := libhive.SimEnv{}
 	backend := fakes.NewContainerBackend(hooks)
-	tm := libhive.NewTestManager(env, backend, defs)
+	hiveInfo := libhive.HiveInfo{
+		Command: []string{"/hive"},
+	}
+	tm := libhive.NewTestManager(env, backend, defs, hiveInfo)
 	srv := httptest.NewServer(tm.API())
 	return tm, srv
 }

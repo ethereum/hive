@@ -27,11 +27,12 @@ const hiveEnvvarPrefix = "HIVE_"
 const defaultStartTimeout = time.Duration(60 * time.Second)
 
 // newSimulationAPI creates handlers for the simulation API.
-func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
-	api := &simAPI{backend: b, env: env, tm: tm}
+func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive HiveInfo) http.Handler {
+	api := &simAPI{backend: b, env: env, tm: tm, hive: hive}
 
 	// API routes.
 	router := mux.NewRouter()
+	router.HandleFunc("/hive", api.getHiveInfo).Methods("GET")
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
@@ -56,6 +57,13 @@ type simAPI struct {
 	backend ContainerBackend
 	env     SimEnv
 	tm      *TestManager
+	hive    HiveInfo
+}
+
+// getHiveInfo returns information about the hive server instance.
+func (api *simAPI) getHiveInfo(w http.ResponseWriter, r *http.Request) {
+	slog.Info("API: hive info requested")
+	serveJSON(w, api.hive)
 }
 
 // getClientTypes returns all known client types.
