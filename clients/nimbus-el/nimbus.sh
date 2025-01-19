@@ -47,8 +47,8 @@
 # Immediately abort the script on any error encountered
 set -e
 
-nimbus=/usr/bin/nimbus
-FLAGS="--chaindb:archive --nat:extip:0.0.0.0"
+nimbus=/usr/bin/nimbus_execution_client
+FLAGS="--nat:extip:0.0.0.0 "
 
 loglevel=DEBUG
 case "$HIVE_LOGLEVEL" in
@@ -98,7 +98,7 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-  CMD="import /chain.rlp"
+  CMD="import-rlp /chain.rlp"
   echo "Running nimbus: $nimbus $CMD $FLAGS"
   $nimbus $CMD $FLAGS
 else
@@ -108,7 +108,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && $nimbus import `ls | sort -n` $FLAGS)
+  (cd /blocks && $nimbus import-rlp `ls | sort -n` $FLAGS)
 else
   echo "Warning: blocks folder not found."
 fi
