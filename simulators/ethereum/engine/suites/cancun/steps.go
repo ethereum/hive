@@ -528,7 +528,7 @@ func (step NewPayloads) Execute(t *TestContext) error {
 			},
 			OnNewPayloadBroadcast: func() {
 				if step.NewPayloadCustomizer != nil {
-					// Send a test NewPayload directive with either a modified payload or modifed versioned hashes
+					// Send a test NewPayload directive with either a modified payload or modified versioned hashes
 					var (
 						payload        = &t.CLMock.LatestPayloadBuilt
 						r              *test.NewPayloadResponseExpectObject

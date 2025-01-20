@@ -114,7 +114,7 @@ func (c BeaconCache) GetBlockStateByRoot(
 	stateRoot := s.Root()
 	if !bytes.Equal(blockStateRoot[:], stateRoot[:]) {
 		return BeaconBlockState{}, fmt.Errorf(
-			"state root missmatch while fetching state",
+			"state root mismatch while fetching state",
 		)
 	}
 	both := BeaconBlockState{

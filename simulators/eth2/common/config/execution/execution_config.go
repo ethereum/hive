@@ -111,7 +111,7 @@ func (c ExecutionEthashConsensus) DifficultyPerBlock() *big.Int {
 }
 
 func (c ExecutionEthashConsensus) SecondsPerBlock() uint64 {
-	// It is really hard to approxmate this value
+	// It is really hard to approximate this value
 	return 10
 }
 
