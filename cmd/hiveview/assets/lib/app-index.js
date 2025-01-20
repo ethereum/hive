@@ -311,7 +311,7 @@ ${timeSince(new Date(run.start))} ago">
                         return '';
                     }
 
-                    const passDiff = data.passes - prevRun.passes;
+                    const passDiff = prevRun.passes - data.passes;
                     const sign = passDiff > 0 ? '-' : '+';
                     const absValue = Math.abs(passDiff);
                     return `<span class="${passDiff > 0 ? 'fail-diff' : 'pass-diff'}" title="Change in passing tests compared to previous run">${sign}${absValue}</span>`;
