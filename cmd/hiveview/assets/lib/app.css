@@ -168,3 +168,101 @@ td.ellipsis {
         margin-top: 5px;
     }
 }
+
+.suite-box {
+  padding: 1.2rem;
+  border-radius: 8px;
+  background: var(--bs-dark-bg-subtle);
+  min-width: 300px;
+  flex: 1;
+}
+
+.suite-box .title {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.client-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.client-box {
+  padding: 0.8rem;
+  border-radius: 6px;
+  background: var(--bs-body-bg);
+}
+
+.client-name {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.3rem;
+}
+
+.history-dots {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.history-dot {
+  width: 16px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--bs-dark-bg-subtle);
+  position: relative;
+  cursor: pointer;
+}
+
+.history-dot .dot-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: var(--bs-success);
+  border-radius: 2px;
+  transition: height 0.2s ease;
+}
+
+.history-dot.trend-up::after {
+  content: "▲";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--bs-success);
+  font-size: 8px;
+}
+
+.history-dot.trend-down::after {
+  content: "▼";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--bs-danger);
+  font-size: 8px;
+}
+
+.time {
+  font-size: 0.9em;
+  color: var(--bs-secondary);
+}
+
+.pass-count {
+  color: var(--bs-success);
+}
+
+.fail-count {
+  color: var(--bs-danger);
+}

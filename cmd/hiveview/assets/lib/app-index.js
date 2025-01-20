@@ -33,6 +33,93 @@ $(document).ready(function () {
 
 function showFileListing(data) {
     console.log('Got file list');
+
+    // Process summary data
+    const lines = data.trim().split('\n');
+    const suiteGroups = new Map();
+
+    // First, collect all runs for each suite+client combination
+    lines.forEach(line => {
+        const entry = JSON.parse(line);
+        if (!suiteGroups.has(entry.name)) {
+            suiteGroups.set(entry.name, new Map());
+        }
+
+        const clientGroup = suiteGroups.get(entry.name);
+        const clientKey = entry.clients.join(',');
+
+        if (!clientGroup.has(clientKey)) {
+            clientGroup.set(clientKey, []);
+        }
+        clientGroup.get(clientKey).push(entry);
+    });
+
+    // Sort runs and keep only last 5 for each client
+    for (const clientGroup of suiteGroups.values()) {
+        for (const [clientKey, runs] of clientGroup.entries()) {
+            runs.sort((a, b) => new Date(b.start) - new Date(a.start));
+            clientGroup.set(clientKey, runs.slice(0, 5));
+        }
+    }
+
+    // Display summary boxes
+    const summaryDiv = $('#suite-summary');
+    Array.from(suiteGroups.entries())
+        .sort((a, b) => a[0].localeCompare(b[0])) // Sort suites alphabetically by name
+        .slice(0, 4)
+        .forEach(([suiteName, clientResults]) => {
+            const clientBoxes = Array.from(clientResults.entries())
+                .sort((a, b) => a[0].localeCompare(b[0])) // Sort by client name
+                .map(([clientKey, runs]) => {
+                    const latest = runs[0];
+                    const timeAgo = timeSince(new Date(latest.start));
+
+                    // Generate history dots
+                    const historyDots = runs.map((run, idx) => {
+                        const prevRun = runs[idx + 1];
+                        let trendClass = '';
+                        if (prevRun) {
+                            const prevRatio = prevRun.passes / (prevRun.passes + prevRun.fails);
+                            const currRatio = run.passes / (run.passes + run.fails);
+                            trendClass = currRatio > prevRatio ? 'trend-up' :
+                                       currRatio < prevRatio ? 'trend-down' : 'trend-same';
+                        }
+                        const passRatio = Math.round((run.passes / (run.passes + run.fails)) * 100);
+                        return `
+                            <div class="history-dot ${trendClass}"
+                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio}%)
+${timeSince(new Date(run.start))} ago">
+                                <div class="dot-fill" style="height: ${passRatio}%"></div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="client-box">
+                            <div class="client-name">${clientKey}</div>
+                            <div class="stats">
+                                <span class="pass-count">✓ ${latest.passes}</span>
+                                <span class="fail-count">✗ ${latest.fails}</span>
+                                <div class="history-dots">
+                                    ${historyDots}
+                                </div>
+                            </div>
+                            <div class="time">${timeAgo} ago</div>
+                        </div>
+                    `;
+                }).join('');
+
+            const box = $(`
+                <div class="suite-box">
+                    <div class="title">${suiteName}</div>
+                    <div class="client-results">
+                        ${clientBoxes}
+                    </div>
+                </div>
+            `);
+            summaryDiv.append(box);
+        });
+
     // the data is jsonlines
     /*
         {
@@ -141,6 +228,28 @@ function showFileListing(data) {
         filters.clear();
         return false;
     });
+}
+
+function timeSince(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+
+    const intervals = {
+        year: 31536000,
+        month: 2592000,
+        week: 604800,
+        day: 86400,
+        hour: 3600,
+        minute: 60
+    };
+
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+        const interval = Math.floor(seconds / secondsInUnit);
+        if (interval >= 1) {
+            return interval === 1 ? `1 ${unit}` : `${interval} ${unit}s`;
+        }
+    }
+
+    return 'just now';
 }
 
 // ColumnFilterSet manages the column filters.
