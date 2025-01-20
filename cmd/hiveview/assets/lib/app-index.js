@@ -95,7 +95,9 @@ ${timeSince(new Date(run.start))} ago">
                     }).join('');
 
                     return `
-                        <div class="client-box">
+                        <div class="client-box" style="cursor: pointer;"
+                             data-suite="${suiteName}" data-client="${clientKey}"
+                             onclick="window.filterSuiteAndClient('${suiteName}', '${clientKey}')">
                             <div class="client-name">${clientKey}</div>
                             <div class="stats">
                                 <span class="pass-count">✓ ${latest.passes}</span>
@@ -111,7 +113,7 @@ ${timeSince(new Date(run.start))} ago">
 
             const box = $(`
                 <div class="suite-box">
-                    <div class="title">${suiteName}</div>
+                    <div class="title" onclick="window.filterSuite('${suiteName}')">${suiteName}</div>
                     <div class="client-results">
                         ${clientBoxes}
                     </div>
@@ -226,6 +228,8 @@ ${timeSince(new Date(run.start))} ago">
     filters.build();
     $('#filters-clear').click(function () {
         filters.clear();
+        $('.suite-box').removeClass('selected');
+        $('.client-box').removeClass('selected');
         return false;
     });
 }
@@ -483,3 +487,56 @@ class StatusFilter extends ColumnFilter {
         return escapeRegExp(value);
     }
 }
+
+// Add this function at the global scope
+window.filterSuite = function(suiteName) {
+    // Remove all selections
+    $('.suite-box').removeClass('selected');
+    $('.client-box').removeClass('selected');
+
+    // Find and highlight the clicked suite
+    $(`.suite-box:has(.title:contains('${suiteName}'))`).addClass('selected');
+
+    const filters = new ColumnFilterSet($('#filetable').DataTable());
+
+    // Apply suite filter
+    const suiteFilter = filters.byKey('suite');
+    if (suiteFilter) {
+        suiteFilter.apply(suiteName);
+        $('select', $('.filters th').eq(1)).val(suiteName);
+    }
+
+    // Clear client filter
+    const clientFilter = filters.byKey('client');
+    if (clientFilter) {
+        clientFilter.apply('');
+        $('select', $('.filters th').eq(2)).val('');
+    }
+};
+
+// Update the existing filterSuiteAndClient function to also handle suite box selection
+window.filterSuiteAndClient = function(suiteName, clientKey) {
+    // Remove all selections
+    $('.suite-box').removeClass('selected');
+    $('.client-box').removeClass('selected');
+
+    // Find and highlight the clicked box and its suite
+    $(`.suite-box:has(.title:contains('${suiteName}'))`).addClass('selected');
+    $(`.client-box[data-suite="${suiteName}"][data-client="${clientKey}"]`).addClass('selected');
+
+    const filters = new ColumnFilterSet($('#filetable').DataTable());
+
+    // Apply suite filter
+    const suiteFilter = filters.byKey('suite');
+    if (suiteFilter) {
+        suiteFilter.apply(suiteName);
+        $('select', $('.filters th').eq(1)).val(suiteName);
+    }
+
+    // Apply client filter
+    const clientFilter = filters.byKey('client');
+    if (clientFilter) {
+        clientFilter.apply(clientKey);
+        $('select', $('.filters th').eq(2)).val(clientKey);
+    }
+};

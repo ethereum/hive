@@ -175,6 +175,12 @@ td.ellipsis {
   background: var(--bs-dark-bg-subtle);
   min-width: 300px;
   flex: 1;
+  transition: background-color 0.2s ease;
+}
+
+.suite-box.selected {
+  background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-dark-bg-subtle));
+  outline: 1px solid var(--bs-primary);
 }
 
 .suite-box .title {
@@ -183,6 +189,7 @@ td.ellipsis {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--bs-border-color);
+  cursor: pointer;
 }
 
 .client-results {
@@ -195,6 +202,12 @@ td.ellipsis {
   padding: 0.8rem;
   border-radius: 6px;
   background: var(--bs-body-bg);
+  transition: background-color 0.2s ease;
+}
+
+.client-box.selected {
+  background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-body-bg));
+  outline: 1px solid var(--bs-primary);
 }
 
 .client-name {
