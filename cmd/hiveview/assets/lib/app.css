@@ -292,13 +292,29 @@ td.ellipsis {
   padding: 0.5rem;
   border-radius: 4px;
   background: var(--bs-body-bg);
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   height: fit-content;
+  border: 2px solid transparent;
 }
 
 .client-box.selected {
   background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-body-bg));
   outline: 1px solid var(--bs-primary);
+}
+
+.client-box.all-passed {
+  border-color: var(--bs-success);
+  background: color-mix(in srgb, var(--bs-success) 8%, var(--bs-body-bg));
+}
+
+.client-box.has-failures {
+  border-color: var(--bs-warning);
+  background: color-mix(in srgb, var(--bs-warning) 8%, var(--bs-body-bg));
+}
+
+.client-box.all-failed {
+  border-color: var(--bs-danger);
+  background: color-mix(in srgb, var(--bs-danger) 8%, var(--bs-body-bg));
 }
 
 .client-name {

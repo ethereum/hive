@@ -94,7 +94,7 @@ ${timeSince(new Date(run.start))} ago">
                     }).join('');
 
                     return `
-                        <div class="client-box" style="cursor: pointer;"
+                        <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}" style="cursor: pointer;"
                              data-suite="${suiteName}" data-client="${clientKey}"
                              onclick="window.filterSuiteAndClient('${suiteName}', '${clientKey}')">
                             <div class="client-name">${clientKey}</div>
