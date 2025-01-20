@@ -396,6 +396,20 @@ td.ellipsis {
   color: var(--bs-secondary);
 }
 
+#filters-notice {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+#filters-notice .btn {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.9rem;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 576px) {
   .client-results {

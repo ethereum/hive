@@ -124,6 +124,15 @@ ${timeSince(new Date(run.start))} ago">
             summaryDiv.append(box);
         });
 
+    // Add floating filters notice
+    const filtersNotice = $(`
+        <div id="filters-notice" class="btn-group" role="group" style="display: none">
+            <button type="button" class="btn btn-light" disabled>Filters active</button>
+            <button type="button" class="btn btn-primary" id="filters-clear">Clear Filters</button>
+        </div>
+    `);
+    $('main').prepend(filtersNotice);
+
     // the data is jsonlines
     /*
         {
@@ -535,6 +544,9 @@ window.filterSuite = function(suiteName) {
         clientFilter.apply('');
         $('select', $('.filters th').eq(2)).val('');
     }
+
+    // Scroll to the table
+    $('#filetable').get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 // Update the existing filterSuiteAndClient function to also handle suite box selection
@@ -564,4 +576,7 @@ window.filterSuiteAndClient = function(suiteName, clientKey) {
         clientFilter.apply(clientKey);
         $('select', $('.filters th').eq(2)).val(clientKey);
     }
+
+    // Scroll to the table
+    $('#filetable').get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
