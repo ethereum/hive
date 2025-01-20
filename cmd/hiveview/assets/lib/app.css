@@ -256,12 +256,18 @@ td.ellipsis {
     }
 }
 
-.suite-box {
-  padding: 1.2rem;
-  border-radius: 8px;
+#suite-summary {
+  border-radius: 6px;
   background: var(--bs-dark-bg-subtle);
-  min-width: 300px;
-  flex: 1;
+}
+
+.suite-box {
+  margin: 5px;
+  padding: 5px 0.8rem;
+  border-radius: 6px;
+  background: var(--bs-dark-bg-subtle);
+  min-width: 250px;
+  width: 100%;
   transition: background-color 0.2s ease;
 }
 
@@ -272,24 +278,22 @@ td.ellipsis {
 
 .suite-box .title {
   font-weight: bold;
-  font-size: 1.1em;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--bs-border-color);
+  font-size: 1em;
   cursor: pointer;
 }
 
 .client-results {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.4rem;
 }
 
 .client-box {
-  padding: 0.8rem;
-  border-radius: 6px;
+  padding: 0.5rem;
+  border-radius: 4px;
   background: var(--bs-body-bg);
   transition: background-color 0.2s ease;
+  height: fit-content;
 }
 
 .client-box.selected {
@@ -299,25 +303,27 @@ td.ellipsis {
 
 .client-name {
   font-weight: 500;
-  margin-bottom: 0.5rem;
+  font-size: 0.9em;
+  margin-bottom: 0.3rem;
 }
 
 .stats {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.3rem;
+  gap: 0.6rem;
+  margin-bottom: 0.2rem;
+  font-size: 0.9em;
 }
 
 .history-dots {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.3rem;
   margin-left: auto;
 }
 
 .history-dot {
-  width: 16px;
-  height: 24px;
+  width: 12px;
+  height: 20px;
   border-radius: 2px;
   background: var(--bs-dark-bg-subtle);
   position: relative;
@@ -355,7 +361,7 @@ td.ellipsis {
 }
 
 .time {
-  font-size: 0.9em;
+  font-size: 0.8em;
   color: var(--bs-secondary);
 }
 
@@ -365,4 +371,17 @@ td.ellipsis {
 
 .fail-count {
   color: var(--bs-danger);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 576px) {
+  .client-results {
+    grid-template-columns: 1fr;  /* Single column on very small screens */
+  }
+}
+
+@media screen and (min-width: 577px) and (max-width: 992px) {
+  .client-results {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));  /* Slightly smaller on medium screens */
+  }
 }

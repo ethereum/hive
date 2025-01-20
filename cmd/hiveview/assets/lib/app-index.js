@@ -100,7 +100,7 @@ ${timeSince(new Date(run.start))} ago">
                             <div class="client-name">${clientKey}</div>
                             <div class="stats">
                                 <span class="pass-count">✓ ${latest.passes}</span>
-                                <span class="fail-count">✗ ${latest.fails}</span>
+                                ${latest.fails > 0 ? `<span class="fail-count">✗ ${latest.fails}</span>` : ''}
                                 <div class="history-dots">
                                     ${historyDots}
                                 </div>
@@ -510,8 +510,10 @@ window.filterSuite = function(suiteName) {
     $('.suite-box').removeClass('selected');
     $('.client-box').removeClass('selected');
 
-    // Find and highlight the clicked suite
-    $(`.suite-box:has(.title:contains('${suiteName}'))`).addClass('selected');
+    // Find and highlight the clicked suite - match exact title
+    $(`.suite-box:has(.title:contains('${suiteName}'))`).filter(function() {
+        return $(this).find('.title').text() === suiteName;
+    }).addClass('selected');
 
     const filters = new ColumnFilterSet($('#filetable').DataTable());
 
@@ -536,8 +538,10 @@ window.filterSuiteAndClient = function(suiteName, clientKey) {
     $('.suite-box').removeClass('selected');
     $('.client-box').removeClass('selected');
 
-    // Find and highlight the clicked box and its suite
-    $(`.suite-box:has(.title:contains('${suiteName}'))`).addClass('selected');
+    // Find and highlight the clicked box and its suite - match exact title
+    $(`.suite-box:has(.title:contains('${suiteName}'))`).filter(function() {
+        return $(this).find('.title').text() === suiteName;
+    }).addClass('selected');
     $(`.client-box[data-suite="${suiteName}"][data-client="${clientKey}"]`).addClass('selected');
 
     const filters = new ColumnFilterSet($('#filetable').DataTable());
