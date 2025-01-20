@@ -123,6 +123,11 @@ main {
     text-align: right;
 }
 
+.suite-diff-column {
+    text-align: right;
+    padding-right: 1rem !important;
+}
+
 .dataTables_info {
     font-size: 0.9em;
     color: var(--bs-secondary);
@@ -411,6 +416,22 @@ td.ellipsis {
   color: var(--bs-secondary);
 }
 
+.status-diff {
+  font-size: 0.85em;
+  margin-top: 0.2rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.pass-diff {
+  color: var(--bs-success);
+}
+
+.fail-diff {
+  color: var(--bs-danger);
+}
+
 #filters-notice {
   position: fixed;
   top: 1rem;
@@ -423,6 +444,10 @@ td.ellipsis {
 #filters-notice .btn {
   padding: 0.3rem 0.8rem;
   font-size: 0.9rem;
+}
+
+.btn-load-results {
+  width: 100%;
 }
 
 /* Responsive adjustments */

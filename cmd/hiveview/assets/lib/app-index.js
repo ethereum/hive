@@ -284,13 +284,37 @@ ${timeSince(new Date(run.start))} ago">
                 data: null,
                 width: '5.5em',
                 className: 'suite-status-column',
-                render: function(data) {
+                render: function(data, type, row) {
                     if (data.fails > 0) {
                         let prefix = data.timeout ? 'Timeout' : 'Fail';
                         const total = data.fails + data.passes;
                         return `<span class="fail-count">✗ ${prefix} (${data.fails}/${total})</span>`;
                     }
                     return `<span class="pass-count">✓ (${data.passes})</span>`;
+                },
+            },
+            {
+                title: 'Diff',
+                data: null,
+                width: '2em',
+                className: 'suite-diff-column',
+                orderable: false,
+                render: function(data, type, row) {
+                    // Find previous run with same suite and clients
+                    const prevRun = suites.find(s =>
+                        s.name === data.name &&
+                        s.clients.join(',') === data.clients.join(',') &&
+                        new Date(s.start) < new Date(data.start)
+                    );
+
+                    if (!prevRun || prevRun.passes === data.passes) {
+                        return '';
+                    }
+
+                    const passDiff = data.passes - prevRun.passes;
+                    const sign = passDiff > 0 ? '-' : '+';
+                    const absValue = Math.abs(passDiff);
+                    return `<span class="${passDiff > 0 ? 'fail-diff' : 'pass-diff'}" title="Change in passing tests compared to previous run">${sign}${absValue}</span>`;
                 },
             },
             {
@@ -301,7 +325,7 @@ ${timeSince(new Date(run.start))} ago">
                 render: function(data) {
                     let url = routes.suite(data.fileName, data.name);
                     let loadText = 'Load (' + formatBytes(data.size) + ')';
-                    return makeButton(url, loadText).outerHTML;
+                    return makeButton(url, loadText, "btn-secondary btn-load-results").outerHTML;
                 },
             },
         ],
