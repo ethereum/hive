@@ -467,7 +467,9 @@ class ClientFilter extends ColumnFilter {
     }
 
     valueToRegExp(value) {
-        return '\\b' + escapeRegExp(value) + '\\b'; // anchor match to words
+        // Add a space after each comma to match how it's rendered in the table
+        const searchValue = value.replace(/,/g, ', ');
+        return '^' + escapeRegExp(searchValue) + '$';
     }
 }
 
