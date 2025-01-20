@@ -379,6 +379,9 @@ td.ellipsis {
 .time {
   font-size: 0.8em;
   color: var(--bs-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .pass-count {
@@ -387,6 +390,10 @@ td.ellipsis {
 
 .fail-count {
   color: var(--bs-danger);
+}
+
+.coverage-percent {
+  color: var(--bs-secondary);
 }
 
 /* Responsive adjustments */

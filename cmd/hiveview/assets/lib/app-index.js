@@ -105,7 +105,10 @@ ${timeSince(new Date(run.start))} ago">
                                     ${historyDots}
                                 </div>
                             </div>
-                            <div class="time">${timeAgo} ago</div>
+                            <div class="time">
+                                <span>${timeAgo} ago</span>
+                                <span class="coverage-percent">${Math.round((latest.passes / (latest.passes + latest.fails)) * 100)}%</span>
+                            </div>
                         </div>
                     `;
                 }).join('');
