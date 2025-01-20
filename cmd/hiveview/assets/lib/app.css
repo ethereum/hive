@@ -261,6 +261,20 @@ td.ellipsis {
   background: var(--bs-dark-bg-subtle);
 }
 
+.summary-controls {
+  padding: 0.5rem 0.8rem;
+}
+
+.summary-controls .dropdown-toggle {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.summary-controls .dropdown-menu {
+  font-size: 0.9rem;
+  min-width: 8rem;
+}
+
 .suite-box {
   margin: 5px;
   padding: 5px 0.8rem;
@@ -271,15 +285,16 @@ td.ellipsis {
   transition: background-color 0.2s ease;
 }
 
-.suite-box.selected {
-  background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-dark-bg-subtle));
-  outline: 1px solid var(--bs-primary);
-}
-
 .suite-box .title {
   font-weight: bold;
   font-size: 1em;
   cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.suite-box.selected {
+  background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-dark-bg-subtle));
+  outline: 1px solid var(--bs-primary);
 }
 
 .client-results {

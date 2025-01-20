@@ -64,6 +64,72 @@ function showFileListing(data) {
 
     // Display summary boxes
     const summaryDiv = $('#suite-summary');
+
+    // Add sorting function to window scope first
+    window.sortAllClients = function(sortBy) {
+        $('.suite-box').each(function() {
+            const clientBoxes = $(this).find('.client-box').get();
+
+            clientBoxes.sort((a, b) => {
+                const boxA = $(a);
+                const boxB = $(b);
+
+                switch(sortBy) {
+                    case 'name':
+                        return boxA.data('client').localeCompare(boxB.data('client'));
+                    case 'coverage':
+                        const coverageA = parseInt(boxA.find('.coverage-percent').text());
+                        const coverageB = parseInt(boxB.find('.coverage-percent').text());
+                        return coverageB - coverageA; // Higher coverage first
+                    case 'time':
+                        const timeA = new Date(boxA.data('time'));
+                        const timeB = new Date(boxB.data('time'));
+                        return timeB - timeA; // Most recent first
+                    default:
+                        return 0;
+                }
+            });
+
+            const clientResults = $(this).find('.client-results');
+            clientResults.empty();
+            clientBoxes.forEach(box => clientResults.append(box));
+        });
+
+        // Update URL hash with sort parameter while preserving other parameters
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        urlParams.set('summary-sort', sortBy);
+        const newHash = urlParams.toString();
+        if (newHash) {
+            window.history.replaceState(null, '', '#' + newHash);
+        }
+
+        // Update dropdown button text
+        const sortText = {
+            'name': 'Name',
+            'coverage': 'Coverage',
+            'time': 'Time'
+        }[sortBy];
+        $('.summary-controls .current-sort').text(sortText);
+    };
+
+    // Add global sort controls
+    const sortControls = $(`
+        <div class="summary-controls">
+            <div class="dropdown">
+                <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    Sort runs by: <span class="current-sort">Name</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); window.sortAllClients('name')">Name</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); window.sortAllClients('coverage')">Coverage</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); window.sortAllClients('time')">Time</a></li>
+                </ul>
+            </div>
+        </div>
+    `);
+    summaryDiv.prepend(sortControls);
+
+    // Generate all client boxes first
     Array.from(suiteGroups.entries())
         .sort((a, b) => a[0].localeCompare(b[0])) // Sort suites alphabetically by name
         .forEach(([suiteName, clientResults]) => {
@@ -95,7 +161,7 @@ ${timeSince(new Date(run.start))} ago">
 
                     return `
                         <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}" style="cursor: pointer;"
-                             data-suite="${suiteName}" data-client="${clientKey}"
+                             data-suite="${suiteName}" data-client="${clientKey}" data-time="${latest.start}"
                              onclick="window.filterSuiteAndClient('${suiteName}', '${clientKey}')">
                             <div class="client-name">${clientKey}</div>
                             <div class="stats">
@@ -124,6 +190,11 @@ ${timeSince(new Date(run.start))} ago">
             summaryDiv.append(box);
         });
 
+    // Apply initial sort from URL hash if present
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    const initialSort = urlParams.get('summary-sort') || 'name';
+    window.sortAllClients(initialSort);
+
     // Add floating filters notice
     const filtersNotice = $(`
         <div id="filters-notice" class="btn-group" role="group" style="display: none">
@@ -132,22 +203,6 @@ ${timeSince(new Date(run.start))} ago">
         </div>
     `);
     $('main').prepend(filtersNotice);
-
-    // the data is jsonlines
-    /*
-        {
-            "fileName": "./1587325327-fa7ec3c7d09a8cfb754097f79df82118.json",
-            "name": "Sync test suite",
-            "start": "",
-            "simLog": "1587325280-00befe48086b1ef74fbb19b9b7d43e4d-simulator.log",
-            "passes": 0,
-            "fails": 0,
-            "size": 435,
-            "clients": [],
-            "description": "This suite of tests verifies that clients can sync from each...'\n",
-            "ntests": 0
-    }
-    */
 
     let suites = [];
     data.split('\n').forEach(function(elem) {
