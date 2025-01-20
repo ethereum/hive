@@ -66,7 +66,6 @@ function showFileListing(data) {
     const summaryDiv = $('#suite-summary');
     Array.from(suiteGroups.entries())
         .sort((a, b) => a[0].localeCompare(b[0])) // Sort suites alphabetically by name
-        .slice(0, 4)
         .forEach(([suiteName, clientResults]) => {
             const clientBoxes = Array.from(clientResults.entries())
                 .sort((a, b) => a[0].localeCompare(b[0])) // Sort by client name
@@ -152,6 +151,22 @@ ${timeSince(new Date(run.start))} ago">
         data: suites,
         pageLength: 50,
         autoWidth: false,
+        dom: '<"row"<"col-sm-6"l><"col-sm-6"f>>' +
+             '<"row"<"col-sm-12"tr>>' +
+             '<"row"<"col-sm-5"i><"col-sm-7"p>>',
+        language: {
+            lengthMenu: "Show _MENU_",
+            search: "",
+            searchPlaceholder: "Search...",
+            info: "Showing _START_ to _END_ of _TOTAL_ results",
+            infoEmpty: "No results found",
+            paginate: {
+                first: "«",
+                last: "»",
+                next: "›",
+                previous: "‹"
+            }
+        },
         responsive: {
             details: {
                 type: 'none',
@@ -205,9 +220,10 @@ ${timeSince(new Date(run.start))} ago">
                 render: function(data) {
                     if (data.fails > 0) {
                         let prefix = data.timeout ? 'Timeout' : 'Fail';
-                        return '&#x2715; <b>' + prefix + ' (' + data.fails + ' / ' + (data.fails + data.passes) + ')</b>';
+                        const total = data.fails + data.passes;
+                        return `<span class="fail-count">✗ ${prefix} (${data.fails}/${total})</span>`;
                     }
-                    return '&#x2713 (' + data.passes + ')';
+                    return `<span class="pass-count">✓ (${data.passes})</span>`;
                 },
             },
             {

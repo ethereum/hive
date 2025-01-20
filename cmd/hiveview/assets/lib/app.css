@@ -59,7 +59,94 @@ main {
 }
 
 .dataTables_wrapper {
-    margin-top: 10px;
+    padding-top: 1rem;
+    margin-top: 1.5rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bs-body-bg) 85%, var(--bs-border-color));
+}
+
+.dataTables_wrapper .row {
+    margin: 0;
+    align-items: center;
+}
+
+.dataTables_wrapper .row:first-child {
+    margin-bottom: 1rem;
+}
+
+.dataTables_wrapper .row:last-child {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.table {
+    margin: 0 !important;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.8rem;
+    background: none;
+}
+
+.table tbody tr {
+    background: var(--bs-body-bg);
+    margin-bottom: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background: color-mix(in srgb, var(--bs-body-bg) 95%, var(--bs-primary));
+}
+
+.table thead th {
+    font-weight: 500;
+    border-bottom: none;
+    padding-bottom: 1rem;
+}
+
+.filters th {
+    padding-top: 0 !important;
+    padding-bottom: 1rem !important;
+}
+
+.filters select {
+    width: 100%;
+    padding: 0.3rem;
+    border-radius: 4px;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+.suite-status-column {
+    text-align: right;
+}
+
+.dataTables_info {
+    font-size: 0.9em;
+    color: var(--bs-secondary);
+}
+
+.dataTables_paginate .pagination {
+    margin: 0;
+    gap: 0.3rem;
+}
+
+.dataTables_paginate .page-link {
+    padding: 0.3rem 0.7rem;
+    border-radius: 4px !important;
+    border: none;
+    background: var(--bs-body-bg);
+}
+
+.dataTables_paginate .page-link:hover {
+    background: var(--bs-primary);
+    color: var(--bs-body-bg);
+}
+
+.dataTables_paginate .active .page-link {
+    background: var(--bs-primary);
 }
 
 td.test-name-column {
