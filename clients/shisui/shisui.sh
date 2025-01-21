@@ -28,5 +28,5 @@ fi
 
 FLAGS="$FLAGS --nat extip:$IP_ADDR"
 
-app $FLAGS
+shisui $FLAGS
 
