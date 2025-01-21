@@ -65,5 +65,6 @@ def to_bool:
         "baseFeeUpdateFraction": (if env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
       }
     },
+    "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   }|remove_empty
 }
