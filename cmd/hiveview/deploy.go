@@ -215,7 +215,7 @@ func insertAfterTag(r io.Reader, w io.Writer, tagName, content string) error {
 	}
 }
 
-// modifyScripts changes the 'src' URL of all script tags using the given function.
+// modifyHTML changes the 'src' URL of all html tags using the given function.
 func modifyHTML(r io.Reader, w io.Writer, modify func(tag *html.Token, errlog io.Writer)) error {
 	var errlog bytes.Buffer
 	z := html.NewTokenizer(r)
