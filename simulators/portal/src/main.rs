@@ -4,7 +4,7 @@ use hivesim::{run_suite, Simulation, Suite, TestSpec};
 
 use crate::suites::beacon::{
     interop::test_portal_beacon_interop, mesh::test_portal_beacon_mesh,
-    rpc_compat::run_rpc_compat_beacon_test_suite,
+    rpc_compat::run_rpc_compat_beacon_test_suite, sync::test_beacon_sync,
 };
 use crate::suites::history::{
     interop::test_portal_history_interop, mesh::test_portal_history_mesh,
@@ -150,7 +150,7 @@ async fn main() {
 
     let mut beacon_mesh = Suite {
         name: "beacon-mesh".to_string(),
-        description: "The portal mesh test suite runs a set of scenarios to test 3 clients"
+        description: "The portal mesh test suite runs a set of scenarios to test 3 clients."
             .to_string(),
         tests: vec![],
     };
@@ -160,6 +160,22 @@ async fn main() {
         description: "This test launches the client and collects its logs.".to_string(),
         always_run: false,
         run: test_portal_beacon_mesh,
+        client: None,
+    });
+
+    let mut beacon_sync = Suite {
+        name: "beacon-sync".to_string(),
+        description:
+            "The portal sync test suite tests a client's ability to sync the beacon network."
+                .to_string(),
+        tests: vec![],
+    };
+
+    beacon_sync.add(TestSpec {
+        name: "client launch".to_string(),
+        description: "This test launches the client and collects its logs.".to_string(),
+        always_run: false,
+        run: test_beacon_sync,
         client: None,
     });
 
@@ -176,6 +192,7 @@ async fn main() {
             beacon_rpc_compat,
             beacon_interop,
             beacon_mesh,
+            beacon_sync,
         ],
     )
     .await;

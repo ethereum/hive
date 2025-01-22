@@ -6,6 +6,10 @@ pub const PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 // trin-bridge constants
 pub const TRIN_BRIDGE_CLIENT_TYPE: &str = "trin-bridge";
 
+// sync constants
+pub const TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE: &str = "HIVE_TRUSTED_BLOCK_ROOT";
+pub const BOOTNODES_ENVIRONMENT_VARIABLE: &str = "HIVE_BOOTNODES";
+
 // Bootstrap https://github.com/ethereum/portal-spec-tests/blob/master/tests/mainnet/beacon_chain/light_client/bootstrap.json
 pub const CONSTANT_CONTENT_KEY: &str =
     "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258acb7bcc7f567b6e3af1";

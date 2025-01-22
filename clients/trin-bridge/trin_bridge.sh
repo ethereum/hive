@@ -7,7 +7,7 @@ IP_ADDR=$(hostname -i | awk '{print $1}')
 FLAGS=""
 
 if [ "$HIVE_BOOTNODES" != "" ]; then
-    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODES"
+    FLAGS+=" --bootnodes=$HIVE_BOOTNODES"
 else
     echo "Warning: HIVE_BOOTNODES wasn't provided"
     exit 1
