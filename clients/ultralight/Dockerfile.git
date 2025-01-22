@@ -17,7 +17,8 @@ RUN echo "Cloning: $github - $tag" \
     && git clone https://github.com/$github ultralight \
     && cd ultralight \
     && git checkout $tag \
-    && npm i 
+    && npm i \
+    && mv .git /.git
 
 # Inject the startup script.
 COPY ultralight.sh /ultralight.sh
