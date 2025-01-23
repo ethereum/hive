@@ -467,12 +467,6 @@ td.ellipsis {
   white-space: nowrap;
 }
 
-.client-name::after {
-  content: ":";
-  color: var(--bs-secondary);
-  margin-left: 2px;
-}
-
 .client-version {
   color: var(--bs-secondary);
   font-size: 0.9em;
