@@ -209,7 +209,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 }
 
 // buildImage builds a single docker image from the specified context.
-// branch specifes a build argument to use a specific base image branch or github source branch.
+// branch specifies a build argument to use a specific base image branch or github source branch.
 func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs map[string]string) error {
 	logger := b.logger.With("image", imageTag)
 	context, err := filepath.Abs(contextDir)

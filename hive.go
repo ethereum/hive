@@ -47,6 +47,7 @@ func main() {
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -125,6 +126,8 @@ func main() {
 	if *dockerOutput {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
+	} else if *dockerBuildOutput {
+		dockerConfig.BuildOutput = os.Stderr
 	}
 	builder, cb, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
 	if err != nil {
@@ -171,20 +174,24 @@ func main() {
 			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
+	hiveInfo := libhive.HiveInfo{
+		Command:    os.Args,
+		ClientFile: clientList,
+	}
 
 	// Build clients and simulators.
 	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
-		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint, hiveInfo)
 		return
 	}
 
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env)
+		result, err := runner.Run(ctx, sim, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,10 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/nsf/jsondiff"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	diff "github.com/yudai/gojsondiff"
-	"github.com/yudai/gojsondiff/formatter"
 )
 
 var (
@@ -114,25 +112,21 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 			}
 
 			// Compare responses.
-			d, err := diff.New().Compare([]byte(resp), []byte(expectedData))
-			if err != nil {
-				return fmt.Errorf("failed to unmarshal value: %s\n", err)
+			opts := &jsondiff.Options{
+				Added:            jsondiff.Tag{Begin: "++ "},
+				Removed:          jsondiff.Tag{Begin: "-- "},
+				Changed:          jsondiff.Tag{Begin: "-- "},
+				ChangedSeparator: " ++ ",
+				Indent:           "  ",
 			}
+			diffStatus, diffText := jsondiff.Compare([]byte(resp), []byte(expectedData), opts)
 
 			// If there is a discrepancy, return error.
-			if d.Modified() {
+			if diffStatus != jsondiff.FullMatch {
 				if errorRedacted {
 					t.Log("note: error messages removed from comparison")
 				}
-				var got map[string]any
-				json.Unmarshal([]byte(resp), &got)
-				config := formatter.AsciiFormatterConfig{
-					ShowArrayIndex: true,
-					Coloring:       false,
-				}
-				formatter := formatter.NewAsciiFormatter(got, config)
-				diffString, _ := formatter.Format(d)
-				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffString)
+				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffText)
 			}
 			respBytes = nil
 		}

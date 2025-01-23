@@ -5,6 +5,8 @@ FROM $baseimage:$tag
 
 RUN echo "latest" > /version.txt
 
+RUN mv /usr/local/bin/app /usr/local/bin/shisui
+
 ADD shisui.sh /shisui.sh
 RUN chmod +x /shisui.sh
 
