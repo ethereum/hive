@@ -340,10 +340,9 @@ ${timeSince(new Date(run.start))} ago">
                 render: function(data, type, row) {
                     if (data.fails > 0) {
                         let prefix = data.timeout ? 'Timeout' : 'Fail';
-                        const total = data.fails + data.passes;
-                        return `<span class="fail-count">✗ ${prefix} (${data.fails}/${total})</span>`;
+                        return `<span><span class="pass-count">✓ ${data.passes}</span> <span class="fail-count">✗ ${data.fails}</span> <span class="badge bg-danger ms-1">${prefix}</span></span>`;
                     }
-                    return `<span class="pass-count">✓ (${data.passes})</span>`;
+                    return `<span class="pass-count">✓ ${data.passes} <span class="badge bg-success ms-1">Pass</span></span>`;
                 },
             },
             {
@@ -690,16 +689,13 @@ class StatusFilter extends ColumnFilter {
 
     build() {
         const select = this.buildSelect();
-        select.append($('<option value="SUCCESS">SUCCESS</option>'));
+        select.append($('<option value="PASS">PASS</option>'));
         select.append($('<option value="FAIL">FAIL</option>'));
         select.append($('<option value="TIMEOUT">TIMEOUT</option>'));
         return select;
     }
 
     valueToRegExp(value) {
-        if (value === 'SUCCESS') {
-            return '✓';
-        }
         return escapeRegExp(value);
     }
 }
