@@ -275,9 +275,62 @@ ${timeSince(new Date(run.start))} ago">
                 title: 'Clients',
                 data: 'clients',
                 width: 'auto',
-                render: function(data) {
-                    return data.join(', ');
+                render: function(data, type, row) {
+                    // For searching and ordering, return raw data
+                    if (type === 'filter' || type === 'sort') {
+                        return data.join(',');  // Return comma-separated list for searching
+                    }
+                    // For display, return the HTML
+                    const clients = data.map(client =>
+                        `<div class="client-entry">
+                            <span class="client-name">${client}</span>
+                            <span class="client-version" data-client="${client}">...</span>
+                        </div>`
+                    ).join('');
+                    return `<div class="client-list" data-suite-id="${row.fileName}" data-suite-name="${row.name}">${clients}</div>`;
                 },
+                createdCell: function(td, cellData, rowData, row, col) {
+                    // Load client versions when the cell becomes visible
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                const cell = $(entry.target);
+                                const suiteId = cell.find('.client-list').data('suite-id');
+
+                                // Load client versions
+                                $.ajax({
+                                    type: 'GET',
+                                    url: routes.resultsRoot + suiteId,
+                                    dataType: 'json',
+                                    success: function(suiteData) {
+                                        if (suiteData.clientVersions) {
+                                            // Update each client's version
+                                            cell.find('.client-version').each(function() {
+                                                const clientName = $(this).data('client');
+                                                const version = suiteData.clientVersions[clientName];
+                                                if (version) {
+                                                    $(this).html(`<code>${version}</code>`);
+                                                } else {
+                                                    $(this).html('');
+                                                }
+                                            });
+                                        } else {
+                                            cell.find('.client-version').html('');
+                                        }
+                                    },
+                                    error: function() {
+                                        cell.find('.client-version').html('');
+                                    }
+                                });
+
+                                // Stop observing after loading
+                                observer.disconnect();
+                            }
+                        });
+                    }, { threshold: 0.1 });
+
+                    observer.observe(td);
+                }
             },
             {
                 title: 'Status',
@@ -554,13 +607,67 @@ class ClientFilter extends ColumnFilter {
     key() { return "client"; }
 
     build() {
-        return this.buildSelectWithOptions();
+        const api = this._controller.table;
+        const select = this.buildSelect();
+        let options = new Set();
+
+        // Get unique client names and combinations from all rows
+        api.column(this._columnIndex)
+           .data()
+           .each(function(clients) {
+               if (clients) {
+                   // Add individual clients
+                   clients.forEach(client => options.add(client));
+                   // Add exact combination if multiple clients
+                   if (clients.length > 1) {
+                       options.add(clients.join(','));
+                   }
+               }
+           });
+
+        // Add options sorted alphabetically
+        Array.from(options.values())
+            .sort()
+            .forEach(function(d) {
+                select.append($('<option value="'+d+'">'+d+'</option>'));
+            });
+
+        return select;
     }
 
-    valueToRegExp(value) {
-        // Add a space after each comma to match how it's rendered in the table
-        const searchValue = value.replace(/,/g, ', ');
-        return '^' + escapeRegExp(searchValue) + '$';
+    apply(value) {
+        const api = this._controller.table;
+        if (value !== '') {
+            // Custom search function
+            $.fn.dataTable.ext.search.push(
+                function(settings, searchData, index, rowData, counter) {
+                    // For single client, match if it exists in the row
+                    if (!value.includes(',')) {
+                        return searchData[2].split(',').includes(value);
+                    }
+                    // For client combinations, match exact string
+                    return searchData[2] === value;
+                }
+            );
+
+            // Trigger search
+            api.draw();
+
+            // Remove the custom search function
+            $.fn.dataTable.ext.search.pop();
+        } else {
+            api.draw();
+        }
+
+        // Update URL hash segment
+        this.storeToURL(value);
+
+        // Notify controller
+        const changed = value !== this.value;
+        this._value = value;
+        if (changed) {
+            this._controller.filterChanged(this);
+        }
     }
 }
 

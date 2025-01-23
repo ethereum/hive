@@ -450,6 +450,42 @@ td.ellipsis {
   width: 100%;
 }
 
+.client-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.client-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.client-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.client-name::after {
+  content: ":";
+  color: var(--bs-secondary);
+  margin-left: 2px;
+}
+
+.client-version {
+  color: var(--bs-secondary);
+  font-size: 0.9em;
+}
+
+.client-version code {
+  color: var(--bs-body-color);
+  background: var(--bs-dark-bg-subtle);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 576px) {
   .client-results {
