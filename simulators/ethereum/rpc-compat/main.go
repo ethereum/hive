@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"regexp"
@@ -118,6 +120,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				Changed:          jsondiff.Tag{Begin: "-- "},
 				ChangedSeparator: " ++ ",
 				Indent:           "  ",
+				CompareNumbers:   numbersEqual,
 			}
 			diffStatus, diffText := jsondiff.Compare([]byte(resp), []byte(expectedData), opts)
 
@@ -136,6 +139,15 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 		t.Fatalf("unhandled response in test case")
 	}
 	return nil
+}
+
+func numbersEqual(a, b json.Number) bool {
+	af, err1 := a.Float64()
+	bf, err2 := b.Float64()
+	if err1 == nil && err2 == nil {
+		return af == bf || math.IsNaN(af) && math.IsNaN(bf)
+	}
+	return a == b
 }
 
 // sendHttp sends an HTTP POST with the provided json data and reads the
