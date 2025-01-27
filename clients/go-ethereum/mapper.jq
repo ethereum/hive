@@ -59,6 +59,11 @@ def to_bool:
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
     "terminalTotalDifficultyPassed": true,
     "blobSchedule": {
+      "cancun": {
+        "target": 3,
+        "max": 6,
+        "baseFeeUpdateFraction": 3338477
+      },
       "prague": {
         "target": (if env.HIVE_PRAGUE_BLOB_TARGET then env.HIVE_PRAGUE_BLOB_TARGET|to_int else 6 end),
         "max": (if env.HIVE_PRAGUE_BLOB_MAX then env.HIVE_PRAGUE_BLOB_MAX|to_int else 9 end),
