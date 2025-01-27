@@ -23,9 +23,9 @@ export function makeLink(url, text) {
 }
 
 // makeButton creates a button-shaped link element.
-export function makeButton(url, text) {
+export function makeButton(url, text, classes = '') {
     let a = makeLink(url, text);
-    a.setAttribute('class', 'btn btn-primary btn-sm');
+    a.setAttribute('class', `btn btn-primary btn-sm ${classes}`.trim());
     return a;
 }
 

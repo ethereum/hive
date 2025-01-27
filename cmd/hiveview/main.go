@@ -26,7 +26,9 @@ func main() {
 		gcKeepInterval = flag.Duration("keep", 5*durationMonth, "Time interval of past log files to keep (for -gc)")
 		gcKeepMin      = flag.Int("keep-min", 10, "Minimum number of suite outputs to keep (for -gc)")
 		config         serverConfig
+		listLimit      int
 	)
+	flag.IntVar(&listLimit, "limit", 200, "Number of test runs to show in listing")
 	flag.StringVar(&config.listenAddr, "addr", "0.0.0.0:8080", "HTTP server listen address")
 	flag.StringVar(&config.logDir, "logdir", "workspace/logs", "Path to hive simulator log directory")
 	flag.StringVar(&config.assetsDir, "assets", "", "Path to static files directory. Serves baked-in assets when not set.")
@@ -39,7 +41,7 @@ func main() {
 		runServer(config)
 	case *listing:
 		fsys := os.DirFS(config.logDir)
-		generateListing(fsys, ".", os.Stdout)
+		generateListing(fsys, ".", os.Stdout, listLimit)
 	case *gc:
 		cutoff := time.Now().Add(-*gcKeepInterval)
 		logdirGC(config.logDir, cutoff, *gcKeepMin)
