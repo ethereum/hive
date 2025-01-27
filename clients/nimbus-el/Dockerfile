@@ -30,7 +30,7 @@ RUN apt-get clean && apt update \
  && apt -y install build-essential librocksdb-dev jq curl
 RUN apt update && apt -y upgrade
 
-RUN ldd --version ldd
+RUN ldd --version
 
 COPY --from=build /usr/bin/nimbus_execution_client /usr/bin/nimbus_execution_client
 RUN usr/bin/nimbus_execution_client --version > /version.txt
