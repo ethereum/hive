@@ -7,7 +7,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get clean && apt update \
  && apt -y install curl build-essential git-lfs librocksdb-dev
 
-RUN ldd --version ldd
+RUN ldd --version
 
 ARG tag=master
 ARG github=status-im/nimbus-eth1
