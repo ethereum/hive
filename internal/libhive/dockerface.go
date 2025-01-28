@@ -81,7 +81,7 @@ type ContainerInfo struct {
 // Builder can build docker images of clients and simulators.
 type Builder interface {
 	BuildClientImage(ctx context.Context, client ClientDesignator) (string, error)
-	BuildSimulatorImage(ctx context.Context, name string) (string, error)
+	BuildSimulatorImage(ctx context.Context, name string, buildArgs map[string]string) (string, error)
 	BuildImage(ctx context.Context, name string, fsys fs.FS) error
 
 	// ReadFile returns the content of a file in the given image.

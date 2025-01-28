@@ -26,6 +26,9 @@ var callrevertCode []byte
 //go:embed bytecode/emit.bin
 var emitCode []byte
 
+//go:embed bytecode/7702account.bin
+var mod7702AccountCode []byte
+
 // //go:embed bytecode/deposit.bin
 // var depositCode []byte
 //

@@ -2,7 +2,7 @@
 ;;; deterministic random data generator using block number.
 ;;; all macros take the memory location of an rng state as argument.
 
-#define RngSize 64
+#define RngSize = 64
 
 ;; initialize random generator
 #define %RngInit(ptr) {         ; []

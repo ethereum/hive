@@ -3,8 +3,8 @@
 ## Builder stage: Compiles erigon from a git repository
 FROM golang:1.22-alpine as builder
 
-ARG github=ledgerwatch/erigon
-ARG tag=devel
+ARG github=erigontech/erigon
+ARG tag=main
 
 RUN echo "Cloning: $github - $tag" \
     && apk add bash build-base ca-certificates git jq \

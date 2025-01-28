@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/devp2p"
@@ -40,18 +39,10 @@ func (s ForkIDSpec) GetForkConfig() *config.ForkConfig {
 	if forkConfig == nil {
 		return nil
 	}
-	// Merge fork happen at block 0
-	mainFork := s.GetMainFork()
-	if mainFork == config.Paris {
-		forkConfig.ParisNumber = common.Big0
-	}
 	return forkConfig
 }
 
 func (ft ForkIDSpec) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
 	// Produce blocks before starting the test if required
 	t.CLMock.ProduceBlocks(ft.ProduceBlocksBeforePeering, clmock.BlockProcessCallbacks{})
 

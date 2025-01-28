@@ -3,13 +3,13 @@ package libdocker
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
 
 	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const hiveproxyTag = "hive/hiveproxy"
@@ -39,7 +39,7 @@ func (cb *ContainerBackend) ServeAPI(ctx context.Context, h http.Handler) (libhi
 		var err error
 		proxy, err = hiveproxy.RunBackend(outR, inW, h)
 		if err != nil {
-			log15.Error("proxy backend startup failed", "err", err)
+			slog.Error("proxy backend startup failed", "err", err)
 		}
 		proxyErrC <- err
 	}()
@@ -75,7 +75,7 @@ func (cb *ContainerBackend) ServeAPI(ctx context.Context, h http.Handler) (libhi
 
 	// Register proxy in ContainerBackend, so it can be used for CheckLive.
 	cb.proxy = proxy
-	log15.Info("hiveproxy started", "container", id[:12], "addr", srv.Addr())
+	slog.Info("hiveproxy started", "container", id[:12], "addr", srv.Addr())
 	return srv, nil
 }
 

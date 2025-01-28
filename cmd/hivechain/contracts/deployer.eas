@@ -1,6 +1,8 @@
 ;;; -*- mode: asm -*-
 ;;; puts any data after @.end into new contract
 
+#pragma target "frontier"
+
     push @.end                  ; [end]
     codesize                    ; [codesize, end]
     sub                         ; [size]

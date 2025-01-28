@@ -1,7 +1,7 @@
 ### Build Nethermind From Git:
 
 ## Builder stage: Compiles nethermind from a git repository
-FROM mcr.microsoft.com/dotnet/sdk:8.0-jammy AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0-noble AS build
 
 ARG github=nethermindeth/nethermind
 ARG tag=master
@@ -12,7 +12,7 @@ RUN echo "Cloning: $github - $tag" && \
     dotnet build -c release
 
 ## Final stage: Sets up the environment for running nethermind
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
@@ -38,5 +38,5 @@ RUN chmod +x /nethermind.sh /hive-bin/enode.sh
 # Expose networking ports
 EXPOSE 8545 30303 30303/udp
 
-ENV NETHERMIND_HIVE_ENABLED true
+ENV NETHERMIND_HIVECONFIG_ENABLED true
 ENTRYPOINT ["/nethermind.sh"]

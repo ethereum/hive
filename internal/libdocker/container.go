@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net"
 	"os"
@@ -17,13 +18,12 @@ import (
 	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 type ContainerBackend struct {
 	client *docker.Client
 	config *Config
-	logger log15.Logger
+	logger *slog.Logger
 
 	proxy *hiveproxy.Proxy
 }
@@ -31,7 +31,7 @@ type ContainerBackend struct {
 func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	b := &ContainerBackend{client: c, config: cfg, logger: cfg.Logger}
 	if b.logger == nil {
-		b.logger = log15.Root()
+		b.logger = slog.Default()
 	}
 	return b
 }
@@ -103,7 +103,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	if err != nil {
 		return "", err
 	}
-	logger := b.logger.New("image", imageName, "container", c.ID[:8])
+	logger := b.logger.With("image", imageName, "container", c.ID[:8])
 
 	// Now upload files.
 	if err := b.uploadFiles(ctx, c.ID, opt.Files); err != nil {
@@ -122,7 +122,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	}
 
 	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
-	logger := b.logger.New("container", info.ID)
+	logger := b.logger.With("container", info.ID)
 
 	// Run the container.
 	var startTime = time.Now()
@@ -350,7 +350,7 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (docker.CloseWaiter, error) {
+func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger, id string, opts libhive.ContainerOptions) (docker.CloseWaiter, error) {
 	var (
 		outStream io.Writer
 		errStream io.Writer
@@ -435,12 +435,12 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger
 // after it is done waiting.
 type fileCloser struct {
 	w         docker.CloseWaiter
-	logger    log15.Logger
+	logger    *slog.Logger
 	closers   []io.Closer
 	closeOnce sync.Once
 }
 
-func newFileCloser(logger log15.Logger) *fileCloser {
+func newFileCloser(logger *slog.Logger) *fileCloser {
 	return &fileCloser{logger: logger}
 }
 

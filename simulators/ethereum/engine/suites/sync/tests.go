@@ -22,16 +22,16 @@ var Tests = []test.BaseSpec{
 		Run:            postMergeSync,
 		TimeoutSeconds: 180,
 		ChainFile:      "blocks_1024_td_135112316.rlp",
-		TTD:            135112316,
 	},
 	{
 		Name:           "Incremental Post Merge Sync",
 		Run:            incrementalPostMergeSync,
 		TimeoutSeconds: 180,
 		ChainFile:      "blocks_1024_td_135112316.rlp",
-		TTD:            135112316,
 	},
 }
+
+const syncTestsTD = 135112316
 
 // Routine that adds all sync tests to a test suite
 func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.BaseSpec) {
@@ -54,7 +54,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 			testFiles := hivesim.Params{"/genesis.json": genesisPath}
 			// Calculate and set the TTD for this test
 			genesis := helper.LoadGenesis(genesisPath)
-			ttd := helper.CalculateRealTTD(&genesis, currentTest.TTD)
+			ttd := helper.CalculateRealTTD(&genesis, syncTestsTD)
 			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 			if currentTest.ChainFile != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
@@ -100,7 +100,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(&currentTest, big.NewInt(ttd), timeout, t, c, &genesis, rand.New(rand.NewSource(0)), syncClientParams, testFiles.Copy())
+						test.Run(&currentTest, timeout, t, c, &genesis, rand.New(rand.NewSource(0)), syncClientParams, testFiles.Copy())
 					},
 				})
 			}
@@ -111,10 +111,6 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 
 // Client Sync tests
 func postMergeSync(t *test.Env) {
-	// Launch another client after the PoS transition has happened in the main client.
-	// Sync should eventually happen without issues.
-	t.CLMock.WaitForTTD()
-
 	// Speed up block production
 	t.CLMock.PayloadProductionClientDelay = 0
 
@@ -162,10 +158,6 @@ func postMergeSync(t *test.Env) {
 
 // Performs a test where sync is done incrementally by sending incremental newPayload/fcU calls
 func incrementalPostMergeSync(t *test.Env) {
-	// Launch another client after the PoS transition has happened in the main client.
-	// Sync should eventually happen without issues.
-	t.CLMock.WaitForTTD()
-
 	var (
 		N uint64 = 500 // Total number of PoS blocks
 		S uint64 = 5   // Number of incremental steps to sync

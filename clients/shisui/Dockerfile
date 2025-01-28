@@ -1,9 +1,11 @@
-ARG baseimage=ghcr.io/optimism-java/shisui
+ARG baseimage=ghcr.io/zen-eth/shisui
 ARG tag=latest
 
 FROM $baseimage:$tag
 
 RUN echo "latest" > /version.txt
+
+RUN mv /usr/local/bin/app /usr/local/bin/shisui
 
 ADD shisui.sh /shisui.sh
 RUN chmod +x /shisui.sh

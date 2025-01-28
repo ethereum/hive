@@ -84,10 +84,7 @@ var knownAccounts = []genAccount{
 		key:  mustParseKey("25e6ce8611cefb5cd338aeaa9292ed2139714668d123a4fb156cabb42051b5b7"),
 		addr: common.HexToAddress("0x1F5BDe34B4afC686f136c7a3CB6EC376F7357759"),
 	},
-	{
-		key:  mustParseKey("14cdde09d1640eb8c3cda063891b0453073f57719583381ff78811efa6d4199f"),
-		addr: common.HexToAddress("0xedA8645bA6948855E3B3cD596bbB07596d59c603"),
-	},
+	mod7702Account,
 }
 
 func mustParseKey(s string) *ecdsa.PrivateKey {

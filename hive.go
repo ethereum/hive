@@ -5,16 +5,39 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"gopkg.in/inconshreveable/log15.v2"
+	"github.com/lmittmann/tint"
 )
+
+type buildArgs map[string]string
+
+func (args *buildArgs) String() string {
+	var kv []string
+	for k, v := range *args {
+		kv = append(kv, k+"="+v)
+	}
+	sort.Strings(kv)
+	return strings.Join(kv, ",")
+}
+
+// Set implements flag.Value.
+func (args *buildArgs) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return errors.New("invalid build argument format, expected ARG=VALUE")
+	}
+	(*args)[parts[0]] = parts[1]
+	return nil
+}
 
 func main() {
 	var (
@@ -24,6 +47,7 @@ func main() {
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -49,12 +73,24 @@ func main() {
 			"never opens the RPC port.")
 	)
 
+	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
+	simBuildArgs := make(buildArgs)
+	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
+
 	// Parse the flags and configure the logger.
 	flag.Parse()
-	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
-
+	terminal := os.Getenv("TERM")
+	tintHandler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:   convertLogLevel(*loglevelFlag),
+		NoColor: terminal == "" || terminal == "dumb",
+	})
+	slog.SetDefault(slog.New(tintHandler))
+	// See: https://github.com/ethereum/hive/issues/1200.
+	if err := os.Setenv("GODEBUG", "multipartmaxparts=20000"); err != nil {
+		fatal(err)
+	}
 	if *simTestLimit > 0 {
-		log15.Warn("Option --sim.testlimit is deprecated and will have no effect.")
+		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
 
 	// Get the list of simulators.
@@ -70,7 +106,7 @@ func main() {
 		fatal("no simulators for pattern", *simPattern)
 	}
 	if *simPattern != "" && *simDevMode {
-		log15.Warn("--sim is ignored when using --dev mode")
+		slog.Warn("--sim is ignored when using --dev mode")
 		simList = nil
 	}
 
@@ -89,6 +125,8 @@ func main() {
 	}
 	if *dockerOutput {
 		dockerConfig.ContainerOutput = os.Stderr
+		dockerConfig.BuildOutput = os.Stderr
+	} else if *dockerBuildOutput {
 		dockerConfig.BuildOutput = os.Stderr
 	}
 	builder, cb, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
@@ -136,25 +174,29 @@ func main() {
 			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
+	hiveInfo := libhive.HiveInfo{
+		Command:    os.Args,
+		ClientFile: clientList,
+	}
 
 	// Build clients and simulators.
-	if err := runner.Build(ctx, clientList, simList); err != nil {
+	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
-		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint, hiveInfo)
 		return
 	}
 
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env)
+		result, err := runner.Run(ctx, sim, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}
 		failCount += result.TestsFailed
-		log15.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
+		slog.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
 	switch failCount {
@@ -188,4 +230,22 @@ func flagIsSet(name string) bool {
 		}
 	})
 	return found
+}
+
+// convertLogLevel maps log level from range 0-5 to the range used by package slog.
+// Input levels are ordered in increasing amounts of messages, i.e. level zero is silent
+// and level 5 means everything is printed.
+func convertLogLevel(level int) slog.Level {
+	switch level {
+	case 0:
+		return 99
+	case 1:
+		return slog.LevelError
+	case 2:
+		return slog.LevelWarn
+	case 3:
+		return slog.LevelInfo
+	default:
+		return slog.LevelDebug
+	}
 }
