@@ -6,10 +6,8 @@ FROM $baseimage:$tag
 ADD trin.sh /trin.sh
 RUN chmod +x /trin.sh
 
-ADD trin_version.sh /trin_version.sh
-RUN chmod +x /trin_version.sh
-
-RUN /trin_version.sh > /version.txt
+# Create version.txt
+RUN /usr/bin/trin --version | head -1 > /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 9009/udp

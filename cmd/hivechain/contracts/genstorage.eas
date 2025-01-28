@@ -1,7 +1,9 @@
 ;;; -*- mode: asm -*-
 ;;; creates storage slots until less than 25k gas remaining.
 
-#define minGas 25000
+#pragma target "frontier"
+
+#define minGas = 25000
 
     number                      ; [block]
 genstorage:

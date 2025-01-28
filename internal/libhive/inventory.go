@@ -3,6 +3,7 @@ package libhive
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,7 +12,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -141,7 +141,7 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		case strings.HasPrefix(file, "Dockerfile."):
 			client, ok := clients[clientName]
 			if !ok {
-				log15.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
+				slog.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
 				return nil
 			}
 			client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
@@ -149,7 +149,7 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		case file == "hive.yaml":
 			client, ok := clients[clientName]
 			if !ok {
-				log15.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
+				slog.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
 				return nil
 			}
 			md, err := loadClientMetadata(path)
@@ -183,19 +183,19 @@ func loadClientMetadata(path string) (m ClientMetadata, err error) {
 type ClientDesignator struct {
 	// Client is the client name.
 	// This must refer to a subdirectory of clients/
-	Client string `yaml:"client"`
+	Client string `yaml:"client" json:"client"`
 
 	// Nametag is used in the name of the client image.
 	// This is for assigning meaningful names to different builds of the same client.
 	// If unspecified, a default value is chosen to make client names unique.
-	Nametag string `yaml:"nametag,omitempty"`
+	Nametag string `yaml:"nametag,omitempty" json:"nametag,omitempty"`
 
 	// DockerfileExt is the extension of the Docker that should be used to build the
 	// client. Example: setting this to "git" will build using "Dockerfile.git".
-	DockerfileExt string `yaml:"dockerfile,omitempty"`
+	DockerfileExt string `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty"`
 
 	// Arguments passed to the docker build.
-	BuildArgs map[string]string `yaml:"build_args,omitempty"`
+	BuildArgs map[string]string `yaml:"build_args,omitempty" json:"build_args,omitempty"`
 }
 
 func (c ClientDesignator) buildString() string {
@@ -333,7 +333,7 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 		// Check build arguments.
 		for key := range c.BuildArgs {
 			if _, ok := knownBuildArgs[key]; !ok {
-				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
+				slog.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
 			}
 		}
 		clientTags[c.Client] = clientTags[c.Client].add(c.BuildArgs["tag"])

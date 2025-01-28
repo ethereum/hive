@@ -38,9 +38,6 @@ func (b BlockStatus) GetName() string {
 
 // Test to verify Block information available at the Eth RPC after NewPayload/ForkchoiceUpdated
 func (b BlockStatus) Execute(t *test.Env) {
-	// Wait until this client catches up with latest PoS Block
-	t.CLMock.WaitForTTD()
-
 	switch b.CheckType {
 	case SafeOnSafeBlockHash, FinalizedOnFinalizedBlockHash:
 		var number *big.Int

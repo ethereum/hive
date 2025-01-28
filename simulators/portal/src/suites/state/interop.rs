@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{CONTENT_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
@@ -8,7 +9,8 @@ use ethportal_api::jsonrpsee::http_client::HttpClient;
 use ethportal_api::types::execution::header_with_proof::{
     BlockHeaderProof, HeaderWithProof, SszNone,
 };
-use ethportal_api::types::state::ContentInfo;
+use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
+use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, Header, HistoryContentKey, HistoryContentValue, StateContentKey,
@@ -21,9 +23,6 @@ use serde_json::json;
 use serde_yaml::Value;
 use tokio::time::Duration;
 
-// This is taken from Trin. It should be fairly standard
-const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
-
 #[derive(Clone, Debug)]
 struct TestData {
     pub header: Header,
@@ -33,12 +32,14 @@ struct TestData {
 }
 
 async fn store_header(header: Header, client: &HttpClient) -> bool {
-    let content_key = HistoryContentKey::BlockHeaderWithProof(header.hash().into());
+    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
     let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
         header,
         proof: BlockHeaderProof::None(SszNone::default()),
     });
-    match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value).await {
+    match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value.encode())
+        .await
+    {
         Ok(stored) => stored,
         Err(err) => panic!("{}", &err.to_string()),
     }
@@ -108,10 +109,11 @@ dyn_async! {
             let header = Header::decode(&mut header_bytes.as_ref()).unwrap();
             let key: StateContentKey =
                 serde_yaml::from_value(value["content_key"].clone()).unwrap();
-            let offer_value: StateContentValue =
-                serde_yaml::from_value(value["content_value_offer"].clone()).unwrap();
-            let lookup_value: StateContentValue =
-                serde_yaml::from_value(value["content_value_retrieval"].clone()).unwrap();
+            let raw_offer_value = Bytes::from_str(value["content_value_offer"].as_str().unwrap()).unwrap();
+            let offer_value = StateContentValue::decode(&key, raw_offer_value.as_ref()).expect("unable to decode content value");
+            let raw_lookup_value = Bytes::from_str(value["content_value_retrieval"].as_str().unwrap()).unwrap();
+            let lookup_value = StateContentValue::decode(&key, raw_lookup_value.as_ref()).expect("unable to decode content value");
+
             TestData { header, key, offer_value, lookup_value }
         }).collect();
 
@@ -132,10 +134,10 @@ dyn_async! {
 
                 test.run(
                     NClientTestSpec {
-                        name: format!("RecursiveFindContent {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
+                        name: format!("GetContent {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
-                        run: test_recursive_find_content,
+                        run: test_get_content,
                         environments: environments.clone(),
                         test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
@@ -194,10 +196,10 @@ dyn_async! {
             // Test gossiping a collection of blocks to node B (B will gossip back to A)
             test.run(
                 NClientTestSpec {
-                    name: format!("GOSSIP blocks from A:{} --> B:{}", client_a.name, client_b.name),
+                    name: format!("PUT CONTENT blocks from A:{} --> B:{}", client_a.name, client_b.name),
                     description: "".to_string(),
                     always_run: false,
-                    run: test_gossip_two_nodes,
+                    run: test_put_content_two_nodes,
                     environments: environments.clone(),
                     test_data: content.clone(),
                     clients: vec![client_a.clone(), client_b.clone()],
@@ -212,40 +214,23 @@ dyn_async! {
     async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let header_with_proof_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         let result = client_a.rpc.find_content(target_enr, header_with_proof_key.clone()).await;
 
         match result {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Enrs{ enrs: val } => {
-                        if !val.is_empty() {
-                            panic!("Error: Unexpected FINDCONTENT response: expected ContentInfo::Enrs length 0 got {}", val.len());
-                        }
-                    },
-                    ContentInfo::Content{ content: _, .. } => {
-                        panic!("Error: Unexpected FINDCONTENT response: wasn't supposed to return back content");
-                    },
-                    other => {
-                        panic!("Error: Unexpected FINDCONTENT response: {other:?}");
-                    }
-                }
+            Ok(FindContentInfo::Enrs { enrs }) => if !enrs.is_empty() {
+                panic!("Error: Unexpected FINDCONTENT response: expected ContentInfo::Enrs length 0 got {}", enrs.len());
             },
-            Err(err) => {
-                panic!("Error: Unable to get response from FINDCONTENT request: {err:?}");
-            }
+            Ok(FindContentInfo::Content { .. }) => panic!("Error: Unexpected FINDCONTENT response: expected Enrs got Content"),
+            Err(err) =>  panic!("Error: Unable to get response from FINDCONTENT request: {err:?}"),
         }
     }
 }
@@ -254,9 +239,7 @@ dyn_async! {
     async fn test_offer<'a>(clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let TestData {
@@ -268,26 +251,22 @@ dyn_async! {
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         store_header(header, &client_b.rpc).await;
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_offer_value.clone()).await;
+        let _ = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_offer_value.encode())]).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
         match client_b.rpc.local_content(target_key).await {
             Ok(possible_content) => {
-                if possible_content != target_lookup_value {
+                if possible_content != target_lookup_value.encode() {
                     panic!("Error receiving content: Expected content: {target_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
-            Err(err) => {
-                panic!("Unable to get received content: {err:?}");
-            }
+            Err(err) => panic!("Unable to get received content: {err:?}"),
         }
     }
 }
@@ -296,15 +275,11 @@ dyn_async! {
     async fn test_ping<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         let pong = client_a.rpc.ping(target_enr).await;
@@ -317,9 +292,7 @@ dyn_async! {
         // handshake mechanism.
         let stored_enr = match client_a.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         match StateNetworkApiClient::get_enr(&client_b.rpc, stored_enr.node_id()).await {
@@ -337,15 +310,11 @@ dyn_async! {
     async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         match client_a.rpc.find_nodes(target_enr.clone(), vec![0]).await {
@@ -369,13 +338,11 @@ dyn_async! {
 }
 
 dyn_async! {
-    // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: TestData) {
+    // test that a node will return a content via GETCONTENT template that it has stored locally
+    async fn test_get_content<'a>(clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let TestData {
@@ -385,20 +352,16 @@ dyn_async! {
             ..
         } = test_data;
 
-        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_offer_value.encode()).await {
             Ok(result) => if !result {
-                panic!("Error storing target content for recursive find content");
+                panic!("Error storing target content for get content");
             },
-            Err(err) => {
-                panic!("Error storing target content: {err:?}");
-            }
+            Err(err) => panic!("Error storing target content: {err:?}"),
         }
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         match StateNetworkApiClient::add_enr(&client_a.rpc, target_enr.clone()).await {
@@ -409,30 +372,21 @@ dyn_async! {
             Err(err) => panic!("{}", &err.to_string()),
         }
 
-        match client_a.rpc.recursive_find_content(target_key.clone()).await {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_lookup_value {
-                            panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
-                        }
+        match client_a.rpc.get_content(target_key.clone()).await {
+            Ok(GetContentInfo{ content, utp_transfer }) => {
+                if content != target_lookup_value.encode() {
+                    panic!("Error: Unexpected GETCONTENT response: didn't return expected target content");
+                }
 
-                        if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
-                            if utp_transfer {
-                                panic!("Error: Unexpected RECURSIVEFINDCONTENT response: utp_transfer was supposed to be false");
-                            }
-                        } else if !utp_transfer {
-                            panic!("Error: Unexpected RECURSIVEFINDCONTENT response: utp_transfer was supposed to be true");
-                        }
-                    },
-                    other => {
-                        panic!("Error: Unexpected RECURSIVEFINDCONTENT response: {other:?}");
+                if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
+                    if utp_transfer {
+                        panic!("Error: Unexpected GETCONTENT response: utp_transfer was supposed to be false");
                     }
+                } else if !utp_transfer {
+                    panic!("Error: Unexpected GETCONTENT response: utp_transfer was supposed to be true");
                 }
             },
-            Err(err) => {
-                panic!("Error: Unable to get response from RECURSIVEFINDCONTENT request: {err:?}");
-            }
+            Err(err) => panic!("Error: Unable to get response from GETCONTENT request: {err:?}"),
         }
     }
 }
@@ -442,9 +396,7 @@ dyn_async! {
     async fn test_find_content<'a> (clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
         let TestData {
@@ -454,64 +406,48 @@ dyn_async! {
             ..
         } = test_data;
 
-        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
+        match client_b.rpc.store(target_key.clone(), target_offer_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
-            Err(err) => {
-                panic!("Error storing target content: {err:?}");
-            }
+            Err(err) => panic!("Error storing target content: {err:?}"),
         }
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
         match client_a.rpc.find_content(target_enr, target_key.clone()).await {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_lookup_value {
-                            panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
-                        }
+            Ok(FindContentInfo::Content { content, utp_transfer }) => {
+                if content != target_lookup_value.encode() {
+                    panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
+                }
 
-                        if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
-                            if utp_transfer {
-                                panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be false");
-                            }
-                        } else if !utp_transfer {
-                            panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be true");
-                        }
-                    },
-                    other => {
-                        panic!("Error: Unexpected FINDCONTENT response: {other:?}");
+                if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
+                    if utp_transfer {
+                        panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be false");
                     }
+                } else if !utp_transfer {
+                    panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be true");
                 }
             },
-            Err(err) => {
-                panic!("Error: Unable to get response from FINDCONTENT request: {err:?}");
-            }
+            Ok(FindContentInfo::Enrs { .. }) => panic!("Error: Unexpected FINDCONTENT response: expected Content got Enrs"),
+            Err(err) => panic!("Error: Unable to get response from FINDCONTENT request: {err:?}"),
         }
     }
 }
 
 dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Vec<TestData>) {
+    async fn test_put_content_two_nodes<'a> (clients: Vec<Client>, test_data: Vec<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
+            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
         // connect clients
         let client_b_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
+            Err(err) => panic!("Error getting node info: {err:?}"),
         };
         match StateNetworkApiClient::add_enr(&client_a.rpc, client_b_enr.clone()).await {
             Ok(response) => match response {
@@ -525,15 +461,13 @@ dyn_async! {
         for TestData { header, key: content_key, offer_value: content_offer_value, .. } in test_data.clone() {
             store_header(header, &client_b.rpc).await;
 
-            match client_a.rpc.gossip(content_key.clone(), content_offer_value.clone()).await {
-                Ok(nodes_gossiped_to) => {
-                   if nodes_gossiped_to != 1 {
-                        panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
+            match client_a.rpc.put_content(content_key.clone(), content_offer_value.encode()).await {
+                Ok(PutContentInfo { peer_count, .. }) => {
+                   if peer_count != 1 {
+                        panic!("We expected to gossip to 1 node instead we gossiped to: {peer_count}");
                     }
                 }
-                Err(err) => {
-                    panic!("Unable to get received content: {err:?}");
-                }
+                Err(err) => panic!("Unable to get received content: {err:?}"),
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -560,13 +494,11 @@ dyn_async! {
 
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(expected_value) => {
-                    if expected_value != content_lookup_value {
+                    if expected_value != content_lookup_value.encode() {
                         result.push(format!("Error content received for block {content_details} was different then expected"));
                     }
                 }
-                Err(err) => {
-                    result.push(format!("Error content for block {err} was absent"));
-                }
+                Err(err) => result.push(format!("Error content for block {err} was absent")),
             }
         }
 

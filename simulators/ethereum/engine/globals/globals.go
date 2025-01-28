@@ -88,10 +88,6 @@ var (
 		"HIVE_FORK_MUIR_GLACIER":   "0",
 		"HIVE_FORK_BERLIN":         "0",
 		"HIVE_FORK_LONDON":         "0",
-		// Tests use clique PoA to mine new blocks until the TTD is reached, then PoS takes over.
-		"HIVE_CLIQUE_PERIOD":     "1",
-		"HIVE_CLIQUE_PRIVATEKEY": MinerPKHex,
-		"HIVE_MINER":             MinerAddrHex,
 		// Merge related
 		"HIVE_MERGE_BLOCK_ID": "100",
 	}

@@ -3,6 +3,7 @@ package hivesim
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ethereum/hive/internal/simapi"
 	"github.com/lithammer/dedent"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // Converts a string to a valid markdown link.
@@ -333,7 +333,7 @@ func (docs *docsCollector) EndSuite(testSuite SuiteID) error {
 	if !docs.AnyRunning() {
 		// Generate markdown files when all suites are done.
 		if err := docs.genSimulatorMarkdownFiles(NewFileWriter(docs.outputDir)); err != nil {
-			log15.Error("can't generate markdown files", "err", err)
+			slog.Error("can't generate markdown files", "err", err)
 		}
 	}
 	return nil

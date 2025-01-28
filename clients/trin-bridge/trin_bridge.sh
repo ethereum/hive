@@ -13,4 +13,4 @@ else
     exit 1
 fi
 
-RUST_LOG="trace,neli=error,rustls=error,polling=error,async_io=error,hyper=error,discv5=info,jsonrpsee_types::params=error,jsonrpsee_core::http_helpers=error" portal-bridge $FLAGS --executable-path /usr/bin/trin --mode test:/test_data_collection_of_forks_blocks.yaml --external-ip $IP_ADDR --epoch-accumulator-path . trin
+RUST_LOG="trace,neli=error,rustls=error,polling=error,async_io=error,hyper=error,discv5=info,jsonrpsee_types::params=error,jsonrpsee_core::http_helpers=error" portal-bridge $FLAGS --executable-path /usr/bin/trin --mode test:/test_data_collection_of_forks_blocks.yaml --external-ip $IP_ADDR --epoch-accumulator-path .

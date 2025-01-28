@@ -1,0 +1,33 @@
+
+### Build Ultralight From Git:
+## Pulls ultralight from a git repository and builds it from source.
+
+## Builder stage: Compiles ultralight from a git repository
+FROM node:20-alpine
+
+RUN apk update && apk add --no-cache bash g++ make git python3 && rm -rf /var/cache/apk/*
+RUN apk add --virtual .build-deps alpine-sdk jq
+
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+
+ARG github=ethereumjs/ultralight
+ARG tag=master
+
+RUN echo "Cloning: $github - $tag" \
+    && git clone https://github.com/$github ultralight \
+    && cd ultralight \
+    && git checkout $tag \
+    && npm i \
+    && mv .git /.git
+
+# Inject the startup script.
+COPY ultralight.sh /ultralight.sh
+RUN chmod +x /ultralight.sh
+
+# Create version.txt
+RUN echo "latest" > /version.txt
+
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 9000/udp
+
+ENTRYPOINT ["/ultralight.sh"]

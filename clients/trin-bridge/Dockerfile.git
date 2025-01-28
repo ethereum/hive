@@ -1,0 +1,45 @@
+
+### Build Trin Bridge From Git:
+## Pulls trin bridge from a git repository and builds it from source.
+
+## Builder stage: Compiles trin bridge from a git repository
+FROM rust:latest AS builder
+
+ARG github=ethereum/trin
+ARG tag=master
+
+RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
+    && echo "Cloning: $github - $tag" \
+    && git clone https://github.com/$github trin \
+    && cd trin \
+    && git checkout $tag \
+    && cargo build -p trin -p portal-bridge --release \
+    && cp target/release/trin /usr/local/bin/trin \
+    && cp target/release/portal-bridge /usr/local/bin/portal-bridge
+
+## Final stage: Sets up the environment for running trin
+FROM debian:latest
+RUN apt-get update && apt-get install -y bash curl jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled binary from builder
+COPY --from=builder /usr/local/bin/trin /usr/bin/trin
+COPY --from=builder /usr/local/bin/portal-bridge /usr/bin/portal-bridge
+COPY --from=builder /trin/bin/trin-execution/resources /resources
+
+# Inject the startup script.
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml /test_data_collection_of_forks_blocks.yaml
+COPY trin_bridge.sh /trin_bridge.sh
+RUN chmod +x /trin_bridge.sh
+
+# Create version.txt
+RUN echo "latest" > /version.txt
+
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 9009/udp
+
+# add fake secrets for bridge activation
+ENV PANDAOPS_CLIENT_ID=xxx
+ENV PANDAOPS_CLIENT_SECRET=xxx
+
+ENTRYPOINT ["/trin_bridge.sh"]

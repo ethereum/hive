@@ -3,7 +3,9 @@
 ;;; The storage entry uses the hash of calldata as the value.
 ;;; In the log, the same hash is used as the second topic.
 
-#define s_counter 0
+#pragma target "frontier"
+
+#define s_counter = 0
 
     ;; hash calldata
     calldatasize                ; [size]

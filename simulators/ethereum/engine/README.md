@@ -78,7 +78,7 @@ Verify the Block returned by the Eth RPC using the `finalized` keyword after a n
 Verify the Block returned by the Eth RPC using the `finalized`/`safe` keyword after following the canonical chain is correctly updated to the canonical values set by `forkchoiceUpdated` calls.
 
 - `latest` Block after Reorg:  
-Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
+Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block every time.
 
 ### Payload Execution
 - Re-Execute Payload:  
