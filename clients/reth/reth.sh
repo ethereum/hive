@@ -101,11 +101,10 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-    echo "Loading remaining individual blocks..."
-    for file in $(ls /blocks | sort -n); do
-        echo "Importing " $file
-        $reth import $FLAGS /blocks/$file
-    done
+    echo "Concatenating all blocks..."
+    cat $(ls /blocks/*.rlp | sort -n) > combined.rlp
+    echo "Importing combined blocks..."
+    $reth import $FLAGS combined.rlp
 else
     echo "Warning: blocks folder not found."
 fi
