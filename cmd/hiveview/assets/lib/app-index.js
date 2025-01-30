@@ -149,15 +149,15 @@ function showFileListing(data) {
                             trendClass = currRatio > prevRatio ? 'trend-up' :
                                        currRatio < prevRatio ? 'trend-down' : 'trend-same';
                         }
-                        const passRatio = Math.round((run.passes / (run.passes + run.fails)) * 100);
+                        const passRatio = (run.passes / (run.passes + run.fails)) * 100;
                         return `
                             <div class="history-dot ${trendClass}"
-                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio}%)
+                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
 ${timeSince(new Date(run.start))} ago">
-                                <div class="dot-fill" style="height: ${passRatio}%"></div>
+                                <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
                             </div>
                         `;
-                    }).join('');
+                    }).reverse().join('');
 
                     return `
                         <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}" style="cursor: pointer;"
@@ -173,7 +173,9 @@ ${timeSince(new Date(run.start))} ago">
                             </div>
                             <div class="time">
                                 <span>${timeAgo} ago</span>
-                                <span class="coverage-percent">${Math.round((latest.passes / (latest.passes + latest.fails)) * 100)}%</span>
+                                <span class="coverage-percent">
+                                    ${((latest.passes / (latest.passes + latest.fails)) * 100).toFixed(2)}%
+                                </span>
                             </div>
                         </div>
                     `;
@@ -194,6 +196,21 @@ ${timeSince(new Date(run.start))} ago">
     const urlParams = new URLSearchParams(window.location.hash.substring(1));
     const initialSort = urlParams.get('summary-sort') || 'name';
     window.sortAllClients(initialSort);
+
+    // Handle suite and client selection from URL hash
+    const hashSuite = urlParams.get('suite');
+    const hashClient = urlParams.get('client');
+    if (hashSuite) {
+        // Find and highlight the clicked suite box
+        $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
+            return $(this).find('.title').text() === hashSuite;
+        }).addClass('selected');
+
+        if (hashClient) {
+            // Find and highlight the clicked client box
+            $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
+        }
+    }
 
     // Add floating filters notice
     const filtersNotice = $(`

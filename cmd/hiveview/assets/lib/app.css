@@ -367,13 +367,16 @@ td.ellipsis {
 }
 
 .history-dot .dot-fill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: var(--bs-success);
-  border-radius: 2px;
-  transition: height 0.2s ease;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    border-radius: 2px;
+    transition: height 0.2s ease, background-color 0.2s ease;
+    --r: calc(220 + (var(--pass-percent) * -167));
+    --g: calc(53 + (var(--pass-percent) * 145));
+    --b: calc(69 + (var(--pass-percent) * -26));
+    background: rgb(var(--r), var(--g), var(--b));
 }
 
 .history-dot.trend-up::after {
