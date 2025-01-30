@@ -464,7 +464,7 @@ td.ellipsis {
 
 .client-name {
   font-weight: 500;
-  white-space: nowrap;
+  word-break: break-all;
 }
 
 .client-version {
