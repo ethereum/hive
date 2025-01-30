@@ -9,14 +9,6 @@ RUN apt-get clean && apt update \
 
 RUN ldd --version
 
-# TODO: This should work like other EL clients and use
-# a docker image from the registry. The git build approach is
-# used in Dockerfile.git
-#
-#  ARG baseimage=ethpandaops/nimbus-eth1
-#  ARG tag=master
-#  FROM $baseimage:$tag
-
 ARG tag=master
 ARG github=status-im/nimbus-eth1
 
