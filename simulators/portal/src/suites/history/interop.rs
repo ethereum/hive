@@ -1,6 +1,3 @@
-use std::str::FromStr;
-
-use alloy_primitives::Bytes;
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::{
@@ -9,16 +6,12 @@ use ethportal_api::{
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
-use serde_json::json;
-use serde_yaml::Value;
 use tokio::time::Duration;
 
-use crate::suites::history::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::history::constants::{
+    get_test_data, HEADER_WITH_PROOF_KEY, TRIN_BRIDGE_CLIENT_TYPE,
+};
 use crate::suites::utils::get_flair;
-
-// Header with proof for block number 14764013
-const HEADER_WITH_PROOF_KEY: &str =
-    "0x00720704f3aa11c53cf344ea069db95cecb81ad7453c8f276b2a1062979611f09c";
 
 type TestData = Vec<(HistoryContentKey, HistoryContentValue)>;
 
@@ -32,7 +25,7 @@ struct ProcessedContent {
 fn process_content(
     content: Vec<(HistoryContentKey, HistoryContentValue)>,
 ) -> Vec<ProcessedContent> {
-    let mut last_header = content.first().unwrap().clone();
+    let mut last_header = content.first().expect("to find a value").clone();
 
     let mut result: Vec<ProcessedContent> = vec![];
     for history_content in content.into_iter() {
@@ -89,17 +82,7 @@ dyn_async! {
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
-
-        let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
-            .expect("cannot find test asset");
-        let values: Value = serde_yaml::from_str(&values).unwrap();
-        let content: Vec<(HistoryContentKey, HistoryContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let content_key: HistoryContentKey =
-                serde_yaml::from_value(value["content_key"].clone()).unwrap();
-            let raw_content_value = Bytes::from_str(value["content_value"].as_str().unwrap()).unwrap();
-            let content_value = HistoryContentValue::decode(&content_key, raw_content_value.as_ref()).expect("unable to decode content value");
-            (content_key, content_value)
-        }).collect();
+        let content = get_test_data().expect("Unable to get test data");
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
         for (client_a, client_b) in clients.iter().cartesian_product(clients.iter()) {
@@ -200,7 +183,7 @@ dyn_async! {
             Some((client_a, client_b)) => (client_a, client_b),
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: HistoryContentKey = serde_json::from_value(json!(HEADER_WITH_PROOF_KEY)).unwrap();
+        let header_with_proof_key = HEADER_WITH_PROOF_KEY.clone();
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
@@ -463,7 +446,7 @@ dyn_async! {
         tokio::time::sleep(Duration::from_secs(test_data.len() as u64)).await;
 
         // process raw test data to generate content details for error output
-        let (first_header_key, first_header_value) = test_data.first().cloned().unwrap();
+        let (first_header_key, first_header_value) = test_data.first().cloned().expect("Test data is empty");
         let mut last_header_seen: (HistoryContentKey, HistoryContentValue) = (first_header_key, first_header_value);
         let mut result = vec![];
         for (content_key, content_value) in test_data.into_iter() {

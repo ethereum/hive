@@ -1,3 +1,5 @@
+#![warn(clippy::unwrap_used)]
+
 mod suites;
 
 use hivesim::{run_suite, Simulation, Suite, TestSpec};

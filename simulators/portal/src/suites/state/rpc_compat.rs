@@ -1,17 +1,15 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{
-    CONTENT_KEY, CONTENT_LOOKUP_VALUE, CONTENT_OFFER_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
+    ACCOUNT_TRIE_NODE_KEY, RAW_CONTENT_LOOKUP_VALUE, RAW_CONTENT_OFFER_VALUE,
+    TRIN_BRIDGE_CLIENT_TYPE,
 };
-use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{StateContentKey, StateNetworkApiClient};
+use ethportal_api::StateNetworkApiClient;
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use serde_json::json;
 
 dyn_async! {
     pub async fn run_rpc_compat_state_test_suite<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -215,7 +213,7 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let content_key = ACCOUNT_TRIE_NODE_KEY.clone();
 
         if let Ok(response) = StateNetworkApiClient::local_content(&client.rpc, content_key).await {
             panic!("Expected to receive an error because content wasn't found {response:?}");
@@ -229,8 +227,8 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
+        let content_key = ACCOUNT_TRIE_NODE_KEY.clone();
+        let raw_content_offer_value = RAW_CONTENT_OFFER_VALUE.clone();
 
         if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key, raw_content_offer_value).await {
             panic!("{}", &err.to_string());
@@ -244,9 +242,9 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let raw_content_offer_value = Bytes::from_str(CONTENT_OFFER_VALUE).unwrap();
-        let raw_content_lookup_value = Bytes::from_str(CONTENT_LOOKUP_VALUE).unwrap();
+        let content_key = ACCOUNT_TRIE_NODE_KEY.clone();
+        let raw_content_offer_value = RAW_CONTENT_OFFER_VALUE.clone();
+        let raw_content_lookup_value = RAW_CONTENT_LOOKUP_VALUE.clone();
 
 
         if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_offer_value).await {
@@ -483,9 +481,9 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let account_trie_node_key = ACCOUNT_TRIE_NODE_KEY.clone();
 
-        if let Ok(content) = StateNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
+        if let Ok(content) = StateNetworkApiClient::get_content(&client.rpc, account_trie_node_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
         }
     }

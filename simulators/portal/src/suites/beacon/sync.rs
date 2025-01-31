@@ -3,12 +3,11 @@ use crate::suites::beacon::constants::{
     BOOTNODES_ENVIRONMENT_VARIABLE, TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE,
 };
 use crate::suites::environment::PortalNetwork;
-use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{BeaconNetworkApiClient, Discv5ApiClient};
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration};
 
 dyn_async! {
    pub async fn test_beacon_sync<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -73,55 +72,53 @@ dyn_async! {
         };
 
         // wait for initial trusted block root
-        let mut trusted_block_root = None;
-        for i in 0..30 {
-            if trusted_block_root.is_some() {
-                break;
+        let result = timeout(Duration::from_secs(30), async {
+            loop {
+                if let Some(trusted_root) = bridge_service.trusted_block_root().await {
+                    return trusted_root;
+                }
+                sleep(Duration::from_secs(1)).await;
             }
-            if i == 29 {
-                drop(provider_handle);
-                panic!("Trusted block root not initialized in time");
-            }
-            sleep(Duration::from_millis(1000)).await;
-            trusted_block_root = bridge_service.trusted_block_root().await;
-        }
+        }).await;
+
+        let Ok(trusted_block_root) = result else {
+            drop(provider_handle);
+            panic!("Trusted block root not initialized in time");
+        };
 
         // start the client that we're using to test syncing functionality
         let test_client = client.test.start_client(
             client.kind,
             Some(HashMap::from([
                 (BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_enr.to_base64()),
-                (TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE.to_string(), hex_encode(trusted_block_root.unwrap())),
+                (TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE.to_string(), trusted_block_root.to_string()),
                 PortalNetwork::as_environment_flag([PortalNetwork::Beacon]),
             ]))).await;
 
 
         // sleep 1 second to allow client to start
-        sleep(Duration::from_millis(1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
-        // loop until beacon client is initialized
-        for i in 0..30 {
-            sleep(Duration::from_millis(1000)).await;
-            if i == 29 {
-                drop(provider_handle);
-                panic!("Beacon client did not sync in time");
+        let result = timeout(Duration::from_secs(30), async {
+            loop {
+                if let Ok(finalized_root) = test_client.rpc.finalized_state_root().await {
+                    return finalized_root;
+                }
+                sleep(Duration::from_secs(1)).await;
             }
-            match test_client.rpc.finalized_state_root().await {
-                Ok(val) => {
-                    let actual_finalized_root = bridge_service.latest_finalized_root().await.unwrap();
-                    assert_eq!(val, actual_finalized_root);
-                    break;
-                }
-                Err(err) => {
-                    // if error says "not initialized" then continue, since this indicates the client
-                    // is not yet synced
-                    if !err.to_string().contains("not initialized") {
-                        drop(provider_handle);
-                        panic!("Error getting finalized state root: {err:?}");
-                    }
-                }
+        }).await;
+
+        match result {
+            Ok(val) => {
+                let actual_finalized_root = bridge_service.latest_finalized_root().await.expect("to find a latest finalized root");
+                assert_eq!(val, actual_finalized_root);
+            }
+            Err(err) => {
+                drop(provider_handle);
+                panic!("Error getting finalized state root: {err:?}");
             }
         }
+
         drop(provider_handle);
     }
 }
@@ -149,55 +146,52 @@ dyn_async! {
         };
 
         // wait for initial trusted block root
-        let mut trusted_block_root = None;
-        for i in 0..30 {
-            if trusted_block_root.is_some() {
-                break;
+        let result = timeout(Duration::from_secs(30), async {
+            loop {
+                if let Some(trusted_root) = bridge_service.trusted_block_root().await {
+                    return trusted_root;
+                }
+                sleep(Duration::from_secs(1)).await;
             }
-            if i == 29 {
-                drop(provider_handle);
-                panic!("Trusted block root not initialized in time");
-            }
-            sleep(Duration::from_millis(1000)).await;
-            trusted_block_root = bridge_service.trusted_block_root().await;
-        }
+        }).await;
+
+        let Ok(trusted_block_root) = result else {
+            drop(provider_handle);
+            panic!("Trusted block root not initialized in time");
+        };
 
         // start the client that we're using to test syncing functionality
         let test_client = client.test.start_client(
             client.kind,
             Some(HashMap::from([
                 (BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_enr.to_base64()),
-                (TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE.to_string(), hex_encode(trusted_block_root.unwrap())),
+                (TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE.to_string(), trusted_block_root.to_string()),
                 PortalNetwork::as_environment_flag([PortalNetwork::Beacon]),
             ]))).await;
 
-
         // sleep 1 second to allow client to start
-        sleep(Duration::from_millis(1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
-        // loop until beacon client is initialized
-        for i in 0..30 {
-            sleep(Duration::from_millis(1000)).await;
-            if i == 29 {
-                drop(provider_handle);
-                panic!("Beacon client did not sync in time");
+        let result = timeout(Duration::from_secs(30), async {
+            loop {
+                if let Ok(optimistic_root) = test_client.rpc.optimistic_state_root().await {
+                    return optimistic_root;
+                }
+                sleep(Duration::from_secs(1)).await;
             }
-            match test_client.rpc.optimistic_state_root().await {
-                Ok(val) => {
-                    let actual_optimistic_root = bridge_service.latest_optimistic_root().await.unwrap();
-                    assert_eq!(val, actual_optimistic_root);
-                    break;
-                }
-                Err(err) => {
-                    // if error says "not initialized" then continue, since this indicates the client
-                    // is not yet synced
-                    if !err.to_string().contains("not initialized") {
-                        drop(provider_handle);
-                        panic!("Error getting optimistic state root: {err:?}");
-                    }
-                }
+        }).await;
+
+        match result {
+            Ok(val) => {
+                let actual_optimistic_root = bridge_service.latest_optimistic_root().await.expect("to find a latest finalized root");
+                assert_eq!(val, actual_optimistic_root);
+            }
+            Err(err) => {
+                drop(provider_handle);
+                panic!("Error getting optimistic state root: {err:?}");
             }
         }
+
         drop(provider_handle);
     }
 }

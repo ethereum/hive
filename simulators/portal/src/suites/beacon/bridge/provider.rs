@@ -1,3 +1,4 @@
+use alloy_primitives::B256;
 use anyhow::{anyhow, Result};
 use ethportal_api::{
     light_client::{
@@ -16,6 +17,8 @@ use reqwest::{
 };
 use tracing::info;
 
+const DEFAULT_PROVIDER_URL: &str = "http://testing.mainnet.beacon-api.nimbus.team";
+
 // The consensus client for fetching data from the consensus layer, to feed
 // into the test network.
 pub struct ConsensusProvider {
@@ -26,11 +29,14 @@ pub struct ConsensusProvider {
 impl ConsensusProvider {
     pub fn new() -> Result<Self> {
         // check if the PORTAL_CONSENSUS_URL is set
-        let base_url = match std::env::var("PORTAL_CONSENSUS_URL") {
-            // trim trailing slash if present
-            Ok(val) => val.trim_end_matches('/').to_string(),
-            Err(_) => panic!("PORTAL_CONSENSUS_URL not set"),
-        };
+        let base_url =
+            std::env::var("PORTAL_CONSENSUS_URL").map_or(DEFAULT_PROVIDER_URL.to_string(), |val| {
+                if val.is_empty() {
+                    DEFAULT_PROVIDER_URL.to_string()
+                } else {
+                    val.trim_end_matches('/').to_string()
+                }
+            });
         info!("Beacon client initialized with base url: {base_url}");
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -53,25 +59,28 @@ impl ConsensusProvider {
         Ok(Self { client, base_url })
     }
 
-    pub async fn get_finalized_root(&self) -> Result<String> {
+    pub async fn get_finalized_root(&self) -> Result<B256> {
         info!("Fetching finalized root");
         let url = format!("{}/eth/v1/beacon/blocks/finalized/root", self.base_url);
         let data = make_request(&self.client, &url).await?;
-        Ok(data["root"].as_str().unwrap().to_string())
+        let root = data["root"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Root not found"))?;
+        Ok(B256::from_slice(&hex_decode(root)?))
     }
 
     pub async fn get_light_client_bootstrap(
         &self,
-        block_root: String,
+        block_hash: B256,
     ) -> Result<(BeaconContentKey, BeaconContentValue)> {
         info!("Fetching light client bootstrap data");
         let url = format!(
             "{}/eth/v1/beacon/light_client/bootstrap/{}",
-            self.base_url, block_root
+            self.base_url, block_hash
         );
         let data = make_request(&self.client, &url).await?;
         let content_key = BeaconContentKey::LightClientBootstrap(LightClientBootstrapKey {
-            block_hash: <[u8; 32]>::try_from(hex_decode(&block_root)?).unwrap(),
+            block_hash: block_hash.into(),
         });
         let bootstrap: LightClientBootstrapDeneb = serde_json::from_value(data)?;
         let content_value = BeaconContentValue::LightClientBootstrap(bootstrap.into());

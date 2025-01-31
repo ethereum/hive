@@ -4,10 +4,6 @@ FROM rust:1.81.0 AS builder
 RUN USER=root cargo new --bin portal
 WORKDIR /portal
 
-# declare build args for first stage
-ARG PORTAL_CONSENSUS_URL
-ARG PORTAL_CONSENSUS_AUTH
-
 RUN apt-get update && apt-get install clang -y
 
 # copy over manifests and source to build image

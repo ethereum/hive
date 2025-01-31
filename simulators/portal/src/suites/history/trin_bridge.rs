@@ -1,22 +1,18 @@
 use super::constants::{
-    BOOTNODES_ENVIRONMENT_VARIABLE, HIVE_CHECK_LIVE_PORT, TEST_DATA_FILE_PATH,
-    TRIN_BRIDGE_CLIENT_TYPE,
+    get_test_data, BOOTNODES_ENVIRONMENT_VARIABLE, HIVE_CHECK_LIVE_PORT, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::utils::get_flair;
-use alloy_primitives::Bytes;
 use ethportal_api::ContentValue;
 use ethportal_api::HistoryContentKey;
 use ethportal_api::HistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use serde_yaml::Value;
 use std::collections::HashMap;
-use std::str::FromStr;
 use tokio::time::Duration;
 
 fn process_content(content: Vec<(HistoryContentKey, HistoryContentValue)>) -> Vec<String> {
-    let mut last_header = content.first().unwrap().clone();
+    let mut last_header = content.first().expect("to find a value").clone();
 
     let mut result: Vec<String> = vec![];
     for history_content in content.into_iter() {
@@ -89,16 +85,7 @@ dyn_async! {
             ]))).await;
 
         // With default node settings nodes should be storing all content
-        let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
-            .expect("cannot find test asset");
-        let values: Value = serde_yaml::from_str(&values).unwrap();
-        let content_vec: Vec<(HistoryContentKey, HistoryContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let content_key: HistoryContentKey =
-                serde_yaml::from_value(value["content_key"].clone()).unwrap();
-                let raw_content_value = Bytes::from_str(value["content_value"].as_str().unwrap()).unwrap();
-                let content_value = HistoryContentValue::decode(&content_key, raw_content_value.as_ref()).expect("unable to decode content value");
-                (content_key, content_value)
-        }).collect();
+        let content_vec = get_test_data().expect("to get test data");
         let processed_content = process_content(content_vec.clone());
 
         // wait content_vec.len() seconds for data to propagate, giving more time if more items are propagating
