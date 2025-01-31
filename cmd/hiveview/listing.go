@@ -55,14 +55,15 @@ type listingEntry struct {
 	Name   string `json:"name"`
 	NTests int    `json:"ntests"`
 	// Info about this run.
-	Passes   int       `json:"passes"`
-	Fails    int       `json:"fails"`
-	Timeout  bool      `json:"timeout"`
-	Clients  []string  `json:"clients"`  // client names involved in this run
-	Start    time.Time `json:"start"`    // timestamp of test start (ISO 8601 format)
-	FileName string    `json:"fileName"` // hive output file
-	Size     int64     `json:"size"`     // size of hive output file
-	SimLog   string    `json:"simLog"`   // simulator log file
+	Passes   int               `json:"passes"`
+	Fails    int               `json:"fails"`
+	Timeout  bool              `json:"timeout"`
+	Clients  []string          `json:"clients"`  // client names involved in this run
+	Versions map[string]string `json:"versions"` // client versions
+	Start    time.Time         `json:"start"`    // timestamp of test start (ISO 8601 format)
+	FileName string            `json:"fileName"` // hive output file
+	Size     int64             `json:"size"`     // size of hive output file
+	SimLog   string            `json:"simLog"`   // simulator log file
 }
 
 func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
@@ -72,6 +73,7 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 		Size:     file.Size(),
 		SimLog:   s.SimulatorLog,
 		Clients:  make([]string, 0),
+		Versions: s.ClientVersions,
 	}
 	for _, test := range s.TestCases {
 		e.NTests++

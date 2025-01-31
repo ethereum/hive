@@ -298,56 +298,15 @@ ${timeSince(new Date(run.start))} ago">
                         return data.join(',');  // Return comma-separated list for searching
                     }
                     // For display, return the HTML
-                    const clients = data.map(client =>
-                        `<div class="client-entry">
+                    const clients = data.map(client => {
+                        const version = row.versions ? row.versions[client] || '' : '';
+                        return `<div class="client-entry">
                             <span class="client-name">${client}</span>
-                            <span class="client-version" data-client="${client}">...</span>
-                        </div>`
-                    ).join('');
+                            ${version ? `<span class="client-version"><code>${version}</code></span>` : ''}
+                        </div>`;
+                    }).join('');
                     return `<div class="client-list" data-suite-id="${row.fileName}" data-suite-name="${row.name}">${clients}</div>`;
                 },
-                createdCell: function(td, cellData, rowData, row, col) {
-                    // Load client versions when the cell becomes visible
-                    const observer = new IntersectionObserver((entries) => {
-                        entries.forEach(entry => {
-                            if (entry.isIntersecting) {
-                                const cell = $(entry.target);
-                                const suiteId = cell.find('.client-list').data('suite-id');
-
-                                // Load client versions
-                                $.ajax({
-                                    type: 'GET',
-                                    url: routes.resultsRoot + suiteId,
-                                    dataType: 'json',
-                                    success: function(suiteData) {
-                                        if (suiteData.clientVersions) {
-                                            // Update each client's version
-                                            cell.find('.client-version').each(function() {
-                                                const clientName = $(this).data('client');
-                                                const version = suiteData.clientVersions[clientName];
-                                                if (version) {
-                                                    $(this).html(`<code>${version}</code>`);
-                                                } else {
-                                                    $(this).html('');
-                                                }
-                                            });
-                                        } else {
-                                            cell.find('.client-version').html('');
-                                        }
-                                    },
-                                    error: function() {
-                                        cell.find('.client-version').html('');
-                                    }
-                                });
-
-                                // Stop observing after loading
-                                observer.disconnect();
-                            }
-                        });
-                    }, { threshold: 0.1 });
-
-                    observer.observe(td);
-                }
             },
             {
                 title: 'Status',
