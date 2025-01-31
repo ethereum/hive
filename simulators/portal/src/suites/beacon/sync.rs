@@ -1,9 +1,11 @@
 use crate::suites::beacon::bridge::service::BridgeService;
 use crate::suites::beacon::constants::{
-    BOOTNODES_ENVIRONMENT_VARIABLE, TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE,
+    BOOTNODES_ENVIRONMENT_VARIABLE, TRIN_BRIDGE_CLIENT_TYPE,
+    TRUSTED_BLOCK_ROOT_ENVIRONMENT_VARIABLE,
 };
 use crate::suites::environment::PortalNetwork;
 use ethportal_api::{BeaconNetworkApiClient, Discv5ApiClient};
+use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,6 +15,8 @@ dyn_async! {
    pub async fn test_beacon_sync<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
+        // todo: remove this once we implement role in hivesim-rs
+        let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
         // this is the "blank" client, used just for storing beacon network
         // syncing data, and then we test sync functionality on the other client

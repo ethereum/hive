@@ -66,9 +66,7 @@ impl BridgeService {
                 let Ok(trusted_block_root) = provider.get_finalized_root().await else {
                     continue;
                 };
-                {
-                    *trusted_block_root_val.lock().await = Some(trusted_block_root);
-                }
+                *trusted_block_root_val.lock().await = Some(trusted_block_root);
 
                 if let Ok(data) = provider
                     .get_light_client_bootstrap(trusted_block_root)
@@ -90,8 +88,7 @@ impl BridgeService {
                         )
                         .await;
                     {
-                        let mut old_finality_update = finality_update_val.lock().await;
-                        *old_finality_update = match finality_update.1 {
+                        *finality_update_val.lock().await = match finality_update.1 {
                             BeaconContentValue::LightClientFinalityUpdate(update) => update
                                 .update
                                 .finalized_header_deneb()
@@ -112,8 +109,7 @@ impl BridgeService {
                         )
                         .await;
                     {
-                        let mut old_optimistic_update = optimistic_update_val.lock().await;
-                        *old_optimistic_update = match optimistic_update.1 {
+                        *optimistic_update_val.lock().await = match optimistic_update.1 {
                             BeaconContentValue::LightClientOptimisticUpdate(update) => update
                                 .update
                                 .attested_header_deneb()

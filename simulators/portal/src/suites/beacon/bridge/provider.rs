@@ -8,13 +8,13 @@ use ethportal_api::{
     types::content_key::beacon::{
         LightClientBootstrapKey, LightClientFinalityUpdateKey, LightClientOptimisticUpdateKey,
     },
-    utils::bytes::hex_decode,
     BeaconContentKey, BeaconContentValue,
 };
 use reqwest::{
     header::{HeaderMap, HeaderValue, CONTENT_TYPE},
     Client,
 };
+use std::str::FromStr;
 use tracing::info;
 
 const DEFAULT_PROVIDER_URL: &str = "http://testing.mainnet.beacon-api.nimbus.team";
@@ -66,7 +66,7 @@ impl ConsensusProvider {
         let root = data["root"]
             .as_str()
             .ok_or_else(|| anyhow!("Root not found"))?;
-        Ok(B256::from_slice(&hex_decode(root)?))
+        Ok(B256::from_str(root)?)
     }
 
     pub async fn get_light_client_bootstrap(
