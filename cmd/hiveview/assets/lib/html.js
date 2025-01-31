@@ -54,3 +54,31 @@ export function makeDefinitionList(data) {
     }
     return list;
 }
+
+// sanitizeHtml safely cleans HTML content by removing unsafe elements and attributes
+export function sanitizeHtml(unsafeHtml, allowList) {
+    if (!unsafeHtml || !unsafeHtml.length) {
+        return unsafeHtml;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(unsafeHtml, 'text/html');
+    const elements = doc.body.querySelectorAll('*');
+
+    elements.forEach(element => {
+        const elementName = element.nodeName.toLowerCase();
+        if (!Object.keys(allowList).includes(elementName)) {
+            element.remove();
+            return;
+        }
+
+        const allowedAttributes = [].concat(allowList['*'] || [], allowList[elementName] || []);
+        Array.from(element.attributes).forEach(attr => {
+            if (!allowedAttributes.includes(attr.name)) {
+                element.removeAttribute(attr.name);
+            }
+        });
+    });
+
+    return doc.body.innerHTML;
+}

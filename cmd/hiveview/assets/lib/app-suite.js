@@ -359,8 +359,31 @@ function formatTestDetails(suiteData, row) {
 
     if (d.description != '') {
         let p = document.createElement('p');
-        let description = html.urlsToLinks(html.encode(d.description.trim()));
-        let txt = '<b>Description:</b><br/>' + description;
+        let description = d.description.trim();
+        // If the description contains HTML tags, sanitize it
+        if (description.match(/<[^>]*>/)) {
+            // Define allowed HTML elements and attributes
+            const allowList = {
+                'a': ['href', 'title', 'target'],
+                'b': [],
+                'i': [],
+                'strong': [],
+                'em': [],
+                'p': [],
+                'br': [],
+                'ul': [],
+                'ol': [],
+                'li': [],
+                'code': [],
+                'pre': [],
+                '*': ['class'] // Allow class attribute on all elements
+            };
+            description = html.sanitizeHtml(description, allowList);
+        } else {
+            // If no HTML, treat as plain text and convert URLs to links
+            description = html.urlsToLinks(html.encode(description));
+        }
+        let txt = '<b>Description:</b><div>' + description + '</div>';
         p.innerHTML = txt;
         container.appendChild(p);
     }
