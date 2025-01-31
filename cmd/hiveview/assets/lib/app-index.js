@@ -389,12 +389,18 @@ ${timeSince(new Date(run.start))} ago">
             {
                 title: '',
                 data: null,
-                width: '8.5em',
+                width: '11em',
+                className: 'action-buttons-column',
                 orderable: false,
                 render: function(data) {
                     let url = routes.suite(data.fileName, data.name);
                     let loadText = 'Load (' + formatBytes(data.size) + ')';
-                    return makeButton(url, loadText, "btn-secondary btn-load-results").outerHTML;
+                    const clientKey = data.clients.join(',');
+
+                    return `<div class="btn-group w-100">
+                        ${makeButton('#', '<i class="bi bi-funnel"></i>', `btn-outline-secondary btn-sm`, `onclick="filterSuiteAndClient('${data.name}', '${clientKey}'); return false;" title="Filter by this suite and client"`).outerHTML}
+                        ${makeButton(url, loadText, "btn-secondary btn-sm flex-grow-1").outerHTML}
+                    </div>`;
                 },
             },
         ],

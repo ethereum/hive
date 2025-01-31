@@ -1,6 +1,7 @@
 @import "../extlib/bootstrap-5.3.3.css";
 @import "../extlib/dataTables-1.13.1.bootstrap5.css";
 @import "../extlib/responsive-2.4.0.bootstrap5.css";
+@import "../extlib/bootstrap-icons-1.11.3.css";
 
 :root {
     --highlight-bg: #fffaea;
@@ -494,4 +495,27 @@ td.ellipsis {
   .client-results {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));  /* Slightly smaller on medium screens */
   }
+}
+
+.action-buttons-column {
+    max-width: 11em;
+    min-width: 11em;
+    padding: 0.5rem !important;
+}
+
+.action-buttons-column .btn-group {
+    display: flex;
+}
+
+.action-buttons-column .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-buttons-column .btn:first-child {
+    width: 30px;
+    min-width: 30px;
+    max-width: 30px;
+    padding: 0;
 }

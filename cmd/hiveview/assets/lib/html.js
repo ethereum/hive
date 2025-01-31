@@ -23,10 +23,21 @@ export function makeLink(url, text) {
 }
 
 // makeButton creates a button-shaped link element.
-export function makeButton(url, text, classes = '') {
-    let a = makeLink(url, text);
-    a.setAttribute('class', `btn btn-primary btn-sm ${classes}`.trim());
-    return a;
+export function makeButton(href, text, classes = "", attributes = "") {
+    const button = document.createElement('a');
+    button.href = href;
+    button.className = 'btn ' + classes;
+    button.innerHTML = text;
+    if (attributes) {
+        // Match attributes while preserving quoted values
+        const attrRegex = /(\w+)=(['"])(.*?)\2/g;
+        let match;
+        while ((match = attrRegex.exec(attributes)) !== null) {
+            const [_, name, quote, value] = match;
+            button.setAttribute(name, value);
+        }
+    }
+    return button;
 }
 
 // Takes { "a": "1", ... }
