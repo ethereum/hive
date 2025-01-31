@@ -9,6 +9,74 @@ import * as routes from './routes.js';
 import { makeButton } from './html.js';
 import { formatBytes, escapeRegExp } from './utils.js';
 
+function timeSince(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+
+    const intervals = {
+        year: 31536000,
+        month: 2592000,
+        week: 604800,
+        day: 86400,
+        hour: 3600,
+        minute: 60
+    };
+
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+        const interval = Math.floor(seconds / secondsInUnit);
+        if (interval >= 1) {
+            return interval === 1 ? `1 ${unit}` : `${interval} ${unit}s`;
+        }
+    }
+
+    return 'just now';
+}
+
+window.sortAllClients = function(sortBy) {
+    $('.suite-box').each(function() {
+        const clientBoxes = $(this).find('.client-box').get();
+
+        clientBoxes.sort((a, b) => {
+            const boxA = $(a);
+            const boxB = $(b);
+
+            switch(sortBy) {
+                case 'name':
+                    return boxA.data('client').localeCompare(boxB.data('client'));
+                case 'coverage':
+                    const coverageA = parseInt(boxA.find('.coverage-percent').text());
+                    const coverageB = parseInt(boxB.find('.coverage-percent').text());
+                    return coverageB - coverageA; // Higher coverage first
+                case 'time':
+                    const timeA = new Date(boxA.data('time'));
+                    const timeB = new Date(boxB.data('time'));
+                    return timeB - timeA; // Most recent first
+                default:
+                    return 0;
+            }
+        });
+
+        const clientResults = $(this).find('.client-results');
+        clientResults.empty();
+        clientBoxes.forEach(box => clientResults.append(box));
+    });
+
+    // Update URL hash with sort parameter while preserving other parameters
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    urlParams.set('summary-sort', sortBy);
+    const newHash = urlParams.toString();
+    if (newHash) {
+        window.history.replaceState(null, '', '#' + newHash);
+    }
+
+    // Update dropdown button text
+    const sortText = {
+        'name': 'Name',
+        'coverage': 'Coverage',
+        'time': 'Time'
+    }[sortBy];
+    $('.summary-controls .current-sort').text(sortText);
+};
+
 $(document).ready(function () {
     common.updateHeader();
 
@@ -65,56 +133,13 @@ function showFileListing(data) {
     // Display summary boxes
     const summaryDiv = $('#suite-summary');
 
-    // Add sorting function to window scope first
-    window.sortAllClients = function(sortBy) {
-        $('.suite-box').each(function() {
-            const clientBoxes = $(this).find('.client-box').get();
-
-            clientBoxes.sort((a, b) => {
-                const boxA = $(a);
-                const boxB = $(b);
-
-                switch(sortBy) {
-                    case 'name':
-                        return boxA.data('client').localeCompare(boxB.data('client'));
-                    case 'coverage':
-                        const coverageA = parseInt(boxA.find('.coverage-percent').text());
-                        const coverageB = parseInt(boxB.find('.coverage-percent').text());
-                        return coverageB - coverageA; // Higher coverage first
-                    case 'time':
-                        const timeA = new Date(boxA.data('time'));
-                        const timeB = new Date(boxB.data('time'));
-                        return timeB - timeA; // Most recent first
-                    default:
-                        return 0;
-                }
-            });
-
-            const clientResults = $(this).find('.client-results');
-            clientResults.empty();
-            clientBoxes.forEach(box => clientResults.append(box));
-        });
-
-        // Update URL hash with sort parameter while preserving other parameters
-        const urlParams = new URLSearchParams(window.location.hash.substring(1));
-        urlParams.set('summary-sort', sortBy);
-        const newHash = urlParams.toString();
-        if (newHash) {
-            window.history.replaceState(null, '', '#' + newHash);
-        }
-
-        // Update dropdown button text
-        const sortText = {
-            'name': 'Name',
-            'coverage': 'Coverage',
-            'time': 'Time'
-        }[sortBy];
-        $('.summary-controls .current-sort').text(sortText);
-    };
-
     // Add global sort controls
     const sortControls = $(`
-        <div class="summary-controls">
+        <div class="summary-controls d-flex gap-2">
+            <div class="btn-group">
+                <button class="btn btn-sm btn-secondary active" data-group-by="suite" onclick="window.toggleGrouping('suite')">Group by Suite</button>
+                <button class="btn btn-sm btn-secondary" data-group-by="client" onclick="window.toggleGrouping('client')">Group by Client</button>
+            </div>
             <div class="dropdown">
                 <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     Sort runs by: <span class="current-sort">Name</span>
@@ -128,89 +153,6 @@ function showFileListing(data) {
         </div>
     `);
     summaryDiv.prepend(sortControls);
-
-    // Generate all client boxes first
-    Array.from(suiteGroups.entries())
-        .sort((a, b) => a[0].localeCompare(b[0])) // Sort suites alphabetically by name
-        .forEach(([suiteName, clientResults]) => {
-            const clientBoxes = Array.from(clientResults.entries())
-                .sort((a, b) => a[0].localeCompare(b[0])) // Sort by client name
-                .map(([clientKey, runs]) => {
-                    const latest = runs[0];
-                    const timeAgo = timeSince(new Date(latest.start));
-
-                    // Generate history dots
-                    const historyDots = runs.map((run, idx) => {
-                        const prevRun = runs[idx + 1];
-                        let trendClass = '';
-                        if (prevRun) {
-                            const prevRatio = prevRun.passes / (prevRun.passes + prevRun.fails);
-                            const currRatio = run.passes / (run.passes + run.fails);
-                            trendClass = currRatio > prevRatio ? 'trend-up' :
-                                       currRatio < prevRatio ? 'trend-down' : 'trend-same';
-                        }
-                        const passRatio = (run.passes / (run.passes + run.fails)) * 100;
-                        return `
-                            <div class="history-dot ${trendClass}"
-                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
-${timeSince(new Date(run.start))} ago">
-                                <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
-                            </div>
-                        `;
-                    }).reverse().join('');
-
-                    return `
-                        <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}" style="cursor: pointer;"
-                             data-suite="${suiteName}" data-client="${clientKey}" data-time="${latest.start}"
-                             onclick="window.filterSuiteAndClient('${suiteName}', '${clientKey}')">
-                            <div class="client-name">${clientKey}</div>
-                            <div class="stats">
-                                <span class="pass-count">✓ ${latest.passes}</span>
-                                ${latest.fails > 0 ? `<span class="fail-count">✗ ${latest.fails}</span>` : ''}
-                                <div class="history-dots">
-                                    ${historyDots}
-                                </div>
-                            </div>
-                            <div class="time">
-                                <span>${timeAgo} ago</span>
-                                <span class="coverage-percent">
-                                    ${((latest.passes / (latest.passes + latest.fails)) * 100).toFixed(2)}%
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-            const box = $(`
-                <div class="suite-box">
-                    <div class="title" onclick="window.filterSuite('${suiteName}')">${suiteName}</div>
-                    <div class="client-results">
-                        ${clientBoxes}
-                    </div>
-                </div>
-            `);
-            summaryDiv.append(box);
-        });
-
-    // Apply initial sort from URL hash if present
-    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-    const initialSort = urlParams.get('summary-sort') || 'name';
-    window.sortAllClients(initialSort);
-
-    // Handle suite and client selection from URL hash
-    const hashSuite = urlParams.get('suite');
-    const hashClient = urlParams.get('client');
-    if (hashSuite) {
-        // Find and highlight the clicked suite box
-        $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
-            return $(this).find('.title').text() === hashSuite;
-        }).addClass('selected');
-
-        if (hashClient) {
-            // Find and highlight the clicked client box
-            $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
-        }
-    }
 
     // Add floating filters notice
     const filtersNotice = $(`
@@ -230,6 +172,41 @@ ${timeSince(new Date(run.start))} ago">
         suite.start = new Date(suite.start);
         suites.push(suite);
     });
+
+    // Store the processed data globally for reuse
+    window.processedData = {
+        suiteGroups,
+        clientGroups: processClientGroups(suites)
+    };
+
+    // Initial display based on URL hash
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    const groupBy = urlParams.get('group-by') || 'suite';
+
+    // Set initial button state
+    $('.summary-controls button[data-group-by]').removeClass('active');
+    $(`.summary-controls button[data-group-by="${groupBy}"]`).addClass('active');
+
+    displayGroups(groupBy);
+
+    // Apply initial sort from URL hash if present
+    const initialSort = urlParams.get('summary-sort') || 'name';
+    window.sortAllClients(initialSort);
+
+    // Handle suite and client selection from URL hash
+    const hashSuite = urlParams.get('suite');
+    const hashClient = urlParams.get('client');
+    if (hashSuite) {
+        // Find and highlight the clicked suite box
+        $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
+            return $(this).find('.title').text() === hashSuite;
+        }).addClass('selected');
+
+        if (hashClient) {
+            // Find and highlight the clicked client box
+            $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
+        }
+    }
 
     let theTable = $('#filetable').DataTable({
         data: suites,
@@ -373,28 +350,6 @@ ${timeSince(new Date(run.start))} ago">
         $('.client-box').removeClass('selected');
         return false;
     });
-}
-
-function timeSince(date) {
-    const seconds = Math.floor((new Date() - date) / 1000);
-
-    const intervals = {
-        year: 31536000,
-        month: 2592000,
-        week: 604800,
-        day: 86400,
-        hour: 3600,
-        minute: 60
-    };
-
-    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
-        const interval = Math.floor(seconds / secondsInUnit);
-        if (interval >= 1) {
-            return interval === 1 ? `1 ${unit}` : `${interval} ${unit}s`;
-        }
-    }
-
-    return 'just now';
 }
 
 // ColumnFilterSet manages the column filters.
@@ -739,6 +694,215 @@ window.filterSuiteAndClient = function(suiteName, clientKey) {
     if (clientFilter) {
         clientFilter.apply(clientKey);
         $('select', $('.filters th').eq(2)).val(clientKey);
+    }
+
+    // Scroll to the table
+    $('#filetable').get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+function processClientGroups(suites) {
+    const clientGroups = new Map();
+
+    suites.forEach(entry => {
+        entry.clients.forEach(client => {
+            if (!clientGroups.has(client)) {
+                clientGroups.set(client, new Map());
+            }
+
+            const suiteGroup = clientGroups.get(client);
+            const suiteKey = entry.name;
+
+            if (!suiteGroup.has(suiteKey)) {
+                suiteGroup.set(suiteKey, []);
+            }
+            suiteGroup.get(suiteKey).push(entry);
+        });
+    });
+
+    // Sort and limit runs
+    for (const suiteGroup of clientGroups.values()) {
+        for (const [suiteKey, runs] of suiteGroup.entries()) {
+            runs.sort((a, b) => new Date(b.start) - new Date(a.start));
+            suiteGroup.set(suiteKey, runs.slice(0, 5));
+        }
+    }
+
+    return clientGroups;
+}
+
+window.toggleGrouping = function(groupBy) {
+    // Update button states
+    $('.summary-controls button[data-group-by]').removeClass('active');
+    $(`.summary-controls button[data-group-by="${groupBy}"]`).addClass('active');
+
+    // Update URL hash
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    urlParams.set('group-by', groupBy);
+    window.history.replaceState(null, '', '#' + urlParams.toString());
+
+    // Display the groups
+    displayGroups(groupBy);
+};
+
+function displayGroups(groupBy) {
+    const summaryDiv = $('#suite-summary');
+    summaryDiv.find('.suite-box, .client-box-container').remove();
+
+    if (groupBy === 'suite') {
+        displaySuiteGroups(window.processedData.suiteGroups);
+    } else {
+        displayClientGroups(window.processedData.clientGroups);
+    }
+}
+
+function displaySuiteGroups(suiteGroups) {
+    Array.from(suiteGroups.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .forEach(([suiteName, clientResults]) => {
+            const clientBoxes = Array.from(clientResults.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([clientKey, runs]) => {
+                    const latest = runs[0];
+                    const timeAgo = timeSince(new Date(latest.start));
+
+                    // Generate history dots
+                    const historyDots = runs.map((run, idx) => {
+                        const prevRun = runs[idx + 1];
+                        let trendClass = '';
+                        if (prevRun) {
+                            const prevRatio = prevRun.passes / (prevRun.passes + prevRun.fails);
+                            const currRatio = run.passes / (run.passes + run.fails);
+                            trendClass = currRatio > prevRatio ? 'trend-up' :
+                                       currRatio < prevRatio ? 'trend-down' : 'trend-same';
+                        }
+                        const passRatio = (run.passes / (run.passes + run.fails)) * 100;
+                        return `
+                            <div class="history-dot ${trendClass}"
+                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
+${timeSince(new Date(run.start))} ago">
+                                <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
+                            </div>
+                        `;
+                    }).reverse().join('');
+
+                    return `
+                        <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}"
+                             data-suite="${suiteName}" data-client="${clientKey}" data-time="${latest.start}"
+                             onclick="window.filterSuiteAndClient('${suiteName}', '${clientKey}')">
+                            <div class="client-name">${clientKey}</div>
+                            <div class="stats">
+                                <span class="pass-count">✓ ${latest.passes}</span>
+                                ${latest.fails > 0 ? `<span class="fail-count">✗ ${latest.fails}</span>` : ''}
+                                <div class="history-dots">${historyDots}</div>
+                            </div>
+                            <div class="time">
+                                <span>${timeAgo} ago</span>
+                                <span class="coverage-percent">
+                                    ${((latest.passes / (latest.passes + latest.fails)) * 100).toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            const box = $(`
+                <div class="suite-box">
+                    <div class="title" onclick="window.filterSuite('${suiteName}')">${suiteName}</div>
+                    <div class="client-results">
+                        ${clientBoxes}
+                    </div>
+                </div>
+            `);
+            $('#suite-summary').append(box);
+        });
+}
+
+function displayClientGroups(clientGroups) {
+    Array.from(clientGroups.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .forEach(([clientName, suiteResults]) => {
+            const suiteBoxes = Array.from(suiteResults.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([suiteName, runs]) => {
+                    const latest = runs[0];
+                    const timeAgo = timeSince(new Date(latest.start));
+
+                    // Generate history dots
+                    const historyDots = runs.map((run, idx) => {
+                        const prevRun = runs[idx + 1];
+                        let trendClass = '';
+                        if (prevRun) {
+                            const prevRatio = prevRun.passes / (prevRun.passes + prevRun.fails);
+                            const currRatio = run.passes / (run.passes + run.fails);
+                            trendClass = currRatio > prevRatio ? 'trend-up' :
+                                       currRatio < prevRatio ? 'trend-down' : 'trend-same';
+                        }
+                        const passRatio = (run.passes / (run.passes + run.fails)) * 100;
+                        return `
+                            <div class="history-dot ${trendClass}"
+                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
+${timeSince(new Date(run.start))} ago">
+                                <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
+                            </div>
+                        `;
+                    }).reverse().join('');
+
+                    return `
+                        <div class="client-box ${latest.passes === 0 ? 'all-failed' : latest.fails === 0 ? 'all-passed' : 'has-failures'}"
+                             data-suite="${suiteName}" data-client="${clientName}" data-time="${latest.start}"
+                             onclick="window.filterSuiteAndClient('${suiteName}', '${clientName}')">
+                            <div class="client-name">${suiteName}</div>
+                            <div class="stats">
+                                <span class="pass-count">✓ ${latest.passes}</span>
+                                ${latest.fails > 0 ? `<span class="fail-count">✗ ${latest.fails}</span>` : ''}
+                                <div class="history-dots">${historyDots}</div>
+                            </div>
+                            <div class="time">
+                                <span>${timeAgo} ago</span>
+                                <span class="coverage-percent">
+                                    ${((latest.passes / (latest.passes + latest.fails)) * 100).toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            const box = $(`
+                <div class="suite-box">
+                    <div class="title" onclick="window.filterClient('${clientName}')">${clientName}</div>
+                    <div class="client-results">
+                        ${suiteBoxes}
+                    </div>
+                </div>
+            `);
+            $('#suite-summary').append(box);
+        });
+}
+
+window.filterClient = function(clientName) {
+    // Remove all selections
+    $('.suite-box').removeClass('selected');
+    $('.client-box').removeClass('selected');
+
+    // Find and highlight the clicked client box
+    $(`.suite-box:has(.title:contains('${clientName}'))`).filter(function() {
+        return $(this).find('.title').text() === clientName;
+    }).addClass('selected');
+
+    const filters = new ColumnFilterSet($('#filetable').DataTable());
+
+    // Apply client filter
+    const clientFilter = filters.byKey('client');
+    if (clientFilter) {
+        clientFilter.apply(clientName);
+        $('select', $('.filters th').eq(2)).val(clientName);
+    }
+
+    // Clear suite filter
+    const suiteFilter = filters.byKey('suite');
+    if (suiteFilter) {
+        suiteFilter.apply('');
+        $('select', $('.filters th').eq(1)).val('');
     }
 
     // Scroll to the table

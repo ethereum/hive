@@ -329,6 +329,7 @@ td.ellipsis {
   transition: all 0.2s ease;
   height: fit-content;
   border: 2px solid transparent;
+  cursor: pointer;
 }
 
 .client-box.selected {
