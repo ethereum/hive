@@ -72,6 +72,10 @@ func makeBuildOptions(fsys fs.FS) esbuild.BuildOptions {
 		Sourcemap:         esbuild.SourceMapLinked,
 		SourcesContent:    esbuild.SourcesContentExclude,
 		LogLevel:          esbuild.LogLevelWarning,
+		Loader: map[string]esbuild.Loader{
+			".js":  esbuild.LoaderJS,
+			".css": esbuild.LoaderCSS,
+		},
 	}
 }
 
@@ -247,6 +251,8 @@ func loaderFromExt(name string) esbuild.Loader {
 		return esbuild.LoaderFile
 	case ".woff":
 		return esbuild.LoaderFile
+	case ".css":
+		return esbuild.LoaderCSS
 	default:
 		return esbuild.LoaderDefault
 	}
