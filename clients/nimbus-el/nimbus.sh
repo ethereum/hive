@@ -39,7 +39,7 @@
 #
 # Other:
 #
-#  - [x] HIVE_MINER                   enable mining. value is coinbase address.
+#  - [ ] HIVE_MINER                   enable mining. value is coinbase address.
 #  - [ ] HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
 #  - [x] HIVE_LOGLEVEL                client loglevel (0-5)
 #  - [x] HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
@@ -47,8 +47,8 @@
 # Immediately abort the script on any error encountered
 set -e
 
-nimbus=/usr/bin/nimbus
-FLAGS="--chaindb:archive --nat:extip:0.0.0.0"
+nimbus=/usr/bin/nimbus_execution_client
+FLAGS="--nat:extip:0.0.0.0 "
 
 loglevel=DEBUG
 case "$HIVE_LOGLEVEL" in
@@ -67,16 +67,6 @@ fi
 
 if [ "$HIVE_NETWORK_ID" != "" ]; then
   FLAGS="$FLAGS --network:$HIVE_NETWORK_ID"
-fi
-
-if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
-# -n will prevent newline when echoing something
-  echo -n "$HIVE_CLIQUE_PRIVATEKEY" > private.key
-  FLAGS="$FLAGS --import-key:private.key"
-
-  if [ "$HIVE_MINER" != "" ]; then
-    FLAGS="$FLAGS --engine-signer:$HIVE_MINER"
-  fi
 fi
 
 # Configure the chain.
@@ -98,7 +88,7 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-  CMD="import /chain.rlp"
+  CMD="import-rlp /chain.rlp"
   echo "Running nimbus: $nimbus $CMD $FLAGS"
   $nimbus $CMD $FLAGS
 else
@@ -108,7 +98,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && $nimbus import `ls | sort -n` $FLAGS)
+  (cd /blocks && $nimbus import-rlp `ls | sort -n` $FLAGS)
 else
   echo "Warning: blocks folder not found."
 fi

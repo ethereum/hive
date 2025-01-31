@@ -1,0 +1,45 @@
+### Build Fluffy From Git:
+## Pulls fluffy from a git repository and builds it from source.
+
+## Builder stage: Compiles fluffy from a git repository
+FROM debian:buster-slim AS builder
+
+ARG github=status-im/nimbus-eth1
+ARG tag=master
+ENV NPROC=2
+ENV NIMFLAGS_COMMON="-d:disableMarchNative --gcc.options.debug:'-g1' --clang.options.debug:'-gline-tables-only'"
+
+RUN apt-get update \
+ && apt-get install -y --fix-missing build-essential make git \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN echo "Cloning: $github - $tag" \
+    && git clone https://github.com/$github nimbus-eth1 \
+    && cd nimbus-eth1 \
+    && git checkout $tag \
+    && make -j${NPROC} NIMFLAGS="${NIMFLAGS_COMMON} --parallelBuild:${NPROC}" V=1 update
+
+RUN cd nimbus-eth1 && \
+    make -j${NPROC} NIMFLAGS="${NIMFLAGS_COMMON} --parallelBuild:${NPROC}" fluffy && \
+    mv build/fluffy /usr/bin/
+
+## Final stage: Sets up the environment for running fluffy
+FROM debian:buster-slim
+RUN apt-get update && apt-get install -y bash curl jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled binary from builder
+COPY --from=builder /usr/bin/fluffy /usr/bin/fluffy
+
+# Inject the startup script.
+ADD fluffy.sh /fluffy.sh
+RUN chmod +x /fluffy.sh
+
+# Create version.txt
+RUN echo "latest" > /version.txt
+
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 9009/udp
+
+ENTRYPOINT ["/fluffy.sh"]
