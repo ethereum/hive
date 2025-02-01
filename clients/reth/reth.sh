@@ -103,7 +103,7 @@ echo "Loading remaining individual blocks..."
 mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
 
 if [[ ! -d "/blocks" || ${#BLOCKS[@]} -eq 0 ]]; then
-    echo "Error: No blocks found."
+    echo "Warning: No blocks found."
 elif [[ ${#BLOCKS[@]} -eq 1 ]]; then
     # Import the only existing block
     $reth import $FLAGS "${BLOCKS[0]}"
