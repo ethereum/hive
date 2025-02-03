@@ -3,6 +3,7 @@ import 'datatables.net-bs5';
 import 'datatables.net-responsive';
 import 'datatables.net-responsive-bs5';
 import $ from 'jquery';
+import * as bootstrap from 'bootstrap';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
@@ -78,6 +79,10 @@ window.sortAllClients = function(sortBy) {
 };
 
 $(document).ready(function () {
+    // Initialize popovers
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(el => new bootstrap.Popover(el));
+
     common.updateHeader();
 
     $('#loading').show();
@@ -753,6 +758,25 @@ function displayGroups(groupBy) {
     } else {
         displayClientGroups(window.processedData.clientGroups);
     }
+
+    // Initialize popovers after adding new content
+    initPopovers();
+}
+
+function initPopovers() {
+    // Destroy existing popovers
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+        const popover = bootstrap.Popover.getInstance(el);
+        if (popover) {
+            popover.dispose();
+        }
+    });
+    // Initialize new popovers
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(el => new bootstrap.Popover(el, {
+        placement: 'top',
+        html: true
+    }));
 }
 
 function displaySuiteGroups(suiteGroups) {
@@ -778,8 +802,9 @@ function displaySuiteGroups(suiteGroups) {
                         const passRatio = (run.passes / (run.passes + run.fails)) * 100;
                         return `
                             <div class="history-dot ${trendClass}"
-                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
-${timeSince(new Date(run.start))} ago">
+                                 data-bs-toggle="popover"
+                                 data-bs-trigger="hover"
+                                 data-bs-content="<div><span class='text-success'>✓ ${run.passes}</span>${run.fails > 0 ? `<span class='text-danger'> ✗ ${run.fails}</span>` : ''} passed (<span class='text-primary'>${passRatio.toFixed(2)}%</span>)</div><div class='text-secondary mt-1'>${timeSince(new Date(run.start))} ago</div>">
                                 <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
                             </div>
                         `;
@@ -840,8 +865,9 @@ function displayClientGroups(clientGroups) {
                         const passRatio = (run.passes / (run.passes + run.fails)) * 100;
                         return `
                             <div class="history-dot ${trendClass}"
-                                 title="${run.passes}/${run.passes + run.fails} passed (${passRatio.toFixed(2)}%)
-${timeSince(new Date(run.start))} ago">
+                                 data-bs-toggle="popover"
+                                 data-bs-trigger="hover"
+                                 data-bs-content="<div><span class='text-success'>✓ ${run.passes}</span>${run.fails > 0 ? `/<span class='text-danger'>✗ ${run.fails}</span>` : ''} passed (<span class='text-primary'>${passRatio.toFixed(2)}%</span>)</div><div class='text-secondary mt-1'>${timeSince(new Date(run.start))} ago</div>">
                                 <div class="dot-fill" style="height: ${passRatio}%; --pass-percent: ${passRatio/100}"></div>
                             </div>
                         `;
