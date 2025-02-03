@@ -323,18 +323,31 @@ td.ellipsis {
 }
 
 .client-box {
-  padding: 0.5rem;
-  border-radius: 4px;
-  background: var(--bs-body-bg);
-  transition: all 0.2s ease;
-  height: fit-content;
-  border: 2px solid transparent;
-  cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background: var(--bs-body-bg);
+    transition: all 0.2s ease;
+    height: fit-content;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.client-box:hover,
+.client-box.selected {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .client-box.selected {
-  background: color-mix(in srgb, var(--bs-primary) 15%, var(--bs-body-bg));
-  outline: 1px solid var(--bs-primary);
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--bs-primary) 25%, var(--bs-body-bg)),
+        color-mix(in srgb, var(--bs-primary) 10%, var(--bs-body-bg))
+    );
+    border-color: var(--bs-primary);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-primary) 30%, transparent);
 }
 
 .client-box.all-passed {
@@ -350,6 +363,36 @@ td.ellipsis {
 .client-box.all-failed {
   border-color: var(--bs-danger);
   background: color-mix(in srgb, var(--bs-danger) 8%, var(--bs-body-bg));
+}
+
+.client-box.all-passed.selected {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--bs-success) 25%, var(--bs-body-bg)),
+        color-mix(in srgb, var(--bs-success) 10%, var(--bs-body-bg))
+    );
+    border-color: var(--bs-success);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-success) 30%, transparent);
+}
+
+.client-box.has-failures.selected {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--bs-warning) 25%, var(--bs-body-bg)),
+        color-mix(in srgb, var(--bs-warning) 10%, var(--bs-body-bg))
+    );
+    border-color: var(--bs-warning);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-warning) 30%, transparent);
+}
+
+.client-box.all-failed.selected {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--bs-danger) 25%, var(--bs-body-bg)),
+        color-mix(in srgb, var(--bs-danger) 10%, var(--bs-body-bg))
+    );
+    border-color: var(--bs-danger);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-danger) 30%, transparent);
 }
 
 .client-name {
@@ -546,4 +589,41 @@ td.ellipsis {
 
 #loading-container.show {
     opacity: 1;
+}
+
+.modal-content {
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.modal-body .table {
+    margin: 0;
+}
+
+.modal-body .table td {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+.modal-body .table td:first-child {
+    width: 30%;
+    white-space: nowrap;
+}
+
+kbd {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--bs-body-color);
+    background: var(--bs-dark-bg-subtle);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 0 var(--bs-border-color);
+    margin: 0 0.2rem;
 }

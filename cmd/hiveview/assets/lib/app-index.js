@@ -102,6 +102,95 @@ $(document).ready(function () {
             $('#loading-container').removeClass('show');
         },
     });
+
+    // Add keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        // Don't handle keyboard events if user is typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        switch (e.key) {
+            case 'Escape':
+                // Clear filters and selections
+                $('#filters-clear').click();
+                break;
+
+            case 'ArrowLeft':
+            case 'ArrowRight':
+                // Navigate between client boxes
+                const boxes = $('.client-box');
+                const selected = $('.client-box.selected');
+                if (!selected.length) {
+                    // If no box is selected, select the first one on right arrow
+                    if (e.key === 'ArrowRight') {
+                        boxes.first().click();
+                    }
+                    return;
+                }
+
+                const currentIndex = boxes.index(selected);
+                const nextIndex = currentIndex + (e.key === 'ArrowLeft' ? -1 : 1);
+
+                if (nextIndex >= 0 && nextIndex < boxes.length) {
+                    const nextBox = boxes.eq(nextIndex);
+                    nextBox.click();
+                    nextBox[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                break;
+
+            case 'ArrowUp':
+            case 'ArrowDown':
+                // Navigate between suite boxes
+                const suites = $('.suite-box');
+                const selectedSuite = $('.suite-box.selected');
+                if (!selectedSuite.length) {
+                    // If no suite is selected, select the first one on down arrow
+                    if (e.key === 'ArrowDown') {
+                        suites.first().find('.title').click();
+                    }
+                    return;
+                }
+
+                const currentSuiteIndex = suites.index(selectedSuite);
+                const nextSuiteIndex = currentSuiteIndex + (e.key === 'ArrowUp' ? -1 : 1);
+
+                if (nextSuiteIndex >= 0 && nextSuiteIndex < suites.length) {
+                    const nextSuite = suites.eq(nextSuiteIndex);
+                    nextSuite.find('.title').click();
+                    nextSuite[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                break;
+
+            case 'Enter':
+                // If a client box is selected, load its results
+                const selectedBox = $('.client-box.selected');
+                if (selectedBox.length) {
+                    selectedBox.find('.btn-load-results').click();
+                }
+                break;
+
+            case 'g':
+                // Group by toggle
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const currentGrouping = $('.summary-controls button[data-group-by].active').data('group-by');
+                    const newGrouping = currentGrouping === 'suite' ? 'client' : 'suite';
+                    window.toggleGrouping(newGrouping);
+                }
+                break;
+
+            case '/':
+                // Focus search
+                e.preventDefault();
+                $('.dataTables_filter input').focus();
+                break;
+        }
+    });
+
+    // Add keyboard shortcut hints to UI elements
+    $('.dataTables_filter input').attr('placeholder', 'Search... (Press /)');
+    $('.summary-controls button[data-group-by]').attr('title', 'Toggle grouping (Ctrl/⌘ + G)');
 });
 
 function showFileListing(data) {
@@ -155,9 +244,65 @@ function showFileListing(data) {
                     <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); window.sortAllClients('time')">Time</a></li>
                 </ul>
             </div>
+            <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#keyboardShortcutsModal">
+                <i class="bi bi-question-circle"></i>
+            </button>
         </div>
     `);
     summaryDiv.prepend(sortControls);
+
+    // Add keyboard shortcuts modal
+    const shortcutsModal = $(`
+        <div class="modal fade" id="keyboardShortcutsModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Keyboard Shortcuts</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><kbd>/</kbd></td>
+                                    <td>Focus search input</td>
+                                </tr>
+                                <tr>
+                                    <td><kbd>←</kbd> <kbd>→</kbd></td>
+                                    <td>Navigate between client boxes</td>
+                                </tr>
+                                <tr>
+                                    <td><kbd>↑</kbd> <kbd>↓</kbd></td>
+                                    <td>Navigate between suite boxes</td>
+                                </tr>
+                                <tr>
+                                    <td><kbd>Enter</kbd></td>
+                                    <td>Load results for selected client</td>
+                                </tr>
+                                <tr>
+                                    <td><kbd>Esc</kbd></td>
+                                    <td>Clear filters and selections</td>
+                                </tr>
+                                <tr>
+                                    <td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>G</kbd></td>
+                                    <td>Toggle between suite/client grouping</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    $('body').append(shortcutsModal);
+
+    // Add keyboard shortcut to open modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === '?' && !e.target.closest('input, textarea')) {
+            e.preventDefault();
+            new bootstrap.Modal('#keyboardShortcutsModal').show();
+        }
+    });
 
     // Add floating filters notice
     const filtersNotice = $(`
