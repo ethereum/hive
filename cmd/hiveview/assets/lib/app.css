@@ -533,3 +533,17 @@ td.ellipsis {
     max-width: 30px;
     padding: 0;
 }
+
+#loading-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#loading-container.show {
+    opacity: 1;
+}

@@ -85,7 +85,7 @@ $(document).ready(function () {
 
     common.updateHeader();
 
-    $('#loading').show();
+    $('#loading-container').addClass('show');
     console.log('Loading file list...');
     $.ajax({
         type: 'GET',
@@ -99,7 +99,7 @@ $(document).ready(function () {
             alert(err);
         },
         complete: function () {
-            $('#loading').hide();
+            $('#loading-container').removeClass('show');
         },
     });
 });
