@@ -276,10 +276,6 @@ function showFileListing(data) {
                                     <td>Navigate between suite boxes</td>
                                 </tr>
                                 <tr>
-                                    <td><kbd>Enter</kbd></td>
-                                    <td>Load results for selected client</td>
-                                </tr>
-                                <tr>
                                     <td><kbd>Esc</kbd></td>
                                     <td>Clear filters and selections</td>
                                 </tr>
