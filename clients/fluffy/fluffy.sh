@@ -23,10 +23,15 @@ else
     FLAGS="$FLAGS --portal-subnetworks=history"
 fi
 
+if [ "$HIVE_BOOTNODES" != "" ]; then
+    FLAGS="$FLAGS --bootstrap-node=$HIVE_BOOTNODES"
+else
+    FLAGS="$FLAGS --network=none"
+fi
 
 if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
     FLAGS="$FLAGS --netkey-unsafe=0x$HIVE_CLIENT_PRIVATE_KEY"
 fi
 
-fluffy --log-level=INFO --rpc --rpc-address="0.0.0.0" --rpc-api="eth,portal,discovery" --nat:extip:"$IP_ADDR" --network=none \
-    --log-level="debug" --disable-state-root-validation $FLAGS
+fluffy --log-level=INFO --rpc --rpc-address="0.0.0.0" --rpc-api="eth,portal,discovery" --nat:extip:"$IP_ADDR" --log-level="debug" \
+	--disable-state-root-validation $FLAGS
