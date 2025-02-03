@@ -361,7 +361,7 @@ td.ellipsis {
 .stats {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.3rem;
   margin-bottom: 0.2rem;
   font-size: 0.9em;
 }
