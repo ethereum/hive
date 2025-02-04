@@ -100,23 +100,13 @@ fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
-mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
-
-if [[ ! -d "/blocks" || ${#BLOCKS[@]} -eq 0 ]]; then
-    echo "Warning: No blocks found."
-elif [[ ${#BLOCKS[@]} -eq 1 ]]; then
-    # Import the only existing block
-    $reth import $FLAGS "${BLOCKS[0]}"
+if [ -d /blocks ]; then
+    echo "Concatenating all blocks..."
+    cat $(ls /blocks/*.rlp | sort -n) > combined.rlp
+    echo "Importing combined blocks..."
+    $reth import $FLAGS combined.rlp
 else
-    # First import as many blocks as possible, and only then import the last one.
-    # This is important because usually tests expecting a failure will assert that the last valid inserted block is at last - 1. If we attempted to import all of them the pipeline would unwind the whole range.
-    cat "${BLOCKS[@]:0:${#BLOCKS[@]}-1}" > "combined.rlp"
-
-    # Import all but the last block first
-    $reth import $FLAGS "combined.rlp"
-
-    # Import the last block separately
-    $reth import $FLAGS "${BLOCKS[-1]}"
+    echo "Warning: blocks folder not found."
 fi
 
 # Only set boot nodes in online steps
