@@ -1,19 +1,15 @@
 use crate::suites::beacon::constants::{
-    CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+    BOOTSTRAP_CONTENT_KEY, BOOTSTRAP_CONTENT_VALUE, PRIVATE_KEY_ENVIRONMENT_VARIABLE,
     TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::environment::PortalNetwork;
-use alloy_primitives::Bytes;
-use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Metric, XorMetric};
 use ethportal_api::types::portal::FindContentInfo;
-use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient, Discv5ApiClient};
+use ethportal_api::{BeaconNetworkApiClient, Discv5ApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
-use serde_json::json;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 dyn_async! {
    pub async fn test_portal_beacon_mesh<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -88,8 +84,8 @@ dyn_async! {
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
 
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).unwrap();
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
 
         // get enr for b and c to seed for the jumps
         let client_b_enr = match client_b.rpc.node_info().await {

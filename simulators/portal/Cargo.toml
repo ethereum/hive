@@ -7,13 +7,17 @@ edition = "2021"
 [dependencies]
 alloy-rlp = "0.3.8"
 alloy-primitives = "0.8.3"
+anyhow = "1.0"
+chrono = "0.4"
 ethportal-api = { git = "https://github.com/ethereum/trin", rev = "eec13c6ec884b9be0cd95bb4db59cb93d18f4c7e" }
 futures = "0.3.25"
 hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
 itertools = "0.10.5"
+lazy_static = "1.4.0"
+reqwest = { version = "0.12.7", features = ["json"] }
 serde_json = "1.0.95"
 serde_yaml = "0.9.33"
+ssz_types = "0.8.0"
 tokio = { version = "1.14.0", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
-
