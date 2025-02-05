@@ -109,6 +109,8 @@ fi
 # Configure NAT
 # FLAGS="$FLAGS --nat none"
 
+FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
+
 # Launch the main client.
 echo "Running ethrex with flags: $FLAGS"
 $ethrex $FLAGS
