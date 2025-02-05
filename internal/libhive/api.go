@@ -238,6 +238,9 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
 	}
 
+	// CUSTOM for ethrex
+	env["HIVE_ETHREX_FLAGS"] = api.env.EthrexFlags
+
 	// Set up the timeout.
 	timeout := api.env.ClientStartTimeout
 	if timeout == 0 {
