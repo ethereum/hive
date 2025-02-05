@@ -96,6 +96,8 @@ fi
 
 FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
 
+FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
+
 # Launch the main client.
 echo "Running ethrex with flags: $FLAGS"
 $ethrex $FLAGS
