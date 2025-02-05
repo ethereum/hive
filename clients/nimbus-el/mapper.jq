@@ -73,7 +73,7 @@ def to_bool:
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
     "arrowGlacierBlock": env.HIVE_FORK_ARROW_GLACIER|to_int,
     "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
-    "mergeForkBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
+    "mergeNetsplitBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
@@ -90,6 +90,6 @@ def to_bool:
         "baseFeeUpdateFraction": (if env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
       }
     },
-    "terminalTotalDifficultyPassed": true,
+    "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
   }|remove_empty
 }
