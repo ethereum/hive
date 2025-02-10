@@ -48,5 +48,19 @@ func (g *generator) writeForkEnv() error {
 	setTime("HIVE_CANCUN_TIMESTAMP", cfg.CancunTime)
 	setTime("HIVE_PRAGUE_TIMESTAMP", cfg.PragueTime)
 
+	// blob schedule
+	if cfg.BlobScheduleConfig != nil {
+		if cfg.BlobScheduleConfig.Cancun != nil {
+			env["HIVE_CANCUN_BLOB_TARGET"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.Target)
+			env["HIVE_CANCUN_BLOB_MAX"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.Max)
+			env["HIVE_CANCUN_BLOB_BASE_FEE_UPDATE_FRACTION"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.UpdateFraction)
+		}
+		if cfg.BlobScheduleConfig.Prague != nil {
+			env["HIVE_PRAGUE_BLOB_TARGET"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.Target)
+			env["HIVE_PRAGUE_BLOB_MAX"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.Max)
+			env["HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.UpdateFraction)
+		}
+	}
+
 	return g.writeJSON("forkenv.json", env)
 }
