@@ -48,7 +48,7 @@ impl BridgeService {
         *self.trusted_block_root.lock().await
     }
 
-    pub async fn start(&self) {
+    pub async fn start(&self, stay_updated: bool) {
         let provider = self.provider.clone();
         let query_interval = self.query_interval;
         let portal_client = self.portal_client.clone();
@@ -119,7 +119,14 @@ impl BridgeService {
                         };
                     }
                 }
+
+                if !stay_updated {
+                    // Break out of the loop and stop syncing from the provider (for tests where we don't want to pull 
+                    // new updates)
+                    break;
+                }
             }
+            println!("Bridge service stopped");
         });
     }
 }

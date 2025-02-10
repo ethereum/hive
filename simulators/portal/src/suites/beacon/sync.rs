@@ -29,7 +29,7 @@ dyn_async! {
         for client in &clients {
             test.run(
                 NClientTestSpec {
-                    name: format!("Beacon sync test: latest finalized root{}", client.name),
+                    name: format!("Beacon sync test: latest finalized root. {}", client.name),
                     description: "".to_string(),
                     always_run: false,
                     run: test_client_syncs_with_latest_finalized_root,
@@ -66,7 +66,7 @@ dyn_async! {
         let bridge_service = Arc::new(BridgeService::new(client.clone()));
         let service_for_task = bridge_service.clone();
         let provider_handle = tokio::spawn(async move {
-            service_for_task.start().await;
+            service_for_task.start(true).await;
         });
 
         // get enr
@@ -140,7 +140,7 @@ dyn_async! {
         let bridge_service = Arc::new(BridgeService::new(client.clone()));
         let service_for_task = bridge_service.clone();
         let provider_handle = tokio::spawn(async move {
-            service_for_task.start().await;
+            service_for_task.start(false).await;
         });
 
         // get enr
@@ -184,10 +184,10 @@ dyn_async! {
                 sleep(Duration::from_secs(1)).await;
             }
         }).await;
-
+        
         match result {
             Ok(val) => {
-                let actual_optimistic_root = bridge_service.latest_optimistic_root().await.expect("to find a latest finalized root");
+                let actual_optimistic_root = bridge_service.latest_optimistic_root().await.expect("to find a latest optimistic root");
                 assert_eq!(val, actual_optimistic_root);
             }
             Err(err) => {
