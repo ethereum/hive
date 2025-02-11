@@ -48,7 +48,7 @@ impl BridgeService {
         *self.trusted_block_root.lock().await
     }
 
-    pub async fn start(&self) {
+    pub async fn start(&self, stay_updated: bool) {
         let provider = self.provider.clone();
         let query_interval = self.query_interval;
         let portal_client = self.portal_client.clone();
@@ -118,6 +118,11 @@ impl BridgeService {
                             _ => panic!("Unexpected optimistic update content value"),
                         };
                     }
+                }
+
+                if !stay_updated {
+                    // Break out of the loop and stop syncing from the provider in tests where additional updates are not needed
+                    break;
                 }
             }
         });
