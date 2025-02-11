@@ -126,7 +126,6 @@ impl BridgeService {
                     break;
                 }
             }
-            println!("Bridge service stopped");
         });
     }
 }
