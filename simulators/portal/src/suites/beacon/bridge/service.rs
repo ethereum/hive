@@ -121,8 +121,7 @@ impl BridgeService {
                 }
 
                 if !stay_updated {
-                    // Break out of the loop and stop syncing from the provider (for tests where we don't want to pull 
-                    // new updates)
+                    // Break out of the loop and stop syncing from the provider in tests where additional updates are not needed
                     break;
                 }
             }

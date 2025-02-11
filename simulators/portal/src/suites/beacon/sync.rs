@@ -184,7 +184,6 @@ dyn_async! {
                 sleep(Duration::from_secs(1)).await;
             }
         }).await;
-        
         match result {
             Ok(val) => {
                 let actual_optimistic_root = bridge_service.latest_optimistic_root().await.expect("to find a latest optimistic root");
