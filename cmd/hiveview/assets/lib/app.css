@@ -416,7 +416,7 @@ td.ellipsis {
 }
 
 .history-dot {
-  width: 12px;
+  width: 10px;
   height: 20px;
   border-radius: 2px;
   background: var(--bs-dark-bg-subtle);
