@@ -23,10 +23,21 @@ export function makeLink(url, text) {
 }
 
 // makeButton creates a button-shaped link element.
-export function makeButton(url, text) {
-    let a = makeLink(url, text);
-    a.setAttribute('class', 'btn btn-primary btn-sm');
-    return a;
+export function makeButton(href, text, classes = "", attributes = "") {
+    const button = document.createElement('a');
+    button.href = href;
+    button.className = 'btn ' + classes;
+    button.innerHTML = text;
+    if (attributes) {
+        // Match attributes while preserving quoted values
+        const attrRegex = /(\w+)=(['"])(.*?)\2/g;
+        let match;
+        while ((match = attrRegex.exec(attributes)) !== null) {
+            const [_, name, quote, value] = match;
+            button.setAttribute(name, value);
+        }
+    }
+    return button;
 }
 
 // Takes { "a": "1", ... }
@@ -42,4 +53,32 @@ export function makeDefinitionList(data) {
         list.appendChild(dd);
     }
     return list;
+}
+
+// sanitizeHtml safely cleans HTML content by removing unsafe elements and attributes
+export function sanitizeHtml(unsafeHtml, allowList) {
+    if (!unsafeHtml || !unsafeHtml.length) {
+        return unsafeHtml;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(unsafeHtml, 'text/html');
+    const elements = doc.body.querySelectorAll('*');
+
+    elements.forEach(element => {
+        const elementName = element.nodeName.toLowerCase();
+        if (!Object.keys(allowList).includes(elementName)) {
+            element.remove();
+            return;
+        }
+
+        const allowedAttributes = [].concat(allowList['*'] || [], allowList[elementName] || []);
+        Array.from(element.attributes).forEach(attr => {
+            if (!allowedAttributes.includes(attr.name)) {
+                element.removeAttribute(attr.name);
+            }
+        });
+    });
+
+    return doc.body.innerHTML;
 }

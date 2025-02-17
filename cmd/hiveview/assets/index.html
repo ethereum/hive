@@ -25,12 +25,16 @@
         <style>.script-content{ display: none; }</style>
       </noscript>
 
+      <div id="loading-container">
+        <div id="loading" class="spinner-border text-secondary" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
       <div class="script-content">
-        <h2>
-          Recent results
-          <div id="loading" class="spinner-border text-secondary" role="status" style="width: 26px; height: 26px; display: none;"></div>
-        </h2>
-        <p id="page-text" style="display: none">These test suites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
+        <div id="summary-section" class="mb-3">
+          <div id="suite-summary" class="d-flex flex-wrap"></div>
+        </div>
         <p id="filters-notice" style="display: none">Note: column filters are active: <a id="filters-clear" href="">[Clear Filters]</a></p>
         <table id="filetable" class="table table-bordered"></table>
       </div>
