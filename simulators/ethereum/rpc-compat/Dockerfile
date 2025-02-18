@@ -3,7 +3,10 @@ FROM golang:1-alpine as builder
 RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 
 # Clone the tests repo.
-RUN git clone --depth 1 https://github.com/ethereum/execution-apis.git /execution-apis
+RUN git clone https://github.com/ethereum/execution-apis.git /execution-apis
+
+WORKDIR /execution-apis
+RUN git checkout d08382ae5c808680e976fce4b73f4ba91647199b
 
 # To run local tests, copy the directory into the same as the simulator and
 # uncomment the line below
