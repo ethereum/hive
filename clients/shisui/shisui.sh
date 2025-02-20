@@ -20,8 +20,12 @@ else
     FLAGS="$FLAGS --networks history"
 fi
 
-if [ "$HIVE_BOOTNODE" != "" ]; then
-    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+if [ "$HIVE_TRUSTED_BLOCK_ROOT" != "" ]; then
+    FLAGS="$FLAGS --trusted-block-root $HIVE_TRUSTED_BLOCK_ROOT"
+fi
+
+if [ "$HIVE_BOOTNODES" != "" ]; then
+    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODES"
 else
     FLAGS="$FLAGS --bootnodes=none"
 fi

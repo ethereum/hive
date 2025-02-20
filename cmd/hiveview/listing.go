@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -14,10 +15,8 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 )
 
-const listLimit = 200 // number of runs reported
-
 // generateListing processes hive simulation output files and generates a listing file.
-func generateListing(fsys fs.FS, dir string, output io.Writer) error {
+func generateListing(fsys fs.FS, dir string, output io.Writer, limit int) error {
 	var (
 		stop    = errors.New("stop")
 		entries []listingEntry
@@ -27,7 +26,7 @@ func generateListing(fsys fs.FS, dir string, output io.Writer) error {
 	err := walkSummaryFiles(fsys, dir, func(suite *libhive.TestSuite, fi fs.FileInfo) error {
 		entry := suiteToEntry(suite, fi)
 		entries = append(entries, entry)
-		if len(entries) >= listLimit {
+		if len(entries) >= limit {
 			return stop
 		}
 		return nil
@@ -57,14 +56,15 @@ type listingEntry struct {
 	Name   string `json:"name"`
 	NTests int    `json:"ntests"`
 	// Info about this run.
-	Passes   int       `json:"passes"`
-	Fails    int       `json:"fails"`
-	Timeout  bool      `json:"timeout"`
-	Clients  []string  `json:"clients"`  // client names involved in this run
-	Start    time.Time `json:"start"`    // timestamp of test start (ISO 8601 format)
-	FileName string    `json:"fileName"` // hive output file
-	Size     int64     `json:"size"`     // size of hive output file
-	SimLog   string    `json:"simLog"`   // simulator log file
+	Passes   int               `json:"passes"`
+	Fails    int               `json:"fails"`
+	Timeout  bool              `json:"timeout"`
+	Clients  []string          `json:"clients"`  // client names involved in this run
+	Versions map[string]string `json:"versions"` // client versions
+	Start    time.Time         `json:"start"`    // timestamp of test start (ISO 8601 format)
+	FileName string            `json:"fileName"` // hive output file
+	Size     int64             `json:"size"`     // size of hive output file
+	SimLog   string            `json:"simLog"`   // simulator log file
 }
 
 func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
@@ -74,6 +74,7 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 		Size:     file.Size(),
 		SimLog:   s.SimulatorLog,
 		Clients:  make([]string, 0),
+		Versions: s.ClientVersions,
 	}
 	for _, test := range s.TestCases {
 		e.NTests++
@@ -89,21 +90,12 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 			e.Start = test.Start
 		}
 		for _, client := range test.ClientInfo {
-			if !contains(e.Clients, client.Name) {
+			if !slices.Contains(e.Clients, client.Name) {
 				e.Clients = append(e.Clients, client.Name)
 			}
 		}
 	}
 	return e
-}
-
-func contains(list []string, s string) bool {
-	for _, elem := range list {
-		if elem == s {
-			return true
-		}
-	}
-	return false
 }
 
 type suiteCB func(*libhive.TestSuite, fs.FileInfo) error

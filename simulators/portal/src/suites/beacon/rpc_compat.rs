@@ -1,17 +1,14 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use crate::suites::beacon::constants::{
-    CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
+    BOOTSTRAP_CONTENT_KEY, BOOTSTRAP_CONTENT_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::environment::PortalNetwork;
-use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::BeaconNetworkApiClient;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use serde_json::json;
 
 dyn_async! {
     pub async fn run_rpc_compat_beacon_test_suite<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -215,7 +212,7 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
 
         if let Ok(response)  = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
             panic!("Expected to receive an error because content wasn't found {response:?}");
@@ -229,8 +226,8 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
 
         if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key, raw_content_value).await {
             panic!("{}", &err.to_string());
@@ -244,8 +241,8 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
 
         // seed CONTENT_KEY/content_value onto the local node to test local_content expect content present
         if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
@@ -472,9 +469,10 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let bootstrap_content_key = BOOTSTRAP_CONTENT_KEY.clone();
 
-        if let Ok(content) = BeaconNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
+
+        if let Ok(content) = BeaconNetworkApiClient::get_content(&client.rpc, bootstrap_content_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
         }
     }
