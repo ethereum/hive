@@ -1,5 +1,7 @@
 package hivesim
 
+import "slices"
+
 // SuiteID identifies a test suite context.
 type SuiteID uint32
 
@@ -42,10 +44,5 @@ type ClientDefinition struct {
 
 // HasRole reports whether the client has the given role.
 func (m *ClientDefinition) HasRole(role string) bool {
-	for _, m := range m.Meta.Roles {
-		if m == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Meta.Roles, role)
 }

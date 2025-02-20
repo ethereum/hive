@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -89,21 +90,12 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 			e.Start = test.Start
 		}
 		for _, client := range test.ClientInfo {
-			if !contains(e.Clients, client.Name) {
+			if !slices.Contains(e.Clients, client.Name) {
 				e.Clients = append(e.Clients, client.Name)
 			}
 		}
 	}
 	return e
-}
-
-func contains(list []string, s string) bool {
-	for _, elem := range list {
-		if elem == s {
-			return true
-		}
-	}
-	return false
 }
 
 type suiteCB func(*libhive.TestSuite, fs.FileInfo) error
