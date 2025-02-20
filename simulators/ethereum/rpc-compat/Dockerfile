@@ -5,6 +5,7 @@ RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 # Clone the tests repo.
 RUN git clone https://github.com/ethereum/execution-apis.git /execution-apis
 
+# ethrex: we are pinning this version because future versions use pre-merge blocks.
 WORKDIR /execution-apis
 RUN git checkout d08382ae5c808680e976fce4b73f4ba91647199b
 
