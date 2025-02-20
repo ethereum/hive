@@ -1,0 +1,18 @@
+- client: trin
+  dockerfile: git
+  build_args:
+    github: morph-dev/trin
+    tag: cfb5da6447595090a480337a48491736621da600
+- client: fluffy
+  dockerfile: git
+  build_args:
+    tag: ae7e355d131b006c5e8f73ef6aa5c4005cdf8076
+- client: ultralight
+  dockerfile: git
+  build_args:
+    tag: 8448374a7fd9f03bff00a84c1deef2199713068d
+# doesn't have a PR open yet
+# - client: shisui
+#   dockerfile: git
+#   build_args:
+#     tag: ping-ext
