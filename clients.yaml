@@ -10,9 +10,8 @@
 - client: ultralight
   dockerfile: git
   build_args:
-    tag: 8448374a7fd9f03bff00a84c1deef2199713068d
-# doesn't have a PR open yet
-# - client: shisui
-#   dockerfile: git
-#   build_args:
-#     tag: ping-ext
+    tag: a5437099da0423ed2ef0e4e42fc11e43f9a1e04c
+- client: shisui
+  dockerfile: git
+  build_args:
+    tag: 5ca05515be67b714b1d37249221e1dad0d67a900
