@@ -1,0 +1,17 @@
+- client: trin
+  dockerfile: git
+  build_args:
+    github: morph-dev/trin
+    tag: 018a1d2caa6c2f7cc031b72f93ac1be127eacb06
+- client: fluffy
+  dockerfile: git
+  build_args:
+    tag: ae7e355d131b006c5e8f73ef6aa5c4005cdf8076
+- client: ultralight
+  dockerfile: git
+  build_args:
+    tag: a5437099da0423ed2ef0e4e42fc11e43f9a1e04c
+- client: shisui
+  dockerfile: git
+  build_args:
+    tag: 5ca05515be67b714b1d37249221e1dad0d67a900
