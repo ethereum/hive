@@ -2,7 +2,7 @@
   dockerfile: git
   build_args:
     github: morph-dev/trin
-    tag: cfb5da6447595090a480337a48491736621da600
+    tag: 018a1d2caa6c2f7cc031b72f93ac1be127eacb06
 - client: fluffy
   dockerfile: git
   build_args:
