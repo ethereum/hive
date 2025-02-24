@@ -9,9 +9,7 @@ use alloy_primitives::Bytes;
 use alloy_rlp::Decodable;
 use anyhow::Result;
 use ethportal_api::jsonrpsee::http_client::HttpClient;
-use ethportal_api::types::execution::header_with_proof::{
-    BlockHeaderProof, HeaderWithProof, SszNone,
-};
+use ethportal_api::types::execution::header_with_proof_new::{BlockHeaderProof, HeaderWithProof};
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
@@ -37,7 +35,7 @@ async fn store_header(header: Header, client: &HttpClient) -> bool {
     let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
     let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
         header,
-        proof: BlockHeaderProof::None(SszNone::default()),
+        proof: BlockHeaderProof::HistoricalHashes(Default::default()),
     });
     match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value.encode())
         .await
