@@ -5,11 +5,14 @@ use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{
     ACCOUNT_TRIE_NODE_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
 };
+use crate::suites::utils::{MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER};
 use alloy_primitives::Bytes;
 use alloy_rlp::Decodable;
 use anyhow::Result;
 use ethportal_api::jsonrpsee::http_client::HttpClient;
-use ethportal_api::types::execution::header_with_proof_new::{BlockHeaderProof, HeaderWithProof};
+use ethportal_api::types::execution::header_with_proof_new::{
+    BlockHeaderProof, BlockProofHistoricalRoots, BlockProofHistoricalSummaries, HeaderWithProof,
+};
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
@@ -33,15 +36,30 @@ struct TestData {
 
 async fn store_header(header: Header, client: &HttpClient) -> bool {
     let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
-    let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
-        header,
-        proof: BlockHeaderProof::HistoricalHashes(Default::default()),
-    });
+    let proof = if header.number <= MERGE_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalHashes(Default::default())
+    } else if header.number <= SHANGHAI_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalRoots(BlockProofHistoricalRoots {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
+    } else {
+        BlockHeaderProof::HistoricalSummaries(BlockProofHistoricalSummaries {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
+    };
+    let content_value =
+        HistoryContentValue::BlockHeaderWithProof(HeaderWithProof { header, proof });
     match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value.encode())
         .await
     {
         Ok(stored) => stored,
-        Err(err) => panic!("{}", &err.to_string()),
+        Err(err) => panic!("Failed to store block header: {}", &err.to_string()),
     }
 }
 
