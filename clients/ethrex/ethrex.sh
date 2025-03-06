@@ -59,8 +59,7 @@ set +ex
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     echo "Importing chain.rlp..."
-    FLAGS="$FLAGS --import /chain.rlp"
-    # $ethrex import $FLAGS /chain.rlp
+    $ethrex import --network /genesis.json /chain.rlp
 else
     echo "Warning: chain.rlp not found."
 fi
@@ -68,7 +67,7 @@ fi
 # Load the remainder of the test chain
 if [ -d /blocks ]; then
     echo "Loading remaining individual blocks..."
-    FLAGS="$FLAGS --import_dir /blocks"
+    $ethrex import --network /genesis.json /blocks
 else
     echo "Warning: blocks folder not found."
 fi
