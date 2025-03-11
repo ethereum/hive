@@ -177,6 +177,8 @@ def clique_engine:
         "baseFeeUpdateFraction": (if env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
       }
     },
+
+    "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
   },
   "genesis": {
     "seal": {
