@@ -254,7 +254,7 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 	return sim.ClientEnodeURLNetwork(testSuite, test, node, "bridge")
 }
 
-// ClientEnodeURLCustomNetwork returns the enode URL of a running client in a custom network.
+// ClientEnodeURLNetwork returns the enode URL of a running client in a custom network.
 func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
 	if sim.docs != nil {
 		return "", errors.New("ClientEnodeURLNetwork is not supported in docs mode")
