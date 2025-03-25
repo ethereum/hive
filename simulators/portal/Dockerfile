@@ -1,4 +1,4 @@
-FROM rust:1.81.0 AS builder
+FROM rust:latest AS builder
 
 # create a new empty shell project
 RUN USER=root cargo new --bin portal
@@ -24,7 +24,7 @@ RUN touch -a -m ./src/main.rs
 RUN cargo build --release
 
 # final base
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # declare build args for second stage
 ARG PORTAL_CONSENSUS_URL

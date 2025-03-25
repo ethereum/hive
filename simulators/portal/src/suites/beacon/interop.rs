@@ -179,7 +179,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let pong = client_a.rpc.ping(target_enr).await;
+        let pong = BeaconNetworkApiClient::ping(&client_a.rpc, target_enr, None, None).await;
 
         if let Err(err) = pong {
             panic!("Unable to receive pong info: {err:?}");
