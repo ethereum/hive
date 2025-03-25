@@ -6,18 +6,19 @@ use crate::suites::state::constants::{
     ACCOUNT_TRIE_NODE_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::utils::{MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER};
+use alloy_consensus::Header;
 use alloy_primitives::Bytes;
 use alloy_rlp::Decodable;
 use anyhow::Result;
 use ethportal_api::jsonrpsee::http_client::HttpClient;
-use ethportal_api::types::execution::header_with_proof_new::{
+use ethportal_api::types::execution::header_with_proof::{
     BlockHeaderProof, BlockProofHistoricalRoots, BlockProofHistoricalSummaries, HeaderWithProof,
 };
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
-    ContentValue, Discv5ApiClient, Header, HistoryContentKey, HistoryContentValue, StateContentKey,
+    ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, StateContentKey,
     StateContentValue, StateNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
@@ -35,7 +36,7 @@ struct TestData {
 }
 
 async fn store_header(header: Header, client: &HttpClient) -> bool {
-    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
+    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash_slow());
     let proof = if header.number <= MERGE_BLOCK_NUMBER {
         BlockHeaderProof::HistoricalHashes(Default::default())
     } else if header.number <= SHANGHAI_BLOCK_NUMBER {
@@ -320,7 +321,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let pong = client_a.rpc.ping(target_enr).await;
+        let pong = StateNetworkApiClient::ping(&client_a.rpc, target_enr, None, None).await;
 
         if let Err(err) = pong {
                 panic!("Unable to receive pong info: {err:?}");

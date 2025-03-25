@@ -349,10 +349,7 @@ dyn_async! {
         };
         let (_, enr) = generate_random_remote_enr();
         match BeaconNetworkApiClient::delete_enr(&client.rpc, enr.node_id()).await {
-            Ok(response) => match response {
-                true => panic!("DeleteEnr expected to get false and instead got true"),
-                false => ()
-            },
+            Ok(response) => if response { panic!("DeleteEnr expected to get false and instead got true") },
             Err(err) => panic!("{}", &err.to_string()),
         };
     }

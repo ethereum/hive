@@ -5,19 +5,20 @@ authors = ["Kolby ML (Moroz Liebl) <kolbydml@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-alloy-rlp = "0.3.8"
-alloy-primitives = "0.8.3"
+alloy-consensus = "0.12"
+alloy-rlp = "0.3.11"
+alloy-primitives = "0.8.24"
 anyhow = "1.0"
 chrono = "0.4"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "f58a3296092084b5aee5f89683e4308ee0e43e27" }
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "4d605acb22874778f2cebd3b06fea69d1325199d" }
 futures = "0.3.25"
 hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
-itertools = "0.10.5"
+itertools = "0.14"
 lazy_static = "1.4.0"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde_json = "1.0.95"
 serde_yaml = "0.9.33"
-ssz_types = "0.8.0"
+ssz_types = "0.10.0"
 tokio = { version = "1.14.0", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"

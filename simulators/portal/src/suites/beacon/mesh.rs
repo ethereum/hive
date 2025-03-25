@@ -108,7 +108,7 @@ dyn_async! {
         }
 
         // send a ping from client B to C to connect the clients
-        if let Err(err) = client_b.rpc.ping(client_c_enr.clone()).await {
+        if let Err(err) = BeaconNetworkApiClient::ping(&client_b.rpc, client_c_enr.clone(), None, None).await {
             panic!("Unable to receive pong info: {err:?}");
         }
 
