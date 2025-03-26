@@ -8,12 +8,10 @@ ARG branch=main
 ENV BRANCH=${branch}
 
 ## Clone and install EEST
-RUN apt-get update && apt-get install -y git && \
-    git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1 && \
-    cd execution-spec-tests && \
-    uv sync
-
+RUN apt-get update && apt-get install -y git
+RUN git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1
 WORKDIR /execution-spec-tests
+RUN uv sync
 
 # Cache the fixtures. This is done to avoid re-downloading the fixtures every time
 # the container starts.
