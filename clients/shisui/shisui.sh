@@ -30,7 +30,7 @@ else
     FLAGS="$FLAGS --bootnodes=none"
 fi
 
-FLAGS="$FLAGS --nat extip:$IP_ADDR"
+FLAGS="$FLAGS --nat --disable-init-check extip:$IP_ADDR"
 
 shisui $FLAGS
 
