@@ -1,15 +1,26 @@
 # Builds and runs the EEST (execution-spec-tests) consume rlp simulator
 FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
 
-## Default fixtures and branch
+## Default fixtures/branch/commit
 ARG fixtures=stable@latest
 ENV FIXTURES=${fixtures}
 ARG branch=main
 ENV BRANCH=${branch}
+ARG commit=
+ENV COMMIT=${commit}
 
 ## Clone and install EEST
 RUN apt-get update && apt-get install -y git
-RUN git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1
+
+# Use commit if specified, otherwise use branch
+RUN if [ -z "$COMMIT" ]; then \
+        git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1; \
+    else \
+        git clone https://github.com/ethereum/execution-spec-tests.git && \
+        cd execution-spec-tests && \
+        git checkout "$COMMIT"; \
+    fi
+
 WORKDIR /execution-spec-tests
 RUN uv sync
 
