@@ -37,7 +37,7 @@ func ConfigGenesis(genesis *core.Genesis, forkTimestamp uint64) error {
 	return nil
 }
 
-// Configure specific test genesis accounts related to Cancun funtionality.
+// Configure specific test genesis accounts related to Cancun functionality.
 func ConfigTestAccounts(genesis *core.Genesis) error {
 	// Add accounts that use the DATAHASH opcode
 	datahashCode := []byte{

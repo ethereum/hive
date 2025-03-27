@@ -214,7 +214,7 @@ func CustomizeTransaction(baseTransaction *types.Transaction, sender SenderAccou
 	if customData.Signature == nil {
 		// If a custom invalid signature was not specified, simply sign the transaction again
 		if customData.ChainID == nil {
-			// Use the default value if an invaild chain ID was not specified
+			// Use the default value if an invalid chain ID was not specified
 			customData.ChainID = baseTransaction.ChainId()
 		}
 		signer := types.NewCancunSigner(customData.ChainID)
