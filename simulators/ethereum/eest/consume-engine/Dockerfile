@@ -1,28 +1,34 @@
 # Builds and runs the EEST (execution-spec-tests) consume engine simulator
-FROM python:3.10-slim
+FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
 
-## Default fixtures and branch
+## Default fixtures/branch/commit
 ARG fixtures=stable@latest
-ENV INPUT=${fixtures}
+ENV FIXTURES=${fixtures}
 ARG branch=main
 ENV BRANCH=${branch}
-
-## Install dependencies
-RUN apt-get update && \
-    apt-get install -y git wget tar && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+ARG commit=
+ENV COMMIT=${commit}
 
 ## Clone and install EEST
-RUN git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1
-WORKDIR execution-spec-tests
-RUN pip install uv && uv sync
+RUN apt-get update && apt-get install -y git
+
+# Use commit if specified, otherwise use branch env variable
+RUN if [ -z "$COMMIT" ]; then \
+        git clone https://github.com/ethereum/execution-spec-tests.git --branch "$BRANCH" --single-branch --depth 1; \
+    else \
+        git clone https://github.com/ethereum/execution-spec-tests.git && \
+        cd execution-spec-tests && \
+        git checkout "$COMMIT"; \
+    fi
+
+WORKDIR /execution-spec-tests
+RUN uv sync
 
 # Cache the fixtures. This is done to avoid re-downloading the fixtures every time
 # the container starts.
 # If newer version of the fixtures is needed, the image needs to be rebuilt.
 # Use `--docker.nocache` flag to force rebuild.
-RUN uv run consume cache --input "$INPUT"
+RUN uv run consume cache --input "$FIXTURES"
 
 ## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT uv run consume engine -v --input "$INPUT"
+ENTRYPOINT uv run consume engine -v --input "$FIXTURES"
