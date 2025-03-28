@@ -137,7 +137,7 @@ func (dfs *deployFS) rebuildBundleFS() ([]esbuild.Message, fs.FS) {
 	return dfs.buildmsg, dfs.bundlefs
 }
 
-// openHTML opens a HTML file in the root directory and modifies it to use
+// openHTML opens an HTML file in the root directory and modifies it to use
 // bundled JS/CSS files.
 func (dfs *deployFS) openHTML(name string) (fs.File, error) {
 	inputFile, err := dfs.assets.Open(name)
@@ -190,7 +190,7 @@ func (dfs *deployFS) openHTML(name string) (fs.File, error) {
 	return file, nil
 }
 
-// insertAfterTag adds content to the document after the first occurrence of a HTML tag.
+// insertAfterTag adds content to the document after the first occurrence of an HTML tag.
 // The resulting document is written to w.
 func insertAfterTag(r io.Reader, w io.Writer, tagName, content string) error {
 	var done bool
