@@ -78,7 +78,7 @@ All test cases contain the following verifications:
 ## Shanghai Fork Re-Org Tests
 
 - Shanghai Fork on Block 1 - 16 Post-Fork Blocks - 1 Block Re-Org via NewPayload:
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Go through Shanghai fork on Block 1
   - Produce 15 blocks on both clients `A` and `B`, withdrawing to 16 accounts each block
   - Produce a canonical chain `A` block 16 on client `A`, withdrawing to the same 16 accounts
@@ -87,7 +87,7 @@ All test cases contain the following verifications:
   - Verify the re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Block 1 - 8 Block Re-Org NewPayload
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Go through Shanghai fork on Block 1
   - Produce 8 blocks on both clients `A` and `B`, withdrawing to 16 accounts each block
   - Produce canonical chain `A` blocks 9-16 on client `A`, withdrawing to the same 16 accounts
@@ -96,7 +96,7 @@ All test cases contain the following verifications:
   - Verify the re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Block 1 - 8 Block Re-Org Sync
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Go through Shanghai fork on Block 1
   - Produce 8 blocks on both clients `A` and `B`, withdrawing to 16 accounts each block
   - Produce canonical chain `A` blocks 9-16 on client `A`, withdrawing to the same 16 accounts
@@ -105,7 +105,7 @@ All test cases contain the following verifications:
   - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Block 8 - 10 Block Re-Org NewPayload
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`
   - Produce canonical chain `A` blocks 7-16 on client `A`
   - Produce side chain `B` blocks 7-16 on client `B`
@@ -114,7 +114,7 @@ All test cases contain the following verifications:
   - Verify the re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Block 8 - 10 Block Re-Org Sync
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`
   - Produce canonical chain `A` blocks 7-16 on client `A`
   - Produce side chain `B` blocks 7-16 on client `B`
@@ -123,7 +123,7 @@ All test cases contain the following verifications:
   - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org NewPayload
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`
   - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 1.
   - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 2
@@ -132,7 +132,7 @@ All test cases contain the following verifications:
   - Verify the re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`
   - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 1.
   - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 2
@@ -141,7 +141,7 @@ All test cases contain the following verifications:
   - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org NewPayload
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`, with timestamp increments of 2
   - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 2.
   - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 1
@@ -150,7 +150,7 @@ All test cases contain the following verifications:
   - Verify the re-org was correctly applied along with the withdrawal balances.
 
 - Shanghai Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync
-  - Spawn a two clients `A` and `B`
+  - Spawn two clients `A` and `B`
   - Produce 6 blocks on both clients `A` and `B`, with timestamp increments of 2
   - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 2.
   - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 1
@@ -164,9 +164,9 @@ All test cases contain the following verifications:
     - `TxA`, a smart contract creating transaction with an initcode length equal to MAX_INITCODE_SIZE ([EIP-3860](https://eips.ethereum.org/EIPS/eip-3860))
     - `TxB`, a smart contract creating transaction with an initcode length equal to MAX_INITCODE_SIZE+1.
   - Verify that `TxB` returns error on `eth_sendRawTransaction` and also should be absent from the transaction pool of the client
-  - Request a new payload from the client and verify that the payload built only includes `TxA`, and `TxB` is not included, nor the contract it could create is present in the `stateRoot`.
+  - Request a new payload from the client and verify that the payload built only includes `TxA`, and `TxB` is not included, nor the contract it could create present in the `stateRoot`.
   - Create a modified payload where `TxA` is replaced by `TxB` and send using `engine_newPayloadV2`
-  - Verify that `engine_newPayloadV2` returns `INVALID` nad `latestValidHash` points to the latest valid payload in the canonical chain.
+  - Verify that `engine_newPayloadV2` returns `INVALID` and `latestValidHash` points to the latest valid payload in the canonical chain.
 
 ## GetPayloadBodies Tests
 

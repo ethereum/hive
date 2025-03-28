@@ -10,7 +10,7 @@ but the actual test-execution has been left unspecified.
 Each client has had to implement client-specific test-harnesses to perform the tests:
 
 * The actual execution of the testcase, which includes creating necessary `prestate`.
-* The verificaton of the testcase, which includes verifying various things, such as:
+* The verification of the testcase, which includes verifying various things, such as:
   * `poststate` state root
   * `lastblock` hash
   * Various `account`s, and `storage`.
@@ -41,7 +41,7 @@ of the following parts.
 
 This repo is responsible for souping up the tests, telling the framework to boot up new clients and then verify the results, and report back to hive, 
 
-The Hive framework then outputs the results-report as a json-file, which can be packaged with a HTML viewer and client-logs for analysis of all test failures.  
+The Hive framework then outputs the results-report as a json-file, which can be packaged with an HTML viewer and client-logs for analysis of all test failures.  
 
 The benefits of this approach is that there is no need for client-implementations to create a bespoke testing framework, as long as they
 conform to the requirements of being a hive-node. Which are, basically:
