@@ -5,7 +5,7 @@ This is *experimental*.
 ## Configuration
 
 Chain configuration is provided via environment vars, for the clients to build configs in their format of preference.
-The configuration (incl. formatting of values) matches the [Eth2 config spec](https://github.com/ethereum/consensus-specs/tree/dev/configs)).
+The configuration (incl. formatting of values) matches the [Eth2 config spec](https://github.com/ethereum/consensus-specs/tree/dev/configs).
 
 **Each configuration var is prefixed with `HIVE_ETH2_CONFIG_`**.
 
