@@ -113,7 +113,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-    (cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
+    (cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL import --nocompaction `ls | sort -n`)
 else
     echo "Warning: blocks folder not found."
 fi

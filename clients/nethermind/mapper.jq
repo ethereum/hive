@@ -163,6 +163,9 @@ def clique_engine:
 
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
 
+    # Osaka
+    "eip7692TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
@@ -177,7 +180,12 @@ def clique_engine:
         "target": (if env.HIVE_PRAGUE_BLOB_TARGET then env.HIVE_PRAGUE_BLOB_TARGET|to_hex else "0x6" end),
         "max": (if env.HIVE_PRAGUE_BLOB_MAX then env.HIVE_PRAGUE_BLOB_MAX|to_hex else "0x9" end),
         "baseFeeUpdateFraction": (if env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
-      }
+      },
+      "osaka": {
+        "target": (if env.HIVE_OSAKA_BLOB_TARGET then env.HIVE_OSAKA_BLOB_TARGET|to_hex else "0x6" end),
+        "max": (if env.HIVE_OSAKA_BLOB_MAX then env.HIVE_OSAKA_BLOB_MAX|to_hex else "0x9" end),
+        "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
+      },
     },
   },
   "genesis": {
