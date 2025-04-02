@@ -73,6 +73,16 @@ func main() {
 					runDiscv5Test(t, c, getBeaconENR)
 				},
 			},
+			hivesim.ClientTestSpec{
+				Role: "portal",
+				Parameters: hivesim.Params{
+					"HIVE_CHECK_LIVE_PORT": "8545",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, getPortalENR)
+				},
+			},
 		},
 	}
 
@@ -313,4 +323,17 @@ func getBeaconENR(c *hivesim.Client) (string, error) {
 		return "", err
 	}
 	return responseJSON.Data.ENR, nil
+}
+
+func getPortalENR(c *hivesim.Client) (string, error) {
+	var nodeInfoResult struct {
+		ENR string `json:"enr"`
+	}
+	if err := c.RPC().Call(&nodeInfoResult, "discv5_nodeInfo"); err != nil {
+		return "", err
+	}
+	if nodeInfoResult.ENR == "" {
+		return "", fmt.Errorf("missing 'enr' in discv5_nodeInfo response")
+	}
+	return nodeInfoResult.ENR, nil
 }
