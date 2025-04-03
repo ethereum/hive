@@ -23,4 +23,4 @@ WORKDIR /execution-spec-tests
 RUN uv sync
 
 ## Define `execute hive` entry point using the local fixtures
-ENTRYPOINT uv run execute hive --fork "$FORK" -m "$MARKER"
+ENTRYPOINT uv run execute hive --fork "$FORK" -m "$MARKER_EXPR"
