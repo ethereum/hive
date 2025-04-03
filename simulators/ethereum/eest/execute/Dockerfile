@@ -4,8 +4,8 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
 ## Default fork/marker/git-ref
 ARG fork=Prague
 ENV FORK=${fork}
-ARG marker=
-ENV MARKER=${marker}
+ARG marker_expr=
+ENV MARKER_EXPR=${marker_expr}
 ARG branch=main
 ENV GIT_REF=${branch} 
 
