@@ -286,7 +286,7 @@ dyn_async! {
             header,
             key: target_key,
             offer_value: target_offer_value,
-            lookup_value: target_lookup_value
+            lookup_value: target_lookup_value,
         } = test_data;
 
         let target_enr = match client_b.rpc.node_info().await {
@@ -296,10 +296,21 @@ dyn_async! {
 
         store_header(header, &client_b.rpc).await;
 
-        let accept_info = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_offer_value.encode())]).await.expect("Failed to send offer");
-        let mut expected_accept_code_list = AcceptCodeList::new(1).expect("We are making a valid accept code list");
+        let accept_info = client_a
+            .rpc
+            .offer(
+                target_enr,
+                vec![(target_key.clone(), target_offer_value.encode())],
+            )
+            .await
+            .expect("Failed to send offer");
+        let mut expected_accept_code_list =
+            AcceptCodeList::new(1).expect("We are making a valid accept code list");
         expected_accept_code_list.set(0, AcceptCode::Accepted);
-        assert_eq!(accept_info.content_keys, expected_accept_code_list, "Accept code list didn't match expected accept code list {:?} != {:?}", accept_info.content_keys, expected_accept_code_list);
+        assert_eq!(
+            accept_info.content_keys, expected_accept_code_list,
+            "AcceptCodeList didn't match expected value",
+        );
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
