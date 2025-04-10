@@ -1,3 +1,4 @@
+use ethportal_api::types::accept_code::{AcceptCode, AcceptCodeList};
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::{
@@ -223,7 +224,10 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let _ = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_value.encode())]).await;
+        let accept_info = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_value.encode())]).await.expect("Failed to send offer");
+        let mut expected_accept_code_list = AcceptCodeList::new(1).expect("We are making a valid accept code list");
+        expected_accept_code_list.set(0, AcceptCode::Accepted);
+        assert_eq!(accept_info.content_keys, expected_accept_code_list, "Accept code list didn't match expected accept code list {:?} != {:?}", accept_info.content_keys, expected_accept_code_list);
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
