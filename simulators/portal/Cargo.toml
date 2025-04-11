@@ -10,7 +10,7 @@ alloy-rlp = "0.3.11"
 alloy-primitives = "0.8.24"
 anyhow = "1.0"
 chrono = "0.4"
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "f584d6e745b6900e1d7e63fd4814cafeb43c91a9" }
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "2fdcce72bf21bbc128a1b6d6a96b20c0ca077c0b" }
 futures = "0.3.25"
 hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
 itertools = "0.14"
