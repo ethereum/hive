@@ -228,7 +228,7 @@ dyn_async! {
         let mut expected_accept_code_list = AcceptCodeList::new(1).expect("We are making a valid accept code list");
         expected_accept_code_list.set(0, AcceptCode::Accepted);
         assert_eq!(
-            accept_info.content_keys,
+            accept_info.0,
             expected_accept_code_list,
             "AcceptCodeList didn't match expected value",
         );
