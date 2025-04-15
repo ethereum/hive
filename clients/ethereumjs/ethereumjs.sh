@@ -46,7 +46,7 @@
 # Immediately abort the script on any error encountered
 set -e
 
-CLIENT_DIRECTORY=/ethereumjs-monorepo/packages/client
+CLIENT_DIRECTORY=/usr/app/packages/client
 
 ethereumjs="node $CLIENT_DIRECTORY/dist/esm/bin/cli.js"
 FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws --logLevel debug --rpcDebug all --rpcDebugVerbose all --isSingleNode"

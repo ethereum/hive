@@ -1,27 +1,13 @@
-### Build EthereumJS From Git:
+ARG baseimage=ghcr.io/ethereumjs/ethereumjs-monorepo
+ARG tag=latest
 
-FROM node:20-alpine as build
+FROM $baseimage:$tag as builder
 
-
-# TODO: This should work like other EL clients and use
-# a docker image from the registry. The git build approach is
-# used in Dockerfile.git
-#
-#  ARG baseimage=ethpandaops/ethereumjs
-#  ARG tag=main
-#  FROM $baseimage:$tag
-
-ARG github=ethereumjs/ethereumjs-monorepo
-ARG tag=master
-
-RUN echo "Cloning: $github - $tag" \
-    && apk update && apk add --no-cache bash git jq curl python3 gcc make g++ \
-    && rm -rf /var/cache/apk/* \
-    && git clone --depth 1 -b $tag https://github.com/$github \
-    && cd ethereumjs-monorepo && npm i
+RUN apk add --update --no-cache bash git jq curl python3 gcc make g++ \
+    && rm -rf /var/cache/apk/*
 
 # Create version.txt
-RUN cd ethereumjs-monorepo/packages/client && npm ethereumjs --version > /version.txt
+RUN cd /usr/app/packages/client/ && npm ethereumjs --version > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
