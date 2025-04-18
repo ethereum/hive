@@ -7,7 +7,7 @@ RUN apk add --update --no-cache bash git jq curl python3 gcc make g++ \
     && rm -rf /var/cache/apk/*
 
 # Create version.txt
-RUN cd /usr/app/packages/client/ && npm ethereumjs --version > /version.txt
+RUN cd /ethereumjs-monorepo/packages/client/ && npm ethereumjs --version > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
