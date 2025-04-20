@@ -321,11 +321,12 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 // Note that jsonPath gets written to the result JSON and always uses '/' as the separator.
 // The filePath is passed to the docker backend and uses the platform separator.
 func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath string, file string) {
-	// TODO: might be nice to put timestamp into the filename as well.
-	safeDir := strings.Replace(clientName, string(filepath.Separator), "_", -1)
-	jsonPath = path.Join(safeDir, fmt.Sprintf("client-%s.log", containerID))
+	ts := time.Now().UTC().Format("20060102T150405Z")  // yyyymmddThhmmssZ
+	safeDir := strings.ReplaceAll(clientName, string(filepath.Separator), "_")
+	fname := fmt.Sprintf("client-%s-%s.log", ts, containerID)
+	jsonPath = path.Join(safeDir, fname)
 	file = filepath.Join(api.env.LogDir, filepath.FromSlash(jsonPath))
-	return jsonPath, file
+	return
 }
 
 func (api *simAPI) checkClient(req *simapi.NodeConfig) (*ClientDefinition, error) {
