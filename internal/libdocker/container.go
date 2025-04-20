@@ -156,7 +156,6 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		return info, err
 	}
 	info.IP = container.NetworkSettings.IPAddress
-	info.MAC = container.NetworkSettings.MacAddress
 
 	// Set up the port check if requested.
 	hasStarted := make(chan struct{})

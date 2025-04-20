@@ -128,9 +128,6 @@ func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, op
 		ip := net.IP{192, 0, 2, byte(b.clientCounter)}
 		info.IP = ip.String()
 	}
-	if info.MAC == "" {
-		info.MAC = "00:80:41:ae:fd:7e"
-	}
 	info.Wait = func() {}
 	return &info, nil
 }
