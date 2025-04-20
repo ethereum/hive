@@ -156,9 +156,13 @@ func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS)
 		return err
 	}
 
-	// TODO: errors
-	w.Flush()
-	w.Close()
+	// Handle tar writer errors properly
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
 	return nil
 }
 
