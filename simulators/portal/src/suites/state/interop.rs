@@ -152,7 +152,7 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
-        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::State, PortalNetwork::History])]));
+        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::Beacon, PortalNetwork::History, PortalNetwork::State])]));
         let environments = Some(vec![environment.clone(), environment]);
 
         let content = parse_test_values().expect("unable to parse test values");

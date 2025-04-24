@@ -56,6 +56,12 @@ fn process_content(
                         header_with_proof.header.number,
                         vec![history_content, last_header.clone()],
                     ),
+                    HistoryContentKey::EphemeralHeadersFindContent(_) => {
+                        todo!("Add test for EphemeralHeadersFindContent")
+                    }
+                    HistoryContentKey::EphemeralHeaderOffer(_) => {
+                        todo!("Add tests for EphemeralHeaderOffer")
+                    }
                 }
             } else {
                 unreachable!("History test dated is formatted incorrectly")
@@ -468,6 +474,8 @@ dyn_async! {
                         HistoryContentKey::BlockHeaderByNumber(_) => "header by number".to_string(),
                         HistoryContentKey::BlockBody(_) => "body".to_string(),
                         HistoryContentKey::BlockReceipts(_) => "receipt".to_string(),
+                        HistoryContentKey::EphemeralHeadersFindContent(_) => "ephemeral headers find_content".to_string(),
+                        HistoryContentKey::EphemeralHeaderOffer(_) => "ephemeral header offer".to_string(),
                     };
                     format!(
                         "{} {}",

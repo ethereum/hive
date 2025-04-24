@@ -13,7 +13,7 @@ fi
 if [ "$HIVE_PORTAL_NETWORKS_SELECTED" != "" ]; then
     FLAGS="$FLAGS --portal-subnetworks $HIVE_PORTAL_NETWORKS_SELECTED"
 else
-    FLAGS="$FLAGS --portal-subnetworks history"
+    FLAGS="$FLAGS --portal-subnetworks beacon,history"
 fi
 
 if [ "$HIVE_TRUSTED_BLOCK_ROOT" != "" ]; then

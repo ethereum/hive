@@ -19,7 +19,7 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
-        let environment_flag = PortalNetwork::as_environment_flag([PortalNetwork::State, PortalNetwork::History]);
+        let environment_flag = PortalNetwork::as_environment_flag([PortalNetwork::Beacon, PortalNetwork::History, PortalNetwork::State]);
         let environments = Some(vec![Some(HashMap::from([environment_flag]))]);
 
         // Test single type of client
