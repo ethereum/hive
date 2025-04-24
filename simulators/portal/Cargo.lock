@@ -1498,8 +1498,9 @@ dependencies = [
 
 [[package]]
 name = "ethportal-api"
-version = "0.7.0"
-source = "git+https://github.com/ethereum/trin?rev=2fdcce72bf21bbc128a1b6d6a96b20c0ca077c0b#2fdcce72bf21bbc128a1b6d6a96b20c0ca077c0b"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "867347901415dc912ff8b9b12435bd80b72940bc852e958e5bbb583521ff7c6f"
 dependencies = [
  "alloy",
  "alloy-rlp",
