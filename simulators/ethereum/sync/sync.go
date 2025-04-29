@@ -194,7 +194,7 @@ func (n *node) checkHead() error {
 
 // head returns the node's chain head.
 func (n *node) head() (*types.Header, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 	return ethclient.NewClient(n.RPC()).HeaderByNumber(ctx, nil)
 }
 
