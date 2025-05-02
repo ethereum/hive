@@ -495,7 +495,7 @@ dyn_async! {
         }
 
         if !result.is_empty() {
-            panic!("Client B: {:?}", result);
+            panic!("Client B: {result:?}");
         }
     }
 }

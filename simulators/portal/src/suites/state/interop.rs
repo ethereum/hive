@@ -5,7 +5,7 @@ use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{
     ACCOUNT_TRIE_NODE_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
 };
-use crate::suites::utils::{MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER};
+use crate::suites::utils::{CANCUN_BLOCK_NUMBER, MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER};
 use alloy_consensus::Header;
 use alloy_primitives::Bytes;
 use alloy_rlp::Decodable;
@@ -13,7 +13,8 @@ use anyhow::Result;
 use ethportal_api::jsonrpsee::http_client::HttpClient;
 use ethportal_api::types::accept_code::{AcceptCode, AcceptCodeList};
 use ethportal_api::types::execution::header_with_proof::{
-    BlockHeaderProof, BlockProofHistoricalRoots, BlockProofHistoricalSummaries, HeaderWithProof,
+    BlockHeaderProof, BlockProofHistoricalRoots, BlockProofHistoricalSummariesCapella,
+    BlockProofHistoricalSummariesDeneb, HeaderWithProof,
 };
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
@@ -47,8 +48,15 @@ async fn store_header(header: Header, client: &HttpClient) -> bool {
             execution_block_proof: Default::default(),
             slot: Default::default(),
         })
+    } else if header.number <= CANCUN_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalSummariesCapella(BlockProofHistoricalSummariesCapella {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
     } else {
-        BlockHeaderProof::HistoricalSummaries(BlockProofHistoricalSummaries {
+        BlockHeaderProof::HistoricalSummariesDeneb(BlockProofHistoricalSummariesDeneb {
             beacon_block_proof: Default::default(),
             beacon_block_root: Default::default(),
             execution_block_proof: Default::default(),
@@ -534,16 +542,12 @@ dyn_async! {
         let mut result = vec![];
         for TestData { key: content_key, lookup_value: content_lookup_value, .. } in test_data {
             let content_details = {
-                    let content_type = match &content_key {
-                        StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
-                        StateContentKey::ContractStorageTrieNode(_) => "contract storage trie node".to_string(),
-                        StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
-                    };
-                    format!(
-                        "{:?} {}",
-                        content_key,
-                        content_type
-                    )
+                let content_type = match &content_key {
+                    StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
+                    StateContentKey::ContractStorageTrieNode(_) => "contract storage trie node".to_string(),
+                    StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
+                };
+                format!("{content_key:?} {content_type}")
             };
 
             match client_b.rpc.local_content(content_key.clone()).await {
@@ -557,7 +561,7 @@ dyn_async! {
         }
 
         if !result.is_empty() {
-            panic!("Client B: {:?}", result);
+            panic!("Client B: {result:?}");
         }
     }
 }
