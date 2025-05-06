@@ -4,10 +4,12 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
 ## Default fork/marker/git-ref
 ARG fork=Prague
 ENV FORK=${fork}
-ARG marker_expr=
+ARG marker_expr=transaction_test
 ENV MARKER_EXPR=${marker_expr}
 ARG branch=main
 ENV GIT_REF=${branch} 
+ARG keyword=
+ENV KEYWORD=${keyword}
 
 ## Clone and install EEST
 RUN apt-get update && apt-get install -y git
@@ -23,4 +25,5 @@ WORKDIR /execution-spec-tests
 RUN uv sync
 
 ## Define `execute hive` entry point using the local fixtures
-ENTRYPOINT uv run execute hive --fork "$FORK" -m "$MARKER_EXPR"
+ENTRYPOINT uv run execute hive --fork "$FORK" -m "$MARKER_EXPR" -k "$KEYWORD" -v
+
