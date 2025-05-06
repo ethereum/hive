@@ -109,6 +109,9 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
 	engine := beacon.New(ethash.NewFaker())
+	if g.genesis.Config.MergeNetsplitBlock != nil {
+		engine.TestingTTDBlock(g.genesis.Config.MergeNetsplitBlock.Uint64())
+	}
 
 	// Init genesis block.
 	trieconfig := *triedb.HashDefaults

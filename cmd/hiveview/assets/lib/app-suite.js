@@ -122,8 +122,22 @@ function showSuiteData(data, suiteID) {
 
     // Fill info box.
     let suiteTimes = testSuiteTimes(cases);
-    $('#testsuite_start').html('🕒 ' + suiteTimes.start.toLocaleString());
-    $('#testsuite_duration').html('⌛️ ' + formatDuration(suiteTimes.duration));
+    const stats = calculateTestStats(cases);
+
+    $('#testsuite_info').html(`
+        <li class="list-group-item">🕒 ${suiteTimes.start.toLocaleString()}</li>
+        <li class="list-group-item">⌛️ ${formatDuration(suiteTimes.duration)}</li>
+        <li class="list-group-item">
+            <span class="text-success">✓ ${stats.passed}</span> /
+            <span class="text-danger">✗ ${stats.failed}</span>
+            ${stats.timeouts > 0 ? `/ <span class="text-warning">${stats.timeouts} timeouts</span>` : ''}
+            ${stats.failed > 0
+                ? '<span class="badge bg-danger ms-1">Fail</span>'
+                : '<span class="badge bg-success ms-1">Pass</span>'}
+        </li>
+        <li class="list-group-item"><a id="sim-log-link"></a></li>
+    `);
+
     let logfile = routes.resultsRoot + data.simLog;
     let url = routes.simulatorLog(suiteID, suiteName, logfile);
     $('#sim-log-link').attr('href', url);
@@ -323,10 +337,10 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
 
 function formatTestStatus(summaryResult) {
     if (summaryResult.pass) {
-        return '&#x2713';
+        return '<span class="text-success">&#x2713;</span>';
     }
     let s = summaryResult.timeout ? 'Timeout' : 'Fail';
-    return '&#x2715; <b>' + s + '</b>';
+    return '<span class="text-danger">&#x2715; <b>' + s + '</b></span>';
 }
 
 // formatting function for the test 'details box' - this is called when a test is opened.
@@ -359,8 +373,31 @@ function formatTestDetails(suiteData, row) {
 
     if (d.description != '') {
         let p = document.createElement('p');
-        let description = html.urlsToLinks(html.encode(d.description.trim()));
-        let txt = '<b>Description:</b><br/>' + description;
+        let description = d.description.trim();
+        // If the description contains HTML tags, sanitize it
+        if (description.match(/<[^>]*>/)) {
+            // Define allowed HTML elements and attributes
+            const allowList = {
+                'a': ['href', 'title', 'target'],
+                'b': [],
+                'i': [],
+                'strong': [],
+                'em': [],
+                'p': [],
+                'br': [],
+                'ul': [],
+                'ol': [],
+                'li': [],
+                'code': [],
+                'pre': [],
+                '*': ['class'] // Allow class attribute on all elements
+            };
+            description = html.sanitizeHtml(description, allowList);
+        } else {
+            // If no HTML, treat as plain text and convert URLs to links
+            description = html.urlsToLinks(html.encode(description));
+        }
+        let txt = '<b>Description:</b><div>' + description + '</div>';
         p.innerHTML = txt;
         container.appendChild(p);
     }
@@ -457,4 +494,18 @@ function highlightErrorsInTestOutput(content) {
         return '<span class="output-error">' + content + '</span>';
     }
     return content;
+}
+
+function calculateTestStats(cases) {
+    return cases.reduce((stats, test) => {
+        if (test.summaryResult.pass) {
+            stats.passed++;
+        } else {
+            stats.failed++;
+            if (test.summaryResult.timeout) {
+                stats.timeouts++;
+            }
+        }
+        return stats;
+    }, { passed: 0, failed: 0, timeouts: 0 });
 }

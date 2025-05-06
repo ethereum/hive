@@ -72,6 +72,10 @@ func makeBuildOptions(fsys fs.FS) esbuild.BuildOptions {
 		Sourcemap:         esbuild.SourceMapLinked,
 		SourcesContent:    esbuild.SourcesContentExclude,
 		LogLevel:          esbuild.LogLevelWarning,
+		Loader: map[string]esbuild.Loader{
+			".js":  esbuild.LoaderJS,
+			".css": esbuild.LoaderCSS,
+		},
 	}
 }
 
@@ -179,28 +183,45 @@ func fsLoaderPlugin(fsys fs.FS) esbuild.Plugin {
 					return esbuild.OnResolveResult{Path: args.Path, External: true}, nil
 				}
 
+				// Strip query parameters from path
+				cleanPath := args.Path
+				if idx := strings.Index(cleanPath, "?"); idx >= 0 {
+					cleanPath = cleanPath[:idx]
+				}
+
 				var p string
 				if args.Kind == esbuild.ResolveEntryPoint {
 					// For the initial entry point in the bundle, args.Importer is set
 					// to the absolute working directory, which can't be used, so just treat
 					// it as a raw path into the FS.
-					p = args.Path
+					p = cleanPath
 				} else {
-					alias, isAlias := build.InitialOptions.Alias[args.Path]
+					alias, isAlias := build.InitialOptions.Alias[cleanPath]
 					if isAlias {
 						p = path.Clean(alias)
 					} else {
 						// Relative import paths are resolved relative to the
 						// importing file's location.
 						imp := strings.TrimPrefix(args.Importer, "/")
-						p = path.Clean(path.Join(path.Dir(imp), args.Path))
+						p = path.Clean(path.Join(path.Dir(imp), cleanPath))
 					}
 				}
 
 				res := esbuild.OnResolveResult{Path: "/" + p}
 				_, err := fs.Stat(fsys, p)
-				if errors.Is(err, fs.ErrNotExist) && !strings.HasPrefix(args.Path, ".") {
-					err = fmt.Errorf("File %s does not exist. Missing definition in moduleAliases?", p)
+				if errors.Is(err, fs.ErrNotExist) {
+					// For font files, if one format doesn't exist but another does, ignore the error
+					ext := path.Ext(p)
+					if ext == ".woff" {
+						woff2Path := p[:len(p)-len(ext)] + ".woff2"
+						if _, err2 := fs.Stat(fsys, woff2Path); err2 == nil {
+							return esbuild.OnResolveResult{External: true}, nil
+						}
+					}
+
+					if !strings.HasPrefix(args.Path, ".") {
+						err = fmt.Errorf("File %s does not exist. Missing definition in moduleAliases?", p)
+					}
 				}
 				return res, err
 			})
@@ -226,6 +247,12 @@ func loaderFromExt(name string) esbuild.Loader {
 	switch path.Ext(name) {
 	case ".svg":
 		return esbuild.LoaderFile
+	case ".woff2":
+		return esbuild.LoaderFile
+	case ".woff":
+		return esbuild.LoaderFile
+	case ".css":
+		return esbuild.LoaderCSS
 	default:
 		return esbuild.LoaderDefault
 	}

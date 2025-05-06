@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
-use crate::suites::beacon::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::beacon::constants::{
+    get_test_data, BOOTSTRAP_CONTENT_KEY, TRIN_BRIDGE_CLIENT_TYPE,
+};
 use crate::suites::environment::PortalNetwork;
-use alloy_primitives::Bytes;
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
@@ -13,10 +13,6 @@ use ethportal_api::{
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
-use serde_json::json;
-use serde_yaml::Value;
-
-const BOOTSTRAP_KEY: &str = "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258acb7bcc7f567b6e3af1";
 
 type TestData = (BeaconContentKey, BeaconContentValue);
 
@@ -79,16 +75,7 @@ dyn_async! {
         let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::Beacon])]));
         let environments = Some(vec![environment.clone(), environment]);
 
-        let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
-            .expect("cannot find test asset");
-        let values: Value = serde_yaml::from_str(&values).unwrap();
-        let content: Vec<(BeaconContentKey, BeaconContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let content_key: BeaconContentKey =
-                serde_yaml::from_value(value["content_key"].clone()).unwrap();
-            let raw_content_value = Bytes::from_str(value["content_value"].as_str().unwrap()).unwrap();
-            let content_value = BeaconContentValue::decode(&content_key, raw_content_value.as_ref()).expect("unable to decode content value");
-            (content_key, content_value)
-        }).collect();
+        let content = get_test_data().expect("cannot parse test asset");
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
         for (client_a, client_b) in clients.iter().cartesian_product(clients.iter()) {
@@ -164,14 +151,14 @@ dyn_async! {
             Some((client_a, client_b)) => (client_a, client_b),
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: BeaconContentKey = serde_json::from_value(json!(BOOTSTRAP_KEY)).unwrap();
+        let bootstrap_key = BOOTSTRAP_CONTENT_KEY.clone();
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        match client_a.rpc.find_content(target_enr, header_with_proof_key.clone()).await {
+        match client_a.rpc.find_content(target_enr, bootstrap_key.clone()).await {
             Ok(FindContentInfo::Enrs { enrs }) => if !enrs.is_empty() {
                 panic!("Error: Unexpected FINDCONTENT response: expected ContentInfo::Enrs length 0 got {}", enrs.len());
             },
@@ -192,7 +179,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let pong = client_a.rpc.ping(target_enr).await;
+        let pong = BeaconNetworkApiClient::ping(&client_a.rpc, target_enr, None, None).await;
 
         if let Err(err) = pong {
             panic!("Unable to receive pong info: {err:?}");

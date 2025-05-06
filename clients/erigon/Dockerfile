@@ -7,7 +7,12 @@ FROM $baseimage:$tag
 # to install additional commands, so switch back to root.
 USER root
 
-RUN apk add --no-cache bash curl jq
+RUN apt-get update && apt-get install -y \
+    bash \
+    build-essential \
+    ca-certificates \
+    git \
+    jq && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
 RUN erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
