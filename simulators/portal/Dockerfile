@@ -34,13 +34,14 @@ ARG PORTAL_CONSENSUS_AUTH
 ENV PORTAL_CONSENSUS_URL=$PORTAL_CONSENSUS_URL
 ENV PORTAL_CONSENSUS_AUTH=$PORTAL_CONSENSUS_AUTH
 
-RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y wget git ca-certificates
 
 # copy build artifacts from build stage
 COPY --from=builder /portal/target/release/portal .
-ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
-ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/state/hive/test_data.yaml ./test-data/state_test_data.yaml
-ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/beacon_chain/hive/test_data.yaml ./test-data/beacon_test_data.yaml
+
+# clone portal-spec-tests repo. The add command is used to reset docker's cache so new data is pulled
+ADD "https://api.github.com/repos/ethereum/portal-spec-tests/commits?per_page=1" latest_commit
+RUN git clone https://github.com/ethereum/portal-spec-tests.git ./portal-spec-tests
 
 ENV RUST_LOG=debug,hyper_util=info,hyper=info,reqwest=info
 

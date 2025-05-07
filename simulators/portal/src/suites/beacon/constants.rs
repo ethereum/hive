@@ -3,7 +3,8 @@ use ethportal_api::{BeaconContentKey, BeaconContentValue, ContentValue};
 use serde_yaml::Value;
 use std::str::FromStr;
 
-pub const TEST_DATA_FILE_PATH: &str = "./test-data/beacon_test_data.yaml";
+pub const TEST_DATA_FILE_PATH: &str =
+    "./portal-spec-tests/tests/mainnet/beacon_chain/hive/test_data.yaml";
 
 pub fn get_test_data() -> anyhow::Result<Vec<(BeaconContentKey, BeaconContentValue)>> {
     let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)?;

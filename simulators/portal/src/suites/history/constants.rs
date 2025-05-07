@@ -1,33 +1,51 @@
 use alloy_primitives::Bytes;
+use anyhow::bail;
 use ethportal_api::{ContentValue, HistoryContentKey, HistoryContentValue};
 use serde_yaml::Value;
 use std::str::FromStr;
 
-pub const TEST_DATA_FILE_PATH: &str = "./test-data/test_data_collection_of_forks_blocks.yaml";
-
 // trin-bridge constants
 pub const TRIN_BRIDGE_CLIENT_TYPE: &str = "trin-bridge";
 
+pub const TEST_DATA_FILE_PATH: &str = "./portal-spec-tests/tests/mainnet/history/hive/success";
+
 pub fn get_test_data() -> anyhow::Result<Vec<(HistoryContentKey, HistoryContentValue)>> {
-    let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)?;
-    let values: Value = serde_yaml::from_str(&values)?;
-    values
-        .as_sequence()
-        .expect("unable to convert test data to sequence")
-        .iter()
-        .map(|value| {
-            let content_key: HistoryContentKey =
-                serde_yaml::from_value(value["content_key"].clone())?;
-            let raw_content_value = Bytes::from_str(
-                value["content_value"]
-                    .as_str()
-                    .expect("to find content value"),
-            )?;
-            let content_value =
-                HistoryContentValue::decode(&content_key, raw_content_value.as_ref())?;
-            Ok((content_key, content_value))
-        })
-        .collect()
+    let mut content = vec![];
+
+    for entry in std::fs::read_dir(TEST_DATA_FILE_PATH)? {
+        let entry = entry?;
+        let test_path = entry.path();
+        if !test_path.is_file() {
+            bail!("Expected a file, but found a directory: {test_path:?}");
+        }
+
+        let values = std::fs::read_to_string(test_path)?;
+        let values: Value = serde_yaml::from_str(&values)?;
+        let test_case = values
+            .as_sequence()
+            .expect("unable to convert test data to sequence")
+            .iter()
+            .map(|value| {
+                let content_key: HistoryContentKey =
+                    serde_yaml::from_value(value["content_key"].clone())
+                        .expect("to find content key");
+                let raw_content_value = Bytes::from_str(
+                    value["content_value"]
+                        .as_str()
+                        .expect("to find content value"),
+                )
+                .expect("unable to convert content value to bytes");
+                let content_value =
+                    HistoryContentValue::decode(&content_key, raw_content_value.as_ref())
+                        .expect("unable to decode content value");
+                (content_key, content_value)
+            })
+            .collect::<Vec<_>>();
+
+        content.extend(test_case);
+    }
+
+    Ok(content)
 }
 
 lazy_static::lazy_static! {
