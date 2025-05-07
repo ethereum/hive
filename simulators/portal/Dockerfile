@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y wget git ca-certificates
 # copy build artifacts from build stage
 COPY --from=builder /portal/target/release/portal .
 
-# clone portal-spec-tests repo
+# clone portal-spec-tests repo. The add command is used to reset docker's cache so new data is pulled
+ADD "https://api.github.com/repos/ethereum/portal-spec-tests/commits?per_page=1" latest_commit
 RUN git clone https://github.com/ethereum/portal-spec-tests.git ./portal-spec-tests
 
 ENV RUST_LOG=debug,hyper_util=info,hyper=info,reqwest=info
