@@ -2,8 +2,8 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, Result};
 use ethportal_api::{
     light_client::{
-        bootstrap::LightClientBootstrapDeneb, finality_update::LightClientFinalityUpdateDeneb,
-        optimistic_update::LightClientOptimisticUpdateDeneb,
+        bootstrap::LightClientBootstrapElectra, finality_update::LightClientFinalityUpdateElectra,
+        optimistic_update::LightClientOptimisticUpdateElectra,
     },
     types::content_key::beacon::{
         LightClientBootstrapKey, LightClientFinalityUpdateKey, LightClientOptimisticUpdateKey,
@@ -82,7 +82,7 @@ impl ConsensusProvider {
         let content_key = BeaconContentKey::LightClientBootstrap(LightClientBootstrapKey {
             block_hash: block_hash.into(),
         });
-        let bootstrap: LightClientBootstrapDeneb = serde_json::from_value(data)?;
+        let bootstrap: LightClientBootstrapElectra = serde_json::from_value(data)?;
         let content_value = BeaconContentValue::LightClientBootstrap(bootstrap.into());
 
         Ok((content_key, content_value))
@@ -97,7 +97,7 @@ impl ConsensusProvider {
             self.base_url
         );
         let data = make_request(&self.client, &url).await?;
-        let update: LightClientFinalityUpdateDeneb = serde_json::from_value(data)?;
+        let update: LightClientFinalityUpdateElectra = serde_json::from_value(data)?;
         let new_finalized_slot = update.finalized_header.beacon.slot;
         let content_key = BeaconContentKey::LightClientFinalityUpdate(
             LightClientFinalityUpdateKey::new(new_finalized_slot),
@@ -116,7 +116,7 @@ impl ConsensusProvider {
             self.base_url
         );
         let data = make_request(&self.client, &url).await?;
-        let update: LightClientOptimisticUpdateDeneb = serde_json::from_value(data)?;
+        let update: LightClientOptimisticUpdateElectra = serde_json::from_value(data)?;
         let content_key = BeaconContentKey::LightClientOptimisticUpdate(
             LightClientOptimisticUpdateKey::new(update.signature_slot),
         );
