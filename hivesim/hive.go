@@ -270,6 +270,20 @@ func (sim *Simulation) GetClientLogOffset(testSuite SuiteID, clientID string) (i
 	return resp, err
 }
 
+// ExecSharedClient runs a command in a shared client container.
+func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd []string) (*ExecInfo, error) {
+	if sim.docs != nil {
+		return nil, errors.New("ExecSharedClient is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s/exec", sim.url, testSuite, clientID)
+		req  = &simapi.ExecRequest{Command: cmd}
+		resp *ExecInfo
+	)
+	err := post(url, req, &resp)
+	return resp, err
+}
+
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	if sim.docs != nil {
