@@ -34,17 +34,30 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 	router := mux.NewRouter()
 	router.HandleFunc("/hive", api.getHiveInfo).Methods("GET")
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
+
+	// Test suite and client routes
+	router.HandleFunc("/testsuite", api.startSuite).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}", api.endSuite).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
+	// post because the delete http verb does not always support a message body
+	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
+
+	// Shared client routes
+	router.HandleFunc("/testsuite/{suite}/shared-client", api.startSharedClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/shared-client/{node}", api.getSharedClientInfo).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/shared-client/{node}/log-offset", api.getSharedClientLogOffset).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/shared-client/{node}/exec", api.execInSharedClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/shared-client/{node}", api.stopSharedClient).Methods("DELETE")
+
+	// Regular client routes
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
-	// post because the delete http verb does not always support a message body
-	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
-	router.HandleFunc("/testsuite", api.startSuite).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}", api.endSuite).Methods("DELETE")
+
+	// Network routes
 	router.HandleFunc("/testsuite/{suite}/network/{network}", api.networkCreate).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", api.networkRemove).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", api.networkIPGet).Methods("GET")
@@ -58,6 +71,297 @@ type simAPI struct {
 	env     SimEnv
 	tm      *TestManager
 	hive    HiveInfo
+}
+
+// startSharedClient starts a client container at the suite level (shared across tests).
+func (api *simAPI) startSharedClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	// Client launch parameters are given as multipart/form-data.
+	const maxMemory = 8 * 1024 * 1024
+	if err := r.ParseMultipartForm(maxMemory); err != nil {
+		slog.Error("API: could not parse shared client request", "error", err)
+		err := fmt.Errorf("could not parse shared client request")
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+
+	if !r.Form.Has("config") {
+		slog.Error("API: missing 'config' parameter in shared client request")
+		err := fmt.Errorf("missing 'config' parameter in shared client request")
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	var clientConfig simapi.NodeConfig
+	if err := json.Unmarshal([]byte(r.Form.Get("config")), &clientConfig); err != nil {
+		slog.Error("API: invalid 'config' parameter in shared client request", "error", err)
+		err := fmt.Errorf("invalid 'config' parameter in shared client request")
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	// Get the client name.
+	clientDef, err := api.checkClient(&clientConfig)
+	if err != nil {
+		slog.Error("API: " + err.Error())
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	// Get the network names, if any, for the container to be connected to at start.
+	networks, err := api.checkClientNetworks(&clientConfig, suiteID)
+	if err != nil {
+		slog.Error("API: "+err.Error(), "client", clientDef.Name)
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	files := make(map[string]*multipart.FileHeader)
+	for key, fheaders := range r.MultipartForm.File {
+		if len(fheaders) > 0 {
+			files[key] = fheaders[0]
+
+			// Debug output for genesis.json allocations in shared clients
+			if key == "genesis.json" {
+				slog.Info("Shared client genesis.json detected", "filename", key)
+
+				// Read the file content
+				file, err := fheaders[0].Open()
+				if err == nil {
+					defer file.Close()
+
+					// Read the genesis file
+					genesisBytes, err := io.ReadAll(file)
+					if err == nil {
+						// Parse JSON to extract and log alloc information
+						var genesisMap map[string]interface{}
+						if err := json.Unmarshal(genesisBytes, &genesisMap); err == nil {
+							if alloc, ok := genesisMap["alloc"].(map[string]interface{}); ok {
+								// Log the number of accounts in alloc
+								slog.Info("Shared client genesis alloc accounts", "count", len(alloc))
+
+								// Log a few accounts as examples
+								i := 0
+								for addr, details := range alloc {
+									if i < 3 { // Log only first 3 accounts to avoid spam
+										slog.Info("Genesis alloc entry", "address", addr, "details", details)
+										i++
+									} else {
+										break
+									}
+								}
+							}
+						}
+
+						// Rewind the file for normal processing
+						file.Seek(0, 0)
+					}
+				}
+			}
+		}
+	}
+
+	// Sanitize environment.
+	env := clientConfig.Environment
+	for k := range env {
+		if !strings.HasPrefix(k, hiveEnvvarPrefix) {
+			delete(env, k)
+		}
+	}
+	// Set default client loglevel to sim loglevel.
+	if env == nil {
+		env = make(map[string]string)
+	}
+
+	if env["HIVE_LOGLEVEL"] == "" {
+		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
+	}
+
+	// Set up the timeout.
+	timeout := api.env.ClientStartTimeout
+	if timeout == 0 {
+		timeout = defaultStartTimeout
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	// Create the client container.
+	options := ContainerOptions{Env: env, Files: files}
+	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
+	if err != nil {
+		slog.Error("API: shared client container create failed", "client", clientDef.Name, "error", err)
+		err := fmt.Errorf("shared client container create failed (%v)", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Set the log file. We need the container ID for this,
+	// so it can only be set after creating the container.
+	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
+	options.LogFile = logFilePath
+
+	// Connect to the networks if requested, so it is started already joined to each one.
+	for _, network := range networks {
+		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
+			slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+			serveError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// by default: check the eth1 port
+	options.CheckLive = 8545
+	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
+		v, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			slog.Error("API: could not parse check-live port", "error", err)
+			serveError(w, err, http.StatusBadRequest)
+			return
+		}
+		options.CheckLive = uint16(v)
+	}
+
+	// Start it!
+	info, err := api.backend.StartContainer(ctx, containerID, options)
+	if info != nil {
+		clientInfo := &ClientInfo{
+			ID:             info.ID,
+			IP:             info.IP,
+			Name:           clientDef.Name,
+			InstantiatedAt: time.Now(),
+			LogFile:        logPath,
+			wait:           info.Wait,
+			IsShared:       true,
+			LogPosition:    0, // Starting at position 0
+			SuiteID:        suiteID,
+		}
+
+		// Add client version to the test suite.
+		api.tm.testSuiteMutex.Lock()
+		if suite, ok := api.tm.runningTestSuites[suiteID]; ok {
+			suite.ClientVersions[clientDef.Name] = clientDef.Version
+		}
+		api.tm.testSuiteMutex.Unlock()
+
+		// Register the shared client with the suite.
+		api.tm.RegisterSharedClient(suiteID, info.ID, clientInfo)
+	}
+	if err != nil {
+		slog.Error("API: could not start shared client", "client", clientDef.Name, "container", containerID[:8], "error", err)
+		err := fmt.Errorf("shared client did not start: %v", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	// It's started.
+	slog.Info("API: shared client "+clientDef.Name+" started", "suite", suiteID, "container", containerID[:8])
+	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
+}
+
+// getSharedClientInfo returns information about a shared client,
+// including container ID, client type, IP and log file location.
+func (api *simAPI) getSharedClientInfo(w http.ResponseWriter, r *http.Request) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	node := mux.Vars(r)["node"]
+	nodeInfo, err := api.tm.GetSharedClient(suiteID, node)
+	if err != nil {
+		slog.Error("API: can't find shared client", "node", node, "error", err)
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+
+	serveJSON(w, &simapi.NodeResponse{ID: nodeInfo.ID, Name: nodeInfo.Name})
+}
+
+// getSharedClientLogOffset returns the current log offset for a shared client.
+// This is used to track which segments of the log belong to each test.
+func (api *simAPI) getSharedClientLogOffset(w http.ResponseWriter, r *http.Request) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	node := mux.Vars(r)["node"]
+	offset, err := api.tm.GetClientLogOffset(suiteID, node)
+	if err != nil {
+		slog.Error("API: can't get log offset for shared client", "node", node, "error", err)
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+
+	serveJSON(w, offset)
+}
+
+// execInSharedClient executes a command in a shared client container.
+// Similar to execInClient but for shared clients at the suite level.
+func (api *simAPI) execInSharedClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	node := mux.Vars(r)["node"]
+	nodeInfo, err := api.tm.GetSharedClient(suiteID, node)
+	if err != nil {
+		slog.Error("API: can't find shared client", "node", node, "error", err)
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+
+	// Parse and validate the exec request.
+	commandline, err := parseExecRequest(r.Body)
+	if err != nil {
+		slog.Error("API: invalid shared client exec request", "node", node, "error", err)
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
+	if err != nil {
+		slog.Error("API: shared client script exec error", "node", node, "error", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+	serveJSON(w, &info)
+}
+
+// stopSharedClient terminates a shared client container.
+// This is typically called at the end of a test suite.
+func (api *simAPI) stopSharedClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	node := mux.Vars(r)["node"]
+
+	clientInfo, err := api.tm.GetSharedClient(suiteID, node)
+	if err != nil {
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+
+	// Stop the container.
+	if clientInfo.wait != nil {
+		if err := api.backend.DeleteContainer(clientInfo.ID); err != nil {
+			serveError(w, err, http.StatusInternalServerError)
+			return
+		}
+		clientInfo.wait()
+		clientInfo.wait = nil
+	}
+
+	serveOK(w)
 }
 
 // getHiveInfo returns information about the hive server instance.
@@ -219,6 +523,44 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			// components should be ignored in the filename supplied by the form, and
 			// package multipart strips the directory info away at parse time.
 			files[key] = fheaders[0]
+
+			// Debug output for genesis.json allocations in regular clients
+			if key == "genesis.json" {
+				slog.Info("Regular client genesis.json detected", "filename", key)
+
+				// Read the file content
+				file, err := fheaders[0].Open()
+				if err == nil {
+					defer file.Close()
+
+					// Read the genesis file
+					genesisBytes, err := io.ReadAll(file)
+					if err == nil {
+						// Parse JSON to extract and log alloc information
+						var genesisMap map[string]interface{}
+						if err := json.Unmarshal(genesisBytes, &genesisMap); err == nil {
+							if alloc, ok := genesisMap["alloc"].(map[string]interface{}); ok {
+								// Log the number of accounts in alloc
+								slog.Info("Regular client genesis alloc accounts", "count", len(alloc))
+
+								// Log a few accounts as examples
+								i := 0
+								for addr, details := range alloc {
+									if i < 3 { // Log only first 3 accounts to avoid spam
+										slog.Info("Genesis alloc entry", "address", addr, "details", details)
+										i++
+									} else {
+										break
+									}
+								}
+							}
+						}
+
+						// Rewind the file for normal processing
+						file.Seek(0, 0)
+					}
+				}
+			}
 		}
 	}
 
