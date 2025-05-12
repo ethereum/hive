@@ -21,6 +21,12 @@ type Suite struct {
 	Category    string // Category of the test suite [Optional]
 	Description string // Description of the test suite (if empty, suite won't appear in documentation) [Optional]
 	Tests       []AnyTest
+
+	// SharedClients maps client IDs to client instances that are shared across tests
+	SharedClients map[string]*Client
+
+	// Internal tracking
+	sharedClientOpts map[string][]StartOption // Stores options for starting shared clients
 }
 
 func (s *Suite) request() *simapi.TestRequest {
@@ -36,6 +42,30 @@ func (s *Suite) request() *simapi.TestRequest {
 // Add adds a test to the suite.
 func (s *Suite) Add(test AnyTest) *Suite {
 	s.Tests = append(s.Tests, test)
+	return s
+}
+
+// AddSharedClient registers a client to be shared across all tests in the suite.
+// The client will be started when the suite begins and terminated when the suite ends.
+// This is useful for maintaining state across tests for incremental testing or
+// avoiding client initialization for every test.
+func (s *Suite) AddSharedClient(clientID string, clientType string, options ...StartOption) *Suite {
+	if s.SharedClients == nil {
+		s.SharedClients = make(map[string]*Client)
+	}
+	if s.sharedClientOpts == nil {
+		s.sharedClientOpts = make(map[string][]StartOption)
+	}
+
+	// Store options for later use when the suite is started
+	s.sharedClientOpts[clientID] = append([]StartOption{}, options...)
+
+	// Create a placeholder client that will be initialized when the suite runs
+	s.SharedClients[clientID] = &Client{
+		Type:     clientType,
+		IsShared: true,
+	}
+
 	return s
 }
 
@@ -77,11 +107,46 @@ func RunSuite(host *Simulation, suite Suite) error {
 	}
 	defer host.EndSuite(suiteID)
 
+	// Start shared clients for the suite
+	if len(suite.SharedClients) > 0 {
+		fmt.Printf("Starting %d shared clients for suite %s...\n", len(suite.SharedClients), suite.Name)
+
+		// Initialize any shared clients defined for this suite
+		for clientID, client := range suite.SharedClients {
+			// Retrieve stored options for this client
+			options := suite.sharedClientOpts[clientID]
+
+			// Start the shared client
+			containerID, ip, err := host.StartSharedClient(suiteID, client.Type, options...)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error starting shared client %s: %v\n", clientID, err)
+				return err
+			}
+
+			// Update the client object with actual container information
+			client.Container = containerID
+			client.IP = ip
+			client.SuiteID = suiteID
+			client.IsShared = true
+
+			fmt.Printf("Started shared client %s (container: %s)\n", clientID, containerID)
+		}
+	}
+
+	// Run all tests in the suite
 	for _, test := range suite.Tests {
 		if err := test.runTest(host, suiteID, &suite); err != nil {
 			return err
 		}
 	}
+
+	// Clean up any shared clients at the end of the suite
+	// They are automatically stopped when the suite ends via defer host.EndSuite(suiteID) above
+	// But we should output a message for clarity
+	if len(suite.SharedClients) > 0 {
+		fmt.Printf("Cleaning up %d shared clients for suite %s...\n", len(suite.SharedClients), suite.Name)
+	}
+
 	return nil
 }
 
@@ -164,6 +229,11 @@ type Client struct {
 	rpc       *rpc.Client
 	enginerpc *rpc.Client
 	test      *T
+
+	// Fields for shared client support
+	IsShared    bool      // Whether this client is shared across tests
+	LogPosition int64     // Current position in the log file (for shared clients)
+	SuiteID     SuiteID   // The suite this client belongs to (for shared clients)
 }
 
 // EnodeURL returns the default peer-to-peer endpoint of the client.
@@ -227,6 +297,9 @@ type T struct {
 	suite   *Suite
 	mu      sync.Mutex
 	result  TestResult
+
+	// Fields for tracking client logs
+	clientLogOffsets map[string]*LogOffset // Tracks log offsets for clients used in this test
 }
 
 // StartClient starts a client instance. If the client cannot by started, the test fails immediately.
@@ -235,7 +308,59 @@ func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 	if err != nil {
 		t.Fatalf("can't launch node (type %s): %v", clientType, err)
 	}
-	return &Client{Type: clientType, Container: container, IP: ip, test: t}
+
+	// Initialize log tracking for this client
+	if t.clientLogOffsets == nil {
+		t.clientLogOffsets = make(map[string]*LogOffset)
+	}
+
+	return &Client{
+		Type:      clientType,
+		Container: container,
+		IP:        ip,
+		test:      t,
+		IsShared:  false,
+	}
+}
+
+// GetSharedClient retrieves a shared client by ID and prepares it for use in this test.
+// The client can be used like a normal Client object, but maintains its state across tests.
+// Returns nil if the client doesn't exist.
+func (t *T) GetSharedClient(clientID string) *Client {
+	if t.suite == nil || t.suite.SharedClients == nil {
+		t.Logf("No shared clients available in this suite")
+		return nil
+	}
+
+	sharedClient, exists := t.suite.SharedClients[clientID]
+	if !exists {
+		t.Logf("Shared client %q not found", clientID)
+		return nil
+	}
+
+	// Store the test context in the client so it can be used for this test
+	// Create a new Client instance that points to the same container
+	client := &Client{
+		Type:      sharedClient.Type,
+		Container: sharedClient.Container,
+		IP:        sharedClient.IP,
+		test:      t,
+		IsShared:  true,
+		SuiteID:   t.SuiteID,
+	}
+
+	// Initialize log tracking for this client
+	if t.clientLogOffsets == nil {
+		t.clientLogOffsets = make(map[string]*LogOffset)
+	}
+
+	// Record the current log position for this client
+	t.clientLogOffsets[clientID] = &LogOffset{
+		Start: sharedClient.LogPosition,
+		End:   0, // Will be set when the test completes
+	}
+
+	return client
 }
 
 // RunClient runs the given client test against a single client type.
@@ -365,6 +490,7 @@ func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 		Sim:     host,
 		SuiteID: test.suiteID,
 		suite:   test.suite,
+		clientLogOffsets: make(map[string]*LogOffset), // Initialize log offset tracking
 	}
 	testID, err := host.StartTest(test.suiteID, test.request())
 	if err != nil {
@@ -372,8 +498,40 @@ func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 	}
 	t.TestID = testID
 	t.result.Pass = true
+
+	// Capture current log positions for all shared clients before running the test
+	if test.suite != nil && test.suite.SharedClients != nil {
+		for clientID, client := range test.suite.SharedClients {
+			// Get the current log position for each shared client
+			logPosition, err := host.GetClientLogOffset(test.suiteID, client.Container)
+			if err == nil {
+				t.clientLogOffsets[clientID] = &LogOffset{
+					Start: logPosition,
+					End:   0, // Will be set when test completes
+				}
+			}
+		}
+	}
+
 	defer func() {
 		t.mu.Lock()
+
+		// After test is complete, update ending log positions for all shared clients
+		if test.suite != nil && test.suite.SharedClients != nil {
+			for clientID, client := range test.suite.SharedClients {
+				if offset, exists := t.clientLogOffsets[clientID]; exists {
+					// Get the current log position after test execution
+					logPosition, err := host.GetClientLogOffset(test.suiteID, client.Container)
+					if err == nil {
+						offset.End = logPosition
+
+						// Update the shared client's log position for the next test
+						client.LogPosition = logPosition
+					}
+				}
+			}
+		}
+
 		defer t.mu.Unlock()
 		host.EndTest(test.suiteID, testID, t.result)
 	}()

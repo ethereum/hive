@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -531,11 +532,59 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.Details = ""
 		result.LogOffsets = offsets
 	}
+
+	// Process client logs for shared clients
+	result.ClientLogs = make(map[string]*ClientLogSegment)
+	for nodeID, clientInfo := range testCase.ClientInfo {
+		if clientInfo.IsShared {
+			// Get current log position
+			currentPosition, err := manager.getClientCurrentLogPosition(clientInfo)
+			if err != nil {
+				slog.Error("could not get client log position", "err", err)
+				continue
+			}
+
+			// Create log segment for this test
+			result.ClientLogs[nodeID] = &ClientLogSegment{
+				Start:    clientInfo.LogPosition,
+				End:      currentPosition,
+				ClientID: clientInfo.ID,
+			}
+
+			// Extract log segment to a dedicated file for hiveview
+			if clientInfo.LogFile != "" && clientInfo.LogPosition < currentPosition {
+				sharedLogDir := filepath.Join(manager.config.LogDir, "shared_clients")
+				os.MkdirAll(sharedLogDir, 0755)
+				segmentLogFile := filepath.Join(sharedLogDir,
+					fmt.Sprintf("%d-%s-test%d.log", time.Now().Unix(), nodeID, testID))
+
+				sourceFile, err := os.Open(clientInfo.LogFile)
+				if err == nil {
+					defer sourceFile.Close()
+					targetFile, err := os.Create(segmentLogFile)
+					if err == nil {
+						defer targetFile.Close()
+						sourceFile.Seek(clientInfo.LogPosition, 0)
+						io.CopyN(targetFile, sourceFile, currentPosition - clientInfo.LogPosition)
+						relativePath := filepath.Join("shared_clients",
+							fmt.Sprintf("%d-%s-test%d.log", time.Now().Unix(), nodeID, testID))
+						testCase.ClientInfo[nodeID].LogFile = relativePath
+					}
+				}
+			}
+
+			// Update the shared client's log position in the suite
+			if sharedClient, err := manager.GetSharedClient(suiteID, nodeID); err == nil {
+				sharedClient.LogPosition = currentPosition
+			}
+		}
+	}
+
 	testCase.SummaryResult = *result
 
-	// Stop running clients.
+	// Stop running clients that are not shared.
 	for _, v := range testCase.ClientInfo {
-		if v.wait != nil {
+		if !v.IsShared && v.wait != nil {
 			manager.backend.DeleteContainer(v.ID)
 			v.wait()
 			v.wait = nil
@@ -545,6 +594,27 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
 	return nil
+}
+
+// getClientCurrentLogPosition gets the current position in a client's log file
+// This is a helper function for tracking log positions in shared clients
+func (manager *TestManager) getClientCurrentLogPosition(clientInfo *ClientInfo) (int64, error) {
+	// This is a simplified implementation - in production, you would:
+	// 1. Open the client's log file
+	// 2. Seek to the end
+	// 3. Return the current position
+
+	// For now, we'll estimate it using the log file size
+	if clientInfo.LogFile == "" {
+		return 0, fmt.Errorf("no log file for client %s", clientInfo.ID)
+	}
+
+	fileInfo, err := os.Stat(clientInfo.LogFile)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size(), nil
 }
 
 func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
@@ -584,8 +654,73 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 	if testCase.ClientInfo == nil {
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
+
+	// Initialize log position to 0 for new clients
+	if nodeInfo.LogPosition == 0 && !nodeInfo.IsShared {
+		nodeInfo.LogPosition = 0
+	}
+
 	testCase.ClientInfo[nodeID] = nodeInfo
 	return nil
+}
+
+// RegisterSharedClient registers a shared client at the suite level
+func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, nodeID string, nodeInfo *ClientInfo) error {
+	manager.testSuiteMutex.Lock()
+	defer manager.testSuiteMutex.Unlock()
+
+	// Check if the test suite is running
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestSuite
+	}
+
+	// Initialize shared clients map if it doesn't exist
+	if testSuite.SharedClients == nil {
+		testSuite.SharedClients = make(map[string]*ClientInfo)
+	}
+
+	// Mark client as shared
+	nodeInfo.IsShared = true
+	nodeInfo.SuiteID = suiteID
+
+	// Initialize log position to 0
+	nodeInfo.LogPosition = 0
+
+	testSuite.SharedClients[nodeID] = nodeInfo
+	return nil
+}
+
+// GetSharedClient retrieves a shared client from a suite
+func (manager *TestManager) GetSharedClient(suiteID TestSuiteID, nodeID string) (*ClientInfo, error) {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return nil, ErrNoSuchTestSuite
+	}
+
+	if testSuite.SharedClients == nil {
+		return nil, ErrNoSuchNode
+	}
+
+	client, ok := testSuite.SharedClients[nodeID]
+	if !ok {
+		return nil, ErrNoSuchNode
+	}
+
+	return client, nil
+}
+
+// GetClientLogOffset returns the current position in the client's log file
+func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, nodeID string) (int64, error) {
+	client, err := manager.GetSharedClient(suiteID, nodeID)
+	if err != nil {
+		return 0, err
+	}
+
+	return client.LogPosition, nil
 }
 
 // StopNode stops a client container.

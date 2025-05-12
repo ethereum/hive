@@ -14,6 +14,7 @@ type NodeConfig struct {
 	Client      string            `json:"client"`
 	Networks    []string          `json:"networks"`
 	Environment map[string]string `json:"environment"`
+	IsShared    bool              `json:"isShared,omitempty"` // Whether this client is shared across tests
 }
 
 // StartNodeResponse is returned by the client startup endpoint.
