@@ -500,6 +500,47 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this is a reference to a shared client
+	if clientConfig.SharedClientID != "" {
+		// This is a reference to a shared client - get the shared client info
+		sharedClient, err := api.tm.GetSharedClient(suiteID, clientConfig.SharedClientID)
+		if err != nil {
+			slog.Error("API: shared client not found", "sharedClientId", clientConfig.SharedClientID, "error", err)
+			serveError(w, err, http.StatusNotFound)
+			return
+		}
+
+		// Create a reference to the shared client in this test
+		clientInfo := &ClientInfo{
+			ID:             sharedClient.ID,
+			IP:             sharedClient.IP,
+			Name:           sharedClient.Name,
+			InstantiatedAt: sharedClient.InstantiatedAt,
+			LogFile:        sharedClient.LogFile,
+			IsShared:       true,
+			SharedClientID: clientConfig.SharedClientID,
+			LogPosition:    sharedClient.LogPosition,
+			SuiteID:        suiteID, // Make sure this is properly set
+		}
+		
+		slog.Debug("Created shared client reference", 
+			"nodeID", clientConfig.SharedClientID,
+			"name", sharedClient.Name,
+			"isShared", true,
+			"logPosition", sharedClient.LogPosition,
+			"logFile", sharedClient.LogFile)
+
+		// Register the node with the test
+		api.tm.RegisterNode(testID, clientConfig.SharedClientID, clientInfo)
+
+		// Return success with the node info
+		slog.Info("API: shared client registered with test", "suite", suiteID, "test", testID, 
+			"sharedClientId", clientConfig.SharedClientID, "container", sharedClient.ID[:8])
+		serveJSON(w, &simapi.StartNodeResponse{ID: sharedClient.ID, IP: sharedClient.IP})
+		return
+	}
+
+	// Normal client startup flow
 	// Get the client name.
 	clientDef, err := api.checkClient(&clientConfig)
 	if err != nil {

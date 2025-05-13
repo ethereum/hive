@@ -11,10 +11,11 @@ type TestRequest struct {
 
 // NodeConfig contains the launch parameters for a client container.
 type NodeConfig struct {
-	Client      string            `json:"client"`
-	Networks    []string          `json:"networks"`
-	Environment map[string]string `json:"environment"`
-	IsShared    bool              `json:"isShared,omitempty"` // Whether this client is shared across tests
+	Client         string            `json:"client"`
+	Networks       []string          `json:"networks"`
+	Environment    map[string]string `json:"environment"`
+	IsShared       bool              `json:"isShared,omitempty"`       // Whether this client is shared across tests
+	SharedClientID string            `json:"sharedClientId,omitempty"` // If set, this is a reference to an existing shared client
 }
 
 // StartNodeResponse is returned by the client startup endpoint.
@@ -27,6 +28,14 @@ type StartNodeResponse struct {
 type NodeResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// NodeInfo contains information about a client node to register with a test.
+type NodeInfo struct {
+	ID             string `json:"id"`                       // Container ID
+	Name           string `json:"name"`                     // Client name/type
+	IsShared       bool   `json:"isShared"`                 // Whether this is a shared client
+	SharedClientID string `json:"sharedClientId,omitempty"` // ID of the shared client in the suite
 }
 
 type ExecRequest struct {

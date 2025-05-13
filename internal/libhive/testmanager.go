@@ -672,11 +672,29 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 				continue
 			}
 
-			// Create log segment for this test
+			slog.Debug("Processing shared client logs",
+				"testID", testID,
+				"nodeID", nodeID,
+				"clientName", clientInfo.Name,
+				"startPosition", clientInfo.LogPosition,
+				"endPosition", currentPosition)
+
+			// Count lines in the log segment to determine line numbers
+			startLine, endLine, err := manager.countLinesInSegment(clientInfo.LogFile, clientInfo.LogPosition, currentPosition)
+			if err != nil {
+				slog.Error("could not count lines in client log segment", "err", err)
+				// If we can't count lines, use 1 to indicate the beginning of the file
+				startLine = 1
+				endLine = 1
+			}
+
+			// Create log segment for this test with both byte offsets and line numbers
 			result.ClientLogs[nodeID] = &ClientLogSegment{
-				Start:    clientInfo.LogPosition,
-				End:      currentPosition,
-				ClientID: clientInfo.ID,
+				Start:     clientInfo.LogPosition,
+				End:       currentPosition,
+				StartLine: startLine,
+				EndLine:   endLine,
+				ClientID:  clientInfo.ID,
 			}
 
 			// Extract log segment to a dedicated file for hiveview
@@ -931,6 +949,82 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 		return fmt.Errorf("unable to unpause client: %v", err)
 	}
 	return nil
+}
+
+// countLinesInSegment counts the number of lines in a file segment between startByte and endByte.
+// Returns the starting and ending line numbers (1-based).
+func (manager *TestManager) countLinesInSegment(filePath string, startByte, endByte int64) (int, int, error) {
+	// Ensure we have the full path to the log file
+	fullPath := filePath
+	if !filepath.IsAbs(fullPath) {
+		fullPath = filepath.Join(manager.config.LogDir, filePath)
+	}
+	slog.Debug("Opening log file", "path", fullPath)
+
+	// Open the log file
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return 1, 1, err
+	}
+	defer file.Close()
+
+	// Count lines up to the start position to get the starting line number
+	startLine := 1
+	if startByte > 0 {
+		buffer := make([]byte, startByte)
+		_, err = file.Read(buffer)
+		if err != nil && err != io.EOF {
+			return 1, 1, err
+		}
+
+		// Count newlines in the buffer
+		for _, b := range buffer {
+			if b == '\n' {
+				startLine++
+			}
+		}
+	}
+
+	// Now count lines in the segment to determine the ending line number
+	bufferSize := endByte - startByte
+	if bufferSize <= 0 {
+		return startLine, startLine, nil
+	}
+
+	// Seek to the start position
+	_, err = file.Seek(startByte, 0)
+	if err != nil {
+		return startLine, startLine, err
+	}
+
+	// Read the segment
+	buffer := make([]byte, bufferSize)
+	_, err = file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return startLine, startLine, err
+	}
+
+	// Count newlines in the segment
+	endLine := startLine
+	for _, b := range buffer {
+		if b == '\n' {
+			endLine++
+		}
+	}
+
+	// Adjust endLine to fix the off-by-1 issue (the actual line with content rather than the next line)
+	if endLine > startLine {
+		endLine--
+	}
+
+	slog.Debug("Counted lines in segment",
+		"file", filePath,
+		"startByte", startByte,
+		"endByte", endByte,
+		"startLine", startLine,
+		"endLine", endLine)
+
+	return startLine, endLine, nil
 }
 
 // writeSuiteFile writes the simulation result to the log directory.

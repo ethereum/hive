@@ -162,9 +162,11 @@ type TestResult struct {
 
 // ClientLogSegment represents a segment of a client log file
 type ClientLogSegment struct {
-	Start    int64  `json:"start"`    // Starting offset in log file
-	End      int64  `json:"end"`      // Ending offset in log file
-	ClientID string `json:"clientId"` // ID of the client
+	Start     int64  `json:"start"`     // Starting byte offset in log file
+	End       int64  `json:"end"`       // Ending byte offset in log file
+	StartLine int    `json:"startLine"` // Starting line number
+	EndLine   int    `json:"endLine"`   // Ending line number
+	ClientID  string `json:"clientId"`  // ID of the client
 }
 
 type TestLogOffsets struct {
@@ -181,10 +183,10 @@ type ClientInfo struct {
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
 
 	// Fields for shared client support
-	IsShared     bool  `json:"isShared"`     // Indicates if this client is shared across tests
-	LogPosition  int64 `json:"logPosition"`  // Current position in log file for shared clients
-	SuiteID      TestSuiteID `json:"suiteId,omitempty"` // Suite ID for shared clients
-	SharedClientID string    `json:"sharedClientId,omitempty"` // ID of the shared client (if this is a reference)
+	IsShared       bool        `json:"isShared"`                 // Indicates if this client is shared across tests
+	LogPosition    int64       `json:"logPosition"`              // Current position in log file for shared clients
+	SuiteID        TestSuiteID `json:"suiteId,omitempty"`        // Suite ID for shared clients
+	SharedClientID string      `json:"sharedClientId,omitempty"` // ID of the shared client (if this is a reference)
 
 	wait func()
 }
