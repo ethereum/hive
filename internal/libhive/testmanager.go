@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -548,8 +549,120 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.LogOffsets = offsets
 	}
 
+	// Auto-register shared clients with this test if they weren't already registered
+	// but only if the test name contains the client name (for backwards compatibility)
+	if testSuite.SharedClients != nil && (testCase.ClientInfo == nil || len(testCase.ClientInfo) == 0) {
+		// Initialize client info map if needed
+		if testCase.ClientInfo == nil {
+			testCase.ClientInfo = make(map[string]*ClientInfo)
+		}
+
+		// First, group shared clients by name to identify if there are multiple of the same type
+		clientsByName := make(map[string][]struct {
+			ID   string
+			Info *ClientInfo
+		})
+		for clientID, clientInfo := range testSuite.SharedClients {
+			clientsByName[clientInfo.Name] = append(clientsByName[clientInfo.Name],
+				struct {
+					ID   string
+					Info *ClientInfo
+				}{ID: clientID, Info: clientInfo})
+		}
+
+		// Now check if the test name contains a client name and there's exactly one of that type
+		for clientName, clientList := range clientsByName {
+			if strings.Contains(testCase.Name, clientName) && len(clientList) == 1 {
+				// Safe to auto-register as there's only one client of this type
+				clientID := clientList[0].ID
+				clientInfo := clientList[0].Info
+
+				slog.Debug("Auto-registering shared client with test",
+					"testID", testID,
+					"clientID", clientID,
+					"clientName", clientInfo.Name,
+					"testName", testCase.Name)
+
+				testCase.ClientInfo[clientID] = &ClientInfo{
+					ID:             clientInfo.ID,
+					IP:             clientInfo.IP,
+					Name:           clientInfo.Name,
+					InstantiatedAt: clientInfo.InstantiatedAt,
+					LogFile:        clientInfo.LogFile,
+					IsShared:       true,
+					SharedClientID: clientID,
+					LogPosition:    clientInfo.LogPosition,
+					SuiteID:        suiteID,
+				}
+			} else if strings.Contains(testCase.Name, clientName) && len(clientList) > 1 {
+				// When there are multiple clients of the same type, we can try to find the right one by creation time
+				// Newer tests generally use newer clients, so find the most recently created client
+				var mostRecentClient struct {
+					ID   string
+					Info *ClientInfo
+				}
+				var mostRecentTime time.Time
+
+				for _, client := range clientList {
+					if mostRecentTime.IsZero() || client.Info.InstantiatedAt.After(mostRecentTime) {
+						mostRecentTime = client.Info.InstantiatedAt
+						mostRecentClient = client
+					}
+				}
+
+				if !mostRecentTime.IsZero() {
+					clientID := mostRecentClient.ID
+					clientInfo := mostRecentClient.Info
+
+					slog.Debug("Auto-registering most recent shared client with test",
+						"testID", testID,
+						"clientID", clientID,
+						"clientName", clientInfo.Name,
+						"instantiatedAt", clientInfo.InstantiatedAt,
+						"testName", testCase.Name)
+
+					testCase.ClientInfo[clientID] = &ClientInfo{
+						ID:             clientInfo.ID,
+						IP:             clientInfo.IP,
+						Name:           clientInfo.Name,
+						InstantiatedAt: clientInfo.InstantiatedAt,
+						LogFile:        clientInfo.LogFile,
+						IsShared:       true,
+						SharedClientID: clientID,
+						LogPosition:    clientInfo.LogPosition,
+						SuiteID:        suiteID,
+					}
+				} else {
+					// Log a warning if we couldn't determine which client to use
+					slog.Debug("Skipping auto-registration - multiple clients of same type",
+						"testID", testID,
+						"clientName", clientName,
+						"count", len(clientList),
+						"testName", testCase.Name)
+				}
+			}
+		}
+	}
+
 	// Process client logs for shared clients
 	result.ClientLogs = make(map[string]*ClientLogSegment)
+
+	// Log the number of clients in the test case for debugging
+	if len(testCase.ClientInfo) > 0 {
+		slog.Debug("Processing client logs",
+			"testID", testID,
+			"clientCount", len(testCase.ClientInfo),
+			"clientTypes", fmt.Sprintf("%v", func() []string {
+				types := make([]string, 0, len(testCase.ClientInfo))
+				for _, ci := range testCase.ClientInfo {
+					types = append(types, ci.Name)
+				}
+				return types
+			}()))
+	} else {
+		slog.Debug("No clients registered with test", "testID", testID)
+	}
+
 	for nodeID, clientInfo := range testCase.ClientInfo {
 		if clientInfo.IsShared {
 			// Get current log position
@@ -624,7 +737,15 @@ func (manager *TestManager) getClientCurrentLogPosition(clientInfo *ClientInfo) 
 		return 0, fmt.Errorf("no log file for client %s", clientInfo.ID)
 	}
 
-	fileInfo, err := os.Stat(clientInfo.LogFile)
+	// Fix the log file path by converting it to an absolute path if it's not already
+	logFilePath := clientInfo.LogFile
+	if !filepath.IsAbs(logFilePath) {
+		logFilePath = filepath.Join(manager.config.LogDir, logFilePath)
+	}
+
+	slog.Debug("Getting client log position", "client", clientInfo.ID, "logFile", clientInfo.LogFile, "fullPath", logFilePath)
+
+	fileInfo, err := os.Stat(logFilePath)
 	if err != nil {
 		return 0, err
 	}
@@ -673,6 +794,16 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 	// Initialize log position to 0 for new clients
 	if nodeInfo.LogPosition == 0 && !nodeInfo.IsShared {
 		nodeInfo.LogPosition = 0
+	}
+
+	// If this is a shared client, log detailed information for debugging
+	if nodeInfo.IsShared {
+		slog.Debug("Registering shared client with test",
+			"testID", testID,
+			"nodeID", nodeID,
+			"clientName", nodeInfo.Name,
+			"logPosition", nodeInfo.LogPosition,
+			"logFile", nodeInfo.LogFile)
 	}
 
 	testCase.ClientInfo[nodeID] = nodeInfo
