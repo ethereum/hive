@@ -284,6 +284,33 @@ func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd 
 	return resp, err
 }
 
+// RegisterNode registers a client with a test. This is normally handled
+// automatically by StartClient, but can be used directly to register a reference
+// to a shared client.
+func (sim *Simulation) RegisterNode(testSuite SuiteID, test TestID, clientID string, nodeInfo *simapi.NodeInfo) error {
+	if sim.docs != nil {
+		return errors.New("RegisterNode is not supported in docs mode")
+	}
+
+	// We'll use the startClient endpoint with a special parameter to register a shared client
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
+		config = simapi.NodeConfig{
+			Client:        nodeInfo.Name,
+			SharedClientID: clientID,
+		}
+	)
+
+	// Set up a client setup object to post with files (even though we don't have any files)
+	setup := &clientSetup{
+		files: make(map[string]func() (io.ReadCloser, error)),
+		config: config,
+	}
+
+	var resp simapi.StartNodeResponse
+	return setup.postWithFiles(url, &resp)
+}
+
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	if sim.docs != nil {
