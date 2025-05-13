@@ -106,14 +106,14 @@ func filterClientDesignators(clients []ClientDesignator) []ClientDesignator {
 			DockerfileExt: client.DockerfileExt,
 			BuildArgs:     make(map[string]string),
 		}
-		
+
 		// Filter build args
 		for key, value := range client.BuildArgs {
 			if !excludedBuildArgs[key] {
 				filteredClient.BuildArgs[key] = value
 			}
 		}
-		
+
 		filtered[i] = filteredClient
 	}
 	return filtered
@@ -123,10 +123,10 @@ func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefiniti
 	if hiveInfo.Commit == "" && hiveInfo.Date == "" {
 		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
 	}
-	
+
 	// Filter sensitive build args from HiveInfo.ClientFile
 	hiveInfo.ClientFile = filterClientDesignators(hiveInfo.ClientFile)
-	
+
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,
@@ -398,29 +398,44 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
-	
+
 	// Create comprehensive run metadata
 	runMetadata := &RunMetadata{
 		HiveCommand: manager.hiveInfo.Command,
 		HiveVersion: GetHiveVersion(),
 	}
-	
+
 	// Add client configuration if available
 	if manager.hiveInfo.ClientFilePath != "" && len(manager.hiveInfo.ClientFile) > 0 {
 		// Convert existing ClientFile data to consistent format for storage
 		clientConfigContent := map[string]interface{}{
 			"clients": manager.hiveInfo.ClientFile,
 		}
-		
+
 		runMetadata.ClientConfig = &ClientConfigInfo{
 			FilePath: manager.hiveInfo.ClientFilePath,
 			Content:  clientConfigContent,
 		}
 	}
-	
+
 	// Attach metadata to suite
 	suite.RunMetadata = runMetadata
-	
+
+	// Clean up any shared clients for this suite.
+	if suite.SharedClients != nil {
+		for nodeID, clientInfo := range suite.SharedClients {
+			// Stop the container if it's still running.
+			if clientInfo.wait != nil {
+				slog.Info("cleaning up shared client", "suite", testSuite, "client", clientInfo.Name, "container", nodeID[:8])
+				if err := manager.backend.DeleteContainer(clientInfo.ID); err != nil {
+					slog.Error("could not stop shared client", "suite", testSuite, "container", nodeID[:8], "err", err)
+				}
+				clientInfo.wait()
+				clientInfo.wait = nil
+			}
+		}
+	}
+
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -565,7 +580,7 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 					if err == nil {
 						defer targetFile.Close()
 						sourceFile.Seek(clientInfo.LogPosition, 0)
-						io.CopyN(targetFile, sourceFile, currentPosition - clientInfo.LogPosition)
+						io.CopyN(targetFile, sourceFile, currentPosition-clientInfo.LogPosition)
 						relativePath := filepath.Join("shared_clients",
 							fmt.Sprintf("%d-%s-test%d.log", time.Now().Unix(), nodeID, testID))
 						testCase.ClientInfo[nodeID].LogFile = relativePath
@@ -790,15 +805,14 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 // writeSuiteFile writes the simulation result to the log directory.
 // List of build arguments to exclude from result JSON for security/privacy
 var excludedBuildArgs = map[string]bool{
-	"GOPROXY":    true,  // Go proxy URLs may contain sensitive info
-	"GITHUB_TOKEN": true,  // GitHub tokens
-	"ACCESS_TOKEN": true,  // Generic access tokens
-	"API_KEY":      true,  // API keys
-	"PASSWORD":     true,  // Passwords
-	"SECRET":       true,  // Generic secrets
-	"TOKEN":        true,  // Generic tokens
+	"GOPROXY":      true, // Go proxy URLs may contain sensitive info
+	"GITHUB_TOKEN": true, // GitHub tokens
+	"ACCESS_TOKEN": true, // Generic access tokens
+	"API_KEY":      true, // API keys
+	"PASSWORD":     true, // Passwords
+	"SECRET":       true, // Generic secrets
+	"TOKEN":        true, // Generic tokens
 }
-
 
 func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteData, err := json.Marshal(s)
