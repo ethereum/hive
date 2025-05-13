@@ -364,6 +364,22 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
+	
+	// Clean up any shared clients for this suite.
+	if suite.SharedClients != nil {
+		for nodeID, clientInfo := range suite.SharedClients {
+			// Stop the container if it's still running.
+			if clientInfo.wait != nil {
+				slog.Info("cleaning up shared client", "suite", testSuite, "client", clientInfo.Name, "container", nodeID[:8])
+				if err := manager.backend.DeleteContainer(clientInfo.ID); err != nil {
+					slog.Error("could not stop shared client", "suite", testSuite, "container", nodeID[:8], "err", err)
+				}
+				clientInfo.wait()
+				clientInfo.wait = nil
+			}
+		}
+	}
+	
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
