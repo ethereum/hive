@@ -207,6 +207,110 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 	return resp.ID, ip, nil
 }
 
+// StartSharedClient starts a new node as a shared client at the suite level.
+// The client persists for the duration of the suite and can be used by multiple tests.
+// Returns container id and ip.
+func (sim *Simulation) StartSharedClient(testSuite SuiteID, clientType string, options ...StartOption) (string, net.IP, error) {
+	if sim.docs != nil {
+		return "", nil, errors.New("StartSharedClient is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/shared-client", sim.url, testSuite)
+		resp simapi.StartNodeResponse
+	)
+
+	setup := &clientSetup{
+		files: make(map[string]func() (io.ReadCloser, error)),
+		config: simapi.NodeConfig{
+			Client:      clientType,
+			Environment: make(map[string]string),
+			IsShared:    true, // Mark this client as shared
+		},
+	}
+	for _, opt := range options {
+		opt.apply(setup)
+	}
+
+	err := setup.postWithFiles(url, &resp)
+	if err != nil {
+		return "", nil, err
+	}
+	ip := net.ParseIP(resp.IP)
+	if ip == nil {
+		return resp.ID, nil, fmt.Errorf("no IP address returned")
+	}
+	return resp.ID, ip, nil
+}
+
+// GetSharedClientInfo retrieves information about a shared client,
+// including its ID, type, IP and log file location.
+func (sim *Simulation) GetSharedClientInfo(testSuite SuiteID, clientID string) (*SharedClientInfo, error) {
+	if sim.docs != nil {
+		return nil, errors.New("GetSharedClientInfo is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s", sim.url, testSuite, clientID)
+		resp SharedClientInfo
+	)
+	err := get(url, &resp)
+	return &resp, err
+}
+
+// GetClientLogOffset gets the current offset position in a shared client's log file.
+// This is used for tracking log segments in shared clients across multiple tests.
+func (sim *Simulation) GetClientLogOffset(testSuite SuiteID, clientID string) (int64, error) {
+	if sim.docs != nil {
+		return 0, errors.New("GetClientLogOffset is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s/log-offset", sim.url, testSuite, clientID)
+		resp int64
+	)
+	err := get(url, &resp)
+	return resp, err
+}
+
+// ExecSharedClient runs a command in a shared client container.
+func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd []string) (*ExecInfo, error) {
+	if sim.docs != nil {
+		return nil, errors.New("ExecSharedClient is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s/exec", sim.url, testSuite, clientID)
+		req  = &simapi.ExecRequest{Command: cmd}
+		resp *ExecInfo
+	)
+	err := post(url, req, &resp)
+	return resp, err
+}
+
+// RegisterNode registers a client with a test. This is normally handled
+// automatically by StartClient, but can be used directly to register a reference
+// to a shared client.
+func (sim *Simulation) RegisterNode(testSuite SuiteID, test TestID, clientID string, nodeInfo *simapi.NodeInfo) error {
+	if sim.docs != nil {
+		return errors.New("RegisterNode is not supported in docs mode")
+	}
+
+	// We'll use the startClient endpoint with a special parameter to register a shared client
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
+		config = simapi.NodeConfig{
+			Client:        nodeInfo.Name,
+			SharedClientID: clientID,
+		}
+	)
+
+	// Set up a client setup object to post with files (even though we don't have any files)
+	setup := &clientSetup{
+		files: make(map[string]func() (io.ReadCloser, error)),
+		config: config,
+	}
+
+	var resp simapi.StartNodeResponse
+	return setup.postWithFiles(url, &resp)
+}
+
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	if sim.docs != nil {
