@@ -6,6 +6,7 @@ use crate::suites::state::constants::{
     TRIN_BRIDGE_CLIENT_TYPE,
 };
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::types::portal::GetContentInfo;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::StateNetworkApiClient;
 use hivesim::types::ClientDefinition;
@@ -18,7 +19,7 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
-        let environment_flag = PortalNetwork::as_environment_flag([PortalNetwork::State, PortalNetwork::History]);
+        let environment_flag = PortalNetwork::as_environment_flag([PortalNetwork::Beacon, PortalNetwork::History, PortalNetwork::State]);
         let environments = Some(vec![Some(HashMap::from([environment_flag]))]);
 
         // Test single type of client
@@ -190,6 +191,18 @@ dyn_async! {
                     clients: vec![client.clone()],
                 }
             ).await;
+
+            test.run(
+                NClientTestSpec {
+                    name: "portal_stateGetContent Content Present Locally".to_string(),
+                    description: "".to_string(),
+                    always_run: false,
+                    run: test_get_content_content_present_locally,
+                    environments: environments.clone(),
+                    test_data: (),
+                    clients: vec![client.clone()],
+                }
+            ).await;
         }
     }
 }
@@ -248,7 +261,7 @@ dyn_async! {
 
 
         if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_offer_value).await {
-            panic!("{}", &err.to_string());
+            panic!("Failed to store data: {err:?}");
         }
 
         // Here we are calling local_content RPC to test if the content is present
@@ -355,10 +368,7 @@ dyn_async! {
         };
         let (_, enr) = generate_random_remote_enr();
         match StateNetworkApiClient::delete_enr(&client.rpc, enr.node_id()).await {
-            Ok(response) => match response {
-                true => panic!("DeleteEnr expected to get false and instead got true"),
-                false => ()
-            },
+            Ok(response) => if response { panic!("DeleteEnr expected to get false and instead got true") },
             Err(err) => panic!("{}", &err.to_string()),
         };
     }
@@ -485,6 +495,35 @@ dyn_async! {
 
         if let Ok(content) = StateNetworkApiClient::get_content(&client.rpc, account_trie_node_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
+        }
+    }
+}
+
+dyn_async! {
+    // test that a node will return a PresentContent via GetContent when the data is stored locally
+    async fn test_get_content_content_present_locally<'a>(clients: Vec<Client>, _: ()) {
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
+            None => {
+                panic!("Unable to get expected amount of clients from NClientTestSpec");
+            }
+        };
+
+        let content_key = ACCOUNT_TRIE_NODE_KEY.clone();
+        let raw_content_offer_value = RAW_CONTENT_OFFER_VALUE.clone();
+        let raw_content_lookup_value = RAW_CONTENT_LOOKUP_VALUE.clone();
+
+        // seed content_key/content_value onto the local node to test get_content expect content present
+        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_offer_value).await {
+            panic!("Failed to store data: {err:?}");
+        }
+
+        match StateNetworkApiClient::get_content(&client.rpc, content_key).await {
+            Ok(GetContentInfo { content, utp_transfer }) => {
+                assert!(!utp_transfer, "Error: Expected utp_transfer to be false");
+                assert_eq!(content, raw_content_lookup_value, "Error receiving content");
+            }
+            Err(err) => panic!("Expected GetContent to not throw an error {err:?}"),
         }
     }
 }

@@ -8,18 +8,6 @@ export RUST_LOG_STYLE=never
 
 ethrex=./ethrex
 
-# Create the data directory.
-# DATADIR="/ethrex-hive-datadir"
-# mkdir $DATADIR
-# FLAGS="$FLAGS --datadir $DATADIR"
-
-# TODO If a specific network ID is requested, use that
-#if [ "$HIVE_NETWORK_ID" != "" ]; then
-#    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
-#else
-#    FLAGS="$FLAGS --networkid 1337"
-#fi
-
 # Configure the chain.
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
@@ -95,18 +83,17 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Configure RPC.
-# FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
-# FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
 FLAGS="$FLAGS --http.addr=0.0.0.0  --authrpc.addr=0.0.0.0"
 
+# We don't support pre merge
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
     echo -n $JWT_SECRET > /jwt.secret
     FLAGS="$FLAGS  --authrpc.jwtsecret=/jwt.secret"
+else
+    # We dont exit because some tests require this
+    echo "Warning: HIVE_TERMINAL_TOTAL_DIFFICULTY not supported."
 fi
-
-# Configure NAT
-# FLAGS="$FLAGS --nat none"
 
 FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
 

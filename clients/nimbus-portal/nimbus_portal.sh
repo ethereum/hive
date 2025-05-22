@@ -33,5 +33,5 @@ if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
     FLAGS="$FLAGS --netkey-unsafe=0x$HIVE_CLIENT_PRIVATE_KEY"
 fi
 
-fluffy --log-level=INFO --rpc --rpc-address="0.0.0.0" --rpc-api="eth,portal,discovery" --nat:extip:"$IP_ADDR" --log-level="debug" \
+nimbus_portal_client --rpc --rpc-address="0.0.0.0" --rpc-api="eth,portal,discovery" --nat:extip:"$IP_ADDR" --log-level="debug" \
 	--disable-state-root-validation $FLAGS

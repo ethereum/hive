@@ -5,18 +5,22 @@ use crate::suites::environment::PortalNetwork;
 use crate::suites::state::constants::{
     ACCOUNT_TRIE_NODE_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
 };
+use crate::suites::utils::{CANCUN_BLOCK_NUMBER, MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER};
+use alloy_consensus::Header;
 use alloy_primitives::Bytes;
 use alloy_rlp::Decodable;
 use anyhow::Result;
 use ethportal_api::jsonrpsee::http_client::HttpClient;
+use ethportal_api::types::accept_code::{AcceptCode, AcceptCodeList};
 use ethportal_api::types::execution::header_with_proof::{
-    BlockHeaderProof, HeaderWithProof, SszNone,
+    BlockHeaderProof, BlockProofHistoricalRoots, BlockProofHistoricalSummariesCapella,
+    BlockProofHistoricalSummariesDeneb, HeaderWithProof,
 };
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
-    ContentValue, Discv5ApiClient, Header, HistoryContentKey, HistoryContentValue, StateContentKey,
+    ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, StateContentKey,
     StateContentValue, StateNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
@@ -34,16 +38,38 @@ struct TestData {
 }
 
 async fn store_header(header: Header, client: &HttpClient) -> bool {
-    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash());
-    let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
-        header,
-        proof: BlockHeaderProof::None(SszNone::default()),
-    });
+    let content_key = HistoryContentKey::new_block_header_by_hash(header.hash_slow());
+    let proof = if header.number <= MERGE_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalHashes(Default::default())
+    } else if header.number <= SHANGHAI_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalRoots(BlockProofHistoricalRoots {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
+    } else if header.number <= CANCUN_BLOCK_NUMBER {
+        BlockHeaderProof::HistoricalSummariesCapella(BlockProofHistoricalSummariesCapella {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
+    } else {
+        BlockHeaderProof::HistoricalSummariesDeneb(BlockProofHistoricalSummariesDeneb {
+            beacon_block_proof: Default::default(),
+            beacon_block_root: Default::default(),
+            execution_block_proof: Default::default(),
+            slot: Default::default(),
+        })
+    };
+    let content_value =
+        HistoryContentValue::BlockHeaderWithProof(HeaderWithProof { header, proof });
     match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value.encode())
         .await
     {
         Ok(stored) => stored,
-        Err(err) => panic!("{}", &err.to_string()),
+        Err(err) => panic!("Failed to store block header: {}", &err.to_string()),
     }
 }
 
@@ -134,7 +160,7 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
-        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::State, PortalNetwork::History])]));
+        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::Beacon, PortalNetwork::History, PortalNetwork::State])]));
         let environments = Some(vec![environment.clone(), environment]);
 
         let content = parse_test_values().expect("unable to parse test values");
@@ -268,7 +294,7 @@ dyn_async! {
             header,
             key: target_key,
             offer_value: target_offer_value,
-            lookup_value: target_lookup_value
+            lookup_value: target_lookup_value,
         } = test_data;
 
         let target_enr = match client_b.rpc.node_info().await {
@@ -278,7 +304,21 @@ dyn_async! {
 
         store_header(header, &client_b.rpc).await;
 
-        let _ = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_offer_value.encode())]).await;
+        let accept_info = client_a
+            .rpc
+            .offer(
+                target_enr,
+                vec![(target_key.clone(), target_offer_value.encode())],
+            )
+            .await
+            .expect("Failed to send offer");
+        let mut expected_accept_code_list =
+            AcceptCodeList::new(1).expect("We are making a valid accept code list");
+        expected_accept_code_list.set(0, AcceptCode::Accepted);
+        assert_eq!(
+            accept_info.0, expected_accept_code_list,
+            "AcceptCodeList didn't match expected value",
+        );
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
@@ -304,7 +344,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let pong = client_a.rpc.ping(target_enr).await;
+        let pong = StateNetworkApiClient::ping(&client_a.rpc, target_enr, None, None).await;
 
         if let Err(err) = pong {
                 panic!("Unable to receive pong info: {err:?}");
@@ -502,16 +542,12 @@ dyn_async! {
         let mut result = vec![];
         for TestData { key: content_key, lookup_value: content_lookup_value, .. } in test_data {
             let content_details = {
-                    let content_type = match &content_key {
-                        StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
-                        StateContentKey::ContractStorageTrieNode(_) => "contract storage trie node".to_string(),
-                        StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
-                    };
-                    format!(
-                        "{:?} {}",
-                        content_key,
-                        content_type
-                    )
+                let content_type = match &content_key {
+                    StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
+                    StateContentKey::ContractStorageTrieNode(_) => "contract storage trie node".to_string(),
+                    StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
+                };
+                format!("{content_key:?} {content_type}")
             };
 
             match client_b.rpc.local_content(content_key.clone()).await {
@@ -525,7 +561,7 @@ dyn_async! {
         }
 
         if !result.is_empty() {
-            panic!("Client B: {:?}", result);
+            panic!("Client B: {result:?}");
         }
     }
 }

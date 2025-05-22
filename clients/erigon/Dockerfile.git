@@ -1,7 +1,7 @@
 ### Build Erigon From Git:
 
 ## Builder stage: Compiles erigon from a git repository
-FROM golang:1.22-alpine as builder
+FROM golang:1.24.1-alpine as builder
 
 ARG github=erigontech/erigon
 ARG tag=main

@@ -1,7 +1,7 @@
-### Build Fluffy From Git:
-## Pulls fluffy from a git repository and builds it from source.
+### Build Nimbus Portal client From Git:
+## Pulls Nimbus Portal client from a git repository and builds it from source.
 
-## Builder stage: Compiles fluffy from a git repository
+## Builder stage: Compiles nimbus_portal_client from a git repository
 FROM debian:buster-slim AS builder
 
 ARG github=status-im/nimbus-eth1
@@ -21,20 +21,20 @@ RUN echo "Cloning: $github - $tag" \
     && make -j${NPROC} NIMFLAGS="${NIMFLAGS_COMMON} --parallelBuild:${NPROC}" V=1 update
 
 RUN cd nimbus-eth1 && \
-    make -j${NPROC} NIMFLAGS="${NIMFLAGS_COMMON} --parallelBuild:${NPROC}" fluffy && \
-    mv build/fluffy /usr/bin/
+    make -j${NPROC} NIMFLAGS="${NIMFLAGS_COMMON} --parallelBuild:${NPROC}" nimbus_portal_client && \
+    mv build/nimbus_portal_client /usr/bin/
 
-## Final stage: Sets up the environment for running fluffy
+## Final stage: Sets up the environment for running nimbus_portal_client
 FROM debian:buster-slim
 RUN apt-get update && apt-get install -y bash curl jq \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled binary from builder
-COPY --from=builder /usr/bin/fluffy /usr/bin/fluffy
+COPY --from=build /usr/bin/nimbus_portal_client /usr/bin/nimbus_portal_client
 
 # Inject the startup script.
-ADD fluffy.sh /fluffy.sh
-RUN chmod +x /fluffy.sh
+ADD nimbus_portal.sh /nimbus_portal.sh
+RUN chmod +x /nimbus_portal.sh
 
 # Create version.txt
 RUN echo "latest" > /version.txt
@@ -42,4 +42,4 @@ RUN echo "latest" > /version.txt
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 9009/udp
 
-ENTRYPOINT ["/fluffy.sh"]
+ENTRYPOINT ["/nimbus_portal.sh"]

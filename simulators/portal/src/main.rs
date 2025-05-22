@@ -10,7 +10,7 @@ use crate::suites::beacon::{
 };
 use crate::suites::history::{
     interop::test_portal_history_interop, mesh::test_portal_history_mesh,
-    rpc_compat::run_rpc_compat_history_test_suite, trin_bridge::test_portal_bridge,
+    rpc_compat::run_rpc_compat_history_test_suite,
 };
 use crate::suites::state::{
     interop::test_portal_state_interop, rpc_compat::run_rpc_compat_state_test_suite,
@@ -65,20 +65,6 @@ async fn main() {
         description: "This test launches the client and collects its logs.".to_string(),
         always_run: false,
         run: test_portal_history_mesh,
-        client: None,
-    });
-
-    let mut history_trin_bridge = Suite {
-        name: "history-trin-bridge".to_string(),
-        description: "The portal bridge test suite".to_string(),
-        tests: vec![],
-    };
-
-    history_trin_bridge.add(TestSpec {
-        name: "client launch".to_string(),
-        description: "This test launches the client and collects its logs.".to_string(),
-        always_run: false,
-        run: test_portal_bridge,
         client: None,
     });
 
@@ -188,7 +174,6 @@ async fn main() {
             history_rpc_compat,
             history_interop,
             history_mesh,
-            history_trin_bridge,
             state_rpc_compat,
             state_interop,
             beacon_rpc_compat,

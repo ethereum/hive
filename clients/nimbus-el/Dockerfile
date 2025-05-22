@@ -1,46 +1,21 @@
-# Docker container spec for building the master branch of nimbus.
+ARG tag=master
+ARG baseimage=statusim/nimbus-eth1
 
-FROM debian:testing-slim AS build
+FROM $baseimage:$tag AS source
+
+FROM debian:testing-slim AS deploy
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get clean && apt update \
- && apt -y install curl build-essential git-lfs librocksdb-dev
+RUN apt-get clean \
+    && apt-get update \
+    && apt-get install -y build-essential librocksdb-dev jq curl \
+    && apt -y upgrade
 
 RUN ldd --version
 
-# TODO: This should work like other EL clients and use
-# a docker image from the registry. The git build approach is
-# used in Dockerfile.git
-#
-#  ARG baseimage=ethpandaops/nimbus-eth1
-#  ARG tag=master
-#  FROM $baseimage:$tag
+COPY --from=source /home/user/nimbus-eth1/build/nimbus_execution_client /usr/bin/nimbus_execution_client
 
-ARG tag=master
-ARG github=status-im/nimbus-eth1
-
-RUN git clone --branch "$tag" https://github.com/$github
-
-WORKDIR /nimbus-eth1
-
-RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
-
-RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:chronicles_colors=none" nimbus_execution_client && \
-    mv build/nimbus_execution_client /usr/bin/
-
-# --------------------------------- #
-# Starting new image to reduce size #
-# --------------------------------- #
-FROM debian:testing-slim AS deploy
-
-RUN apt-get clean && apt update \
- && apt -y install build-essential librocksdb-dev jq curl
-RUN apt update && apt -y upgrade
-
-RUN ldd --version
-
-COPY --from=build /usr/bin/nimbus_execution_client /usr/bin/nimbus_execution_client
 RUN usr/bin/nimbus_execution_client --version > /version.txt
 
 # Add genesis mapper script.

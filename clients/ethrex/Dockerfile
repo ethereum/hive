@@ -1,4 +1,4 @@
-ARG baseimage=ethrex
+ARG baseimage=ghcr.io/lambdaclass/ethrex
 ARG tag=latest
 
 FROM $baseimage:$tag as builder
@@ -20,8 +20,7 @@ ADD enode.sh /hive-bin/enode.sh
 RUN chmod +x /hive-bin/enode.sh
 
 # Create version.txt
-# RUN /usr/local/bin/ethrex --version | sed -e 's/ethrex \(.*\)/\1/' > /version.txt
-RUN echo "ethrex/0.1.0" > /version.txt
+RUN ethrex --version | sed -e 's/ethrex \(.*\)/\1/' > /version.txt
 
 # Export the usual networking ports to allow outside access to the node.
 EXPOSE 8545 8546 30303 30303/udp

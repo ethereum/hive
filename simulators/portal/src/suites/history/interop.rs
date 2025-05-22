@@ -1,17 +1,24 @@
+use std::collections::HashMap;
+
+use ethportal_api::types::accept_code::{AcceptCode, AcceptCodeList};
 use ethportal_api::types::portal::{FindContentInfo, GetContentInfo, PutContentInfo};
 use ethportal_api::types::portal_wire::MAX_PORTAL_CONTENT_PAYLOAD_SIZE;
 use ethportal_api::{
-    ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
+    BeaconNetworkApiClient, ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue,
+    HistoryNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use tokio::time::Duration;
 
+use crate::suites::environment::PortalNetwork;
 use crate::suites::history::constants::{
-    get_test_data, HEADER_WITH_PROOF_KEY, TRIN_BRIDGE_CLIENT_TYPE,
+    get_success_test_data, HEADER_WITH_PROOF_KEY, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::utils::get_flair;
+
+use super::constants::LATEST_HISTORICAL_SUMMARIES;
 
 type TestData = Vec<(HistoryContentKey, HistoryContentValue)>;
 
@@ -55,6 +62,12 @@ fn process_content(
                         header_with_proof.header.number,
                         vec![history_content, last_header.clone()],
                     ),
+                    HistoryContentKey::EphemeralHeadersFindContent(_) => {
+                        todo!("Add test for EphemeralHeadersFindContent")
+                    }
+                    HistoryContentKey::EphemeralHeaderOffer(_) => {
+                        todo!("Add tests for EphemeralHeaderOffer")
+                    }
                 }
             } else {
                 unreachable!("History test dated is formatted incorrectly")
@@ -82,7 +95,10 @@ dyn_async! {
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
-        let content = get_test_data().expect("Unable to get test data");
+        let content = get_success_test_data().expect("Unable to get test data");
+
+        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::Beacon, PortalNetwork::History])]));
+        let environments = Some(vec![environment.clone(), environment]);
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
         for (client_a, client_b) in clients.iter().cartesian_product(clients.iter()) {
@@ -93,7 +109,7 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_offer,
-                        environments: None,
+                        environments: environments.clone(),
                         test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -105,7 +121,7 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_get_content,
-                        environments: None,
+                        environments: environments.clone(),
                         test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -117,7 +133,7 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_find_content,
-                        environments: None,
+                        environments: environments.clone(),
                         test_data,
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -130,7 +146,7 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_ping,
-                    environments: None,
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -142,7 +158,7 @@ dyn_async! {
                     description: "find content: calls find content that doesn't exist".to_string(),
                     always_run: false,
                     run: test_find_content_non_present,
-                    environments: None,
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -154,7 +170,7 @@ dyn_async! {
                     description: "find nodes: distance zero expect called nodes enr".to_string(),
                     always_run: false,
                     run: test_find_nodes_zero_distance,
-                    environments: None,
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -167,7 +183,7 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_put_content_two_nodes,
-                    environments: None,
+                    environments: environments.clone(),
                     test_data: content.clone(),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -179,10 +195,8 @@ dyn_async! {
 dyn_async! {
     // test that a node will not return content via FINDCONTENT.
     async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: ()) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         let header_with_proof_key = HEADER_WITH_PROOF_KEY.clone();
 
         let target_enr = match client_b.rpc.node_info().await {
@@ -190,7 +204,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let result = client_a.rpc.find_content(target_enr, header_with_proof_key.clone()).await;
+        let result = HistoryNetworkApiClient::find_content(&client_a.rpc, target_enr, header_with_proof_key.clone()).await;
 
         match result {
             Ok(FindContentInfo::Enrs { enrs }) => if !enrs.is_empty() {
@@ -204,12 +218,10 @@ dyn_async! {
 
 dyn_async! {
     async fn test_offer<'a>(clients: Vec<Client>, test_data: TestData) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value.encode()).await {
+            match   HistoryNetworkApiClient::store(&client_b.rpc, optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for get content");
                 },
@@ -223,11 +235,18 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let _ = client_a.rpc.offer(target_enr, vec![(target_key.clone(), target_value.encode())]).await;
+        let accept_info =  HistoryNetworkApiClient::offer(&client_a.rpc, target_enr, vec![(target_key.clone(), target_value.encode())]).await.expect("Failed to send offer");
+        let mut expected_accept_code_list = AcceptCodeList::new(1).expect("We are making a valid accept code list");
+        expected_accept_code_list.set(0, AcceptCode::Accepted);
+        assert_eq!(
+            accept_info.0,
+            expected_accept_code_list,
+            "AcceptCodeList didn't match expected value",
+        );
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
-        match client_b.rpc.local_content(target_key).await {
+        match  HistoryNetworkApiClient::local_content(&client_b.rpc, target_key).await {
             Ok(possible_content) => {
                 if possible_content != target_value.encode() {
                     panic!("Error receiving content: Expected content: {target_value:?}, Received content: {possible_content:?}");
@@ -240,16 +259,14 @@ dyn_async! {
 
 dyn_async! {
     async fn test_ping<'a>(clients: Vec<Client>, _: ()) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        let pong = client_a.rpc.ping(target_enr).await;
+        let pong = HistoryNetworkApiClient::ping(&client_a.rpc, target_enr, None, None).await;
 
         if let Err(err) = pong {
             panic!("Unable to receive pong info: {err:?}");
@@ -275,16 +292,14 @@ dyn_async! {
 
 dyn_async! {
     async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: ()) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        match client_a.rpc.find_nodes(target_enr.clone(), vec![0]).await {
+        match  HistoryNetworkApiClient::find_nodes(&client_a.rpc, target_enr.clone(), vec![0]).await {
             Ok(response) => {
                 if response.len() != 1 {
                     panic!("Response from FindNodes didn't return expected length of 1");
@@ -305,12 +320,10 @@ dyn_async! {
 dyn_async! {
     // test that a node will return a content via GETCONTENT template that it has stored locally
     async fn test_get_content<'a>(clients: Vec<Client>, test_data: TestData) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value.encode()).await {
+            match  HistoryNetworkApiClient::store(&client_b.rpc, optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for get content");
                 },
@@ -319,7 +332,7 @@ dyn_async! {
         }
 
         let (target_key, target_value) = test_data.first().cloned().expect("Target content is required for this test");
-        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
+        match  HistoryNetworkApiClient::store(&client_b.rpc, target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for get content");
             },
@@ -339,7 +352,7 @@ dyn_async! {
             Err(err) => panic!("{}", &err.to_string()),
         }
 
-        match client_a.rpc.get_content(target_key.clone()).await {
+        match  HistoryNetworkApiClient::get_content(&client_a.rpc, target_key.clone()).await {
             Ok(GetContentInfo { content, utp_transfer }) => {
                 if content != target_value.encode() {
                     panic!("Error: Unexpected GETCONTENT response: didn't return expected target content");
@@ -361,12 +374,10 @@ dyn_async! {
 dyn_async! {
     // test that a node will return a x content via FINDCONTENT that it has stored locally
     async fn test_find_content<'a> (clients: Vec<Client>, test_data: TestData) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         if let Some((optional_key, optional_value)) = test_data.get(1).cloned() {
-            match client_b.rpc.store(optional_key, optional_value.encode()).await {
+            match  HistoryNetworkApiClient::store(&client_b.rpc, optional_key, optional_value.encode()).await {
                 Ok(result) => if !result {
                     panic!("Unable to store optional content for find content");
                 },
@@ -375,7 +386,7 @@ dyn_async! {
         }
 
         let (target_key, target_value) = test_data.first().cloned().expect("Target content is required for this test");
-        match client_b.rpc.store(target_key.clone(), target_value.encode()).await {
+        match  HistoryNetworkApiClient::store(&client_b.rpc, target_key.clone(), target_value.encode()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
@@ -387,7 +398,7 @@ dyn_async! {
             Err(err) => panic!("Error getting node info: {err:?}"),
         };
 
-        match client_a.rpc.find_content(target_enr, target_key.clone()).await {
+        match  HistoryNetworkApiClient::find_content(&client_a.rpc, target_enr, target_key.clone()).await {
             Ok(FindContentInfo::Content { content, utp_transfer }) => {
                 if content != target_value.encode() {
                     panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
@@ -409,10 +420,8 @@ dyn_async! {
 
 dyn_async! {
     async fn test_put_content_two_nodes<'a> (clients: Vec<Client>, test_data: TestData) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
-        };
+        let (client_a, client_b) = initialize_clients(clients).await;
+
         // connect clients
         let client_b_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
@@ -428,7 +437,7 @@ dyn_async! {
 
         // With default node settings nodes should be storing all content
         for (content_key, content_value) in test_data.clone() {
-            match client_a.rpc.put_content(content_key.clone(), content_value.encode()).await {
+            match  HistoryNetworkApiClient::put_content(&client_a.rpc, content_key.clone(), content_value.encode()).await {
                 Ok(PutContentInfo { peer_count, .. }) => {
                    if peer_count != 1 {
                         panic!("We expected to gossip to 1 node instead we gossiped to: {peer_count}");
@@ -460,6 +469,8 @@ dyn_async! {
                         HistoryContentKey::BlockHeaderByNumber(_) => "header by number".to_string(),
                         HistoryContentKey::BlockBody(_) => "body".to_string(),
                         HistoryContentKey::BlockReceipts(_) => "receipt".to_string(),
+                        HistoryContentKey::EphemeralHeadersFindContent(_) => "ephemeral headers find_content".to_string(),
+                        HistoryContentKey::EphemeralHeaderOffer(_) => "ephemeral header offer".to_string(),
                     };
                     format!(
                         "{} {}",
@@ -470,7 +481,7 @@ dyn_async! {
                     unreachable!("History test data is formatted incorrectly. Header wasn't in front of data. Please refer to test data file for more information")
                 };
 
-            match client_b.rpc.local_content(content_key.clone()).await {
+            match  HistoryNetworkApiClient::local_content(&client_b.rpc, content_key.clone()).await {
                 Ok(expected_value) => if expected_value != content_value.encode() {
                     result.push(format!("Error content received for block {content_details} was different then expected"));
                 }
@@ -479,7 +490,44 @@ dyn_async! {
         }
 
         if !result.is_empty() {
-            panic!("Client B: {:?}", result);
+            panic!("Client B: {result:?}");
         }
+    }
+}
+
+/// Initialize clients for the test
+///
+/// It will insert HistoricalSummariesWithProof content into the clients
+///
+/// Panics if the clients are not of length 2, or if HistoricalSummaries can't be seeded
+async fn initialize_clients(clients: Vec<Client>) -> (Client, Client) {
+    let (content_key, content_value) = LATEST_HISTORICAL_SUMMARIES.as_ref().clone();
+
+    for client in clients.iter() {
+        match BeaconNetworkApiClient::store(
+            &client.rpc,
+            content_key.clone(),
+            content_value.encode(),
+        )
+        .await
+        {
+            Ok(result) => {
+                if !result {
+                    panic!(
+                        "Unable to HistoricalSummaries for client_type {}",
+                        client.kind
+                    );
+                }
+            }
+            Err(err) => panic!(
+                "Error storing HistoricalSummaries for client_type {}: {err:?}",
+                client.kind
+            ),
+        }
+    }
+
+    match clients.into_iter().collect_tuple() {
+        Some((client_a, client_b)) => (client_a, client_b),
+        None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
     }
 }
