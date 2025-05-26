@@ -164,7 +164,8 @@ def clique_engine:
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
 
     # Osaka
-    "eip7692TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7823TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7883TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
 
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
