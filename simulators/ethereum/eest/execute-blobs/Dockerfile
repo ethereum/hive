@@ -21,4 +21,4 @@ WORKDIR /execution-spec-tests
 RUN uv sync
 
 ## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT uv run execute hive --fork=$FORK -v -m get_blobs
+ENTRYPOINT uv run execute hive --fork=$FORK -v -m blob_transaction_test
