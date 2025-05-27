@@ -1,6 +1,7 @@
 # This is the image we build on a push to main
 # We do have a problem, if we're testing locally it doesn't show changes
 # Removing this from here now, but the upstream version should use the ghcr.io version
+# For now, users needs to build locally ethrex
 # ARG baseimage=ghcr.io/lambdaclass/ethrex 
 ARG baseimage=ethrex # We don
 
