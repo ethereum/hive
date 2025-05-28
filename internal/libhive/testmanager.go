@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -363,6 +365,22 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
+
+	// Clean up any shared clients for this suite.
+	if suite.SharedClients != nil {
+		for nodeID, clientInfo := range suite.SharedClients {
+			// Stop the container if it's still running.
+			if clientInfo.wait != nil {
+				slog.Info("cleaning up shared client", "suite", testSuite, "client", clientInfo.Name, "container", nodeID[:8])
+				if err := manager.backend.DeleteContainer(clientInfo.ID); err != nil {
+					slog.Error("could not stop shared client", "suite", testSuite, "container", nodeID[:8], "err", err)
+				}
+				clientInfo.wait()
+				clientInfo.wait = nil
+			}
+		}
+	}
+
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -474,11 +492,189 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.Details = ""
 		result.LogOffsets = offsets
 	}
+
+	// Auto-register shared clients with this test if they weren't already registered
+	// but only if the test name contains the client name (for backwards compatibility)
+	if testSuite.SharedClients != nil && (testCase.ClientInfo == nil || len(testCase.ClientInfo) == 0) {
+		// Initialize client info map if needed
+		if testCase.ClientInfo == nil {
+			testCase.ClientInfo = make(map[string]*ClientInfo)
+		}
+
+		// First, group shared clients by name to identify if there are multiple of the same type
+		clientsByName := make(map[string][]struct {
+			ID   string
+			Info *ClientInfo
+		})
+		for clientID, clientInfo := range testSuite.SharedClients {
+			clientsByName[clientInfo.Name] = append(clientsByName[clientInfo.Name],
+				struct {
+					ID   string
+					Info *ClientInfo
+				}{ID: clientID, Info: clientInfo})
+		}
+
+		// Now check if the test name contains a client name and there's exactly one of that type
+		for clientName, clientList := range clientsByName {
+			if strings.Contains(testCase.Name, clientName) && len(clientList) == 1 {
+				// Safe to auto-register as there's only one client of this type
+				clientID := clientList[0].ID
+				clientInfo := clientList[0].Info
+
+				slog.Debug("Auto-registering shared client with test",
+					"testID", testID,
+					"clientID", clientID,
+					"clientName", clientInfo.Name,
+					"testName", testCase.Name)
+
+				testCase.ClientInfo[clientID] = &ClientInfo{
+					ID:             clientInfo.ID,
+					IP:             clientInfo.IP,
+					Name:           clientInfo.Name,
+					InstantiatedAt: clientInfo.InstantiatedAt,
+					LogFile:        clientInfo.LogFile,
+					IsShared:       true,
+					SharedClientID: clientID,
+					LogPosition:    clientInfo.LogPosition,
+					SuiteID:        suiteID,
+				}
+			} else if strings.Contains(testCase.Name, clientName) && len(clientList) > 1 {
+				// When there are multiple clients of the same type, we can try to find the right one by creation time
+				// Newer tests generally use newer clients, so find the most recently created client
+				var mostRecentClient struct {
+					ID   string
+					Info *ClientInfo
+				}
+				var mostRecentTime time.Time
+
+				for _, client := range clientList {
+					if mostRecentTime.IsZero() || client.Info.InstantiatedAt.After(mostRecentTime) {
+						mostRecentTime = client.Info.InstantiatedAt
+						mostRecentClient = client
+					}
+				}
+
+				if !mostRecentTime.IsZero() {
+					clientID := mostRecentClient.ID
+					clientInfo := mostRecentClient.Info
+
+					slog.Debug("Auto-registering most recent shared client with test",
+						"testID", testID,
+						"clientID", clientID,
+						"clientName", clientInfo.Name,
+						"instantiatedAt", clientInfo.InstantiatedAt,
+						"testName", testCase.Name)
+
+					testCase.ClientInfo[clientID] = &ClientInfo{
+						ID:             clientInfo.ID,
+						IP:             clientInfo.IP,
+						Name:           clientInfo.Name,
+						InstantiatedAt: clientInfo.InstantiatedAt,
+						LogFile:        clientInfo.LogFile,
+						IsShared:       true,
+						SharedClientID: clientID,
+						LogPosition:    clientInfo.LogPosition,
+						SuiteID:        suiteID,
+					}
+				} else {
+					// Log a warning if we couldn't determine which client to use
+					slog.Debug("Skipping auto-registration - multiple clients of same type",
+						"testID", testID,
+						"clientName", clientName,
+						"count", len(clientList),
+						"testName", testCase.Name)
+				}
+			}
+		}
+	}
+
+	// Process client logs for shared clients
+	result.ClientLogs = make(map[string]*ClientLogSegment)
+
+	// Log the number of clients in the test case for debugging
+	if len(testCase.ClientInfo) > 0 {
+		slog.Debug("Processing client logs",
+			"testID", testID,
+			"clientCount", len(testCase.ClientInfo),
+			"clientTypes", fmt.Sprintf("%v", func() []string {
+				types := make([]string, 0, len(testCase.ClientInfo))
+				for _, ci := range testCase.ClientInfo {
+					types = append(types, ci.Name)
+				}
+				return types
+			}()))
+	} else {
+		slog.Debug("No clients registered with test", "testID", testID)
+	}
+
+	for nodeID, clientInfo := range testCase.ClientInfo {
+		if clientInfo.IsShared {
+			// Get current log position
+			currentPosition, err := manager.getClientCurrentLogPosition(clientInfo)
+			if err != nil {
+				slog.Error("could not get client log position", "err", err)
+				continue
+			}
+
+			slog.Debug("Processing shared client logs",
+				"testID", testID,
+				"nodeID", nodeID,
+				"clientName", clientInfo.Name,
+				"startPosition", clientInfo.LogPosition,
+				"endPosition", currentPosition)
+
+			// Count lines in the log segment to determine line numbers
+			startLine, endLine, err := manager.countLinesInSegment(clientInfo.LogFile, clientInfo.LogPosition, currentPosition)
+			if err != nil {
+				slog.Error("could not count lines in client log segment", "err", err)
+				// If we can't count lines, use 1 to indicate the beginning of the file
+				startLine = 1
+				endLine = 1
+			}
+
+			// Create log segment for this test with both byte offsets and line numbers
+			result.ClientLogs[nodeID] = &ClientLogSegment{
+				Start:     clientInfo.LogPosition,
+				End:       currentPosition,
+				StartLine: startLine,
+				EndLine:   endLine,
+				ClientID:  clientInfo.ID,
+			}
+
+			// Extract log segment to a dedicated file for hiveview
+			if clientInfo.LogFile != "" && clientInfo.LogPosition < currentPosition {
+				sharedLogDir := filepath.Join(manager.config.LogDir, "shared_clients")
+				os.MkdirAll(sharedLogDir, 0755)
+				segmentLogFile := filepath.Join(sharedLogDir,
+					fmt.Sprintf("%d-%s-test%d.log", time.Now().Unix(), nodeID, testID))
+
+				sourceFile, err := os.Open(clientInfo.LogFile)
+				if err == nil {
+					defer sourceFile.Close()
+					targetFile, err := os.Create(segmentLogFile)
+					if err == nil {
+						defer targetFile.Close()
+						sourceFile.Seek(clientInfo.LogPosition, 0)
+						io.CopyN(targetFile, sourceFile, currentPosition-clientInfo.LogPosition)
+						relativePath := filepath.Join("shared_clients",
+							fmt.Sprintf("%d-%s-test%d.log", time.Now().Unix(), nodeID, testID))
+						testCase.ClientInfo[nodeID].LogFile = relativePath
+					}
+				}
+			}
+
+			// Update the shared client's log position in the suite
+			if sharedClient, err := manager.GetSharedClient(suiteID, nodeID); err == nil {
+				sharedClient.LogPosition = currentPosition
+			}
+		}
+	}
+
 	testCase.SummaryResult = *result
 
-	// Stop running clients.
+	// Stop running clients that are not shared.
 	for _, v := range testCase.ClientInfo {
-		if v.wait != nil {
+		if !v.IsShared && v.wait != nil {
 			manager.backend.DeleteContainer(v.ID)
 			v.wait()
 			v.wait = nil
@@ -488,6 +684,35 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
 	return nil
+}
+
+// getClientCurrentLogPosition gets the current position in a client's log file
+// This is a helper function for tracking log positions in shared clients
+func (manager *TestManager) getClientCurrentLogPosition(clientInfo *ClientInfo) (int64, error) {
+	// This is a simplified implementation - in production, you would:
+	// 1. Open the client's log file
+	// 2. Seek to the end
+	// 3. Return the current position
+
+	// For now, we'll estimate it using the log file size
+	if clientInfo.LogFile == "" {
+		return 0, fmt.Errorf("no log file for client %s", clientInfo.ID)
+	}
+
+	// Fix the log file path by converting it to an absolute path if it's not already
+	logFilePath := clientInfo.LogFile
+	if !filepath.IsAbs(logFilePath) {
+		logFilePath = filepath.Join(manager.config.LogDir, logFilePath)
+	}
+
+	slog.Debug("Getting client log position", "client", clientInfo.ID, "logFile", clientInfo.LogFile, "fullPath", logFilePath)
+
+	fileInfo, err := os.Stat(logFilePath)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size(), nil
 }
 
 func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
@@ -527,8 +752,83 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 	if testCase.ClientInfo == nil {
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
+
+	// Initialize log position to 0 for new clients
+	if nodeInfo.LogPosition == 0 && !nodeInfo.IsShared {
+		nodeInfo.LogPosition = 0
+	}
+
+	// If this is a shared client, log detailed information for debugging
+	if nodeInfo.IsShared {
+		slog.Debug("Registering shared client with test",
+			"testID", testID,
+			"nodeID", nodeID,
+			"clientName", nodeInfo.Name,
+			"logPosition", nodeInfo.LogPosition,
+			"logFile", nodeInfo.LogFile)
+	}
+
 	testCase.ClientInfo[nodeID] = nodeInfo
 	return nil
+}
+
+// RegisterSharedClient registers a shared client at the suite level
+func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, nodeID string, nodeInfo *ClientInfo) error {
+	manager.testSuiteMutex.Lock()
+	defer manager.testSuiteMutex.Unlock()
+
+	// Check if the test suite is running
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestSuite
+	}
+
+	// Initialize shared clients map if it doesn't exist
+	if testSuite.SharedClients == nil {
+		testSuite.SharedClients = make(map[string]*ClientInfo)
+	}
+
+	// Mark client as shared
+	nodeInfo.IsShared = true
+	nodeInfo.SuiteID = suiteID
+
+	// Initialize log position to 0
+	nodeInfo.LogPosition = 0
+
+	testSuite.SharedClients[nodeID] = nodeInfo
+	return nil
+}
+
+// GetSharedClient retrieves a shared client from a suite
+func (manager *TestManager) GetSharedClient(suiteID TestSuiteID, nodeID string) (*ClientInfo, error) {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return nil, ErrNoSuchTestSuite
+	}
+
+	if testSuite.SharedClients == nil {
+		return nil, ErrNoSuchNode
+	}
+
+	client, ok := testSuite.SharedClients[nodeID]
+	if !ok {
+		return nil, ErrNoSuchNode
+	}
+
+	return client, nil
+}
+
+// GetClientLogOffset returns the current position in the client's log file
+func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, nodeID string) (int64, error) {
+	client, err := manager.GetSharedClient(suiteID, nodeID)
+	if err != nil {
+		return 0, err
+	}
+
+	return client.LogPosition, nil
 }
 
 // StopNode stops a client container.
@@ -593,6 +893,82 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 		return fmt.Errorf("unable to unpause client: %v", err)
 	}
 	return nil
+}
+
+// countLinesInSegment counts the number of lines in a file segment between startByte and endByte.
+// Returns the starting and ending line numbers (1-based).
+func (manager *TestManager) countLinesInSegment(filePath string, startByte, endByte int64) (int, int, error) {
+	// Ensure we have the full path to the log file
+	fullPath := filePath
+	if !filepath.IsAbs(fullPath) {
+		fullPath = filepath.Join(manager.config.LogDir, filePath)
+	}
+	slog.Debug("Opening log file", "path", fullPath)
+
+	// Open the log file
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return 1, 1, err
+	}
+	defer file.Close()
+
+	// Count lines up to the start position to get the starting line number
+	startLine := 1
+	if startByte > 0 {
+		buffer := make([]byte, startByte)
+		_, err = file.Read(buffer)
+		if err != nil && err != io.EOF {
+			return 1, 1, err
+		}
+
+		// Count newlines in the buffer
+		for _, b := range buffer {
+			if b == '\n' {
+				startLine++
+			}
+		}
+	}
+
+	// Now count lines in the segment to determine the ending line number
+	bufferSize := endByte - startByte
+	if bufferSize <= 0 {
+		return startLine, startLine, nil
+	}
+
+	// Seek to the start position
+	_, err = file.Seek(startByte, 0)
+	if err != nil {
+		return startLine, startLine, err
+	}
+
+	// Read the segment
+	buffer := make([]byte, bufferSize)
+	_, err = file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return startLine, startLine, err
+	}
+
+	// Count newlines in the segment
+	endLine := startLine
+	for _, b := range buffer {
+		if b == '\n' {
+			endLine++
+		}
+	}
+
+	// Adjust endLine to fix the off-by-1 issue (the actual line with content rather than the next line)
+	if endLine > startLine {
+		endLine--
+	}
+
+	slog.Debug("Counted lines in segment",
+		"file", filePath,
+		"startByte", startByte,
+		"endByte", endByte,
+		"startLine", startLine,
+		"endLine", endLine)
+
+	return startLine, endLine, nil
 }
 
 // writeSuiteFile writes the simulation result to the log directory.
