@@ -85,13 +85,14 @@ fi
 # Configure RPC.
 FLAGS="$FLAGS --http.addr=0.0.0.0  --authrpc.addr=0.0.0.0"
 
-# We don't support pre merge so we exit with an error if HIVE_TERMINAL_TOTAL_DIFFICULTY is set
+# We don't support pre merge
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
     echo -n $JWT_SECRET > /jwt.secret
     FLAGS="$FLAGS  --authrpc.jwtsecret=/jwt.secret"
 else
-    exit 1
+    # We dont exit because some tests require this
+    echo "Warning: HIVE_TERMINAL_TOTAL_DIFFICULTY not supported."
 fi
 
 FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
