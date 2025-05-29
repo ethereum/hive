@@ -3,7 +3,7 @@
 # Build devp2p tool.
 FROM golang:1-alpine as geth-builder
 RUN apk add --update git gcc musl-dev linux-headers
-RUN git clone --depth 1 https://github.com/ethereum/go-ethereum.git /go-ethereum
+RUN git clone --depth 1 https://github.com/lambdaclass/go-ethereum.git /go-ethereum
 WORKDIR /go-ethereum
 RUN go build -v ./cmd/devp2p
 
@@ -21,6 +21,6 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=geth-builder /go-ethereum/devp2p ./devp2p
-COPY --from=geth-builder /go-ethereum/cmd/devp2p/internal/ethtest/testdata /testchain
+COPY --from=sim-builder /source/testdata /testchain
 COPY --from=sim-builder /source/devp2p-simulator .
 ENTRYPOINT ["./devp2p-simulator"]
