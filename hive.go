@@ -65,6 +65,7 @@ Otherwise, it looks for files in the $HOME directory:
 		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
+		useCredHelper         = flag.Bool("docker.cred-helper", false, "(DEPRECATED) Use --docker.auth instead.")
 
 		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
 
@@ -121,7 +122,7 @@ Otherwise, it looks for files in the $HOME directory:
 	dockerConfig := &libdocker.Config{
 		Inventory:         inv,
 		PullEnabled:       *dockerPull,
-		UseAuthentication: *dockerAuth,
+		UseAuthentication: *dockerAuth || *useCredHelper,
 	}
 	if *dockerNoCache != "" {
 		re, err := regexp.Compile(*dockerNoCache)
