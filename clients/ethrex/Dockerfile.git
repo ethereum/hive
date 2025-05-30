@@ -1,17 +1,16 @@
 ## Pulls geth from a git repository and builds it from source.
 
-FROM golang:1.23-alpine as builder
+FROM rust:latest as builder
 ARG github=lambdaclass/ethrex
 ARG tag=main
 
 RUN \
-  apk add --update bash curl jq git make gcc musl-dev                  \
-  ca-certificates linux-headers                                     && \
-  echo "Cloning: $github - $tag"                                    && \
-  git clone --depth 1 --branch $tag https://github.com/$github      && \
-  cd ethrex                                                         && \
-  make build                                                        && \
-  cp target/debug/ethrex /usr/local/bin/ethrex
+  apt-get update && \
+  apt-get install -y libclang-dev pkg-config build-essential && \
+  git clone --depth 1 --branch $tag https://github.com/$github      
+WORKDIR ethrex
+RUN make build
+RUN cp target/debug/ethrex /usr/local/bin/ethrex
 
 FROM debian:latest
 RUN apt-get update && apt-get install -y bash curl jq \
