@@ -6,7 +6,8 @@ ARG local_path=ethrex
 COPY $local_path ethrex
 
 WORKDIR ethrex
-RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
+RUN apt-get update && \
+    apt-get install -y libclang-dev pkg-config build-essential 
 RUN make build
 RUN cp target/debug/ethrex /usr/local/bin/ethrex
 
