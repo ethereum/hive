@@ -22,10 +22,10 @@ type Builder struct {
 	client        *docker.Client
 	config        *Config
 	logger        *slog.Logger
-	authenticator Authenticator
+	authenticator *docker.AuthConfigurations
 }
 
-func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder {
+func NewBuilder(client *docker.Client, cfg *Config, auth *docker.AuthConfigurations) *Builder {
 	b := &Builder{
 		client:        client,
 		config:        cfg,
@@ -99,7 +99,7 @@ func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImag
 		Pull:         b.config.PullEnabled,
 	}
 	if b.authenticator != nil {
-		opts.AuthConfigs = b.authenticator.AuthConfigs()
+		opts.AuthConfigs = *b.authenticator
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput

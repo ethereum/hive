@@ -41,8 +41,16 @@ func (args *buildArgs) Set(value string) error {
 
 func main() {
 	var (
-		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
-		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		testResultsRoot = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
+		loglevelFlag    = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		dockerAuth      = flag.Bool("docker.auth", false, `Enable docker authentication from system config files. The following files are checked in the order listed:
+If the environment variable DOCKER_CONFIG is set to a non-empty string:
+- $DOCKER_CONFIG/plaintext-passwords.json
+- $DOCKER_CONFIG/config.json
+Otherwise, it looks for files in the $HOME directory:
+- $HOME/.docker/plaintext-passwords.json
+- $HOME/.docker/config.json
+- $HOME/.dockercfg`)
 		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
@@ -57,7 +65,7 @@ func main() {
 		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
-		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
+		useCredHelper         = flag.Bool("docker.cred-helper", false, "(DEPRECATED) Use --docker.auth instead.")
 
 		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
 
@@ -114,9 +122,9 @@ func main() {
 
 	// Create the docker backends.
 	dockerConfig := &libdocker.Config{
-		Inventory:           inv,
-		PullEnabled:         *dockerPull,
-		UseCredentialHelper: *useCredHelper,
+		Inventory:         inv,
+		PullEnabled:       *dockerPull,
+		UseAuthentication: *dockerAuth || *useCredHelper,
 	}
 	if *dockerNoCache != "" {
 		re, err := regexp.Compile(*dockerNoCache)
