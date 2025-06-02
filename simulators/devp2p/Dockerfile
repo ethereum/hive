@@ -3,8 +3,9 @@
 # Build devp2p tool.
 FROM golang:1-alpine as geth-builder
 RUN apk add --update git gcc musl-dev linux-headers
-RUN git clone --depth 1 https://github.com/lambdaclass/go-ethereum.git /go-ethereum
+RUN git clone https://github.com/ethereum/go-ethereum.git /go-ethereum
 WORKDIR /go-ethereum
+RUN git checkout v1.15.11
 RUN go build -v ./cmd/devp2p
 
 # Build the simulator executable.

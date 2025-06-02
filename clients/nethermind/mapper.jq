@@ -166,6 +166,7 @@ def clique_engine:
     # Osaka
     "eip7692TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
 
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
