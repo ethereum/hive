@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -124,9 +125,7 @@ func (s *markdownSuite) testIDs() []TestID {
 	for testID := range s.tests {
 		testIDs = append(testIDs, testID)
 	}
-	sort.Slice(testIDs, func(i, j int) bool {
-		return testIDs[i] < testIDs[j]
-	})
+	slices.Sort(testIDs)
 	return testIDs
 }
 
@@ -300,9 +299,7 @@ func (docs *docsCollector) suiteIDs() []SuiteID {
 	for suiteID := range docs.suites {
 		suiteIDs = append(suiteIDs, suiteID)
 	}
-	sort.Slice(suiteIDs, func(i, j int) bool {
-		return suiteIDs[i] < suiteIDs[j]
-	})
+	slices.Sort(suiteIDs)
 	return suiteIDs
 }
 
