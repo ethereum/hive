@@ -79,8 +79,6 @@ Otherwise, it looks for files in the $HOME directory:
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
-
-		ethrexFlags = flag.String("ethrex.flags", "--evm revm", "Sets arguments for the ethrex client. Mainly used to choose between `revm or levm`")
 	)
 
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
@@ -153,8 +151,6 @@ Otherwise, it looks for files in the $HOME directory:
 		cancel()
 	}()
 
-	fmt.Printf("ethrexFlag is:%s\n", *ethrexFlags)
-
 	// Run.
 	env := libhive.SimEnv{
 		LogDir:             *testResultsRoot,
@@ -164,7 +160,6 @@ Otherwise, it looks for files in the $HOME directory:
 		SimRandomSeed:      *simRandomSeed,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
-		EthrexFlags:        *ethrexFlags,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 
