@@ -30,7 +30,7 @@ COPY enode.sh /hive-bin/enode.sh
 RUN chmod +x /reth.sh /hive-bin/enode.sh
 
 # Create version.txt
-RUN /usr/local/bin/reth --version | head -1 > /version.txt
+RUN /usr/local/bin/reth --version | head -2 | awk 'NR==1 {gsub("reth Version: ", ""); version=$0} NR==2 {gsub("Commit SHA: ", ""); sha=substr($0, 1, 8)} END {print version"+"sha}' > /version.txt
 
 # Export the usual networking ports
 EXPOSE 8545 8546 30303 30303/udp
