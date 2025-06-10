@@ -3,6 +3,7 @@ workspace
 .idea/
 # build output
 /hive
+**/hivechain
 
 # build output for rust simulators and hivesim-rs files
 simulators/**/target
