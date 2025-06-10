@@ -6,6 +6,7 @@ go build ./cmd/hivechain
 
 ./hivechain generate \
     --outdir "$wd/chain" \
+    --pos \
     --fork-interval 6 \
     --tx-interval 1 \
     --length 500 \
