@@ -24,7 +24,14 @@ func (cb *ContainerBackend) ServeAPI(ctx context.Context, h http.Handler) (libhi
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
 
-	opts := libhive.ContainerOptions{Output: outW, Input: inR}
+	// Create labels for hiveproxy container.
+	proxyLabels := libhive.NewBaseLabels(cb.hiveInstanceID, cb.hiveVersion)
+	proxyLabels[libhive.LabelHiveType] = libhive.ContainerTypeProxy
+
+	// Generate container name.
+	containerName := libhive.GenerateProxyContainerName()
+
+	opts := libhive.ContainerOptions{Output: outW, Input: inR, Labels: proxyLabels, Name: containerName}
 	id, err := cb.CreateContainer(ctx, hiveproxyTag, opts)
 	if err != nil {
 		return nil, err

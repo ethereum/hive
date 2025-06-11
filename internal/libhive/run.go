@@ -189,6 +189,9 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		}
 	}()
 
+	// Set hive instance info for container labeling.
+	r.container.SetHiveInstanceInfo(tm.hiveInstanceID, tm.hiveVersion)
+
 	slog.Debug("starting simulator API server")
 	server, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
@@ -196,6 +199,14 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		return SimResult{}, err
 	}
 	defer shutdownServer(server)
+
+	// Create labels for simulator container.
+	simLabels := NewBaseLabels(tm.hiveInstanceID, tm.hiveVersion)
+	simLabels[LabelHiveType] = ContainerTypeSimulator
+	simLabels[LabelHiveSimulator] = sim
+
+	// Generate container name.
+	containerName := GenerateSimulatorContainerName(sim)
 
 	// Create the simulator container.
 	opts := ContainerOptions{
@@ -206,6 +217,8 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 			"HIVE_TEST_PATTERN": env.SimTestPattern,
 			"HIVE_RANDOM_SEED":  strconv.Itoa(env.SimRandomSeed),
 		},
+		Labels: simLabels,
+		Name:   containerName,
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {

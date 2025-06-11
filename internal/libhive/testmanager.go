@@ -76,6 +76,10 @@ type TestManager struct {
 	simContainerID string
 	simLogFile     string
 
+	// Hive instance information for labeling
+	hiveInstanceID string
+	hiveVersion    string
+
 	// all networks started by a specific test suite, where key
 	// is network name and value is network ID
 	networks     map[TestSuiteID]map[string]string
@@ -99,6 +103,8 @@ func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefiniti
 		config:            config,
 		backend:           b,
 		hiveInfo:          hiveInfo,
+		hiveInstanceID:    GenerateHiveInstanceID(),
+		hiveVersion:       hiveInfo.Commit,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
 		results:           make(map[TestSuiteID]*TestSuite),
