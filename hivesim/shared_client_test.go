@@ -21,13 +21,13 @@ func TestStartSharedClient(t *testing.T) {
 		case "/testsuite":
 			// StartSuite
 			json.NewEncoder(w).Encode(0) // Return suite ID
-		case "/testsuite/0/shared-client":
+		case "/testsuite/0/node":
 			// StartSharedClient
 			json.NewEncoder(w).Encode(simapi.StartNodeResponse{
 				ID: "container1",
 				IP: "192.0.2.1",
 			})
-		case "/testsuite/0/shared-client/container1":
+		case "/testsuite/0/node/container1":
 			// GetSharedClientInfo
 			json.NewEncoder(w).Encode(simapi.NodeResponse{
 				ID:   "container1",
@@ -148,18 +148,18 @@ func TestSharedClientLogOffset(t *testing.T) {
 		case "/testsuite":
 			// StartSuite
 			json.NewEncoder(w).Encode(0) // Return suite ID
-		case "/testsuite/0/shared-client":
+		case "/testsuite/0/node":
 			// StartSharedClient
 			json.NewEncoder(w).Encode(simapi.StartNodeResponse{
 				ID: "container1",
 				IP: "192.0.2.1",
 			})
-		case "/testsuite/0/shared-client/container1/log-offset":
+		case "/testsuite/0/node/container1/log-offset":
 			// GetClientLogOffset - increment the offset each time it's called
 			currentOffset := offsetValue
 			offsetValue += 100 // Simulate log growth
 			json.NewEncoder(w).Encode(currentOffset)
-		case "/testsuite/0/shared-client/container1/exec":
+		case "/testsuite/0/node/container1/exec":
 			// ExecSharedClient
 			json.NewEncoder(w).Encode(&ExecInfo{
 				Stdout:   "test output",
@@ -254,13 +254,13 @@ func TestGetClientLogOffset(t *testing.T) {
 		case "/testsuite":
 			// StartSuite
 			json.NewEncoder(w).Encode(0) // Return suite ID
-		case "/testsuite/0/shared-client":
+		case "/testsuite/0/node":
 			// StartSharedClient
 			json.NewEncoder(w).Encode(simapi.StartNodeResponse{
 				ID: "container1",
 				IP: "192.0.2.1",
 			})
-		case "/testsuite/0/shared-client/container1/log-offset":
+		case "/testsuite/0/node/container1/log-offset":
 			// GetClientLogOffset
 			json.NewEncoder(w).Encode(int64(0)) // Initial log offset
 		default:
