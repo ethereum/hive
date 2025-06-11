@@ -215,7 +215,7 @@ func (sim *Simulation) StartSharedClient(testSuite SuiteID, clientType string, o
 		return "", nil, errors.New("StartSharedClient is not supported in docs mode")
 	}
 	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/shared-client", sim.url, testSuite)
+		url  = fmt.Sprintf("%s/testsuite/%d/node", sim.url, testSuite)
 		resp simapi.StartNodeResponse
 	)
 
@@ -249,7 +249,7 @@ func (sim *Simulation) GetSharedClientInfo(testSuite SuiteID, clientID string) (
 		return nil, errors.New("GetSharedClientInfo is not supported in docs mode")
 	}
 	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s", sim.url, testSuite, clientID)
+		url  = fmt.Sprintf("%s/testsuite/%d/node/%s", sim.url, testSuite, clientID)
 		resp SharedClientInfo
 	)
 	err := get(url, &resp)
@@ -263,7 +263,7 @@ func (sim *Simulation) GetClientLogOffset(testSuite SuiteID, clientID string) (i
 		return 0, errors.New("GetClientLogOffset is not supported in docs mode")
 	}
 	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s/log-offset", sim.url, testSuite, clientID)
+		url  = fmt.Sprintf("%s/testsuite/%d/node/%s/log-offset", sim.url, testSuite, clientID)
 		resp int64
 	)
 	err := get(url, &resp)
@@ -276,7 +276,7 @@ func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd 
 		return nil, errors.New("ExecSharedClient is not supported in docs mode")
 	}
 	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/shared-client/%s/exec", sim.url, testSuite, clientID)
+		url  = fmt.Sprintf("%s/testsuite/%d/node/%s/exec", sim.url, testSuite, clientID)
 		req  = &simapi.ExecRequest{Command: cmd}
 		resp *ExecInfo
 	)

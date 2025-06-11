@@ -43,11 +43,11 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
 
 	// Shared client routes
-	router.HandleFunc("/testsuite/{suite}/shared-client", api.startSharedClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/shared-client/{node}", api.getSharedClientInfo).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/shared-client/{node}/log-offset", api.getSharedClientLogOffset).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/shared-client/{node}/exec", api.execInSharedClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/shared-client/{node}", api.stopSharedClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/node", api.startSharedClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.getSharedClientInfo).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/node/{node}/log-offset", api.getSharedClientLogOffset).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/node/{node}/exec", api.execInSharedClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.stopSharedClient).Methods("DELETE")
 
 	// Regular client routes
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
