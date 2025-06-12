@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -60,10 +63,11 @@ type SimResult struct {
 
 // HiveInfo contains information about the hive instance running the simulation.
 type HiveInfo struct {
-	Command    []string           `json:"command"`
-	ClientFile []ClientDesignator `json:"clientFile"`
-	Commit     string             `json:"commit"`
-	Date       string             `json:"date"`
+	Command        []string           `json:"command"`
+	ClientFile     []ClientDesignator `json:"clientFile"`
+	ClientFilePath string             `json:"clientFilePath,omitempty"`
+	Commit         string             `json:"commit"`
+	Date           string             `json:"date"`
 }
 
 // TestManager collects test results during a simulation run.
@@ -94,10 +98,37 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
+// filterClientDesignators removes sensitive build arguments from ClientDesignator slice
+func filterClientDesignators(clients []ClientDesignator) []ClientDesignator {
+	filtered := make([]ClientDesignator, len(clients))
+	for i, client := range clients {
+		filteredClient := ClientDesignator{
+			Client:        client.Client,
+			Nametag:       client.Nametag,
+			DockerfileExt: client.DockerfileExt,
+			BuildArgs:     make(map[string]string),
+		}
+		
+		// Filter build args
+		for key, value := range client.BuildArgs {
+			if !excludedBuildArgs[key] {
+				filteredClient.BuildArgs[key] = value
+			}
+		}
+		
+		filtered[i] = filteredClient
+	}
+	return filtered
+}
+
 func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefinition, hiveInfo HiveInfo) *TestManager {
 	if hiveInfo.Commit == "" && hiveInfo.Date == "" {
 		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
 	}
+	
+	// Filter sensitive build args from HiveInfo.ClientFile
+	hiveInfo.ClientFile = filterClientDesignators(hiveInfo.ClientFile)
+	
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,
@@ -369,6 +400,29 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
+	
+	// Create comprehensive run metadata
+	runMetadata := &RunMetadata{
+		HiveCommand: manager.hiveInfo.Command,
+		HiveVersion: GetHiveVersion(),
+	}
+	
+	// Add client configuration if available
+	if manager.hiveInfo.ClientFilePath != "" {
+		if clientConfigContent, err := readClientConfig(manager.hiveInfo.ClientFilePath); err == nil {
+			runMetadata.ClientConfig = &ClientConfigInfo{
+				FilePath: manager.hiveInfo.ClientFilePath,
+				Content:  clientConfigContent,
+			}
+		} else {
+			// Log warning but don't fail the test suite
+			slog.Warn("Failed to read client config file", "path", manager.hiveInfo.ClientFilePath, "error", err)
+		}
+	}
+	
+	// Attach metadata to suite
+	suite.RunMetadata = runMetadata
+	
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -602,6 +656,124 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 }
 
 // writeSuiteFile writes the simulation result to the log directory.
+// List of build arguments to exclude from result JSON for security/privacy
+var excludedBuildArgs = map[string]bool{
+	"GOPROXY":    true,  // Go proxy URLs may contain sensitive info
+	"GITHUB_TOKEN": true,  // GitHub tokens
+	"ACCESS_TOKEN": true,  // Generic access tokens
+	"API_KEY":      true,  // API keys
+	"PASSWORD":     true,  // Passwords
+	"SECRET":       true,  // Generic secrets
+	"TOKEN":        true,  // Generic tokens
+}
+
+// filterBuildArgs removes sensitive build arguments from client configuration
+func filterBuildArgs(clients interface{}) interface{} {
+	switch v := clients.(type) {
+	case []interface{}:
+		// Handle array of clients
+		filtered := make([]interface{}, len(v))
+		for i, client := range v {
+			filtered[i] = filterBuildArgs(client)
+		}
+		return filtered
+	case []ClientDesignator:
+		// Handle array of ClientDesignator structs
+		filtered := make([]interface{}, len(v))
+		for i, client := range v {
+			// Convert to map for filtering
+			clientMap := map[string]interface{}{
+				"client":    client.Client,
+				"nametag":   client.Nametag,
+				"dockerfile": client.DockerfileExt,
+			}
+			if len(client.BuildArgs) > 0 {
+				buildArgsMap := make(map[string]interface{})
+				for k, v := range client.BuildArgs {
+					buildArgsMap[k] = v
+				}
+				clientMap["build_args"] = buildArgsMap
+			}
+			filtered[i] = filterBuildArgs(clientMap)
+		}
+		return filtered
+	case map[string]interface{}:
+		// Handle individual client or top-level map
+		filtered := make(map[string]interface{})
+		for key, value := range v {
+			if key == "build_args" {
+				if buildArgs, ok := value.(map[string]interface{}); ok {
+					filteredBuildArgs := make(map[string]interface{})
+					for argKey, argValue := range buildArgs {
+						// Check if this build arg should be excluded
+						if !excludedBuildArgs[argKey] {
+							filteredBuildArgs[argKey] = argValue
+						}
+					}
+					filtered[key] = filteredBuildArgs
+				} else {
+					filtered[key] = value
+				}
+			} else if key == "clients" {
+				// Recursively filter clients array
+				filtered[key] = filterBuildArgs(value)
+			} else {
+				filtered[key] = value
+			}
+		}
+		return filtered
+	default:
+		return clients
+	}
+}
+
+// readClientConfig reads and parses a client configuration YAML file
+func readClientConfig(path string) (map[string]interface{}, error) {
+	if path == "" {
+		return nil, nil
+	}
+	
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("client config file does not exist: %s", path)
+	}
+	
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open client config file %s: %w", path, err)
+	}
+	defer file.Close()
+	
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read client config file %s: %w", path, err)
+	}
+	
+	// Try to parse as both possible formats
+	// First, try the wrapped format (with "clients:" key)
+	var wrappedConfig map[string]interface{}
+	if err := yaml.Unmarshal(data, &wrappedConfig); err == nil {
+		// Apply filtering to remove sensitive build_args
+		filtered := filterBuildArgs(wrappedConfig).(map[string]interface{})
+		return filtered, nil
+	}
+	
+	// If that fails, try the direct array format (same as main Hive parsing)
+	var clientArray []ClientDesignator
+	if err := yaml.Unmarshal(data, &clientArray); err == nil {
+		// Convert to wrapped format for consistent storage
+		result := map[string]interface{}{
+			"clients": clientArray,
+		}
+		// Apply filtering to remove sensitive build_args
+		filtered := filterBuildArgs(result).(map[string]interface{})
+		return filtered, nil
+	}
+	
+	// If both formats fail, return an error
+	return nil, fmt.Errorf("failed to parse client config file %s: file must be either a YAML array of clients or a map with 'clients' key", path)
+}
+
 func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteData, err := json.Marshal(s)
 	if err != nil {

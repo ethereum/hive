@@ -227,8 +227,9 @@ Otherwise, it looks for files in the $HOME directory:
 		}
 	}
 	hiveInfo := libhive.HiveInfo{
-		Command:    os.Args,
-		ClientFile: clientList,
+		Command:        os.Args,
+		ClientFile:     clientList,
+		ClientFilePath: *clientsFile,
 	}
 
 	// Build clients and simulators.
