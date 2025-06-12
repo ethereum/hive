@@ -16,6 +16,12 @@ type ContainerBackend interface {
 	// This is called before anything else in the simulation run.
 	Build(context.Context, Builder) error
 
+	// SetHiveInstanceInfo sets the hive instance information for container labeling.
+	SetHiveInstanceInfo(instanceID, version string)
+
+	// GetDockerClient returns the underlying Docker client for cleanup operations.
+	GetDockerClient() interface{}
+
 	// This is for launching the simulation API server.
 	ServeAPI(context.Context, http.Handler) (APIServer, error)
 
@@ -63,6 +69,12 @@ type ContainerOptions struct {
 
 	// Input: if set, container stdin draws from the given reader.
 	Input io.ReadCloser
+
+	// Labels: Docker labels to apply to container
+	Labels map[string]string
+
+	// Name: Docker container name (optional)
+	Name string
 }
 
 // ContainerInfo is returned by StartContainer.
