@@ -2,6 +2,8 @@
 
 # Build devp2p tool.
 FROM golang:1-alpine as geth-builder
+ARG GOPROXY
+ENV GOPROXY=${GOPROXY}
 RUN apk add --update git gcc musl-dev linux-headers
 RUN git clone --depth 1 https://github.com/ethereum/go-ethereum.git /go-ethereum
 WORKDIR /go-ethereum
@@ -9,6 +11,8 @@ RUN go build -v ./cmd/devp2p
 
 # Build the simulator executable.
 FROM golang:1-alpine as sim-builder
+ARG GOPROXY
+ENV GOPROXY=${GOPROXY}
 RUN apk add --update git gcc musl-dev linux-headers
 WORKDIR /source
 COPY go.mod go.sum ./
