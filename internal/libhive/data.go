@@ -125,6 +125,9 @@ type TestSuite struct {
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
 
+	// Shared client support
+	SharedClients map[string]*ClientInfo `json:"sharedClients,omitempty"` // Map of shared clients available to all tests in this suite
+
 	SimulatorLog   string `json:"simLog"`         // path to simulator log-file simulator. (may be shared with multiple suites)
 	TestDetailsLog string `json:"testDetailsLog"` // the test details output file
 
@@ -151,6 +154,18 @@ type TestResult struct {
 	// suite's TestDetailsLog file ("log").
 	Details    string          `json:"details,omitempty"`
 	LogOffsets *TestLogOffsets `json:"log,omitempty"`
+
+	// ClientLogs stores log segments for shared clients used in this test
+	ClientLogs map[string]*ClientLogSegment `json:"clientLogs,omitempty"`
+}
+
+// ClientLogSegment represents a segment of a client log file
+type ClientLogSegment struct {
+	Start     int64  `json:"start"`     // Starting byte offset in log file
+	End       int64  `json:"end"`       // Ending byte offset in log file
+	StartLine int    `json:"startLine"` // Starting line number
+	EndLine   int    `json:"endLine"`   // Ending line number
+	ClientID  string `json:"clientId"`  // ID of the client
 }
 
 type TestLogOffsets struct {
@@ -165,6 +180,12 @@ type ClientInfo struct {
 	Name           string    `json:"name"`
 	InstantiatedAt time.Time `json:"instantiatedAt"`
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
+
+	// Fields for shared client support
+	IsShared       bool        `json:"isShared"`                 // Indicates if this client is shared across tests
+	LogPosition    int64       `json:"logPosition"`              // Current position in log file for shared clients
+	SuiteID        TestSuiteID `json:"suiteId,omitempty"`        // Suite ID for shared clients
+	SharedClientID string      `json:"sharedClientId,omitempty"` // ID of the shared client (if this is a reference)
 
 	wait func()
 }

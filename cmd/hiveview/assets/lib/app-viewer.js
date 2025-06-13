@@ -12,10 +12,16 @@ import { formatBytes, queryParam } from './utils.js';
 $(document).ready(function () {
     common.updateHeader();
 
-    // Check for line number in hash.
-    var line = null;
-    if (window.location.hash.substr(1, 1) == 'L') {
-        line = parseInt(window.location.hash.substr(2));
+    // Check for line number or line range in hash.
+    var startLine = null;
+    var endLine = null;
+    var hash = window.location.hash.substr(1);
+    if (hash.startsWith('L')) {
+        var range = hash.substr(1).split('-');
+        startLine = parseInt(range[0]);
+        if (range.length > 1) {
+            endLine = parseInt(range[1]);
+        }
     }
 
     // Get suite context.
@@ -33,7 +39,7 @@ $(document).ready(function () {
             showError('Invalid parameters! Missing \'suitefile\' or \'testid\' in URL.');
             return;
         }
-        fetchTestLog(routes.resultsRoot + suiteFile, testIndex, line);
+        fetchTestLog(routes.resultsRoot + suiteFile, testIndex, startLine, endLine);
         return;
     }
 
@@ -42,7 +48,7 @@ $(document).ready(function () {
     if (file) {
         $('#fileload').val(file);
         showText('Loading file...');
-        fetchFile(file, line);
+        fetchFile(file, startLine, endLine);
         return;
     }
 
@@ -50,27 +56,53 @@ $(document).ready(function () {
     showText(document.getElementById('exampletext').innerHTML);
 });
 
-// setHL sets the highlight on a line number.
-function setHL(num, scroll) {
+// setHL sets the highlight on a line number or range of lines.
+function setHL(startLine, endLine, scroll) {
     // out with the old
     $('.highlighted').removeClass('highlighted');
-    if (!num) {
+    if (!startLine) {
         return;
     }
 
     let contentArea = document.getElementById('file-content');
     let gutter = document.getElementById('gutter');
-    let numElem = gutter.children[num - 1];
-    if (!numElem) {
-        console.error('invalid line number:', num);
-        return;
+    
+    // Calculate the end line if not provided
+    if (!endLine) {
+        endLine = startLine;
     }
-    // in with the new
-    let lineElem = contentArea.children[num - 1];
-    $(numElem).addClass('highlighted');
-    $(lineElem).addClass('highlighted');
+    
+    // Calculate max available lines and adjust range if needed
+    const maxLines = gutter.children.length;
+    
+    // Check if the requested range is beyond the file size
+    if (startLine > maxLines) {
+        startLine = 1;
+    }
+    
+    if (endLine > maxLines) {
+        endLine = maxLines;
+    }
+    
+    // Highlight all lines in the adjusted range
+    for (let num = startLine; num <= endLine; num++) {
+        let numElem = gutter.children[num - 1];
+        if (!numElem) {
+            // Skip invalid line numbers
+            continue;
+        }
+        
+        let lineElem = contentArea.children[num - 1];
+        $(numElem).addClass('highlighted');
+        $(lineElem).addClass('highlighted');
+    }
+    
+    // Scroll to the start of the highlighted range
     if (scroll) {
-        numElem.scrollIntoView();
+        let firstNumElem = gutter.children[startLine - 1];
+        if (firstNumElem) {
+            firstNumElem.scrollIntoView();
+        }
     }
 }
 
@@ -163,12 +195,12 @@ function appendLine(contentArea, gutter, number, text) {
 }
 
 function lineNumberClicked() {
-    setHL($(this).attr('line'), false);
+    setHL(parseInt($(this).attr('line')), null, false);
     history.replaceState(null, null, '#' + $(this).attr('id'));
 }
 
 // fetchFile loads up a new file to view
-async function fetchFile(url, line /* optional jump to line */ ) {
+async function fetchFile(url, startLine, endLine) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
     let text;
     try {
@@ -181,11 +213,11 @@ async function fetchFile(url, line /* optional jump to line */ ) {
     let title = url.replace(resultsRE, '');
     showTitle(null, title);
     showText(text);
-    setHL(line, true);
+    setHL(startLine, endLine, true);
 }
 
 // fetchTestLog loads the suite file and displays the output of a test.
-async function fetchTestLog(suiteFile, testIndex, line) {
+async function fetchTestLog(suiteFile, testIndex, startLine, endLine) {
     let data;
     try {
         data = await load(suiteFile, 'json');
@@ -221,7 +253,7 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     }
     showTitle('Test:', name);
     showText(logtext);
-    setHL(line, true);
+    setHL(startLine, endLine, true);
 }
 
 async function load(url, dataType) {
