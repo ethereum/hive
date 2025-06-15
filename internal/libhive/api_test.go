@@ -233,4 +233,87 @@ func TestClientStartTimeout(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		got      interface{}
+		expected interface{}
+	}{
+		{
+			name:     "HiveEnvvarPrefix",
+			got:      hiveEnvvarPrefix,
+			expected: "HIVE_",
+		},
+		{
+			name:     "DefaultStartTimeout",
+			got:      defaultStartTimeout,
+			expected: 60 * time.Second,
+		},
+		{
+			name:     "MaxMultipartMemory",
+			got:      maxMultipartMemory,
+			expected: 8 * 1024 * 1024,
+		},
+		{
+			name:     "DefaultCheckLivePort",
+			got:      defaultCheckLivePort,
+			expected: 8545,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !reflect.DeepEqual(tt.got, tt.expected) {
+				t.Errorf("%s = %v, want %v", tt.name, tt.got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestClientLogFilePaths(t *testing.T) {
+	api := &simAPI{
+		backend: mockBackend{},
+		env: SimEnv{
+			LogDir: "/tmp/logs",
+		},
+		tm:   &TestManager{},
+		hive: HiveInfo{},
+	}
+
+	tests := []struct {
+		name        string
+		clientName  string
+		containerID string
+		wantJSON    string
+		wantFile    string
+	}{
+		{
+			name:        "Simple client name",
+			clientName:  "geth",
+			containerID: "abc123",
+			wantJSON:    "geth/client-abc123.log",
+			wantFile:    "/tmp/logs/geth/client-abc123.log",
+		},
+		{
+			name:        "Client name with path separator",
+			clientName:  "geth/v1.10.0",
+			containerID: "abc123",
+			wantJSON:    "geth_v1.10.0/client-abc123.log",
+			wantFile:    "/tmp/logs/geth_v1.10.0/client-abc123.log",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonPath, filePath := api.clientLogFilePaths(tt.clientName, tt.containerID)
+			if jsonPath != tt.wantJSON {
+				t.Errorf("clientLogFilePaths() jsonPath = %v, want %v", jsonPath, tt.wantJSON)
+			}
+			if filePath != tt.wantFile {
+				t.Errorf("clientLogFilePaths() filePath = %v, want %v", filePath, tt.wantFile)
+			}
+		})
+	}
 } 
