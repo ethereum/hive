@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/hive/internal/simapi"
 	"github.com/gorilla/mux"
@@ -128,6 +130,106 @@ func TestErrorHandling(t *testing.T) {
 
 			if !strings.Contains(response.Error, tt.wantError) {
 				t.Errorf("got error %q, want %q", response.Error, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestHelperFunctions(t *testing.T) {
+	api := &simAPI{
+		backend: mockBackend{},
+		env: SimEnv{
+			SimLogLevel: 3,
+		},
+		tm:   &TestManager{},
+		hive: HiveInfo{},
+	}
+
+	tests := []struct {
+		name     string
+		config   *simapi.NodeConfig
+		wantEnv  map[string]string
+	}{
+		{
+			name: "Basic environment",
+			config: &simapi.NodeConfig{
+				Environment: map[string]string{
+					"HIVE_LOGLEVEL": "5",
+					"OTHER_VAR":     "value",
+				},
+			},
+			wantEnv: map[string]string{
+				"HIVE_LOGLEVEL": "5",
+			},
+		},
+		{
+			name: "Default loglevel",
+			config: &simapi.NodeConfig{
+				Environment: map[string]string{
+					"OTHER_VAR": "value",
+				},
+			},
+			wantEnv: map[string]string{
+				"HIVE_LOGLEVEL": "3",
+			},
+		},
+		{
+			name: "Multiple HIVE variables",
+			config: &simapi.NodeConfig{
+				Environment: map[string]string{
+					"HIVE_LOGLEVEL": "5",
+					"HIVE_TEST":     "value",
+					"OTHER_VAR":     "value",
+				},
+			},
+			wantEnv: map[string]string{
+				"HIVE_LOGLEVEL": "5",
+				"HIVE_TEST":     "value",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := api.prepareClientEnvironment(tt.config)
+			if !reflect.DeepEqual(got, tt.wantEnv) {
+				t.Errorf("prepareClientEnvironment() = %v, want %v", got, tt.wantEnv)
+			}
+		})
+	}
+}
+
+func TestClientStartTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      SimEnv
+		want     time.Duration
+	}{
+		{
+			name: "Default timeout",
+			env:  SimEnv{},
+			want: defaultStartTimeout,
+		},
+		{
+			name: "Custom timeout",
+			env: SimEnv{
+				ClientStartTimeout: 30 * time.Second,
+			},
+			want: 30 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			api := &simAPI{
+				backend: mockBackend{},
+				env:     tt.env,
+				tm:      &TestManager{},
+				hive:    HiveInfo{},
+			}
+			got := api.getClientStartTimeout()
+			if got != tt.want {
+				t.Errorf("getClientStartTimeout() = %v, want %v", got, tt.want)
 			}
 		})
 	}
