@@ -1,11 +1,16 @@
 package libhive
 
 import (
+	"context"
+	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/hive/internal/simapi"
 	"github.com/gorilla/mux"
 )
 
@@ -66,5 +71,64 @@ func TestRegisterRoutes(t *testing.T) {
 		if !router.Match(&http.Request{Method: route.method, URL: &url.URL{Path: route.path}}, &mux.RouteMatch{}) {
 			t.Errorf("Route %s %s not registered", route.method, route.path)
 		}
+	}
+}
+
+func TestErrorHandling(t *testing.T) {
+	api := &simAPI{
+		backend: mockBackend{},
+		env:     SimEnv{},
+		tm:      &TestManager{},
+		hive:    HiveInfo{},
+	}
+
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		request    *http.Request
+		wantStatus int
+		wantError  string
+	}{
+		{
+			name:       "Invalid JSON in startSuite",
+			handler:    api.startSuite,
+			request:    httptest.NewRequest("POST", "/testsuite", strings.NewReader("invalid json")),
+			wantStatus: http.StatusBadRequest,
+			wantError:  "invalid JSON in request body",
+		},
+		{
+			name:       "Empty suite name",
+			handler:    api.startSuite,
+			request:    httptest.NewRequest("POST", "/testsuite", strings.NewReader(`{"name": "", "description": "test"}`)),
+			wantStatus: http.StatusBadRequest,
+			wantError:  "suite name is empty",
+		},
+		{
+			name:       "Invalid test suite ID",
+			handler:    api.endSuite,
+			request:    httptest.NewRequest("DELETE", "/testsuite/invalid", nil),
+			wantStatus: http.StatusBadRequest,
+			wantError:  "invalid test suite",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			tt.handler(w, tt.request)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("got status %d, want %d", w.Code, tt.wantStatus)
+			}
+
+			var response simapi.Error
+			if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+				t.Fatal(err)
+			}
+
+			if !strings.Contains(response.Error, tt.wantError) {
+				t.Errorf("got error %q, want %q", response.Error, tt.wantError)
+			}
+		})
 	}
 } 
