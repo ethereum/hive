@@ -24,7 +24,7 @@ RUN uv sync
 # the container starts.
 # If newer version of the fixtures is needed, the image needs to be rebuilt.
 # Use `--docker.nocache` flag to force rebuild.
-RUN uv run consume cache --input "$FIXTURES"
+RUN uv run consume cache --no-api-calls --input "$FIXTURES"
 
 ## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT uv run consume engine -v --input "$FIXTURES"
+ENTRYPOINT uv run consume engine -v --no-api-calls --input "$FIXTURES"
