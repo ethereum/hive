@@ -26,6 +26,10 @@ type ContainerBackend struct {
 	logger *slog.Logger
 
 	proxy *hiveproxy.Proxy
+
+	// Hive instance information for labeling
+	hiveInstanceID string
+	hiveVersion    string
 }
 
 func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
@@ -34,6 +38,17 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 		b.logger = slog.Default()
 	}
 	return b
+}
+
+// SetHiveInstanceInfo sets the hive instance information for container labeling.
+func (b *ContainerBackend) SetHiveInstanceInfo(instanceID, version string) {
+	b.hiveInstanceID = instanceID
+	b.hiveVersion = version
+}
+
+// GetDockerClient returns the underlying Docker client for cleanup operations.
+func (b *ContainerBackend) GetDockerClient() interface{} {
+	return b.client
 }
 
 // RunProgram runs a /hive-bin script in a container.
@@ -80,9 +95,11 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	}
 	createOpts := docker.CreateContainerOptions{
 		Context: ctx,
+		Name:    opt.Name,
 		Config: &docker.Config{
-			Image: imageName,
-			Env:   vars,
+			Image:  imageName,
+			Env:    vars,
+			Labels: opt.Labels,
 		},
 	}
 

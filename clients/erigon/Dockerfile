@@ -8,6 +8,12 @@ FROM $baseimage:$tag
 USER root
 
 RUN apk add --no-cache bash curl jq
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    jq && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
 RUN erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt

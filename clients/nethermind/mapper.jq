@@ -166,7 +166,14 @@ def clique_engine:
     # Osaka
     "eip7594TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7823TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7825TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7883TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7918TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7951TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7939TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7934TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7907TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
+    "eip7934MaxRlpBlockSize": "0x800000",
 
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
@@ -191,7 +198,7 @@ def clique_engine:
           "max": (if env.HIVE_OSAKA_BLOB_MAX then env.HIVE_OSAKA_BLOB_MAX|to_hex else "0x9" end),
           "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
       } else null end
-    ] | map(select(. != null)),
+    ] | map(select(. != null)) | reverse | unique_by(.timestamp),
   },
   "genesis": {
     "seal": {

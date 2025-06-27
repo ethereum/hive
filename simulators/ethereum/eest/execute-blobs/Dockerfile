@@ -1,5 +1,5 @@
 # Builds and runs the EEST (execution-spec-tests) consume engine simulator
-FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ## Default git-ref/fork
 ARG branch=main

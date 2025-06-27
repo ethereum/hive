@@ -246,8 +246,19 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
+	// Create labels for client container.
+	labels := NewBaseLabels(api.tm.hiveInstanceID, api.tm.hiveVersion)
+	labels[LabelHiveType] = ContainerTypeClient
+	labels[LabelHiveTestSuite] = suiteID.String()
+	labels[LabelHiveTestCase] = testID.String()
+	labels[LabelHiveClientName] = clientDef.Name
+	labels[LabelHiveClientImage] = clientDef.Image
+
+	// Generate container name.
+	containerName := GenerateClientContainerName(clientDef.Name, suiteID, testID)
+
 	// Create the client container.
-	options := ContainerOptions{Env: env, Files: files}
+	options := ContainerOptions{Env: env, Files: files, Labels: labels, Name: containerName}
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
 		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
