@@ -3,7 +3,6 @@ package hivesim
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"runtime"
@@ -232,9 +231,9 @@ type Client struct {
 	test      *T
 
 	// Fields for shared client support
-	IsShared    bool      // Whether this client is shared across tests
-	LogPosition int64     // Current position in the log file (for shared clients)
-	SuiteID     SuiteID   // The suite this client belongs to (for shared clients)
+	IsShared    bool    // Whether this client is shared across tests
+	LogPosition int64   // Current position in the log file (for shared clients)
+	SuiteID     SuiteID // The suite this client belongs to (for shared clients)
 }
 
 // EnodeURL returns the default peer-to-peer endpoint of the client.
@@ -347,7 +346,7 @@ func (t *T) GetSharedClient(clientID string) *Client {
 		// Use the position from the client object as a fallback
 		currentLogPosition = sharedClient.LogPosition
 	}
-	
+
 	// Store the test context in the client so it can be used for this test
 	// Create a new Client instance that points to the same container
 	client := &Client{
@@ -373,25 +372,7 @@ func (t *T) GetSharedClient(clientID string) *Client {
 
 	t.Logf("Using shared client %s with log position %d", clientID, currentLogPosition)
 
-	// Register this shared client with the test using the startClient endpoint with a special parameter
-	// This makes it appear in the test's ClientInfo so the UI can display the logs correctly
-	var (
-		config = simapi.NodeConfig{
-			Client:        sharedClient.Type,
-			SharedClientID: clientID,
-		}
-	)
-
-	// Set up a client setup object to post with files (even though we don't have any files)
-	setup := &clientSetup{
-		files: make(map[string]func() (io.ReadCloser, error)),
-		config: config,
-	}
-
-	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node", t.Sim.url, t.SuiteID, t.TestID)
-	var resp simapi.StartNodeResponse
-	err = setup.postWithFiles(url, &resp)
-	if err != nil {
+	if err := t.Sim.RegisterNode(t.SuiteID, t.TestID, clientID); err != nil {
 		t.Logf("Warning: Failed to register shared client %s with test: %v", clientID, err)
 	} else {
 		t.Logf("Successfully registered shared client %s with test %d", clientID, t.TestID)
@@ -524,9 +505,9 @@ func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 
 	// Register test on simulation server and initialize the T.
 	t := &T{
-		Sim:     host,
-		SuiteID: test.suiteID,
-		suite:   test.suite,
+		Sim:              host,
+		SuiteID:          test.suiteID,
+		suite:            test.suite,
 		clientLogOffsets: make(map[string]*LogOffset), // Initialize log offset tracking
 	}
 	testID, err := host.StartTest(test.suiteID, test.request())
