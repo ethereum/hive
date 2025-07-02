@@ -130,7 +130,7 @@ type TestSuite struct {
 	TestCases      map[TestID]*TestCase `json:"testCases"`
 
 	// Shared client support
-	SharedClients map[string]*ClientInfo `json:"sharedClients,omitempty"` // Map of shared clients available to all tests in this suite
+	ClientInfo map[string]*ClientInfo `json:"clientInfo,omitempty"` // Map of shared clients available to all tests in this suite
 
 	SimulatorLog   string `json:"simLog"`         // path to simulator log-file simulator. (may be shared with multiple suites)
 	TestDetailsLog string `json:"testDetailsLog"` // the test details output file

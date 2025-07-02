@@ -97,7 +97,7 @@ func TestAddSharedClient(t *testing.T) {
 	suite.AddSharedClient("shared1", "client-1", Params(map[string]string{
 		"PARAM1": "value1",
 	}))
-	
+
 	suite.Add(TestSpec{
 		Name: "test-using-shared-client",
 		Run: func(t *T) {
@@ -105,7 +105,7 @@ func TestAddSharedClient(t *testing.T) {
 			if client == nil {
 				t.Fatal("shared client not found")
 			}
-			
+
 			if client.Type != "client-1" {
 				t.Errorf("wrong client type: got %q, want %q", client.Type, "client-1")
 			}
@@ -124,17 +124,17 @@ func TestAddSharedClient(t *testing.T) {
 	if startedContainers == 0 {
 		t.Error("no containers were started")
 	}
-	
+
 	tm.Terminate()
 	results := tm.Results()
 	removeTimestamps(results)
-	
+
 	if len(results) == 0 {
 		t.Fatal("no test results")
 	}
-	
+
 	suiteResult := results[0]
-	if suiteResult.SharedClients == nil || len(suiteResult.SharedClients) == 0 {
+	if suiteResult.ClientInfo == nil || len(suiteResult.ClientInfo) == 0 {
 		t.Error("no shared clients in test results")
 	}
 }

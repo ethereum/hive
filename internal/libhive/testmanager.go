@@ -214,19 +214,38 @@ func (manager *TestManager) Terminate() error {
 }
 
 // GetNodeInfo gets some info on a client belonging to some test
-func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
-	manager.testCaseMutex.RLock()
-	defer manager.testCaseMutex.RUnlock()
+func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test *TestID, nodeID string) (*ClientInfo, error) {
+	if test != nil {
+		manager.testCaseMutex.RLock()
+		defer manager.testCaseMutex.RUnlock()
 
-	testCase, ok := manager.runningTestCases[test]
-	if !ok {
-		return nil, ErrNoSuchTestCase
+		testCase, ok := manager.runningTestCases[*test]
+		if !ok {
+			return nil, ErrNoSuchTestCase
+		}
+		nodeInfo, ok := testCase.ClientInfo[nodeID]
+		if !ok {
+			return nil, ErrNoSuchNode
+		}
+		return nodeInfo, nil
+	} else {
+		manager.testSuiteMutex.RLock()
+		defer manager.testSuiteMutex.RUnlock()
+
+		testSuite, ok := manager.runningTestSuites[testSuite]
+		if !ok {
+			return nil, ErrNoSuchTestSuite
+		}
+
+		if testSuite.ClientInfo == nil {
+			return nil, ErrNoSuchNode
+		}
+		client, ok := testSuite.ClientInfo[nodeID]
+		if !ok {
+			return nil, ErrNoSuchNode
+		}
+		return client, nil
 	}
-	nodeInfo, ok := testCase.ClientInfo[nodeID]
-	if !ok {
-		return nil, ErrNoSuchNode
-	}
-	return nodeInfo, nil
 }
 
 // CreateNetwork creates a docker network with the given network name.
@@ -423,8 +442,8 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	suite.RunMetadata = runMetadata
 
 	// Clean up any shared clients for this suite.
-	if suite.SharedClients != nil {
-		for nodeID, clientInfo := range suite.SharedClients {
+	if suite.ClientInfo != nil {
+		for nodeID, clientInfo := range suite.ClientInfo {
 			// Stop the container if it's still running.
 			if clientInfo.wait != nil {
 				slog.Info("cleaning up shared client", "suite", testSuite, "client", clientInfo.Name, "container", nodeID[:8])
@@ -551,7 +570,7 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 
 	// Auto-register shared clients with this test if they weren't already registered
 	// but only if the test name contains the client name (for backwards compatibility)
-	if testSuite.SharedClients != nil && (testCase.ClientInfo == nil || len(testCase.ClientInfo) == 0) {
+	if testSuite.ClientInfo != nil && (testCase.ClientInfo == nil || len(testCase.ClientInfo) == 0) {
 		// Initialize client info map if needed
 		if testCase.ClientInfo == nil {
 			testCase.ClientInfo = make(map[string]*ClientInfo)
@@ -562,7 +581,7 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 			ID   string
 			Info *ClientInfo
 		})
-		for clientID, clientInfo := range testSuite.SharedClients {
+		for clientID, clientInfo := range testSuite.ClientInfo {
 			clientsByName[clientInfo.Name] = append(clientsByName[clientInfo.Name],
 				struct {
 					ID   string
@@ -720,7 +739,7 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 			}
 
 			// Update the shared client's log position in the suite
-			if sharedClient, err := manager.GetSharedClient(suiteID, nodeID); err == nil {
+			if sharedClient, err := manager.GetNodeInfo(suiteID, nil, nodeID); err == nil {
 				sharedClient.LogPosition = currentPosition
 			}
 		}
@@ -840,8 +859,8 @@ func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, nodeID str
 	}
 
 	// Initialize shared clients map if it doesn't exist
-	if testSuite.SharedClients == nil {
-		testSuite.SharedClients = make(map[string]*ClientInfo)
+	if testSuite.ClientInfo == nil {
+		testSuite.ClientInfo = make(map[string]*ClientInfo)
 	}
 
 	// Mark client as shared
@@ -851,64 +870,13 @@ func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, nodeID str
 	// Initialize log position to 0
 	nodeInfo.LogPosition = 0
 
-	testSuite.SharedClients[nodeID] = nodeInfo
-	return nil
-}
-
-// GetSharedClient retrieves a shared client from a suite
-func (manager *TestManager) GetSharedClient(suiteID TestSuiteID, nodeID string) (*ClientInfo, error) {
-	manager.testSuiteMutex.RLock()
-	defer manager.testSuiteMutex.RUnlock()
-
-	testSuite, ok := manager.runningTestSuites[suiteID]
-	if !ok {
-		return nil, ErrNoSuchTestSuite
-	}
-
-	if testSuite.SharedClients == nil {
-		return nil, ErrNoSuchNode
-	}
-
-	client, ok := testSuite.SharedClients[nodeID]
-	if !ok {
-		return nil, ErrNoSuchNode
-	}
-
-	return client, nil
-}
-
-// StopNode stops a shared client container.
-func (manager *TestManager) StopSharedClient(suiteID TestSuiteID, nodeID string) error {
-	manager.testSuiteMutex.Lock()
-	defer manager.testSuiteMutex.Unlock()
-
-	// Check if the test suite is running
-	testSuite, ok := manager.runningTestSuites[suiteID]
-	if !ok {
-		return ErrNoSuchTestSuite
-	}
-
-	if testSuite.SharedClients == nil {
-		return ErrNoSuchNode
-	}
-	sharedClient, ok := testSuite.SharedClients[nodeID]
-	if !ok {
-		return ErrNoSuchNode
-	}
-	// Stop the container.
-	if sharedClient.wait != nil {
-		if err := manager.backend.DeleteContainer(sharedClient.ID); err != nil {
-			return fmt.Errorf("unable to stop client: %v", err)
-		}
-		sharedClient.wait()
-		sharedClient.wait = nil
-	}
+	testSuite.ClientInfo[nodeID] = nodeInfo
 	return nil
 }
 
 // GetClientLogOffset returns the current position in the client's log file
-func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, nodeID string) (int64, error) {
-	client, err := manager.GetSharedClient(suiteID, nodeID)
+func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, testID *TestID, nodeID string) (int64, error) {
+	client, err := manager.GetNodeInfo(suiteID, testID, nodeID)
 	if err != nil {
 		return 0, err
 	}
@@ -917,17 +885,38 @@ func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, nodeID strin
 }
 
 // StopNode stops a client container.
-func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
-	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
+func (manager *TestManager) StopNode(suiteID TestSuiteID, testID *TestID, nodeID string) error {
+	var nodeInfo *ClientInfo
+	if testID != nil {
+		manager.testCaseMutex.Lock()
+		defer manager.testCaseMutex.Unlock()
 
-	testCase, ok := manager.runningTestCases[testID]
-	if !ok {
-		return ErrNoSuchNode
-	}
-	nodeInfo, ok := testCase.ClientInfo[nodeID]
-	if !ok {
-		return ErrNoSuchNode
+		testCase, ok := manager.runningTestCases[*testID]
+		if !ok {
+			return ErrNoSuchNode
+		}
+		nodeInfo, ok = testCase.ClientInfo[nodeID]
+		if !ok {
+			return ErrNoSuchNode
+		}
+
+	} else {
+		manager.testSuiteMutex.Lock()
+		defer manager.testSuiteMutex.Unlock()
+
+		// Check if the test suite is running
+		testSuite, ok := manager.runningTestSuites[suiteID]
+		if !ok {
+			return ErrNoSuchTestSuite
+		}
+
+		if testSuite.ClientInfo == nil {
+			return ErrNoSuchNode
+		}
+		nodeInfo, ok = testSuite.ClientInfo[nodeID]
+		if !ok {
+			return ErrNoSuchNode
+		}
 	}
 	// Stop the container.
 	if nodeInfo.wait != nil {

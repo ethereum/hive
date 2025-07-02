@@ -96,7 +96,7 @@ func TestSuiteReporting(t *testing.T) {
 					},
 				},
 			},
-			SharedClients: nil, // Add this field to expected results
+			ClientInfo: nil, // Add this field to expected results
 		},
 	}
 

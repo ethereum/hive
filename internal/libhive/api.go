@@ -44,10 +44,10 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 
 	// Shared client routes
 	router.HandleFunc("/testsuite/{suite}/node", api.startClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/node/{node}", api.getSharedClientInfo).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.getNodeStatus).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/node/{node}/log-offset", api.getSharedClientLogOffset).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/node/{node}/exec", api.execInSharedClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/node/{node}", api.stopSharedClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/node/{node}/exec", api.execInClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/node/{node}/test/{test}", api.registerSharedClient).Methods("POST")
 
 	// Regular client routes
@@ -74,26 +74,6 @@ type simAPI struct {
 	hive    HiveInfo
 }
 
-// getSharedClientInfo returns information about a shared client,
-// including container ID, client type, IP and log file location.
-func (api *simAPI) getSharedClientInfo(w http.ResponseWriter, r *http.Request) {
-	suiteID, err := api.requestSuite(r)
-	if err != nil {
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	node := mux.Vars(r)["node"]
-	nodeInfo, err := api.tm.GetSharedClient(suiteID, node)
-	if err != nil {
-		slog.Error("API: can't find shared client", "node", node, "error", err)
-		serveError(w, err, http.StatusNotFound)
-		return
-	}
-
-	serveJSON(w, &simapi.NodeResponse{ID: nodeInfo.ID, Name: nodeInfo.Name})
-}
-
 // getSharedClientLogOffset returns the current log offset for a shared client.
 // This is used to track which segments of the log belong to each test.
 func (api *simAPI) getSharedClientLogOffset(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +84,7 @@ func (api *simAPI) getSharedClientLogOffset(w http.ResponseWriter, r *http.Reque
 	}
 
 	node := mux.Vars(r)["node"]
-	offset, err := api.tm.GetClientLogOffset(suiteID, node)
+	offset, err := api.tm.GetClientLogOffset(suiteID, nil, node)
 	if err != nil {
 		slog.Error("API: can't get log offset for shared client", "node", node, "error", err)
 		serveError(w, err, http.StatusNotFound)
@@ -112,60 +92,6 @@ func (api *simAPI) getSharedClientLogOffset(w http.ResponseWriter, r *http.Reque
 	}
 
 	serveJSON(w, offset)
-}
-
-// execInSharedClient executes a command in a shared client container.
-// Similar to execInClient but for shared clients at the suite level.
-func (api *simAPI) execInSharedClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, err := api.requestSuite(r)
-	if err != nil {
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	node := mux.Vars(r)["node"]
-	nodeInfo, err := api.tm.GetSharedClient(suiteID, node)
-	if err != nil {
-		slog.Error("API: can't find shared client", "node", node, "error", err)
-		serveError(w, err, http.StatusNotFound)
-		return
-	}
-
-	// Parse and validate the exec request.
-	commandline, err := parseExecRequest(r.Body)
-	if err != nil {
-		slog.Error("API: invalid shared client exec request", "node", node, "error", err)
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
-	if err != nil {
-		slog.Error("API: shared client script exec error", "node", node, "error", err)
-		serveError(w, err, http.StatusInternalServerError)
-		return
-	}
-	serveJSON(w, &info)
-}
-
-// stopSharedClient terminates a shared client container.
-// This is typically called at the end of a test suite.
-func (api *simAPI) stopSharedClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, err := api.requestSuite(r)
-	if err != nil {
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-	node := mux.Vars(r)["node"]
-
-	err = api.tm.StopSharedClient(suiteID, node)
-	switch {
-	case err == ErrNoSuchNode:
-		serveError(w, err, http.StatusNotFound)
-	case err != nil:
-		serveError(w, err, http.StatusInternalServerError)
-	default:
-		serveOK(w)
-	}
 }
 
 // getHiveInfo returns information about the hive server instance.
@@ -498,7 +424,7 @@ func (api *simAPI) registerSharedClient(w http.ResponseWriter, r *http.Request) 
 	}
 
 	node := mux.Vars(r)["node"]
-	sharedClient, err := api.tm.GetSharedClient(suiteID, node)
+	sharedClient, err := api.tm.GetNodeInfo(suiteID, nil, node)
 	if err != nil {
 		slog.Error("API: can't find shared client", "node", node, "error", err)
 		serveError(w, err, http.StatusNotFound)
@@ -555,14 +481,14 @@ func (api *simAPI) checkClientNetworks(req *simapi.NodeConfig, suiteID TestSuite
 
 // stopClient terminates a client container.
 func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
-	_, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	node := mux.Vars(r)["node"]
 
-	err = api.tm.StopNode(testID, node)
+	err = api.tm.StopNode(suiteID, testID, node)
 	switch {
 	case err == ErrNoSuchNode:
 		serveError(w, err, http.StatusNotFound)
@@ -615,7 +541,7 @@ func (api *simAPI) unpauseClient(w http.ResponseWriter, r *http.Request) {
 
 // getNodeStatus returns the status of a client container.
 func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -633,7 +559,7 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
