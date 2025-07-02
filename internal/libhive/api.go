@@ -345,23 +345,15 @@ func (api *simAPI) stopSharedClient(w http.ResponseWriter, r *http.Request) {
 	}
 	node := mux.Vars(r)["node"]
 
-	clientInfo, err := api.tm.GetSharedClient(suiteID, node)
-	if err != nil {
+	err = api.tm.StopSharedClient(suiteID, node)
+	switch {
+	case err == ErrNoSuchNode:
 		serveError(w, err, http.StatusNotFound)
-		return
+	case err != nil:
+		serveError(w, err, http.StatusInternalServerError)
+	default:
+		serveOK(w)
 	}
-
-	// Stop the container.
-	if clientInfo.wait != nil {
-		if err := api.backend.DeleteContainer(clientInfo.ID); err != nil {
-			serveError(w, err, http.StatusInternalServerError)
-			return
-		}
-		clientInfo.wait()
-		clientInfo.wait = nil
-	}
-
-	serveOK(w)
 }
 
 // getHiveInfo returns information about the hive server instance.
@@ -522,8 +514,8 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogPosition:    sharedClient.LogPosition,
 			SuiteID:        suiteID, // Make sure this is properly set
 		}
-		
-		slog.Debug("Created shared client reference", 
+
+		slog.Debug("Created shared client reference",
 			"nodeID", clientConfig.SharedClientID,
 			"name", sharedClient.Name,
 			"isShared", true,
@@ -534,7 +526,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		api.tm.RegisterNode(testID, clientConfig.SharedClientID, clientInfo)
 
 		// Return success with the node info
-		slog.Info("API: shared client registered with test", "suite", suiteID, "test", testID, 
+		slog.Info("API: shared client registered with test", "suite", suiteID, "test", testID,
 			"sharedClientId", clientConfig.SharedClientID, "container", sharedClient.ID[:8])
 		serveJSON(w, &simapi.StartNodeResponse{ID: sharedClient.ID, IP: sharedClient.IP})
 		return

@@ -877,6 +877,35 @@ func (manager *TestManager) GetSharedClient(suiteID TestSuiteID, nodeID string) 
 	return client, nil
 }
 
+// StopNode stops a shared client container.
+func (manager *TestManager) StopSharedClient(suiteID TestSuiteID, nodeID string) error {
+	manager.testSuiteMutex.Lock()
+	defer manager.testSuiteMutex.Unlock()
+
+	// Check if the test suite is running
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestSuite
+	}
+
+	if testSuite.SharedClients == nil {
+		return ErrNoSuchNode
+	}
+	sharedClient, ok := testSuite.SharedClients[nodeID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	// Stop the container.
+	if sharedClient.wait != nil {
+		if err := manager.backend.DeleteContainer(sharedClient.ID); err != nil {
+			return fmt.Errorf("unable to stop client: %v", err)
+		}
+		sharedClient.wait()
+		sharedClient.wait = nil
+	}
+	return nil
+}
+
 // GetClientLogOffset returns the current position in the client's log file
 func (manager *TestManager) GetClientLogOffset(suiteID TestSuiteID, nodeID string) (int64, error) {
 	client, err := manager.GetSharedClient(suiteID, nodeID)
