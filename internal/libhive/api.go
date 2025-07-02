@@ -253,44 +253,6 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			// components should be ignored in the filename supplied by the form, and
 			// package multipart strips the directory info away at parse time.
 			files[key] = fheaders[0]
-
-			// Debug output for genesis.json allocations in regular clients
-			if key == "genesis.json" {
-				slog.Info("Regular client genesis.json detected", "filename", key)
-
-				// Read the file content
-				file, err := fheaders[0].Open()
-				if err == nil {
-					defer file.Close()
-
-					// Read the genesis file
-					genesisBytes, err := io.ReadAll(file)
-					if err == nil {
-						// Parse JSON to extract and log alloc information
-						var genesisMap map[string]interface{}
-						if err := json.Unmarshal(genesisBytes, &genesisMap); err == nil {
-							if alloc, ok := genesisMap["alloc"].(map[string]interface{}); ok {
-								// Log the number of accounts in alloc
-								slog.Info("Regular client genesis alloc accounts", "count", len(alloc))
-
-								// Log a few accounts as examples
-								i := 0
-								for addr, details := range alloc {
-									if i < 3 { // Log only first 3 accounts to avoid spam
-										slog.Info("Genesis alloc entry", "address", addr, "details", details)
-										i++
-									} else {
-										break
-									}
-								}
-							}
-						}
-
-						// Rewind the file for normal processing
-						file.Seek(0, 0)
-					}
-				}
-			}
 		}
 	}
 
