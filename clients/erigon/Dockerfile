@@ -7,7 +7,6 @@ FROM $baseimage:$tag
 # to install additional commands, so switch back to root.
 USER root
 
-RUN apk add --no-cache bash curl jq
 RUN apt-get update && apt-get install -y \
     build-essential \
     ca-certificates \
