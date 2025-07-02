@@ -815,63 +815,47 @@ func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCas
 }
 
 // RegisterNode is used by test suite hosts to register the creation of a node in the context of a test
-func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo *ClientInfo) error {
-	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
+func (manager *TestManager) RegisterNode(suiteID TestSuiteID, testID *TestID, nodeID string, nodeInfo *ClientInfo) error {
+	if testID != nil {
+		manager.testCaseMutex.Lock()
+		defer manager.testCaseMutex.Unlock()
 
-	// Check if the test case is running
-	testCase, ok := manager.runningTestCases[testID]
-	if !ok {
-		return ErrNoSuchTestCase
-	}
-	if testCase.ClientInfo == nil {
-		testCase.ClientInfo = make(map[string]*ClientInfo)
-	}
+		// Check if the test case is running
+		testCase, ok := manager.runningTestCases[*testID]
+		if !ok {
+			return ErrNoSuchTestCase
+		}
+		if testCase.ClientInfo == nil {
+			testCase.ClientInfo = make(map[string]*ClientInfo)
+		}
 
-	// Initialize log position to 0 for new clients
-	if nodeInfo.LogPosition == 0 && !nodeInfo.IsShared {
+		testCase.ClientInfo[nodeID] = nodeInfo
+		return nil
+	} else {
+		manager.testSuiteMutex.Lock()
+		defer manager.testSuiteMutex.Unlock()
+
+		// Check if the test suite is running
+		testSuite, ok := manager.runningTestSuites[suiteID]
+		if !ok {
+			return ErrNoSuchTestSuite
+		}
+
+		// Initialize shared clients map if it doesn't exist
+		if testSuite.ClientInfo == nil {
+			testSuite.ClientInfo = make(map[string]*ClientInfo)
+		}
+
+		// Mark client as shared
+		nodeInfo.IsShared = true
+		nodeInfo.SuiteID = suiteID
+
+		// Initialize log position to 0
 		nodeInfo.LogPosition = 0
+
+		testSuite.ClientInfo[nodeID] = nodeInfo
+		return nil
 	}
-
-	// If this is a shared client, log detailed information for debugging
-	if nodeInfo.IsShared {
-		slog.Debug("Registering shared client with test",
-			"testID", testID,
-			"nodeID", nodeID,
-			"clientName", nodeInfo.Name,
-			"logPosition", nodeInfo.LogPosition,
-			"logFile", nodeInfo.LogFile)
-	}
-
-	testCase.ClientInfo[nodeID] = nodeInfo
-	return nil
-}
-
-// RegisterSharedClient registers a shared client at the suite level
-func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, nodeID string, nodeInfo *ClientInfo) error {
-	manager.testSuiteMutex.Lock()
-	defer manager.testSuiteMutex.Unlock()
-
-	// Check if the test suite is running
-	testSuite, ok := manager.runningTestSuites[suiteID]
-	if !ok {
-		return ErrNoSuchTestSuite
-	}
-
-	// Initialize shared clients map if it doesn't exist
-	if testSuite.ClientInfo == nil {
-		testSuite.ClientInfo = make(map[string]*ClientInfo)
-	}
-
-	// Mark client as shared
-	nodeInfo.IsShared = true
-	nodeInfo.SuiteID = suiteID
-
-	// Initialize log position to 0
-	nodeInfo.LogPosition = 0
-
-	testSuite.ClientInfo[nodeID] = nodeInfo
-	return nil
 }
 
 // GetClientLogOffset returns the current position in the client's log file

@@ -335,7 +335,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	options := ContainerOptions{Env: env, Files: files, Labels: labels, Name: containerName}
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
-		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
+		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err, "containerName", containerName)
 		err := fmt.Errorf("client container create failed (%v)", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
@@ -393,11 +393,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 		// Register the node. This should always be done, even if starting the container
 		// failed, to ensure that the failed client log is associated with the test.
-		if testID == nil {
-			api.tm.RegisterSharedClient(suiteID, info.ID, clientInfo)
-		} else {
-			api.tm.RegisterNode(*testID, info.ID, clientInfo)
-		}
+		api.tm.RegisterNode(suiteID, testID, info.ID, clientInfo)
 	}
 	if err != nil {
 		slog.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
@@ -408,9 +404,9 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// It's started.
 	if testID == nil {
-		slog.Info("API: shared client "+clientDef.Name+" started", "suite", suiteID, "container", containerID[:8])
+		slog.Info("API: shared client "+clientDef.Name+" started", "suite", suiteID, "container", containerID[:8], "containerName", containerName)
 	} else {
-		slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+		slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8], "containerName", containerName)
 	}
 	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
 }
@@ -437,7 +433,7 @@ func (api *simAPI) registerSharedClient(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Register the node with the test
-	if err := api.tm.RegisterNode(testID, node, sharedClient); err != nil {
+	if err := api.tm.RegisterNode(suiteID, &testID, node, sharedClient); err != nil {
 		slog.Error("API: failed to register shared client", "node", node, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
