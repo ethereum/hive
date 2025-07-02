@@ -327,9 +327,9 @@ function testHasClients(testData, suiteData) {
         return true;
     }
     
-    if (suiteData && suiteData.sharedClients) {
-        for (let clientID in suiteData.sharedClients) {
-            let clientName = suiteData.sharedClients[clientID].name;
+    if (suiteData && suiteData.clientInfo) {
+        for (let clientID in suiteData.clientInfo) {
+            let clientName = suiteData.clientInfo[clientID].name;
             if (testData.name.includes(clientName)) {
                 return true;
             }
@@ -401,14 +401,14 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
     
     // For backward compatibility - if test name includes client name, add that client
     // This handles the case where tests don't yet have clientInfo or clientLogs properly populated
-    if (suiteData.sharedClients) {
+    if (suiteData.clientInfo) {
         
         // First try to match by existing client logs
         if (usedSharedClients.size === 0) {
             // Group clients by name to identify if there are multiple of the same type
             let clientsByName = {};
-            for (let instanceID in suiteData.sharedClients) {
-                let sharedClient = suiteData.sharedClients[instanceID];
+            for (let instanceID in suiteData.clientInfo) {
+                let sharedClient = suiteData.clientInfo[instanceID];
                 if (!sharedClient.logFile) continue; // Skip if no log file
                 
                 // Add to the clients by name map
@@ -429,7 +429,7 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
         }
         
         // Now add all the used shared clients that haven't been handled yet
-        for (let instanceID in suiteData.sharedClients) {
+        for (let instanceID in suiteData.clientInfo) {
             // First check if this client is explicitly registered in the test's clientLogs
             // This is the most reliable way to determine if a client was used in a test
             const explicitlyRegistered = testCase && 
@@ -451,7 +451,7 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
                 continue;
             }
             
-            let sharedClient = suiteData.sharedClients[instanceID];
+            let sharedClient = suiteData.clientInfo[instanceID];
             
             // Skip if no log file
             if (!sharedClient.logFile) {
