@@ -78,7 +78,7 @@ func SanitizeContainerNameComponent(s string) string {
 
 // GenerateContainerName generates a Hive-prefixed container name
 func GenerateContainerName(containerType, identifier string) string {
-	timestamp := time.Now().Format("20060102-150405")
+	timestamp := time.Now().Format("20060102-150405.0000")
 	sanitizedType := SanitizeContainerNameComponent(containerType)
 	if identifier != "" {
 		sanitizedIdentifier := SanitizeContainerNameComponent(identifier)
