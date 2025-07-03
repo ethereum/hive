@@ -45,15 +45,14 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 	// Shared client routes
 	router.HandleFunc("/testsuite/{suite}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/node/{node}", api.getNodeStatus).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/node/{node}/log-offset", api.getSharedClientLogOffset).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/node/{node}/test/{test}", api.registerSharedClient).Methods("POST")
 
 	// Regular client routes
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
@@ -72,26 +71,6 @@ type simAPI struct {
 	env     SimEnv
 	tm      *TestManager
 	hive    HiveInfo
-}
-
-// getSharedClientLogOffset returns the current log offset for a shared client.
-// This is used to track which segments of the log belong to each test.
-func (api *simAPI) getSharedClientLogOffset(w http.ResponseWriter, r *http.Request) {
-	suiteID, err := api.requestSuite(r)
-	if err != nil {
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	node := mux.Vars(r)["node"]
-	offset, err := api.tm.GetClientLogOffset(suiteID, nil, node)
-	if err != nil {
-		slog.Error("API: can't get log offset for shared client", "node", node, "error", err)
-		serveError(w, err, http.StatusNotFound)
-		return
-	}
-
-	serveJSON(w, offset)
 }
 
 // getHiveInfo returns information about the hive server instance.
@@ -342,8 +321,6 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		}
 		if testID == nil {
 			clientInfo.IsShared = true
-			clientInfo.SuiteID = suiteID
-			clientInfo.LogPosition = 0
 		}
 
 		// Add client version to the test suite.
@@ -395,7 +372,7 @@ func (api *simAPI) registerSharedClient(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Register the node with the test
-	if err := api.tm.RegisterNode(suiteID, &testID, node, sharedClient); err != nil {
+	if err := api.tm.RegisterSharedClient(suiteID, testID, node); err != nil {
 		slog.Error("API: failed to register shared client", "node", node, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return

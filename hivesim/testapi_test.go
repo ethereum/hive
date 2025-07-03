@@ -81,18 +81,16 @@ func TestSuiteReporting(t *testing.T) {
 					Name:        "passing test",
 					Description: "this test passes",
 					SummaryResult: libhive.TestResult{
-						Pass:       true,
-						Details:    "message from the passing test\n",
-						ClientLogs: make(map[string]*libhive.ClientLogSegment),
+						Pass:    true,
+						Details: "message from the passing test\n",
 					},
 				},
 				2: {
 					Name:        "failing test",
 					Description: "this test fails",
 					SummaryResult: libhive.TestResult{
-						Pass:       false,
-						Details:    "message from the failing test\n",
-						ClientLogs: make(map[string]*libhive.ClientLogSegment),
+						Pass:    false,
+						Details: "message from the failing test\n",
 					},
 				},
 			},

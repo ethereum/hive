@@ -255,20 +255,6 @@ func (sim *Simulation) GetSharedClientInfo(testSuite SuiteID, clientID string) (
 	return &resp, err
 }
 
-// GetClientLogOffset gets the current offset position in a shared client's log file.
-// This is used for tracking log segments in shared clients across multiple tests.
-func (sim *Simulation) GetClientLogOffset(testSuite SuiteID, clientID string) (int64, error) {
-	if sim.docs != nil {
-		return 0, errors.New("GetClientLogOffset is not supported in docs mode")
-	}
-	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/node/%s/log-offset", sim.url, testSuite, clientID)
-		resp int64
-	)
-	err := get(url, &resp)
-	return resp, err
-}
-
 // ExecSharedClient runs a command in a shared client container.
 func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd []string) (*ExecInfo, error) {
 	if sim.docs != nil {
@@ -283,12 +269,10 @@ func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd 
 	return resp, err
 }
 
-// RegisterNode registers a client with a test. This is normally handled
-// automatically by StartClient, but can be used directly by a test to
-// register a reference to a shared client.
-func (sim *Simulation) RegisterNode(testSuite SuiteID, test TestID, clientID string) error {
+// RegisterSharedNode registers a shared client with a test.
+func (sim *Simulation) RegisterSharedNode(testSuite SuiteID, test TestID, clientID string) error {
 	if sim.docs != nil {
-		return errors.New("RegisterNode is not supported in docs mode")
+		return errors.New("RegisterSharedNode is not supported in docs mode")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/node/%s/test/%d", sim.url, testSuite, clientID, test), nil)

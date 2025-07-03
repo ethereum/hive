@@ -158,9 +158,6 @@ type TestResult struct {
 	// suite's TestDetailsLog file ("log").
 	Details    string          `json:"details,omitempty"`
 	LogOffsets *TestLogOffsets `json:"log,omitempty"`
-
-	// ClientLogs stores log segments for shared clients used in this test
-	ClientLogs map[string]*ClientLogSegment `json:"clientLogs,omitempty"`
 }
 
 // ClientLogSegment represents a segment of a client log file
@@ -186,10 +183,9 @@ type ClientInfo struct {
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
 
 	// Fields for shared client support
-	IsShared       bool        `json:"isShared"`                 // Indicates if this client is shared across tests
-	LogPosition    int64       `json:"logPosition"`              // Current position in log file for shared clients
-	SuiteID        TestSuiteID `json:"suiteId,omitempty"`        // Suite ID for shared clients
-	SharedClientID string      `json:"sharedClientId,omitempty"` // ID of the shared client (if this is a reference)
+	IsShared     bool   `json:"isShared"`               // Indicates if this client is shared across tests
+	LogStartLine *int64 `json:"logStartLine,omitempty"` // Start line in log file for shared clients
+	LogEndLine   *int64 `json:"logEndLine,omitempty"`   // End line in log file for shared clients
 
 	wait func()
 }
