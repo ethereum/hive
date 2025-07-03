@@ -241,20 +241,6 @@ func (sim *Simulation) StartSharedClient(testSuite SuiteID, clientType string, o
 	return resp.ID, ip, nil
 }
 
-// GetSharedClientInfo retrieves information about a shared client,
-// including its ID, type, IP and log file location.
-func (sim *Simulation) GetSharedClientInfo(testSuite SuiteID, clientID string) (*SharedClientInfo, error) {
-	if sim.docs != nil {
-		return nil, errors.New("GetSharedClientInfo is not supported in docs mode")
-	}
-	var (
-		url  = fmt.Sprintf("%s/testsuite/%d/node/%s", sim.url, testSuite, clientID)
-		resp SharedClientInfo
-	)
-	err := get(url, &resp)
-	return &resp, err
-}
-
 // ExecSharedClient runs a command in a shared client container.
 func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd []string) (*ExecInfo, error) {
 	if sim.docs != nil {

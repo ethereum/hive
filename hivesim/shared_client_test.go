@@ -62,16 +62,6 @@ func TestStartSharedClient(t *testing.T) {
 	if !ip.Equal(expected) {
 		t.Errorf("wrong IP returned: got %v, want %v", ip, expected)
 	}
-
-	// Get client info
-	info, err := sim.GetSharedClientInfo(suiteID, containerID)
-	if err != nil {
-		t.Fatal("can't get shared client info:", err)
-	}
-
-	if info.ID != "container1" {
-		t.Errorf("wrong container ID in info: got %q, want %q", info.ID, "container1")
-	}
 }
 
 // Tests suites that use shared clients.
