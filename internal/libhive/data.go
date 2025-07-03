@@ -184,8 +184,8 @@ type ClientInfo struct {
 
 	// Fields for shared client support
 	IsShared     bool   `json:"isShared"`               // Indicates if this client is shared across tests
-	LogStartLine *int64 `json:"logStartLine,omitempty"` // Start line in log file for shared clients
-	LogEndLine   *int64 `json:"logEndLine,omitempty"`   // End line in log file for shared clients
+	LogStartByte *int64 `json:"logStartByte,omitempty"` // Start byte in log file for shared clients
+	LogEndByte   *int64 `json:"logEndByte,omitempty"`   // End byte in log file for shared clients
 
 	wait func()
 }

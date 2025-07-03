@@ -1,7 +1,6 @@
 package libhive
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -587,12 +586,12 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 	for _, clientInfo := range testCase.ClientInfo {
 		if clientInfo.IsShared {
 			// Get current log position
-			logEndLine, err := manager.getClientCurrentLineCount(clientInfo)
+			logEndByte, err := manager.getClientCurrentByteCount(clientInfo)
 			if err != nil {
 				slog.Error("could not get client log position", "err", err)
 				continue
 			}
-			clientInfo.LogEndLine = &logEndLine
+			clientInfo.LogEndByte = &logEndByte
 		}
 	}
 
@@ -698,11 +697,11 @@ func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, testID Tes
 	if testCase.ClientInfo == nil {
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
-	logStartLine, err := manager.getClientCurrentLineCount(nodeInfo)
+	logStartByte, err := manager.getClientCurrentByteCount(nodeInfo)
 	if err != nil {
 		return err
 	}
-	logStartLine += 1
+	logStartByte += 1
 
 	// Create a new client info object with the shared client info,
 	// without the wait function because we don't want to stop the
@@ -714,8 +713,8 @@ func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, testID Tes
 		InstantiatedAt: nodeInfo.InstantiatedAt,
 		LogFile:        nodeInfo.LogFile,
 		IsShared:       nodeInfo.IsShared,
-		LogStartLine:   &logStartLine,
-		LogEndLine:     nil, // TODO: get the end position from the log file when the test is finished
+		LogStartByte:   &logStartByte,
+		LogEndByte:     nil, // TODO: get the end position from the log file when the test is finished
 	}
 	// TODO: We can optionally add a stopClient flag to the RegisterSharedClient function
 	// to stop the client at the end of the test, but we need to create a new wait function
@@ -811,7 +810,7 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 }
 
 // countLinesInFile counts the current number of lines in a file (1-based).
-func (manager *TestManager) getClientCurrentLineCount(clientInfo *ClientInfo) (int64, error) {
+func (manager *TestManager) getClientCurrentByteCount(clientInfo *ClientInfo) (int64, error) {
 	// Ensure we have the full path to the log file
 	fullPath := clientInfo.LogFile
 	if !filepath.IsAbs(fullPath) {
@@ -819,25 +818,12 @@ func (manager *TestManager) getClientCurrentLineCount(clientInfo *ClientInfo) (i
 	}
 	slog.Debug("Opening log file", "path", fullPath)
 
-	// Open the log file
-	file, err := os.Open(fullPath)
+	fileInfo, err := os.Stat(fullPath)
 	if err != nil {
-		return 1, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	lineCount := int64(1)
-	for scanner.Scan() {
-		lineCount++
+		return 0, err
 	}
 
-	if err := scanner.Err(); err != nil {
-		return 1, err
-	}
-
-	return lineCount, nil
+	return fileInfo.Size(), nil
 }
 
 // writeSuiteFile writes the simulation result to the log directory.
