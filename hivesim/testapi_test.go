@@ -69,6 +69,35 @@ func TestSuiteReporting(t *testing.T) {
 			},
 		},
 	}
+	// Update expected results to match new fields
+	wantResults = map[libhive.TestSuiteID]*libhive.TestSuite{
+		0: {
+			ID:             0,
+			Name:           suite.Name,
+			Description:    suite.Description,
+			ClientVersions: make(map[string]string),
+			TestCases: map[libhive.TestID]*libhive.TestCase{
+				1: {
+					Name:        "passing test",
+					Description: "this test passes",
+					SummaryResult: libhive.TestResult{
+						Pass:    true,
+						Details: "message from the passing test\n",
+					},
+				},
+				2: {
+					Name:        "failing test",
+					Description: "this test fails",
+					SummaryResult: libhive.TestResult{
+						Pass:    false,
+						Details: "message from the failing test\n",
+					},
+				},
+			},
+			ClientInfo: nil, // Add this field to expected results
+		},
+	}
+
 	if !reflect.DeepEqual(results, wantResults) {
 		t.Fatal("wrong results reported:", spew.Sdump(results))
 	}

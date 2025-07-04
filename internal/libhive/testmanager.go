@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrNoSuchNode               = errors.New("no such node")
+	ErrSharedClientNotRunning   = errors.New("shared client not running")
 	ErrNoSuchTestSuite          = errors.New("no such test suite")
 	ErrNoSuchTestCase           = errors.New("no such test case")
 	ErrMissingClientType        = errors.New("missing client type")
@@ -105,14 +106,14 @@ func filterClientDesignators(clients []ClientDesignator) []ClientDesignator {
 			DockerfileExt: client.DockerfileExt,
 			BuildArgs:     make(map[string]string),
 		}
-		
+
 		// Filter build args
 		for key, value := range client.BuildArgs {
 			if !excludedBuildArgs[key] {
 				filteredClient.BuildArgs[key] = value
 			}
 		}
-		
+
 		filtered[i] = filteredClient
 	}
 	return filtered
@@ -122,10 +123,10 @@ func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefiniti
 	if hiveInfo.Commit == "" && hiveInfo.Date == "" {
 		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
 	}
-	
+
 	// Filter sensitive build args from HiveInfo.ClientFile
 	hiveInfo.ClientFile = filterClientDesignators(hiveInfo.ClientFile)
-	
+
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,
@@ -212,19 +213,38 @@ func (manager *TestManager) Terminate() error {
 }
 
 // GetNodeInfo gets some info on a client belonging to some test
-func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
-	manager.testCaseMutex.RLock()
-	defer manager.testCaseMutex.RUnlock()
+func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test *TestID, nodeID string) (*ClientInfo, error) {
+	if test != nil {
+		manager.testCaseMutex.RLock()
+		defer manager.testCaseMutex.RUnlock()
 
-	testCase, ok := manager.runningTestCases[test]
-	if !ok {
-		return nil, ErrNoSuchTestCase
+		testCase, ok := manager.runningTestCases[*test]
+		if !ok {
+			return nil, ErrNoSuchTestCase
+		}
+		nodeInfo, ok := testCase.ClientInfo[nodeID]
+		if !ok {
+			return nil, ErrNoSuchNode
+		}
+		return nodeInfo, nil
+	} else {
+		manager.testSuiteMutex.RLock()
+		defer manager.testSuiteMutex.RUnlock()
+
+		testSuite, ok := manager.runningTestSuites[testSuite]
+		if !ok {
+			return nil, ErrNoSuchTestSuite
+		}
+
+		if testSuite.ClientInfo == nil {
+			return nil, ErrNoSuchNode
+		}
+		client, ok := testSuite.ClientInfo[nodeID]
+		if !ok {
+			return nil, ErrNoSuchNode
+		}
+		return client, nil
 	}
-	nodeInfo, ok := testCase.ClientInfo[nodeID]
-	if !ok {
-		return nil, ErrNoSuchNode
-	}
-	return nodeInfo, nil
 }
 
 // CreateNetwork creates a docker network with the given network name.
@@ -397,29 +417,44 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
-	
+
 	// Create comprehensive run metadata
 	runMetadata := &RunMetadata{
 		HiveCommand: manager.hiveInfo.Command,
 		HiveVersion: GetHiveVersion(),
 	}
-	
+
 	// Add client configuration if available
 	if manager.hiveInfo.ClientFilePath != "" && len(manager.hiveInfo.ClientFile) > 0 {
 		// Convert existing ClientFile data to consistent format for storage
 		clientConfigContent := map[string]interface{}{
 			"clients": manager.hiveInfo.ClientFile,
 		}
-		
+
 		runMetadata.ClientConfig = &ClientConfigInfo{
 			FilePath: manager.hiveInfo.ClientFilePath,
 			Content:  clientConfigContent,
 		}
 	}
-	
+
 	// Attach metadata to suite
 	suite.RunMetadata = runMetadata
-	
+
+	// Clean up any shared clients for this suite.
+	if suite.ClientInfo != nil {
+		for nodeID, clientInfo := range suite.ClientInfo {
+			// Stop the container if it's still running.
+			if clientInfo.wait != nil {
+				slog.Info("cleaning up shared client", "suite", testSuite, "client", clientInfo.Name, "container", nodeID[:8])
+				if err := manager.backend.DeleteContainer(clientInfo.ID); err != nil {
+					slog.Error("could not stop shared client", "suite", testSuite, "container", nodeID[:8], "err", err)
+				}
+				clientInfo.wait()
+				clientInfo.wait = nil
+			}
+		}
+	}
+
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -531,9 +566,38 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.Details = ""
 		result.LogOffsets = offsets
 	}
+
+	// Log the number of clients in the test case for debugging
+	if len(testCase.ClientInfo) > 0 {
+		slog.Debug("Processing client logs",
+			"testID", testID,
+			"clientCount", len(testCase.ClientInfo),
+			"clientTypes", fmt.Sprintf("%v", func() []string {
+				types := make([]string, 0, len(testCase.ClientInfo))
+				for _, ci := range testCase.ClientInfo {
+					types = append(types, ci.Name)
+				}
+				return types
+			}()))
+	} else {
+		slog.Debug("No clients registered with test", "testID", testID)
+	}
+
+	for _, clientInfo := range testCase.ClientInfo {
+		if clientInfo.IsShared {
+			// Get current log position
+			logEndByte, err := manager.getClientCurrentByteCount(clientInfo)
+			if err != nil {
+				slog.Error("could not get client log position", "err", err)
+				continue
+			}
+			clientInfo.LogEndByte = &logEndByte
+		}
+	}
+
 	testCase.SummaryResult = *result
 
-	// Stop running clients.
+	// Stop running clients that are not shared.
 	for _, v := range testCase.ClientInfo {
 		if v.wait != nil {
 			manager.backend.DeleteContainer(v.ID)
@@ -571,11 +635,60 @@ func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCas
 	return &offsets
 }
 
-// RegisterNode is used by test suite hosts to register the creation of a node in the context of a test
-func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo *ClientInfo) error {
-	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
+// RegisterNode is used by test suite hosts to register the creation of a node.
+// If testID is nil, the node is a shared client.
+func (manager *TestManager) RegisterNode(suiteID TestSuiteID, testID *TestID, nodeID string, nodeInfo *ClientInfo) error {
+	if testID != nil {
+		manager.testCaseMutex.Lock()
+		defer manager.testCaseMutex.Unlock()
 
+		// Check if the test case is running
+		testCase, ok := manager.runningTestCases[*testID]
+		if !ok {
+			return ErrNoSuchTestCase
+		}
+		if testCase.ClientInfo == nil {
+			testCase.ClientInfo = make(map[string]*ClientInfo)
+		}
+
+		testCase.ClientInfo[nodeID] = nodeInfo
+		return nil
+	} else {
+		manager.testSuiteMutex.Lock()
+		defer manager.testSuiteMutex.Unlock()
+
+		// Check if the test suite is running
+		testSuite, ok := manager.runningTestSuites[suiteID]
+		if !ok {
+			return ErrNoSuchTestSuite
+		}
+
+		// Initialize shared clients map if it doesn't exist
+		if testSuite.ClientInfo == nil {
+			testSuite.ClientInfo = make(map[string]*ClientInfo)
+		}
+
+		testSuite.ClientInfo[nodeID] = nodeInfo
+		return nil
+	}
+}
+
+// RegisterSharedClient registers an already started shared client in a specific test
+func (manager *TestManager) RegisterSharedClient(suiteID TestSuiteID, testID TestID, nodeID string) error {
+	suite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestSuite
+	}
+	if suite.ClientInfo == nil {
+		return ErrNoSuchNode
+	}
+	nodeInfo, ok := suite.ClientInfo[nodeID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	if nodeInfo.wait == nil {
+		return ErrSharedClientNotRunning
+	}
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
@@ -584,22 +697,66 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 	if testCase.ClientInfo == nil {
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
-	testCase.ClientInfo[nodeID] = nodeInfo
+	logStartByte, err := manager.getClientCurrentByteCount(nodeInfo)
+	if err != nil {
+		return err
+	}
+	logStartByte += 1
+
+	// Create a new client info object with the shared client info,
+	// without the wait function because we don't want to stop the
+	// container at the end of the test
+	nodeInfoTestCopy := ClientInfo{
+		ID:             nodeInfo.ID,
+		IP:             nodeInfo.IP,
+		Name:           nodeInfo.Name,
+		InstantiatedAt: nodeInfo.InstantiatedAt,
+		LogFile:        nodeInfo.LogFile,
+		IsShared:       nodeInfo.IsShared,
+		LogStartByte:   &logStartByte,
+		LogEndByte:     nil, // TODO: get the end position from the log file when the test is finished
+	}
+	// TODO: We can optionally add a stopClient flag to the RegisterSharedClient function
+	// to stop the client at the end of the test, but we need to create a new wait function
+	// that calls and then clears the wait function from the original nodeInfo.
+	testCase.ClientInfo[nodeID] = &nodeInfoTestCopy
+
 	return nil
 }
 
 // StopNode stops a client container.
-func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
-	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
+func (manager *TestManager) StopNode(suiteID TestSuiteID, testID *TestID, nodeID string) error {
+	var nodeInfo *ClientInfo
+	if testID != nil {
+		manager.testCaseMutex.Lock()
+		defer manager.testCaseMutex.Unlock()
 
-	testCase, ok := manager.runningTestCases[testID]
-	if !ok {
-		return ErrNoSuchNode
-	}
-	nodeInfo, ok := testCase.ClientInfo[nodeID]
-	if !ok {
-		return ErrNoSuchNode
+		testCase, ok := manager.runningTestCases[*testID]
+		if !ok {
+			return ErrNoSuchNode
+		}
+		nodeInfo, ok = testCase.ClientInfo[nodeID]
+		if !ok {
+			return ErrNoSuchNode
+		}
+
+	} else {
+		manager.testSuiteMutex.Lock()
+		defer manager.testSuiteMutex.Unlock()
+
+		// Check if the test suite is running
+		testSuite, ok := manager.runningTestSuites[suiteID]
+		if !ok {
+			return ErrNoSuchTestSuite
+		}
+
+		if testSuite.ClientInfo == nil {
+			return ErrNoSuchNode
+		}
+		nodeInfo, ok = testSuite.ClientInfo[nodeID]
+		if !ok {
+			return ErrNoSuchNode
+		}
 	}
 	// Stop the container.
 	if nodeInfo.wait != nil {
@@ -652,18 +809,34 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 	return nil
 }
 
+// countLinesInFile counts the current number of lines in a file (1-based).
+func (manager *TestManager) getClientCurrentByteCount(clientInfo *ClientInfo) (int64, error) {
+	// Ensure we have the full path to the log file
+	fullPath := clientInfo.LogFile
+	if !filepath.IsAbs(fullPath) {
+		fullPath = filepath.Join(manager.config.LogDir, clientInfo.LogFile)
+	}
+	slog.Debug("Opening log file", "path", fullPath)
+
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size(), nil
+}
+
 // writeSuiteFile writes the simulation result to the log directory.
 // List of build arguments to exclude from result JSON for security/privacy
 var excludedBuildArgs = map[string]bool{
-	"GOPROXY":    true,  // Go proxy URLs may contain sensitive info
-	"GITHUB_TOKEN": true,  // GitHub tokens
-	"ACCESS_TOKEN": true,  // Generic access tokens
-	"API_KEY":      true,  // API keys
-	"PASSWORD":     true,  // Passwords
-	"SECRET":       true,  // Generic secrets
-	"TOKEN":        true,  // Generic tokens
+	"GOPROXY":      true, // Go proxy URLs may contain sensitive info
+	"GITHUB_TOKEN": true, // GitHub tokens
+	"ACCESS_TOKEN": true, // Generic access tokens
+	"API_KEY":      true, // API keys
+	"PASSWORD":     true, // Passwords
+	"SECRET":       true, // Generic secrets
+	"TOKEN":        true, // Generic tokens
 }
-
 
 func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteData, err := json.Marshal(s)

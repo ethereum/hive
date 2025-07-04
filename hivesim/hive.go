@@ -207,6 +207,68 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 	return resp.ID, ip, nil
 }
 
+// StartSharedClient starts a new node as a shared client at the suite level.
+// The client persists for the duration of the suite and can be used by multiple tests.
+// Returns container id and ip.
+func (sim *Simulation) StartSharedClient(testSuite SuiteID, clientType string, options ...StartOption) (string, net.IP, error) {
+	if sim.docs != nil {
+		return "", nil, errors.New("StartSharedClient is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/node", sim.url, testSuite)
+		resp simapi.StartNodeResponse
+	)
+
+	setup := &clientSetup{
+		files: make(map[string]func() (io.ReadCloser, error)),
+		config: simapi.NodeConfig{
+			Client:      clientType,
+			Environment: make(map[string]string),
+		},
+	}
+	for _, opt := range options {
+		opt.apply(setup)
+	}
+
+	err := setup.postWithFiles(url, &resp)
+	if err != nil {
+		return "", nil, err
+	}
+	ip := net.ParseIP(resp.IP)
+	if ip == nil {
+		return resp.ID, nil, fmt.Errorf("no IP address returned")
+	}
+	return resp.ID, ip, nil
+}
+
+// ExecSharedClient runs a command in a shared client container.
+func (sim *Simulation) ExecSharedClient(testSuite SuiteID, clientID string, cmd []string) (*ExecInfo, error) {
+	if sim.docs != nil {
+		return nil, errors.New("ExecSharedClient is not supported in docs mode")
+	}
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/node/%s/exec", sim.url, testSuite, clientID)
+		req  = &simapi.ExecRequest{Command: cmd}
+		resp *ExecInfo
+	)
+	err := post(url, req, &resp)
+	return resp, err
+}
+
+// RegisterSharedNode registers a shared client with a test.
+func (sim *Simulation) RegisterSharedNode(testSuite SuiteID, test TestID, clientID string) error {
+	if sim.docs != nil {
+		return errors.New("RegisterSharedNode is not supported in docs mode")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/node/%s/test/%d", sim.url, testSuite, clientID, test), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
+}
+
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	if sim.docs != nil {

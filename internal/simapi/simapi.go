@@ -28,6 +28,14 @@ type NodeResponse struct {
 	Name string `json:"name"`
 }
 
+// NodeInfo contains information about a client node to register with a test.
+type NodeInfo struct {
+	ID             string `json:"id"`                       // Container ID
+	Name           string `json:"name"`                     // Client name/type
+	IsShared       bool   `json:"isShared"`                 // Whether this is a shared client
+	SharedClientID string `json:"sharedClientId,omitempty"` // ID of the shared client in the suite
+}
+
 type ExecRequest struct {
 	Command []string `json:"command"`
 }

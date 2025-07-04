@@ -34,17 +34,30 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 	router := mux.NewRouter()
 	router.HandleFunc("/hive", api.getHiveInfo).Methods("GET")
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
+
+	// Test suite and client routes
+	router.HandleFunc("/testsuite", api.startSuite).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}", api.endSuite).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
 	// post because the delete http verb does not always support a message body
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
-	router.HandleFunc("/testsuite", api.startSuite).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}", api.endSuite).Methods("DELETE")
+
+	// Shared client routes
+	router.HandleFunc("/testsuite/{suite}/node", api.startClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.getNodeStatus).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/node/{node}/exec", api.execInClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/node/{node}", api.stopClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/node/{node}/test/{test}", api.registerSharedClient).Methods("POST")
+
+	// Regular client routes
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
+
+	// Network routes
 	router.HandleFunc("/testsuite/{suite}/network/{network}", api.networkCreate).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", api.networkRemove).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", api.networkIPGet).Methods("GET")
@@ -166,7 +179,7 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 
 // startClient starts a client container.
 func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -250,7 +263,9 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	labels := NewBaseLabels(api.tm.hiveInstanceID, api.tm.hiveVersion)
 	labels[LabelHiveType] = ContainerTypeClient
 	labels[LabelHiveTestSuite] = suiteID.String()
-	labels[LabelHiveTestCase] = testID.String()
+	if testID != nil {
+		labels[LabelHiveTestCase] = testID.String()
+	}
 	labels[LabelHiveClientName] = clientDef.Name
 	labels[LabelHiveClientImage] = clientDef.Image
 
@@ -261,7 +276,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	options := ContainerOptions{Env: env, Files: files, Labels: labels, Name: containerName}
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
-		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
+		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err, "containerName", containerName)
 		err := fmt.Errorf("client container create failed (%v)", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
@@ -304,6 +319,9 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogFile:        logPath,
 			wait:           info.Wait,
 		}
+		if testID == nil {
+			clientInfo.IsShared = true
+		}
 
 		// Add client version to the test suite.
 		api.tm.testSuiteMutex.Lock()
@@ -314,7 +332,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 		// Register the node. This should always be done, even if starting the container
 		// failed, to ensure that the failed client log is associated with the test.
-		api.tm.RegisterNode(testID, info.ID, clientInfo)
+		api.tm.RegisterNode(suiteID, testID, info.ID, clientInfo)
 	}
 	if err != nil {
 		slog.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
@@ -324,8 +342,43 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// It's started.
-	slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+	if testID == nil {
+		slog.Info("API: shared client "+clientDef.Name+" started", "suite", suiteID, "container", containerID[:8], "containerName", containerName)
+	} else {
+		slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8], "containerName", containerName)
+	}
 	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
+}
+
+// registerSharedClient registers a shared client in a test.
+func (api *simAPI) registerSharedClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, testID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	node := mux.Vars(r)["node"]
+	sharedClient, err := api.tm.GetNodeInfo(suiteID, nil, node)
+	if err != nil {
+		slog.Error("API: can't find shared client", "node", node, "error", err)
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+	if !sharedClient.IsShared {
+		slog.Error("API: shared client is not shared", "node", node)
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	// Register the node with the test
+	if err := api.tm.RegisterSharedClient(suiteID, testID, node); err != nil {
+		slog.Error("API: failed to register shared client", "node", node, "error", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	serveOK(w)
 }
 
 // clientLogFilePaths determines the log file path of a client container.
@@ -363,14 +416,14 @@ func (api *simAPI) checkClientNetworks(req *simapi.NodeConfig, suiteID TestSuite
 
 // stopClient terminates a client container.
 func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
-	_, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	node := mux.Vars(r)["node"]
 
-	err = api.tm.StopNode(testID, node)
+	err = api.tm.StopNode(suiteID, testID, node)
 	switch {
 	case err == ErrNoSuchNode:
 		serveError(w, err, http.StatusNotFound)
@@ -423,7 +476,7 @@ func (api *simAPI) unpauseClient(w http.ResponseWriter, r *http.Request) {
 
 // getNodeStatus returns the status of a client container.
 func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -441,7 +494,7 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	suiteID, testID, err := api.requestSuiteAndOptionalTest(r)
 	if err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -624,6 +677,28 @@ func (api *simAPI) requestSuiteAndTest(r *http.Request) (TestSuiteID, TestID, er
 	}
 	testID, err := api.requestTest(r)
 	return suiteID, testID, err
+}
+
+// requestSuiteAndOptionalTest returns the suite ID and test ID from the request body.
+func (api *simAPI) requestSuiteAndOptionalTest(r *http.Request) (TestSuiteID, *TestID, error) {
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		return 0, nil, err
+	}
+	var testID *TestID
+	testString, ok := mux.Vars(r)["test"]
+	if ok {
+		testCase, err := strconv.Atoi(testString)
+		if err != nil {
+			return 0, nil, fmt.Errorf("invalid test case id %q", testString)
+		}
+		testCaseID := TestID(testCase)
+		if _, running := api.tm.IsTestRunning(testCaseID); !running {
+			return 0, nil, fmt.Errorf("test case %d is not running", testCaseID)
+		}
+		testID = &testCaseID
+	}
+	return suiteID, testID, nil
 }
 
 func serveJSON(w http.ResponseWriter, value interface{}) {

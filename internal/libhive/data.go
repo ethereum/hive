@@ -9,15 +9,15 @@ import (
 
 // Docker label keys used by Hive
 const (
-	LabelHiveInstance    = "hive.instance"       // Unique Hive instance ID
-	LabelHiveVersion     = "hive.version"        // Hive version/commit
-	LabelHiveType        = "hive.type"           // container type: client|simulator|proxy
-	LabelHiveTestSuite   = "hive.test.suite"     // test suite ID
-	LabelHiveTestCase    = "hive.test.case"      // test case ID
-	LabelHiveClientName  = "hive.client.name"    // client name (go-ethereum, etc)
-	LabelHiveClientImage = "hive.client.image"   // Docker image name
-	LabelHiveCreated     = "hive.created"        // RFC3339 timestamp
-	LabelHiveSimulator   = "hive.simulator"      // simulator name
+	LabelHiveInstance    = "hive.instance"     // Unique Hive instance ID
+	LabelHiveVersion     = "hive.version"      // Hive version/commit
+	LabelHiveType        = "hive.type"         // container type: client|simulator|proxy
+	LabelHiveTestSuite   = "hive.test.suite"   // test suite ID
+	LabelHiveTestCase    = "hive.test.case"    // test case ID
+	LabelHiveClientName  = "hive.client.name"  // client name (go-ethereum, etc)
+	LabelHiveClientImage = "hive.client.image" // Docker image name
+	LabelHiveCreated     = "hive.created"      // RFC3339 timestamp
+	LabelHiveSimulator   = "hive.simulator"    // simulator name
 )
 
 // Container types
@@ -47,7 +47,7 @@ func SanitizeContainerNameComponent(s string) string {
 	if s == "" {
 		return s
 	}
-	
+
 	// Replace invalid characters with dashes
 	sanitized := ""
 	for i, r := range s {
@@ -61,10 +61,10 @@ func SanitizeContainerNameComponent(s string) string {
 			sanitized += "-"
 		}
 	}
-	
+
 	// Ensure first character is alphanumeric
-	if len(sanitized) > 0 && !((sanitized[0] >= 'a' && sanitized[0] <= 'z') || 
-		(sanitized[0] >= 'A' && sanitized[0] <= 'Z') || 
+	if len(sanitized) > 0 && !((sanitized[0] >= 'a' && sanitized[0] <= 'z') ||
+		(sanitized[0] >= 'A' && sanitized[0] <= 'Z') ||
 		(sanitized[0] >= '0' && sanitized[0] <= '9')) {
 		if len(sanitized) > 1 {
 			sanitized = sanitized[1:]
@@ -72,13 +72,13 @@ func SanitizeContainerNameComponent(s string) string {
 			sanitized = "container"
 		}
 	}
-	
+
 	return sanitized
 }
 
 // GenerateContainerName generates a Hive-prefixed container name
 func GenerateContainerName(containerType, identifier string) string {
-	timestamp := time.Now().Format("20060102-150405")
+	timestamp := time.Now().Format("20060102-150405.0000")
 	sanitizedType := SanitizeContainerNameComponent(containerType)
 	if identifier != "" {
 		sanitizedIdentifier := SanitizeContainerNameComponent(identifier)
@@ -88,8 +88,11 @@ func GenerateContainerName(containerType, identifier string) string {
 }
 
 // GenerateClientContainerName generates a name for client containers
-func GenerateClientContainerName(clientName string, suiteID TestSuiteID, testID TestID) string {
-	identifier := fmt.Sprintf("%s-s%s-t%s", clientName, suiteID.String(), testID.String())
+func GenerateClientContainerName(clientName string, suiteID TestSuiteID, testID *TestID) string {
+	identifier := fmt.Sprintf("%s-s%s", clientName, suiteID.String())
+	if testID != nil {
+		identifier += fmt.Sprintf("-t%s", testID.String())
+	}
 	return GenerateContainerName("client", identifier)
 }
 
@@ -126,6 +129,9 @@ type TestSuite struct {
 	RunMetadata    *RunMetadata         `json:"runMetadata,omitempty"` // Enhanced run metadata
 	TestCases      map[TestID]*TestCase `json:"testCases"`
 
+	// Shared client support
+	ClientInfo map[string]*ClientInfo `json:"clientInfo,omitempty"` // Map of shared clients available to all tests in this suite
+
 	SimulatorLog   string `json:"simLog"`         // path to simulator log-file simulator. (may be shared with multiple suites)
 	TestDetailsLog string `json:"testDetailsLog"` // the test details output file
 
@@ -154,6 +160,15 @@ type TestResult struct {
 	LogOffsets *TestLogOffsets `json:"log,omitempty"`
 }
 
+// ClientLogSegment represents a segment of a client log file
+type ClientLogSegment struct {
+	Start     int64  `json:"start"`     // Starting byte offset in log file
+	End       int64  `json:"end"`       // Ending byte offset in log file
+	StartLine int    `json:"startLine"` // Starting line number
+	EndLine   int    `json:"endLine"`   // Ending line number
+	ClientID  string `json:"clientId"`  // ID of the client
+}
+
 type TestLogOffsets struct {
 	Begin int64 `json:"begin"`
 	End   int64 `json:"end"`
@@ -166,6 +181,11 @@ type ClientInfo struct {
 	Name           string    `json:"name"`
 	InstantiatedAt time.Time `json:"instantiatedAt"`
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
+
+	// Fields for shared client support
+	IsShared     bool   `json:"isShared"`               // Indicates if this client is shared across tests
+	LogStartByte *int64 `json:"logStartByte,omitempty"` // Start byte in log file for shared clients
+	LogEndByte   *int64 `json:"logEndByte,omitempty"`   // End byte in log file for shared clients
 
 	wait func()
 }

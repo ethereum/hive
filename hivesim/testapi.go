@@ -2,6 +2,7 @@ package hivesim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -21,6 +22,12 @@ type Suite struct {
 	Category    string // Category of the test suite [Optional]
 	Description string // Description of the test suite (if empty, suite won't appear in documentation) [Optional]
 	Tests       []AnyTest
+
+	// Function that, given the passed client definition, returns:
+	//   - a list of options to start a shared client
+	//   - nil if the given client type/role is not meant to be started
+	SharedClientsOptions func(clientDefinition *ClientDefinition) []StartOption
+	sharedClients        map[string]Client
 }
 
 func (s *Suite) request() *simapi.TestRequest {
@@ -77,11 +84,39 @@ func RunSuite(host *Simulation, suite Suite) error {
 	}
 	defer host.EndSuite(suiteID)
 
+	// Start shared clients
+	if suite.SharedClientsOptions != nil {
+		suite.sharedClients = map[string]Client{}
+		clients, err := host.ClientTypes()
+		if err != nil {
+			return err
+		}
+		for _, clientDef := range clients {
+			options := suite.SharedClientsOptions(clientDef)
+			if options == nil {
+				continue
+			}
+			container, ip, err := host.StartSharedClient(suiteID, clientDef.Name, options...)
+			if err != nil {
+				return err
+			}
+			suite.sharedClients[container] = Client{
+				Type:      clientDef.Name,
+				Container: container,
+				IP:        ip,
+				IsShared:  true,
+				mu:        &sync.Mutex{},
+			}
+		}
+	}
+
+	// Run all tests in the suite
 	for _, test := range suite.Tests {
 		if err := test.runTest(host, suiteID, &suite); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -159,8 +194,9 @@ type Client struct {
 	Type      string
 	Container string
 	IP        net.IP
+	IsShared  bool
 
-	mu        sync.Mutex
+	mu        *sync.Mutex
 	rpc       *rpc.Client
 	enginerpc *rpc.Client
 	test      *T
@@ -202,16 +238,25 @@ func (c *Client) EngineAPI() *rpc.Client {
 
 // Exec runs a script in the client container.
 func (c *Client) Exec(command ...string) (*ExecInfo, error) {
+	if c.IsShared {
+		return c.test.Sim.ExecSharedClient(c.test.SuiteID, c.Container, command)
+	}
 	return c.test.Sim.ClientExec(c.test.SuiteID, c.test.TestID, c.Container, command)
 }
 
 // Pauses the client container.
 func (c *Client) Pause() error {
+	if c.IsShared {
+		return errors.New("cannot pause shared client")
+	}
 	return c.test.Sim.PauseClient(c.test.SuiteID, c.test.TestID, c.Container)
 }
 
 // Unpauses the client container.
 func (c *Client) Unpause() error {
+	if c.IsShared {
+		return errors.New("cannot unpause shared client")
+	}
 	return c.test.Sim.UnpauseClient(c.test.SuiteID, c.test.TestID, c.Container)
 }
 
@@ -235,7 +280,64 @@ func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 	if err != nil {
 		t.Fatalf("can't launch node (type %s): %v", clientType, err)
 	}
-	return &Client{Type: clientType, Container: container, IP: ip, test: t}
+
+	return &Client{
+		Type:      clientType,
+		Container: container,
+		IP:        ip,
+		test:      t,
+		IsShared:  false,
+		mu:        &sync.Mutex{},
+	}
+}
+
+func (t *T) GetSharedClientIDs() []string {
+	if t.suite == nil || t.suite.sharedClients == nil {
+		return []string{}
+	}
+	ids := make([]string, 0, len(t.suite.sharedClients))
+	for id := range t.suite.sharedClients {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// GetSharedClient retrieves a shared client by ID and prepares it for use in this test.
+// The client can be used like a normal Client object, but maintains its state across tests.
+// Returns nil if the client doesn't exist.
+func (t *T) GetSharedClient(clientID string) *Client {
+	if t.suite == nil || t.suite.sharedClients == nil {
+		t.Logf("No shared clients available in this suite")
+		return nil
+	}
+
+	sharedClient, exists := t.suite.sharedClients[clientID]
+	if !exists {
+		t.Logf("Shared client %q not found", clientID)
+		return nil
+	}
+
+	// Store the test context in the client so it can be used for this test
+	// Create a new Client instance that points to the same container
+	client := &Client{
+		Type:      sharedClient.Type,
+		Container: sharedClient.Container,
+		IP:        sharedClient.IP,
+		IsShared:  true,
+
+		mu:        sharedClient.mu,
+		rpc:       sharedClient.rpc,
+		enginerpc: sharedClient.enginerpc,
+		test:      t,
+	}
+
+	if err := t.Sim.RegisterSharedNode(t.SuiteID, t.TestID, clientID); err != nil {
+		t.Logf("Warning: Failed to register shared client %s with test: %v", clientID, err)
+	} else {
+		t.Logf("Successfully registered shared client %s with test %d", clientID, t.TestID)
+	}
+
+	return client
 }
 
 // RunClient runs the given client test against a single client type.

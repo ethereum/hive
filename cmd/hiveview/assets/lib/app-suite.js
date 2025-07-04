@@ -317,21 +317,175 @@ function deselectTest(row, closeDetails) {
     history.replaceState(null, null, '#');
 }
 
-function testHasClients(testData) {
-    return testData.clientInfo && Object.getOwnPropertyNames(testData.clientInfo).length > 0;
+function testHasClients(testData, suiteData) {
+    if (testData.clientInfo && Object.getOwnPropertyNames(testData.clientInfo).length > 0) {
+        return true;
+    }
+    
+    if (testData.summaryResult && testData.summaryResult.clientLogs && 
+        Object.keys(testData.summaryResult.clientLogs).length > 0) {
+        return true;
+    }
+    
+    if (suiteData && suiteData.clientInfo) {
+        for (let clientID in suiteData.clientInfo) {
+            let clientName = suiteData.clientInfo[clientID].name;
+            if (testData.name.includes(clientName)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
 }
 
 // formatClientLogsList turns the clientInfo part of a test into a list of links.
 function formatClientLogsList(suiteData, testIndex, clientInfo) {
     let links = [];
-    for (let instanceID in clientInfo) {
-        let instanceInfo = clientInfo[instanceID];
-        let logfile = routes.resultsRoot + instanceInfo.logFile;
-        let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
-        let link = html.makeLink(url, instanceInfo.name);
-        link.classList.add('log-link');
-        links.push(link.outerHTML);
+    let testCase = suiteData.testCases[testIndex];
+    let usedSharedClients = new Set(); // Track which shared clients were used in this test
+    
+    // First, check if the test has specific information about which shared clients it used
+    if (testCase && testCase.summaryResult && testCase.summaryResult.clientLogs) {
+        for (let clientID in testCase.summaryResult.clientLogs) {
+            usedSharedClients.add(clientID);
+        }
     }
+    
+    // Handle clients listed directly in the test's clientInfo
+    if (clientInfo) {
+        for (let instanceID in clientInfo) {
+            let instanceInfo = clientInfo[instanceID];
+            
+            // Skip if no log file
+            if (!instanceInfo.logFile) {
+                continue;
+            }
+            
+            // If it's a shared client, mark it as used
+            if (instanceInfo.isShared) {
+                usedSharedClients.add(instanceID);
+            }
+            
+            let logfile = routes.resultsRoot + instanceInfo.logFile;
+            let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+            
+            // Check if this is a shared client with a log segment
+            let hasSegment = testCase && 
+                             testCase.summaryResult && 
+                             testCase.summaryResult.clientLogs && 
+                             testCase.summaryResult.clientLogs[instanceID];
+            
+            if (hasSegment) {
+                // If we have a log segment, update the URL to include the line numbers
+                const clientLogInfo = testCase.summaryResult.clientLogs[instanceID];
+                
+                // Use line numbers from the backend
+                url += `#L${clientLogInfo.startLine}-${clientLogInfo.endLine}`;
+            }
+            
+            // Add "(shared)" indicator for shared clients
+            let clientName = instanceInfo.name;
+            if (instanceInfo.isShared || hasSegment) {
+                clientName += " (shared)";
+            }
+            
+            let link = html.makeLink(url, clientName);
+            link.classList.add('log-link');
+            if (instanceInfo.isShared) {
+                link.classList.add('shared-client-log');
+            }
+            links.push(link.outerHTML);
+        }
+    }
+    
+    // For backward compatibility - if test name includes client name, add that client
+    // This handles the case where tests don't yet have clientInfo or clientLogs properly populated
+    if (suiteData.clientInfo) {
+        
+        // First try to match by existing client logs
+        if (usedSharedClients.size === 0) {
+            // Group clients by name to identify if there are multiple of the same type
+            let clientsByName = {};
+            for (let instanceID in suiteData.clientInfo) {
+                let sharedClient = suiteData.clientInfo[instanceID];
+                if (!sharedClient.logFile) continue; // Skip if no log file
+                
+                // Add to the clients by name map
+                if (!clientsByName[sharedClient.name]) {
+                    clientsByName[sharedClient.name] = [];
+                }
+                clientsByName[sharedClient.name].push({id: instanceID, client: sharedClient});
+            }
+            
+            // Now check test name for client match, but only if there's exactly one client of that type
+            for (let clientName in clientsByName) {
+                if (testCase.name.includes(clientName) && clientsByName[clientName].length === 1) {
+                    // If there's exactly one client of this type, it's safe to auto-register
+                    let instanceID = clientsByName[clientName][0].id;
+                    usedSharedClients.add(instanceID);
+                }
+            }
+        }
+        
+        // Now add all the used shared clients that haven't been handled yet
+        for (let instanceID in suiteData.clientInfo) {
+            // First check if this client is explicitly registered in the test's clientLogs
+            // This is the most reliable way to determine if a client was used in a test
+            const explicitlyRegistered = testCase && 
+                                       testCase.summaryResult && 
+                                       testCase.summaryResult.clientLogs && 
+                                       testCase.summaryResult.clientLogs[instanceID];
+            
+            if (explicitlyRegistered) {
+                usedSharedClients.add(instanceID);
+            }
+            
+            // Skip if not used by this test (based on explicit tracking or name matching)
+            if (!usedSharedClients.has(instanceID)) {
+                continue;
+            }
+            
+            // Skip clients already handled in clientInfo
+            if (clientInfo && instanceID in clientInfo) {
+                continue;
+            }
+            
+            let sharedClient = suiteData.clientInfo[instanceID];
+            
+            // Skip if no log file
+            if (!sharedClient.logFile) {
+                continue;
+            }
+            
+            // Create a link to the full log file for this shared client
+            let logfile = routes.resultsRoot + sharedClient.logFile;
+            let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+            
+            // Check if we have specific log segments for this client in this test
+            let hasSegment = testCase && 
+                             testCase.summaryResult && 
+                             testCase.summaryResult.clientLogs && 
+                             testCase.summaryResult.clientLogs[instanceID];
+            
+            if (hasSegment) {
+                // If we have a log segment, update the URL to include the line numbers
+                const clientLogInfo = testCase.summaryResult.clientLogs[instanceID];
+                
+                // Only add line range if we have valid line numbers (both > 0)
+                if (clientLogInfo.startLine > 0 && clientLogInfo.endLine > 0) {
+                    url += `#L${clientLogInfo.startLine}-${clientLogInfo.endLine}`;
+                }
+            }
+            
+            let clientName = sharedClient.name + " (shared)";
+            let link = html.makeLink(url, clientName);
+            
+            link.classList.add('log-link', 'shared-client-log');
+            links.push(link.outerHTML);
+        }
+    }
+    
     return links.join(', ');
 }
 
@@ -360,7 +514,7 @@ function formatTestDetails(suiteData, row) {
         p.innerHTML = formatTestStatus(d.summaryResult);
         container.appendChild(p);
     }
-    if (!row.column('logs:name').responsiveHidden() && testHasClients(d)) {
+    if (!row.column('logs:name').responsiveHidden() && testHasClients(d, suiteData)) {
         let p = document.createElement('p');
         p.innerHTML = '<b>Clients:</b> ' + formatClientLogsList(suiteData, d.testIndex, d.clientInfo);
         container.appendChild(p);
