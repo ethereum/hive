@@ -8,7 +8,7 @@ import (
 
 func TestGenerateHiveInstanceID(t *testing.T) {
 	id1 := GenerateHiveInstanceID()
-	
+
 	// Sleep briefly to ensure different timestamp
 	time.Sleep(time.Millisecond)
 	id2 := GenerateHiveInstanceID()
@@ -120,7 +120,7 @@ func TestGenerateContainerName(t *testing.T) {
 
 func TestGenerateClientContainerName(t *testing.T) {
 	name := GenerateClientContainerName("go-ethereum", TestSuiteID(1), TestID(2))
-	
+
 	if len(name) < 5 || name[:5] != "hive-" {
 		t.Errorf("Client container name should start with 'hive-', got: %s", name)
 	}
@@ -136,7 +136,7 @@ func TestGenerateClientContainerName(t *testing.T) {
 
 func TestGenerateSimulatorContainerName(t *testing.T) {
 	name := GenerateSimulatorContainerName("devp2p")
-	
+
 	if len(name) < 5 || name[:5] != "hive-" {
 		t.Errorf("Simulator container name should start with 'hive-', got: %s", name)
 	}
@@ -151,7 +151,7 @@ func TestGenerateSimulatorContainerName(t *testing.T) {
 
 func TestGenerateProxyContainerName(t *testing.T) {
 	name := GenerateProxyContainerName()
-	
+
 	if len(name) < 5 || name[:5] != "hive-" {
 		t.Errorf("Proxy container name should start with 'hive-', got: %s", name)
 	}
@@ -191,12 +191,35 @@ func TestSanitizeContainerNameComponent(t *testing.T) {
 func TestSanitizedContainerNames(t *testing.T) {
 	// Test that names with slashes get properly sanitized
 	name := GenerateSimulatorContainerName("ethereum/rpc-compat")
-	
+
 	if strings.Contains(name, "/") {
 		t.Errorf("Container name should not contain '/', got: %s", name)
 	}
-	
+
 	if !strings.Contains(name, "ethereum-rpc-compat") {
 		t.Errorf("Container name should contain sanitized simulator name, got: %s", name)
 	}
+}
+
+func TestGenerateContainerName_Uniqueness(t *testing.T) {
+	seen := make(map[string]bool)
+	duplicates := make(map[string]int)
+	iterations := 1000
+
+	for i := 0; i < iterations; i++ {
+		name := GenerateContainerName("client", "test-client")
+		if seen[name] {
+			duplicates[name]++
+		} else {
+			seen[name] = true
+		}
+	}
+
+	if len(duplicates) > 0 {
+		t.Errorf("Found %d duplicate container names:", len(duplicates))
+		for name, count := range duplicates {
+			t.Errorf("  %s: appeared %d times", name, count+1)
+		}
+	}
+
 }
