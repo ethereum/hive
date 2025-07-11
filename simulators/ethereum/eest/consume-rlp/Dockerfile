@@ -7,18 +7,12 @@ ENV FIXTURES=${fixtures}
 ARG branch=main
 ENV GIT_REF=${branch}
 
-## Clone and install EEST
+## Install EEST
+## TODO: Remove this line once EEST is published to PyPI
 RUN apt-get update && apt-get install -y git
 
-# Allow the user to specify a branch or commit to checkout
-RUN git init execution-spec-tests && \
-    cd execution-spec-tests && \
-    git remote add origin https://github.com/ethereum/execution-spec-tests.git && \
-    git fetch --depth 1 origin $GIT_REF && \
-    git checkout FETCH_HEAD
-
 WORKDIR /execution-spec-tests
-RUN uv sync
+RUN uv venv && uv pip install git+https://github.com/ethereum/execution-spec-tests.git@$GIT_REF
 
 # Cache the fixtures. This is done to avoid re-downloading the fixtures every time
 # the container starts.
