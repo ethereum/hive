@@ -172,7 +172,6 @@ def clique_engine:
     "eip7951TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7939TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7934TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
-    "eip7907TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7934MaxRlpBlockSize": "0x800000",
 
     # Other chain parameters
