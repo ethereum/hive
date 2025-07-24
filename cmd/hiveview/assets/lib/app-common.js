@@ -4,6 +4,24 @@ import $ from 'jquery';
 import * as routes from './routes.js';
 import { makeLink } from './html.js';
 
+// Initialize theme
+const storedTheme = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+document.documentElement.classList.add(storedTheme);
+document.documentElement.setAttribute('data-bs-theme', storedTheme);
+
+// Theme toggle handler
+$(document).ready(function() {
+    $('.theme-toggle').text(storedTheme === 'dark' ? '☀️' : '🌙');
+    $('.theme-toggle').on('click', function() {
+        const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+        document.documentElement.setAttribute('data-bs-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        $('.theme-toggle').text(newTheme === 'dark' ? '☀️' : '🌙');
+    });
+});
+
 // updateHeader populates the page header with version information from hive.json.
 export function updateHeader() {
     $.ajax({
@@ -25,7 +43,7 @@ function hiveInfoHTML(data) {
     var txt = '';
     if (data.buildDate) {
         let date = new Date(data.buildDate).toLocaleString();
-        txt += '<span>built: ' + date + '</span>';
+        txt += '<span>hiveview (UI) built: ' + date + '</span>';
     }
     if (data.sourceCommit) {
         let url = 'https://github.com/ethereum/hive/commits/' + escape(data.sourceCommit);

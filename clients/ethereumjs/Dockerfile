@@ -1,25 +1,20 @@
-### Build EthereumJS From Git:
+ARG baseimage=ghcr.io/ethereumjs/ethereumjs-monorepo
+ARG tag=latest
 
-FROM node:20-alpine as build
+FROM $baseimage:$tag as builder
 
-ARG github=ethereumjs/ethereumjs-monorepo
-ARG tag=master
-
-RUN echo "Cloning: $github - $tag" \
-    && apk update && apk add --no-cache bash git jq curl python3 gcc make g++ \
-    && rm -rf /var/cache/apk/* \
-    && git clone --depth 1 -b $tag https://github.com/$github \
-    && cd ethereumjs-monorepo && npm i
+RUN apk add --update --no-cache bash git jq curl python3 gcc make g++ \
+    && rm -rf /var/cache/apk/*
 
 # Create version.txt
-RUN cd ethereumjs-monorepo/packages/client && npm ethereumjs --version > /version.txt
+RUN cd /ethereumjs-monorepo/packages/client/ && npm ethereumjs --version > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
 ADD ethereumjs.sh /ethereumjs.sh
 ADD enode.sh /hive-bin/enode.sh
-ADD jwtsecret /jwtsecret
+ADD jwtsecret /ethereumjs-monorepo/jwtsecret
 
 # Set execute permissions for scripts
 RUN chmod +x /ethereumjs.sh /hive-bin/enode.sh

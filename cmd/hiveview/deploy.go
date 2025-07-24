@@ -29,8 +29,8 @@ func hiveviewBundler(fsys fs.FS) *bundler {
 // moduleAliases maps ES module names to files.
 var moduleAliases = map[string]string{
 	"jquery":                        "./extlib/jquery-3.6.3.esm.js",
-	"@popper/core":                  "./extlib/popper-2.9.2.js",
-	"bootstrap":                     "./extlib/bootstrap-5.2.3.mjs",
+	"@popperjs/core":                "./extlib/popper-2.9.2.js",
+	"bootstrap":                     "./extlib/bootstrap-5.3.3.mjs",
 	"datatables.net":                "./extlib/dataTables-1.13.1.mjs",
 	"datatables.net-bs5":            "./extlib/dataTables-1.13.1.bootstrap5.mjs",
 	"datatables.net-responsive":     "./extlib/responsive-2.4.0.mjs",

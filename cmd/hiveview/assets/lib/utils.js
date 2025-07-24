@@ -12,11 +12,14 @@ export function formatDuration(dur) {
     var m = Math.floor(dur / 60000);
     dur %= 60000;
     var s = Math.floor(dur / 1000);
+    var ms = dur % 1000;
 
     var a = d ? (' ' + d + 'd') : '';
     a += ((a || h) ? (' ' + h + 'h') : '');
     a += ((a || m) ? (' ' + m + 'min') : '');
-    a += s + 's';
+    a += ((a || s) ? (' ' + s + 's') : '');
+    // Only show ms if total duration is less than 1 second
+    a += (!d && !h && !m && !s && ms ? (' ' + ms + 'ms') : '');
     return _s + a;
 }
 

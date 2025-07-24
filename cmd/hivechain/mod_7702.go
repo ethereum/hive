@@ -93,7 +93,7 @@ func (m *mod7702) deployAccountCode(ctx *genBlockContext) error {
 
 func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 	auth, err := types.SignSetCode(mod7702Account.key, types.SetCodeAuthorization{
-		ChainID: ctx.ChainConfig().ChainID.Uint64(),
+		ChainID: *uint256.MustFromBig(ctx.ChainConfig().ChainID),
 		Address: m.proxyAddr,
 		Nonce:   ctx.AccountNonce(mod7702Account.addr),
 	})
@@ -103,7 +103,7 @@ func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 
 	sender := ctx.TxSenderAccount()
 	txdata := &types.SetCodeTx{
-		ChainID:   ctx.ChainConfig().ChainID.Uint64(),
+		ChainID:   uint256.MustFromBig(ctx.ChainConfig().ChainID),
 		Nonce:     ctx.AccountNonce(sender.addr),
 		GasTipCap: uint256.MustFromDecimal("1"),
 		GasFeeCap: uint256.MustFromBig(ctx.TxGasFeeCap()),

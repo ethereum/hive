@@ -1,4 +1,7 @@
 import $ from 'jquery';
+import Prism from '../extlib/prism-1.29.0.min.js';
+import '../extlib/prism-bash-1.29.0.min.js';
+import '../extlib/prism-json-1.29.0.min.js';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
@@ -154,7 +157,8 @@ function appendLine(contentArea, gutter, number, text) {
     gutter.appendChild(num);
 
     let line = document.createElement('pre');
-    line.innerText = text + '\n';
+    line.className = 'language-log';
+    line.innerHTML = Prism.highlight(text + '\n', Prism.languages.log || Prism.languages.plaintext, 'log');
     contentArea.appendChild(line);
 }
 
@@ -223,3 +227,20 @@ async function fetchTestLog(suiteFile, testIndex, line) {
 async function load(url, dataType) {
     return $.ajax({url, dataType, xhr: common.newXhrWithProgressBar});
 }
+
+// Add log language definition for Prism
+Prism.languages.log = {
+    'info': /(?:^\[INFO\]|\bINFO\b).*/m,
+    'warn': /(?:^\[WARN\]|\bWARN\b).*/m,
+    'error': /(?:^\[ERROR\]|\bERROR\b).*/m,
+    'debug': /(?:^\[DEBUG\]|\bDEBUG\b).*/m,
+    'timestamp': /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/,
+    'number': /\b\d+\b/,
+    'string': /"[^"]*"/,
+    'path': /(?:\/[\w.-]+)+/,
+    'function': /\b\w+(?=\()/,
+    'hexcode': /0x[a-fA-F0-9]+/,
+    'boolean': /\b(?:true|false)\b/,
+    'ip': /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,
+    'important': /\[[A-Z]+\]/
+};

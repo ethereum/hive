@@ -1,17 +1,15 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use crate::suites::beacon::constants::{
-    CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
+    BOOTSTRAP_CONTENT_KEY, BOOTSTRAP_CONTENT_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use crate::suites::environment::PortalNetwork;
-use alloy_primitives::Bytes;
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::types::portal::GetContentInfo;
+use ethportal_api::BeaconNetworkApiClient;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use serde_json::json;
 
 dyn_async! {
     pub async fn run_rpc_compat_beacon_test_suite<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -192,6 +190,18 @@ dyn_async! {
                     clients: vec![client.clone()],
                 }
             ).await;
+
+            test.run(
+                NClientTestSpec {
+                    name: "portal_beaconGetContent Content Present Locally".to_string(),
+                    description: "".to_string(),
+                    always_run: false,
+                    run: test_get_content_content_present_locally,
+                    environments: environments.clone(),
+                    test_data: (),
+                    clients: vec![client.clone()],
+                }
+            ).await;
         }
     }
 }
@@ -215,7 +225,7 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
 
         if let Ok(response)  = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
             panic!("Expected to receive an error because content wasn't found {response:?}");
@@ -229,8 +239,8 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
 
         if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key, raw_content_value).await {
             panic!("{}", &err.to_string());
@@ -244,12 +254,12 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONSTANT_CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
 
         // seed CONTENT_KEY/content_value onto the local node to test local_content expect content present
         if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
-            panic!("{}", &err.to_string());
+            panic!("Failed to store data: {err:?}");
         }
 
         // Here we are calling local_content RPC to test if the content is present
@@ -352,10 +362,7 @@ dyn_async! {
         };
         let (_, enr) = generate_random_remote_enr();
         match BeaconNetworkApiClient::delete_enr(&client.rpc, enr.node_id()).await {
-            Ok(response) => match response {
-                true => panic!("DeleteEnr expected to get false and instead got true"),
-                false => ()
-            },
+            Ok(response) => if response { panic!("DeleteEnr expected to get false and instead got true") },
             Err(err) => panic!("{}", &err.to_string()),
         };
     }
@@ -472,10 +479,39 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let bootstrap_content_key = BOOTSTRAP_CONTENT_KEY.clone();
 
-        if let Ok(content) = BeaconNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
+
+        if let Ok(content) = BeaconNetworkApiClient::get_content(&client.rpc, bootstrap_content_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
+        }
+    }
+}
+
+dyn_async! {
+    // test that a node will return a PresentContent via GetContent when the data is stored locally
+    async fn test_get_content_content_present_locally<'a>(clients: Vec<Client>, _: ()) {
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
+            None => {
+                panic!("Unable to get expected amount of clients from NClientTestSpec");
+            }
+        };
+
+        let content_key = BOOTSTRAP_CONTENT_KEY.clone();
+        let raw_content_value = BOOTSTRAP_CONTENT_VALUE.clone();
+
+        // seed content_key/content_value onto the local node to test get_content expect content present
+        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
+            panic!("Failed to store data: {err:?}");
+        }
+
+        match BeaconNetworkApiClient::get_content(&client.rpc, content_key).await {
+            Ok(GetContentInfo { content, utp_transfer }) => {
+                assert!(!utp_transfer, "Error: Expected utp_transfer to be false");
+                assert_eq!(content, raw_content_value, "Error receiving content");
+            }
+            Err(err) => panic!("Expected GetContent to not throw an error {err:?}"),
         }
     }
 }

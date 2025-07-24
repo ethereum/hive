@@ -1,17 +1,12 @@
-use std::str::FromStr;
-
-use crate::suites::history::constants::TRIN_BRIDGE_CLIENT_TYPE;
-use alloy_primitives::Bytes;
+use crate::suites::history::constants::{
+    HEADER_WITH_PROOF_KEY, HEADER_WITH_PROOF_VALUE, TRIN_BRIDGE_CLIENT_TYPE,
+};
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::types::portal::GetContentInfo;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{HistoryContentKey, HistoryNetworkApiClient};
+use ethportal_api::HistoryNetworkApiClient;
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use serde_json::json;
-
-// Header with proof for block number 14764013
-const CONTENT_KEY: &str = "0x00720704f3aa11c53cf344ea069db95cecb81ad7453c8f276b2a1062979611f09c";
-const CONTENT_VALUE: &str = "0x080000002d020000f90222a02c58e3212c085178dbb1277e2f3c24b3f451267a75a234945c1581af639f4a7aa058a694212e0416353a4d3865ccf475496b55af3a3d3b002057000741af9731919400192fb10df37c9fb26829eb2cc623cd1bf599e8a067a9fb631f4579f9015ef3c6f1f3830dfa2dc08afe156f750e90022134b9ebf6a018a2978fc62cd1a23e90de920af68c0c3af3330327927cda4c005faccefb5ce7a0168a3827607627e781941dc777737fc4b6beb69a8b139240b881992b35b854eab9010000200000400000001000400080080000000000010004010001000008000000002000110000000000000090020001110402008000080208040010000000a8000000000000000000210822000900205020000000000160020020000400800040000000000042080000000400004008084020001000001004004000001000000000000001000000110000040000010200844040048101000008002000404810082002800000108020000200408008000100000000000000002020000b00010080600902000200000050000400000000000000400000002002101000000a00002000003420000800400000020100002000000000000000c00040000001000000100187327bd7ad3116ce83e147ed8401c9c36483140db184627d9afa9a457468657265756d50504c4e532f326d696e6572735f55534133a0f1a32e24eb62f01ec3f2b3b5893f7be9062fbf5482bc0d490a54352240350e26882087fbb243327696851aae1651b6010cc53ffa2df1bae1550a0000000000000000000000000000000000000000000063d45d0a2242d35484f289108b3c80cccf943005db0db6c67ffea4c4a47fd529f64d74fa6068a3fd89a2c0d9938c3a751c4706d0b0e8f99dec6b517cf12809cb413795c8c678b3171303ddce2fa1a91af6a0961b9db72750d4d5ea7d5103d8d25f23f522d9af4c13fe8ac7a7d9d64bb08d980281eea5298b93cb1085fedc19d4c60afdd52d116cfad030cf4223e50afa8031154a2263c76eb08b96b5b8fdf5e5c30825d5c918eefb89daaf0e8573f20643614d9843a1817b6186074e4e53b22cf49046d977c901ec00aef1555fa89468adc2a51a081f186c995153d1cba0f2887d585212d68be4b958d309fbe611abe98a9bfc3f4b7a7b72bb881b888d89a04ecfe08b1c1a48554a48328646e4f864fe722f12d850f0be29e3829d1f94b34083032a9b6f43abd559785c996229f8e022d4cd6dcde4aafcce6445fe8743e1fcbe8672a99f9d9e3a5ca10c01f3751d69fbd22197f0680bc1529151130b22759bf185f4dbce357f46eb9cc8e21ea78f49b298eea2756d761fe23de8bea0d2e15aed136d689f6d252c54ebadc3e46b84a397b681edf7ec63522b9a298301084d019d0020000000000000000000000000000000000000000000000000000000000000";
 
 dyn_async! {
     pub async fn run_rpc_compat_history_test_suite<'a> (test: &'a mut Test, _client: Option<Client>) {
@@ -189,6 +184,18 @@ dyn_async! {
                     clients: vec![client.clone()],
                 }
             ).await;
+
+            test.run(
+                NClientTestSpec {
+                    name: "portal_historyGetContent Content Present Locally".to_string(),
+                    description: "".to_string(),
+                    always_run: false,
+                    run: test_get_content_content_present_locally,
+                    environments: None,
+                    test_data: (),
+                    clients: vec![client.clone()],
+                }
+            ).await;
         }
     }
 }
@@ -212,7 +219,7 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let content_key = HEADER_WITH_PROOF_KEY.clone();
 
         if let Ok(response)  = HistoryNetworkApiClient::local_content(&client.rpc, content_key).await {
             panic!("Expected to receive an error because content wasn't found {response:?}");
@@ -226,8 +233,8 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = HEADER_WITH_PROOF_KEY.clone();
+        let raw_content_value = HEADER_WITH_PROOF_VALUE.clone();
 
         if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key, raw_content_value).await {
             panic!("{}", &err.to_string());
@@ -241,12 +248,12 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let content_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
-        let raw_content_value = Bytes::from_str(CONTENT_VALUE).expect("unable to convert content value to bytes");
+        let content_key = HEADER_WITH_PROOF_KEY.clone();
+        let raw_content_value = HEADER_WITH_PROOF_VALUE.clone();
 
         // seed content_key/content_value onto the local node to test local_content expect content present
         if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
-            panic!("{}", &err.to_string());
+            panic!("Failed to store data: {err:?}");
         }
 
         // Here we are calling local_content RPC to test if the content is present
@@ -353,10 +360,7 @@ dyn_async! {
         };
         let (_, enr) = generate_random_remote_enr();
         match HistoryNetworkApiClient::delete_enr(&client.rpc, enr.node_id()).await {
-            Ok(response) => match response {
-                true => panic!("DeleteEnr expected to get false and instead got true"),
-                false => ()
-            },
+            Ok(response) => if response { panic!("DeleteEnr expected to get false and instead got true") },
             Err(err) => panic!("{}", &err.to_string()),
         };
     }
@@ -479,10 +483,39 @@ dyn_async! {
             Some((client)) => client,
             None => panic!("Unable to get expected amount of clients from NClientTestSpec"),
         };
-        let header_with_proof_key: HistoryContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let header_with_proof_key = HEADER_WITH_PROOF_KEY.clone();
 
         if let Ok(content) = HistoryNetworkApiClient::get_content(&client.rpc, header_with_proof_key).await {
             panic!("Error: Unexpected GetContent expected to not get the content and instead get an error: {content:?}");
+        }
+    }
+}
+
+dyn_async! {
+    // test that a node will return a PresentContent via GetContent when the data is stored locally
+    async fn test_get_content_content_present_locally<'a>(clients: Vec<Client>, _: ()) {
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
+            None => {
+                panic!("Unable to get expected amount of clients from NClientTestSpec");
+            }
+        };
+
+
+        let content_key = HEADER_WITH_PROOF_KEY.clone();
+        let raw_content_value = HEADER_WITH_PROOF_VALUE.clone();
+
+        // seed content_key/content_value onto the local node to test get_content expect content present
+        if let Err(err) = HistoryNetworkApiClient::store(&client.rpc, content_key.clone(), raw_content_value.clone()).await {
+            panic!("Failed to store data: {err:?}");
+        }
+
+        match HistoryNetworkApiClient::get_content(&client.rpc, content_key).await {
+            Ok(GetContentInfo { content, utp_transfer }) => {
+                assert!(!utp_transfer, "Error: Expected utp_transfer to be false");
+                assert_eq!(content, raw_content_value, "Error receiving content");
+            }
+            Err(err) => panic!("Expected GetContent to not throw an error {err:?}"),
         }
     }
 }

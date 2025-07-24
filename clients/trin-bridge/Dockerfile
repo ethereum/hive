@@ -7,10 +7,7 @@ ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/ma
 ADD trin_bridge.sh /trin_bridge.sh
 RUN chmod +x /trin_bridge.sh
 
-ADD trin_bridge_version.sh /trin_bridge_version.sh
-RUN chmod +x /trin_bridge_version.sh
-
-RUN /trin_bridge_version.sh > /version.txt
+RUN echo "latest" > /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 9009/udp

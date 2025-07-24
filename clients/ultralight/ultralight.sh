@@ -16,4 +16,12 @@ else
     FLAGS="$FLAGS --networks=history"
 fi
 
-DEBUG=* node /ultralight/packages/cli/dist/index.js --bindAddress="$IP_ADDR:9000" --dataDir="./data" --rpcPort=8545 $FLAGS
+if [ "$HIVE_TRUSTED_BLOCK_ROOT" != "" ]; then
+    FLAGS="$FLAGS --trustedBlockRoot $HIVE_TRUSTED_BLOCK_ROOT"
+fi
+
+if [ "$HIVE_BOOTNODES" != "" ]; then
+    FLAGS="$FLAGS --bootnode=$HIVE_BOOTNODES"
+fi
+
+DEBUG=*Portal*,*ultralight* node /ultralight/packages/cli/dist/index.js --bindAddress="$IP_ADDR:9000" --dataDir="./data" --rpcPort=8545 $FLAGS

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
 	"github.com/lmittmann/tint"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type buildArgs map[string]string
@@ -41,12 +42,21 @@ func (args *buildArgs) Set(value string) error {
 
 func main() {
 	var (
-		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
-		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		testResultsRoot = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
+		loglevelFlag    = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		dockerAuth      = flag.Bool("docker.auth", false, `Enable docker authentication from system config files. The following files are checked in the order listed:
+If the environment variable DOCKER_CONFIG is set to a non-empty string:
+- $DOCKER_CONFIG/plaintext-passwords.json
+- $DOCKER_CONFIG/config.json
+Otherwise, it looks for files in the $HOME directory:
+- $HOME/.docker/plaintext-passwords.json
+- $HOME/.docker/config.json
+- $HOME/.dockercfg`)
 		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -56,7 +66,15 @@ func main() {
 		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
-		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
+		useCredHelper         = flag.Bool("docker.cred-helper", false, "(DEPRECATED) Use --docker.auth instead.")
+
+		// Cleanup flags
+		cleanupContainers = flag.Bool("cleanup", false, "Clean up Hive containers instead of running simulations")
+		cleanupDryRun     = flag.Bool("cleanup.dry-run", false, "Show what containers would be cleaned up without actually removing them")
+		cleanupInstance   = flag.String("cleanup.instance", "", "Clean up containers from specific Hive instance ID only")
+		cleanupType       = flag.String("cleanup.type", "", "Clean up specific container type only (client, simulator, proxy)")
+		cleanupOlderThan  = flag.Duration("cleanup.older-than", 0, "Clean up containers older than specified duration (e.g., 1h, 24h)")
+		listContainers    = flag.Bool("list", false, "List Hive containers instead of running simulations")
 
 		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
 
@@ -84,7 +102,10 @@ func main() {
 		NoColor: terminal == "" || terminal == "dumb",
 	})
 	slog.SetDefault(slog.New(tintHandler))
-
+	// See: https://github.com/ethereum/hive/issues/1200.
+	if err := os.Setenv("GODEBUG", "multipartmaxparts=20000"); err != nil {
+		fatal(err)
+	}
 	if *simTestLimit > 0 {
 		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
@@ -108,9 +129,9 @@ func main() {
 
 	// Create the docker backends.
 	dockerConfig := &libdocker.Config{
-		Inventory:           inv,
-		PullEnabled:         *dockerPull,
-		UseCredentialHelper: *useCredHelper,
+		Inventory:         inv,
+		PullEnabled:       *dockerPull,
+		UseAuthentication: *dockerAuth || *useCredHelper,
 	}
 	if *dockerNoCache != "" {
 		re, err := regexp.Compile(*dockerNoCache)
@@ -122,10 +143,47 @@ func main() {
 	if *dockerOutput {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
+	} else if *dockerBuildOutput {
+		dockerConfig.BuildOutput = os.Stderr
 	}
 	builder, cb, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
 	if err != nil {
 		fatal(err)
+	}
+
+	// Handle cleanup/list operations if requested.
+	if *cleanupContainers || *listContainers {
+		dockerClient := cb.GetDockerClient()
+		if dockerClient == nil {
+			fatal("Docker client not available for cleanup operations")
+		}
+		
+		client, ok := dockerClient.(*docker.Client)
+		if !ok {
+			fatal("Invalid Docker client type")
+		}
+		
+		if *listContainers {
+			err := libhive.ListHiveContainers(context.Background(), client, *cleanupInstance)
+			if err != nil {
+				fatal("Failed to list containers:", err)
+			}
+			return
+		}
+
+		if *cleanupContainers {
+			cleanupOpts := libhive.CleanupOptions{
+				InstanceID:    *cleanupInstance,
+				OlderThan:     *cleanupOlderThan,
+				DryRun:        *cleanupDryRun,
+				ContainerType: *cleanupType,
+			}
+			err := libhive.CleanupHiveContainers(context.Background(), client, cleanupOpts)
+			if err != nil {
+				fatal("Failed to cleanup containers:", err)
+			}
+			return
+		}
 	}
 
 	// Set up the context for CLI interrupts.
@@ -168,20 +226,25 @@ func main() {
 			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
+	hiveInfo := libhive.HiveInfo{
+		Command:        os.Args,
+		ClientFile:     clientList,
+		ClientFilePath: *clientsFile,
+	}
 
 	// Build clients and simulators.
 	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
-		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint, hiveInfo)
 		return
 	}
 
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env)
+		result, err := runner.Run(ctx, sim, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}

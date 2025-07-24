@@ -71,7 +71,7 @@ type serveListing struct{ fsys fs.FS }
 
 func (h serveListing) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Generating listing...")
-	err := generateListing(h.fsys, ".", w)
+	err := generateListing(h.fsys, ".", w, 200)
 	if err != nil {
 		fmt.Println("error:", err)
 		w.WriteHeader(http.StatusInternalServerError)

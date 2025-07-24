@@ -61,6 +61,9 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 
 	// Apply forks.
 	forks := cfg.forkBlocks()
+	if _, ok := forks["cancun"]; ok {
+		chaincfg.BlobScheduleConfig = new(params.BlobScheduleConfig)
+	}
 	for fork, b := range forks {
 		timestamp := cfg.blockTimestamp(b)
 
@@ -98,8 +101,10 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.ShanghaiTime = &timestamp
 		case "cancun":
 			chaincfg.CancunTime = &timestamp
+			chaincfg.BlobScheduleConfig.Cancun = params.DefaultCancunBlobConfig
 		case "prague":
 			chaincfg.PragueTime = &timestamp
+			chaincfg.BlobScheduleConfig.Prague = params.DefaultPragueBlobConfig
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}

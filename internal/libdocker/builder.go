@@ -22,10 +22,10 @@ type Builder struct {
 	client        *docker.Client
 	config        *Config
 	logger        *slog.Logger
-	authenticator Authenticator
+	authenticator *docker.AuthConfigurations
 }
 
-func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder {
+func NewBuilder(client *docker.Client, cfg *Config, auth *docker.AuthConfigurations) *Builder {
 	b := &Builder{
 		client:        client,
 		config:        cfg,
@@ -99,7 +99,7 @@ func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImag
 		Pull:         b.config.PullEnabled,
 	}
 	if b.authenticator != nil {
-		opts.AuthConfigs = b.authenticator.AuthConfigs()
+		opts.AuthConfigs = *b.authenticator
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
@@ -209,7 +209,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 }
 
 // buildImage builds a single docker image from the specified context.
-// branch specifes a build argument to use a specific base image branch or github source branch.
+// branch specifies a build argument to use a specific base image branch or github source branch.
 func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs map[string]string) error {
 	logger := b.logger.With("image", imageTag)
 	context, err := filepath.Abs(contextDir)

@@ -99,12 +99,12 @@ func (r *Runner) buildSimulators(ctx context.Context, simList []string, buildArg
 	return nil
 }
 
-func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
+func (r *Runner) Run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveInfo) (SimResult, error) {
 	if err := createWorkspace(env.LogDir); err != nil {
 		return SimResult{}, err
 	}
 	writeInstanceInfo(env.LogDir)
-	return r.run(ctx, sim, env)
+	return r.run(ctx, sim, env, hiveInfo)
 }
 
 // RunDevMode starts simulator development mode. In this mode, the simulator is not
@@ -112,7 +112,7 @@ func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 // on the docker network.
 //
 // Note: Sim* options in env are ignored, but Client* options and LogDir still apply.
-func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) error {
+func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string, hiveInfo HiveInfo) error {
 	if err := createWorkspace(env.LogDir); err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) er
 	for _, def := range r.clientDefs {
 		clientDefs = append(clientDefs, def)
 	}
-	tm := NewTestManager(env, r.container, clientDefs)
+	tm := NewTestManager(env, r.container, clientDefs, hiveInfo)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
 			slog.Error("could not terminate test manager", "error", err)
@@ -158,7 +158,7 @@ HIVE_SIMULATOR=http://%v
 }
 
 // run runs one simulation.
-func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
+func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveInfo) (SimResult, error) {
 	slog.Info(fmt.Sprintf("running simulation: %s", sim))
 
 	clientDefs := make([]*ClientDefinition, 0)
@@ -182,12 +182,15 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 	}
 
 	// Start the simulation API.
-	tm := NewTestManager(env, r.container, clientDefs)
+	tm := NewTestManager(env, r.container, clientDefs, hiveInfo)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
 			slog.Error("could not terminate test manager", "error", err)
 		}
 	}()
+
+	// Set hive instance info for container labeling.
+	r.container.SetHiveInstanceInfo(tm.hiveInstanceID, tm.hiveVersion)
 
 	slog.Debug("starting simulator API server")
 	server, err := r.container.ServeAPI(ctx, tm.API())
@@ -196,6 +199,14 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 		return SimResult{}, err
 	}
 	defer shutdownServer(server)
+
+	// Create labels for simulator container.
+	simLabels := NewBaseLabels(tm.hiveInstanceID, tm.hiveVersion)
+	simLabels[LabelHiveType] = ContainerTypeSimulator
+	simLabels[LabelHiveSimulator] = sim
+
+	// Generate container name.
+	containerName := GenerateSimulatorContainerName(sim)
 
 	// Create the simulator container.
 	opts := ContainerOptions{
@@ -206,6 +217,8 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 			"HIVE_TEST_PATTERN": env.SimTestPattern,
 			"HIVE_RANDOM_SEED":  strconv.Itoa(env.SimRandomSeed),
 		},
+		Labels: simLabels,
+		Name:   containerName,
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
@@ -304,11 +317,16 @@ func createWorkspace(logdir string) error {
 
 func writeInstanceInfo(logdir string) {
 	var obj HiveInstance
+	
+	// Legacy fields for backward compatibility
 	obj.SourceCommit, obj.SourceDate = hiveVersion()
 	buildDate := hiveBuildTime()
 	if !buildDate.IsZero() {
 		obj.BuildDate = buildDate.Format("2006-01-02T15:04:05Z")
 	}
+	
+	// Enhanced version information
+	obj.HiveVersion = GetHiveVersion()
 
 	enc, _ := json.Marshal(&obj)
 	err := os.WriteFile(filepath.Join(logdir, "hive.json"), enc, 0644)
@@ -342,3 +360,5 @@ func hiveBuildTime() time.Time {
 	}
 	return stat.ModTime()
 }
+
+
