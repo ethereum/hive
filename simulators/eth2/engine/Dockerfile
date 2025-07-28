@@ -1,5 +1,8 @@
 # Build the simulator binary
 FROM golang:1.22-alpine AS builder
+ARG GOPROXY
+ENV GOPROXY=${GOPROXY}
+
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
 
 # Prepare workspace.

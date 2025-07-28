@@ -8,9 +8,9 @@ FROM $baseimage:$tag
 USER root
 
 RUN apt-get update && apt-get install -y \
-    bash \
     build-essential \
     ca-certificates \
+    curl \
     git \
     jq && rm -rf /var/lib/apt/lists/*
 

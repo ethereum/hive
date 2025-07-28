@@ -11,7 +11,7 @@ ADD $local_path /nethermind
 RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
 
 ## Final stage: Sets up the environment for running nethermind
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble
 
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind

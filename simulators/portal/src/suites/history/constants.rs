@@ -1,33 +1,144 @@
 use alloy_primitives::Bytes;
-use ethportal_api::{ContentValue, HistoryContentKey, HistoryContentValue};
+use anyhow::{anyhow, bail, ensure};
+use ethportal_api::{
+    types::{
+        content_key::beacon::HistoricalSummariesWithProofKey,
+        content_value::beacon::ForkVersionedHistoricalSummariesWithProof,
+    },
+    BeaconContentKey, BeaconContentValue, ContentValue, HistoryContentKey, HistoryContentValue,
+};
 use serde_yaml::Value;
-use std::str::FromStr;
-
-pub const TEST_DATA_FILE_PATH: &str = "./test-data/test_data_collection_of_forks_blocks.yaml";
+use ssz::Decode;
+use std::{
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, LazyLock},
+};
 
 // trin-bridge constants
 pub const TRIN_BRIDGE_CLIENT_TYPE: &str = "trin-bridge";
 
-pub fn get_test_data() -> anyhow::Result<Vec<(HistoryContentKey, HistoryContentValue)>> {
-    let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)?;
-    let values: Value = serde_yaml::from_str(&values)?;
-    values
-        .as_sequence()
-        .expect("unable to convert test data to sequence")
-        .iter()
-        .map(|value| {
-            let content_key: HistoryContentKey =
-                serde_yaml::from_value(value["content_key"].clone())?;
-            let raw_content_value = Bytes::from_str(
-                value["content_value"]
-                    .as_str()
-                    .expect("to find content value"),
-            )?;
-            let content_value =
-                HistoryContentValue::decode(&content_key, raw_content_value.as_ref())?;
-            Ok((content_key, content_value))
-        })
-        .collect()
+pub const BASE_TEST_PATH: &str = "./portal-spec-tests/tests/mainnet/history/hive";
+const HISTORICAL_SUMMARIES_FILE_PREFIX: &str = "fork_digest_historical_summaries_";
+const HISTORICAL_SUMMARIES_FILE_SUFFIX: &str = ".ssz_snappy";
+
+/// The content key and value for the latest historical summaries
+///
+/// This is a static variable that is initialized once and can be reused
+pub static LATEST_HISTORICAL_SUMMARIES: LazyLock<Arc<(BeaconContentKey, BeaconContentValue)>> =
+    LazyLock::new(|| {
+        let (content_key, content_value) =
+            get_latest_historical_summaries().expect("Failed to load latest historical summaries");
+        Arc::new((content_key, content_value))
+    });
+
+/// Get the latest historical summaries
+///
+/// This should only be used in LATEST_HISTORICAL_SUMMARIES
+fn get_latest_historical_summaries() -> anyhow::Result<(BeaconContentKey, BeaconContentValue)> {
+    let mut latest_epoch = 0;
+    let mut latest_file: Option<PathBuf> = None;
+
+    for entry in fs::read_dir(BASE_TEST_PATH)? {
+        let entry = entry?;
+        if entry.path().is_dir() {
+            continue;
+        }
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy();
+
+        if file_name_str.starts_with(HISTORICAL_SUMMARIES_FILE_PREFIX)
+            && file_name_str.ends_with(HISTORICAL_SUMMARIES_FILE_SUFFIX)
+        {
+            let epoch_str = &file_name_str[HISTORICAL_SUMMARIES_FILE_PREFIX.len()
+                ..file_name_str.len() - HISTORICAL_SUMMARIES_FILE_SUFFIX.len()];
+            if let Ok(epoch) = epoch_str.parse::<u64>() {
+                if epoch > latest_epoch {
+                    latest_epoch = epoch;
+                    latest_file = Some(entry.path());
+                }
+            } else {
+                bail!("Unable to parse epoch from file name: {file_name_str}");
+            }
+        }
+    }
+
+    let Some(path) = latest_file else {
+        bail!("No historical summaries files found in the directory");
+    };
+
+    let mut encoded = vec![];
+    let historical_summaries = File::open(path)?.read_to_end(&mut encoded)?;
+    ensure!(
+        historical_summaries > 0,
+        "Historical summaries file is empty",
+    );
+
+    let mut decoder = snap::read::FrameDecoder::new(&*encoded);
+    let mut decoded: Vec<u8> = vec![];
+    decoder.read_to_end(&mut decoded)?;
+
+    let historical_summaries_with_proof =
+        ForkVersionedHistoricalSummariesWithProof::from_ssz_bytes(&decoded).map_err(|err| {
+            anyhow!("Failed to decoded ForkVersionedHistoricalSummariesWithProof {err:?}")
+        })?;
+
+    let content_key =
+        BeaconContentKey::HistoricalSummariesWithProof(HistoricalSummariesWithProofKey {
+            epoch: historical_summaries_with_proof
+                .historical_summaries_with_proof
+                .epoch,
+        });
+    let content_value =
+        BeaconContentValue::HistoricalSummariesWithProof(historical_summaries_with_proof);
+
+    Ok((content_key, content_value))
+}
+
+pub fn get_success_test_data() -> anyhow::Result<Vec<(HistoryContentKey, HistoryContentValue)>> {
+    get_test_data("success")
+}
+
+fn get_test_data(test_case: &str) -> anyhow::Result<Vec<(HistoryContentKey, HistoryContentValue)>> {
+    let mut content = vec![];
+
+    let success_test_path = format!("{BASE_TEST_PATH}/{test_case}");
+    for entry in std::fs::read_dir(success_test_path)? {
+        let entry = entry?;
+        let test_path = entry.path();
+        if !test_path.is_file() {
+            bail!("Expected a file, but found a directory: {test_path:?}");
+        }
+
+        let values = std::fs::read_to_string(test_path)?;
+        let values: Value = serde_yaml::from_str(&values)?;
+        let test_case = values
+            .as_sequence()
+            .expect("unable to convert test data to sequence")
+            .iter()
+            .map(|value| {
+                let content_key: HistoryContentKey =
+                    serde_yaml::from_value(value["content_key"].clone())
+                        .expect("to find content key");
+                let raw_content_value = Bytes::from_str(
+                    value["content_value"]
+                        .as_str()
+                        .expect("to find content value"),
+                )
+                .expect("unable to convert content value to bytes");
+                let content_value =
+                    HistoryContentValue::decode(&content_key, raw_content_value.as_ref())
+                        .expect("unable to decode content value");
+                (content_key, content_value)
+            })
+            .collect::<Vec<_>>();
+
+        content.extend(test_case);
+    }
+
+    Ok(content)
 }
 
 lazy_static::lazy_static! {

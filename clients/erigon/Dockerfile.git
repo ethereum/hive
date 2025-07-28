@@ -5,6 +5,9 @@ FROM golang:1.24.1-alpine as builder
 
 ARG github=erigontech/erigon
 ARG tag=main
+ARG GOPROXY
+
+ENV GOPROXY=${GOPROXY}
 
 RUN echo "Cloning: $github - $tag" \
     && apk add bash build-base ca-certificates git jq \

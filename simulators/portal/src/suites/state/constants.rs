@@ -2,7 +2,7 @@ use alloy_primitives::Bytes;
 use ethportal_api::StateContentKey;
 use std::str::FromStr;
 
-pub const TEST_DATA_FILE_PATH: &str = "./test-data/state_test_data.yaml";
+pub const TEST_DATA_FILE_PATH: &str = "./portal-spec-tests/tests/mainnet/state/hive/test_data.yaml";
 
 // trin-bridge constants
 pub const TRIN_BRIDGE_CLIENT_TYPE: &str = "trin-bridge";

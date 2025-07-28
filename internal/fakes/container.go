@@ -67,6 +67,15 @@ func (b *fakeBackend) Build(context.Context, libhive.Builder) error {
 	return nil
 }
 
+func (b *fakeBackend) SetHiveInstanceInfo(instanceID, version string) {
+	// No-op for fake backend
+}
+
+func (b *fakeBackend) GetDockerClient() interface{} {
+	// Return nil for fake backend since it doesn't use real Docker
+	return nil
+}
+
 func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.APIServer, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

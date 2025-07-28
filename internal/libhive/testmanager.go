@@ -60,10 +60,11 @@ type SimResult struct {
 
 // HiveInfo contains information about the hive instance running the simulation.
 type HiveInfo struct {
-	Command    []string           `json:"command"`
-	ClientFile []ClientDesignator `json:"clientFile"`
-	Commit     string             `json:"commit"`
-	Date       string             `json:"date"`
+	Command        []string           `json:"command"`
+	ClientFile     []ClientDesignator `json:"clientFile"`
+	ClientFilePath string             `json:"clientFilePath,omitempty"`
+	Commit         string             `json:"commit"`
+	Date           string             `json:"date"`
 }
 
 // TestManager collects test results during a simulation run.
@@ -75,6 +76,10 @@ type TestManager struct {
 
 	simContainerID string
 	simLogFile     string
+
+	// Hive instance information for labeling
+	hiveInstanceID string
+	hiveVersion    string
 
 	// all networks started by a specific test suite, where key
 	// is network name and value is network ID
@@ -90,15 +95,44 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
+// filterClientDesignators removes sensitive build arguments from ClientDesignator slice
+func filterClientDesignators(clients []ClientDesignator) []ClientDesignator {
+	filtered := make([]ClientDesignator, len(clients))
+	for i, client := range clients {
+		filteredClient := ClientDesignator{
+			Client:        client.Client,
+			Nametag:       client.Nametag,
+			DockerfileExt: client.DockerfileExt,
+			BuildArgs:     make(map[string]string),
+		}
+		
+		// Filter build args
+		for key, value := range client.BuildArgs {
+			if !excludedBuildArgs[key] {
+				filteredClient.BuildArgs[key] = value
+			}
+		}
+		
+		filtered[i] = filteredClient
+	}
+	return filtered
+}
+
 func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefinition, hiveInfo HiveInfo) *TestManager {
 	if hiveInfo.Commit == "" && hiveInfo.Date == "" {
 		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
 	}
+	
+	// Filter sensitive build args from HiveInfo.ClientFile
+	hiveInfo.ClientFile = filterClientDesignators(hiveInfo.ClientFile)
+	
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,
 		backend:           b,
 		hiveInfo:          hiveInfo,
+		hiveInstanceID:    GenerateHiveInstanceID(),
+		hiveVersion:       hiveInfo.Commit,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
 		results:           make(map[TestSuiteID]*TestSuite),
@@ -363,6 +397,29 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
+	
+	// Create comprehensive run metadata
+	runMetadata := &RunMetadata{
+		HiveCommand: manager.hiveInfo.Command,
+		HiveVersion: GetHiveVersion(),
+	}
+	
+	// Add client configuration if available
+	if manager.hiveInfo.ClientFilePath != "" && len(manager.hiveInfo.ClientFile) > 0 {
+		// Convert existing ClientFile data to consistent format for storage
+		clientConfigContent := map[string]interface{}{
+			"clients": manager.hiveInfo.ClientFile,
+		}
+		
+		runMetadata.ClientConfig = &ClientConfigInfo{
+			FilePath: manager.hiveInfo.ClientFilePath,
+			Content:  clientConfigContent,
+		}
+	}
+	
+	// Attach metadata to suite
+	suite.RunMetadata = runMetadata
+	
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -596,6 +653,18 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 }
 
 // writeSuiteFile writes the simulation result to the log directory.
+// List of build arguments to exclude from result JSON for security/privacy
+var excludedBuildArgs = map[string]bool{
+	"GOPROXY":    true,  // Go proxy URLs may contain sensitive info
+	"GITHUB_TOKEN": true,  // GitHub tokens
+	"ACCESS_TOKEN": true,  // Generic access tokens
+	"API_KEY":      true,  // API keys
+	"PASSWORD":     true,  // Passwords
+	"SECRET":       true,  // Generic secrets
+	"TOKEN":        true,  // Generic tokens
+}
+
+
 func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteData, err := json.Marshal(s)
 	if err != nil {

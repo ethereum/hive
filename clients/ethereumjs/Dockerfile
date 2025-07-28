@@ -14,7 +14,7 @@ ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
 ADD ethereumjs.sh /ethereumjs.sh
 ADD enode.sh /hive-bin/enode.sh
-ADD jwtsecret /jwtsecret
+ADD jwtsecret /ethereumjs-monorepo/jwtsecret
 
 # Set execute permissions for scripts
 RUN chmod +x /ethereumjs.sh /hive-bin/enode.sh

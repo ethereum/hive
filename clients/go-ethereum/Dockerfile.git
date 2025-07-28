@@ -3,6 +3,9 @@
 FROM golang:1.23-alpine as builder
 ARG github=ethereum/go-ethereum
 ARG tag=master
+ARG GOPROXY
+
+ENV GOPROXY=${GOPROXY}
 
 RUN \
   apk add --update bash curl jq git make gcc musl-dev                 \
