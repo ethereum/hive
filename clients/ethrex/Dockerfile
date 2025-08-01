@@ -1,7 +1,12 @@
 ARG baseimage=ghcr.io/lambdaclass/ethrex
 ARG tag=latest
 
-FROM $baseimage:$tag as builder
+FROM $baseimage:$tag AS builder
+
+FROM ubuntu:24.04
+
+WORKDIR /usr/local/bin
+COPY --from=builder /usr/local/bin/ethrex .
 
 # Install script tools.
 RUN apt-get update -y
