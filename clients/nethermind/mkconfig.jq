@@ -23,6 +23,7 @@ def base_config:
       "Enabled": true,
       "Host": "0.0.0.0",
       "Port": 8545,
+      "GasCap": 50000000,
       "WebSocketsPort": 8546,
     },
     "Network": {
