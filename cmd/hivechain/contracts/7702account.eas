@@ -1,0 +1,25 @@
+;;; This code is installed as a delegation destination for testing EIP-7702.
+
+#pragma target "prague"
+
+    calldatasize                ; [size]
+    iszero                      ; [size == 0]
+    jumpi @return               ; []
+
+    push 0                      ; [offset]
+    calldataload                ; [input]
+    push 0                      ; [slot, input]
+    sstore                      ; []
+
+return:
+    address                     ; [addr]
+    push 0                      ; [ptr, addr]
+    mstore                      ; []
+
+    push 0                      ; [slot]
+    sload                       ; [value]
+    push 32                     ; [ptr, value]
+    mstore                      ; []
+    push 64                     ; [64]
+    push 0                      ; [0, 64]
+    return

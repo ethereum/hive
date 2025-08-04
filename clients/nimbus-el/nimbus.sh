@@ -14,7 +14,6 @@
 #  - [x] HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - [x] HIVE_NETWORK_ID              network ID number to use for the eth protocol
 #  - [x] HIVE_CHAIN_ID                chain ID is used in transaction signature process
-#  - [ ] HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - [ ] HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:
@@ -31,6 +30,7 @@
 #  - [x] HIVE_FORK_MUIRGLACIER        block number for Muir Glacier transition
 #  - [x] HIVE_FORK_BERLIN             block number for Berlin transition
 #  - [x] HIVE_FORK_LONDON             block number for London transition
+#  - [x] HIVE_FORK_MERGE              block number for Merge transition
 #
 # Clique PoA:
 #
@@ -39,21 +39,26 @@
 #
 # Other:
 #
-#  - [x] HIVE_MINER                   enable mining. value is coinbase address.
+#  - [ ] HIVE_MINER                   enable mining. value is coinbase address.
 #  - [ ] HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
-#  - [ ] HIVE_SKIP_POW                if set, skip PoW verification during block import
 #  - [x] HIVE_LOGLEVEL                client loglevel (0-5)
 #  - [x] HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 
 # Immediately abort the script on any error encountered
 set -e
 
-nimbus=/usr/bin/nimbus
-FLAGS="--prune-mode:archive --nat:extip:0.0.0.0"
+nimbus=/usr/bin/nimbus_execution_client
+FLAGS="--nat:extip:0.0.0.0 "
 
-if [ "$HIVE_LOGLEVEL" != "" ]; then
-  FLAGS="$FLAGS --log-level:DEBUG"
-fi
+loglevel=DEBUG
+case "$HIVE_LOGLEVEL" in
+    0|1) loglevel=ERROR ;;
+    2)   loglevel=WARN  ;;
+    3)   loglevel=INFO  ;;
+    4)   loglevel=DEBUG ;;
+    5)   loglevel=TRACE ;;
+esac
+FLAGS="$FLAGS --log-level:$loglevel"
 
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -64,20 +69,18 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
   FLAGS="$FLAGS --network:$HIVE_NETWORK_ID"
 fi
 
-if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
-# -n will prevent newline when echoing something
-  echo -n "$HIVE_CLIQUE_PRIVATEKEY" > private.key
-  FLAGS="$FLAGS --import-key:private.key"
-
-  if [ "$HIVE_MINER" != "" ]; then
-    FLAGS="$FLAGS --engine-signer:$HIVE_MINER"
-  fi
-fi
-
-# Configure the genesis chain and use it as start block and dump it to stdout
-echo "Supplied genesis state:"
-jq -f /mapper.jq /genesis.json | tee /genesis-start.json
+# Configure the chain.
+jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --custom-network:/genesis-start.json"
+
+# Dump genesis.
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+  echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+  jq 'del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis-start.json
+else
+  echo "Supplied genesis state:"
+  cat /genesis-start.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -85,7 +88,7 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-  CMD="import /chain.rlp"
+  CMD="import-rlp /chain.rlp"
   echo "Running nimbus: $nimbus $CMD $FLAGS"
   $nimbus $CMD $FLAGS
 else
@@ -95,20 +98,27 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && cat `ls | sort -n` > blocks.rlp && $nimbus import blocks.rlp $FLAGS)
+  (cd /blocks && $nimbus import-rlp `ls | sort -n` $FLAGS)
 else
   echo "Warning: blocks folder not found."
 fi
 
 set -e
 
-# Configure RPC.
+# Configure RPC
+FLAGS="$FLAGS --http-address:0.0.0.0 --http-port:8545"
+FLAGS="$FLAGS --rpc --rpc-api:eth,debug,admin"
+FLAGS="$FLAGS --ws --ws-api:eth,debug,admin"
+
+# Configure graphql
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
-  FLAGS="$FLAGS --graphql --graphql-address:0.0.0.0 --graphql-port:8545"
-else
-  FLAGS="$FLAGS --rpc --rpc-api:eth,debug --rpc-address:0.0.0.0 --rpc-port:8545"
-  FLAGS="$FLAGS --ws --ws-api:eth,debug --ws-address:0.0.0.0 --ws-port:8546"
-  FLAGS="$FLAGS --engine-api:true --engine-api-address:0.0.0.0 --engine-api-port:8551"
+  FLAGS="$FLAGS --graphql"
+fi
+
+# Configure engine api
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+  echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
+  FLAGS="$FLAGS --engine-api:true --engine-api-address:0.0.0.0 --engine-api-port:8551 --jwt-secret:/jwtsecret"
 fi
 
 echo "Running nimbus with flags $FLAGS"

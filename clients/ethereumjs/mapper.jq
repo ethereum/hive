@@ -28,6 +28,21 @@ def to_bool:
   end
 ;
 
+# Pads storage keys to 32 bytes.
+def pad_storage_keys:
+  .alloc |= (if . == null then . else with_entries(
+    .value.storage |= (if . == null then . else with_entries(
+      .key |= (if . == null then . else
+                 if startswith("0x") then
+                   "0x" + (.[2:] | if length < 64 then ("0" * (64 - length)) + . else . end)
+                 else
+                   "0x" + (if length < 64 then ("0" * (64 - length)) + . else . end)
+                 end
+               end)
+    ) end)
+  ) end)
+;
+
 # Replace config in input.
 . + {
   "config": {
@@ -50,10 +65,31 @@ def to_bool:
     "istanbulBlock": env.HIVE_FORK_ISTANBUL|to_int,
     "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
     "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
-    "yolov2Block": env.HIVE_FORK_BERLIN|to_int,
-    "yolov3Block": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
+    "arrowGlacierBlock": env.HIVE_FORK_ARROW_GLACIER|to_int,
+    "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
     "mergeForkBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
-  }|remove_empty
-}
+    "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
+    "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
+    "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
+    "osakaTime": env.HIVE_OSAKA_TIMESTAMP|to_int,
+    "blobSchedule": {
+      "cancun": {
+        "target": (if env.HIVE_CANCUN_BLOB_TARGET then env.HIVE_CANCUN_BLOB_TARGET|to_int else 3 end),
+        "max": (if env.HIVE_CANCUN_BLOB_MAX then env.HIVE_CANCUN_BLOB_MAX|to_int else 6 end),
+        "baseFeeUpdateFraction": (if env.HIVE_CANCUN_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_CANCUN_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 3338477 end)
+      },
+      "prague": {
+        "target": (if env.HIVE_PRAGUE_BLOB_TARGET then env.HIVE_PRAGUE_BLOB_TARGET|to_int else 6 end),
+        "max": (if env.HIVE_PRAGUE_BLOB_MAX then env.HIVE_PRAGUE_BLOB_MAX|to_int else 9 end),
+        "baseFeeUpdateFraction": (if env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
+      },
+      "osaka": {
+        "target": (if env.HIVE_OSAKA_BLOB_TARGET then env.HIVE_OSAKA_BLOB_TARGET|to_int else 6 end),
+        "max": (if env.HIVE_OSAKA_BLOB_MAX then env.HIVE_OSAKA_BLOB_MAX|to_int else 9 end),
+        "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
+      }
+    },
+  }
+} | pad_storage_keys | remove_empty

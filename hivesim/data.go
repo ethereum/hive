@@ -1,5 +1,7 @@
 package hivesim
 
+import "slices"
+
 // SuiteID identifies a test suite context.
 type SuiteID uint32
 
@@ -10,6 +12,15 @@ type TestID uint32
 type TestResult struct {
 	Pass    bool   `json:"pass"`
 	Details string `json:"details"`
+}
+
+// TestStartInfo contains metadata about a test which is supplied to the hive API.
+type TestStartInfo struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Location    string `json:"location"`
+	Category    string `json:"category"`
+	Description string `json:"description"`
 }
 
 // ExecInfo is the result of running a command in a client container.
@@ -33,10 +44,5 @@ type ClientDefinition struct {
 
 // HasRole reports whether the client has the given role.
 func (m *ClientDefinition) HasRole(role string) bool {
-	for _, m := range m.Meta.Roles {
-		if m == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Meta.Roles, role)
 }

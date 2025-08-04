@@ -1,23 +1,25 @@
-FROM node:16-alpine as build
-RUN apk update && apk add --no-cache bash git jq curl && rm -rf /var/cache/apk/*
-RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
-    (cd ethereumjs-monorepo && npm i)
+ARG baseimage=ghcr.io/ethereumjs/ethereumjs-monorepo
+ARG tag=latest
 
-RUN cd ethereumjs-monorepo/packages/client && npm ethereumjs --version > /version.txt
+FROM $baseimage:$tag as builder
 
-ADD ethereumjs.sh /ethereumjs.sh
-ADD mapper.jq /mapper.jq
-ADD jwtsecret /jwtsecret
-RUN chmod +x /ethereumjs.sh
+RUN apk add --update --no-cache bash git jq curl python3 gcc make g++ \
+    && rm -rf /var/cache/apk/*
 
-# Inject the enode id retriever script
-RUN mkdir /hive-bin
-ADD enode.sh /hive-bin/enode.sh
-RUN chmod +x /hive-bin/enode.sh
+# Create version.txt
+RUN cd /ethereumjs-monorepo/packages/client/ && npm ethereumjs --version > /version.txt
 
+# Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
+ADD mapper.jq /mapper.jq
+ADD ethereumjs.sh /ethereumjs.sh
+ADD enode.sh /hive-bin/enode.sh
+ADD jwtsecret /ethereumjs-monorepo/jwtsecret
 
-# Export the usual networking ports to allow outside access to the node
+# Set execute permissions for scripts
+RUN chmod +x /ethereumjs.sh /hive-bin/enode.sh
+
+# Expose networking ports
 EXPOSE 8545 8546 8551 8547 30303 30303/udp
 
 # NodeJS applications have a default memory limit of 2.5GB.

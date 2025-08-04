@@ -25,7 +25,7 @@ The genesis block also contains 2 contracts:
 Ethclient runs various tests that use the `ethclient.Client` API. Such as sending
 transactions, retrieving logs and balances.
 
-ABI, interacts with the pre-deployed events contract. It send transactions, executs calls
+ABI, interacts with the pre-deployed events contract. It send transactions, executes calls
 and examines generated logs.
 
 Each test is designed to run in parallel with other tests. In most cases the first step a

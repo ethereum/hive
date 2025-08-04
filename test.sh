@@ -17,12 +17,12 @@ FLAGS="$FLAGS --results-root $RESULTS "
 FLAGS="$FLAGS --sim.parallelism 1 --client.checktimelimit=20s"
 
 echo "Running the quick'n'dirty version of the Hive tests, for local development"
-echo "To the the hive viewer up, you can do"
+echo "To get the hive viewer up, you can do"
 echo ""
 echo "  cd $HIVEHOME/hiveviewer && ln -s /tmp/TestResults/ Results && python -m SimpleHTTPServer"
 echo ""
 echo "And then visit http://localhost:8000/ with your browser. "
-echo "Log-files and stuff is availalbe in $RESULTS."
+echo "Log-files and stuff is available in $RESULTS."
 echo ""
 echo ""
 
@@ -57,10 +57,8 @@ mkdir $RESULTS
 # Sync are quick tests
 #
 
-# These three can succsessfully sync with themselves
-#testsync openethereum_latest
+# These can succsessfully sync with themselves
 #testsync go-ethereum_latest
-testsync aleth_nightly,openethereum_latest,go-ethereum_latest
 
 # These two are failing - even against themselves
 testsync besu_latest       # fails
@@ -69,8 +67,6 @@ testsync nethermind_latest # fails
 #testsync besu_latest,nethermind_latest
 
 #testsync go-ethereum_latest go-ethereum_stable
-#testsync go-ethereum_latest openethereum_latest
-#testsync go-ethereum_latest aleth_nightly
 #testsync go-ethereum_latest nethermind_latest
 #testsync go-ethereum_latest besu_latest
 
@@ -85,13 +81,10 @@ testgraphql besu_latest
 #testdevp2p go-ethereum_latest
 #testdevp2p nethermind_latest
 #testdevp2p besu_latest
-#testdevp2p openethereum_latest
 
 
 # These take an extremely long time to run
-#testconsensus aleth_nightly
 #testconsensus go-ethereum_latest
-#testconsensus openethereum_latest
 #testconsensus nethermind_latest
 #testconsensus besu_latest
 

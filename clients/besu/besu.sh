@@ -35,13 +35,11 @@
 #
 #  - HIVE_MINER                enables mining. value is coinbase.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
 #
 # These flags are not supported by the Besu hive client
 #
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 
 set -e
@@ -60,12 +58,22 @@ case "$HIVE_LOGLEVEL" in
     4)   LOG=DEBUG ;;
     5)   LOG=TRACE ;;
 esac
-FLAGS="--logging=$LOG"
+FLAGS="--logging=$LOG --data-storage-format=BONSAI"
 
 # Configure the chain.
-jq -f /mapper.jq /genesis.json > /besugenesis.json
-echo -n "Genesis: "; cat /besugenesis.json
-FLAGS="$FLAGS --genesis-file=/besugenesis.json"
+mv /genesis.json /genesis-input.json
+jq -f /mapper.jq /genesis-input.json > /genesis.json
+FLAGS="$FLAGS --genesis-file=/genesis.json "
+
+# Dump genesis. 
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    echo "Supplied genesis state:"
+    cat /genesis.json
+fi
+
 
 # Enable experimental 'berlin' hard-fork features if configured.
 #if [ -n "$HIVE_FORK_BERLIN" ]; then
@@ -75,10 +83,8 @@ FLAGS="$FLAGS --genesis-file=/besugenesis.json"
 # The client should start after loading the blocks, this option configures it.
 IMPORTFLAGS="--run"
 
-# Disable PoW check if requested.
-if [ -n "$HIVE_SKIP_POW" ]; then
-    IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
-fi
+# Skip PoW checks on import.
+IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
 
 # Load chain.rlp if present.
 if [ -f /chain.rlp ]; then
@@ -99,20 +105,21 @@ if [ -d /blocks ]; then
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
 
-
-# Configure mining.
-if [ "$HIVE_MINER" != "" ]; then
-    FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
-    # For clique mining, besu uses the node key as the block signing key.
-    if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
-        echo "Importing clique signing key as node key..."
-        echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
+if [ "$HIVE_BOOTNODE" == "" ]; then
+    # Configure mining.
+    if [ "$HIVE_MINER" != "" ]; then
+        FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
+        # For clique mining, besu uses the node key as the block signing key.
+        if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+            echo "Importing clique signing key as node key..."
+            echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
+        fi
     fi
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
 fi
-FLAGS="$FLAGS --min-gas-price=16 --tx-pool-price-bump=0"
+FLAGS="$FLAGS --min-gas-price=1 --tx-pool-price-bump=0 --Xeth-capability-max=69"
 
 # Configure peer-to-peer networking.
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -124,31 +131,35 @@ else
     FLAGS="$FLAGS --network-id=1337"
 fi
 
-# Sync mode, must only be changed for non merge related tests.
-if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
-    if [ "$HIVE_NODETYPE" == "light" ]; then
-        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
-    else
-        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
-    fi
+# Configure sync mode
+#
+# light: not supported, full sync (per default)
+# not set: fast sync
+# archive, full or merge tests: full sync (per default)
+if [ "$HIVE_NODETYPE" == "light" ]; then
+    echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
+elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
+    FLAGS="$FLAGS --sync-mode=SNAP"
 fi
+
+# Enable Snap Server.
+FLAGS="$FLAGS --Xsnapsync-server-enabled"
 
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
-    RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
+    RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=DEBUG,ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 else
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
 
 # Enable WebSocket.
-RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=DEBUG,ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
 
 # Enable merge support if needed
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
-    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-enabled --engine-jwt-secret /jwtsecret"
-    FLAGS="$FLAGS --sync-mode=FULL"
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-secret /jwtsecret"
 fi
 
 # Start Besu.

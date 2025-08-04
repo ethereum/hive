@@ -5,8 +5,11 @@
 This page explains how client containers work in Hive.
 
 Clients are docker images which can be instantiated by a simulation. A client definition
-consist of a Dockerfile and associated resources. Client definitions live in
+consists of a Dockerfile and associated resources. Client definitions live in
 subdirectories of `clients/` in the hive repository.
+
+See the [go-ethereum client definition][geth-docker] for an example of a client
+Dockerfile.
 
 When hive runs a simulation, it first builds all client docker images using their
 Dockerfile, i.e. it basically runs `docker build .` in the client directory. Since most
@@ -14,14 +17,20 @@ client definitions wrap an existing Ethereum client, and building the client fro
 may take a long time, it is usually best to base the hive client wrapper on a pre-built
 docker image from Docker Hub.
 
-Client Dockerfiles should support an optional argument named `branch`, which specifies the
-requested client version. This argument can be set by users by appending it to the client
-name like:
+The client Dockerfile should support an optional argument named `branch`, which specifies
+the requested client version. This argument can be set by users by appending it to the
+client name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
-See the [go-ethereum client definition][geth-docker] for an example of a client
-Dockerfile.
+Other build arguments can also be set using a YAML file, see the [hive command
+documentation][hive-client-yaml] for more information.
+
+### Alternative Dockerfiles
+
+There can be other Dockerfiles besides the main one. Typically, a client should also
+provide a `Dockerfile.git` that builds the client from source code. Alternative
+Dockerfiles can be selected through hive's `-client-file` YAML configuration.
 
 ### hive.yaml
 
@@ -35,7 +44,7 @@ list:
 
 The role list is available to simulators and can be used to differentiate between clients
 based on features. Declaring a client role also signals that the client supports certain
-role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
+role-specific environment variables and files. If `hive.yaml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
 
 ### /version.txt
@@ -89,8 +98,8 @@ container:
 On startup, the entry point script must first load the genesis block and state into the
 client implementation from `/genesis.json`. To do this, the script needs to translate from
 Geth genesis format into a format appropriate for the specific client implementation. The
-translation is usually done using a jq script. See the [openethereum genesis
-translator][oe-genesis-jq], for example.
+translation is usually done using a jq script. See the [go-ethereum genesis
+translator][geth-genesis-jq], for example.
 
 After the genesis state, the client should import the blocks from `/chain.rlp` if it is
 present, and finally import the individual blocks from `/blocks` in file name order. The
@@ -108,7 +117,7 @@ URL of the running instance.
 ### Environment
 
 Clients must support the following environment variables. The client's entry point script
-may map these to command line flags or use them generate a config file, for example.
+may map these to command line flags or use them to generate a config file, for example.
 
 | Variable                   | Value         |                                                |
 |----------------------------|---------------|------------------------------------------------|
@@ -120,7 +129,6 @@ may map these to command line flags or use them generate a config file, for exam
 | `HIVE_MINER_EXTRA`         | hex           | extradata for mined blocks                     |
 | `HIVE_CLIQUE_PERIOD`       | decimal       | enables clique PoA. value is target block time |
 | `HIVE_CLIQUE_PRIVATEKEY`   | hex           | private key for signing of clique blocks       |
-| `HIVE_SKIP_POW`            | 0 - 1         | disables PoW check during block import         |
 | `HIVE_NETWORK_ID`          | decimal       | p2p network ID                                 |
 | `HIVE_CHAIN_ID`            | decimal       | [EIP-155] chain ID                             |
 | `HIVE_FORK_HOMESTEAD`      | decimal       | [Homestead][EIP-606] transition block          |
@@ -155,7 +163,8 @@ For the server role, the following additional variables should be supported:
 
 [LES]: https://github.com/ethereum/devp2p/blob/master/caps/les.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
-[oe-genesis-jq]: ../clients/openethereum/mapper.jq
+[hive-client-yaml]: ./commandline.md#client-build-parameters
+[geth-genesis-jq]: ../clients/go-ethereum/mapper.jq
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 [EIP-606]: https://eips.ethereum.org/EIPS/eip-606
 [EIP-607]: https://eips.ethereum.org/EIPS/eip-607

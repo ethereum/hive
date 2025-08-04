@@ -5,55 +5,109 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net"
-	"net/http"
+	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
-	"strconv"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"gopkg.in/inconshreveable/log15.v2"
+	"github.com/lmittmann/tint"
+	docker "github.com/fsouza/go-dockerclient"
 )
+
+type buildArgs map[string]string
+
+func (args *buildArgs) String() string {
+	var kv []string
+	for k, v := range *args {
+		kv = append(kv, k+"="+v)
+	}
+	sort.Strings(kv)
+	return strings.Join(kv, ",")
+}
+
+// Set implements flag.Value.
+func (args *buildArgs) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return errors.New("invalid build argument format, expected ARG=VALUE")
+	}
+	(*args)[parts[0]] = parts[1]
+	return nil
+}
 
 func main() {
 	var (
-		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
-		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
-		dockerEndpoint        = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		testResultsRoot = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
+		loglevelFlag    = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		dockerAuth      = flag.Bool("docker.auth", false, `Enable docker authentication from system config files. The following files are checked in the order listed:
+If the environment variable DOCKER_CONFIG is set to a non-empty string:
+- $DOCKER_CONFIG/plaintext-passwords.json
+- $DOCKER_CONFIG/config.json
+Otherwise, it looks for files in the $HOME directory:
+- $HOME/.docker/plaintext-passwords.json
+- $HOME/.docker/config.json
+- $HOME/.dockercfg`)
+		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
+		simRandomSeed         = flag.Int("sim.randomseed", 0, "Randomness seed number (interpreted by simulators).")
 		simTestLimit          = flag.Int("sim.testlimit", 0, "[DEPRECATED] Max `number` of tests to execute per client (interpreted by simulators).")
 		simTimeLimit          = flag.Duration("sim.timelimit", 0, "Simulation `timeout`. Hive aborts the simulator if it exceeds this time.")
 		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
+		useCredHelper         = flag.Bool("docker.cred-helper", false, "(DEPRECATED) Use --docker.auth instead.")
+
+		// Cleanup flags
+		cleanupContainers = flag.Bool("cleanup", false, "Clean up Hive containers instead of running simulations")
+		cleanupDryRun     = flag.Bool("cleanup.dry-run", false, "Show what containers would be cleaned up without actually removing them")
+		cleanupInstance   = flag.String("cleanup.instance", "", "Clean up containers from specific Hive instance ID only")
+		cleanupType       = flag.String("cleanup.type", "", "Clean up specific container type only (client, simulator, proxy)")
+		cleanupOlderThan  = flag.Duration("cleanup.older-than", 0, "Clean up containers older than specified duration (e.g., 1h, 24h)")
+		listContainers    = flag.Bool("list", false, "List Hive containers instead of running simulations")
+
+		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
 
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
 			"the client image will use the given git branch or docker tag. Multiple instances of\n"+
 			"a single client type may be requested with different branches.\n"+
-			"Example: \"besu_latest,besu_20.10.2\"")
+			"Example: \"besu_latest,besu_20.10.2\"\n")
+
 		clientTimeout = flag.Duration("client.checktimelimit", 3*time.Minute, "The `timeout` of waiting for clients to open up the RPC port.\n"+
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
 	)
 
+	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
+	simBuildArgs := make(buildArgs)
+	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
+
 	// Parse the flags and configure the logger.
 	flag.Parse()
-	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
-
+	terminal := os.Getenv("TERM")
+	tintHandler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:   convertLogLevel(*loglevelFlag),
+		NoColor: terminal == "" || terminal == "dumb",
+	})
+	slog.SetDefault(slog.New(tintHandler))
+	// See: https://github.com/ethereum/hive/issues/1200.
+	if err := os.Setenv("GODEBUG", "multipartmaxparts=20000"); err != nil {
+		fatal(err)
+	}
 	if *simTestLimit > 0 {
-		log15.Warn("Option --sim.testlimit is deprecated and will have no effect.")
+		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
 
 	// Get the list of simulators.
@@ -68,11 +122,16 @@ func main() {
 	if *simPattern != "" && len(simList) == 0 {
 		fatal("no simulators for pattern", *simPattern)
 	}
+	if *simPattern != "" && *simDevMode {
+		slog.Warn("--sim is ignored when using --dev mode")
+		simList = nil
+	}
 
 	// Create the docker backends.
 	dockerConfig := &libdocker.Config{
-		Inventory:   inv,
-		PullEnabled: *dockerPull,
+		Inventory:         inv,
+		PullEnabled:       *dockerPull,
+		UseAuthentication: *dockerAuth || *useCredHelper,
 	}
 	if *dockerNoCache != "" {
 		re, err := regexp.Compile(*dockerNoCache)
@@ -84,10 +143,47 @@ func main() {
 	if *dockerOutput {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
+	} else if *dockerBuildOutput {
+		dockerConfig.BuildOutput = os.Stderr
 	}
-	builder, containerBackend, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
+	builder, cb, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
 	if err != nil {
 		fatal(err)
+	}
+
+	// Handle cleanup/list operations if requested.
+	if *cleanupContainers || *listContainers {
+		dockerClient := cb.GetDockerClient()
+		if dockerClient == nil {
+			fatal("Docker client not available for cleanup operations")
+		}
+		
+		client, ok := dockerClient.(*docker.Client)
+		if !ok {
+			fatal("Invalid Docker client type")
+		}
+		
+		if *listContainers {
+			err := libhive.ListHiveContainers(context.Background(), client, *cleanupInstance)
+			if err != nil {
+				fatal("Failed to list containers:", err)
+			}
+			return
+		}
+
+		if *cleanupContainers {
+			cleanupOpts := libhive.CleanupOptions{
+				InstanceID:    *cleanupInstance,
+				OlderThan:     *cleanupOlderThan,
+				DryRun:        *cleanupDryRun,
+				ContainerType: *cleanupType,
+			}
+			err := libhive.CleanupHiveContainers(context.Background(), client, cleanupOpts)
+			if err != nil {
+				fatal("Failed to cleanup containers:", err)
+			}
+			return
+		}
 	}
 
 	// Set up the context for CLI interrupts.
@@ -100,263 +196,68 @@ func main() {
 	}()
 
 	// Run.
-	runner := simRunner{
-		inv:       inv,
-		builder:   builder,
-		container: containerBackend,
-		env: libhive.SimEnv{
-			LogDir:             *testResultsRoot,
-			SimLogLevel:        *simLogLevel,
-			SimTestPattern:     *simTestPattern,
-			SimParallelism:     *simParallelism,
-			ClientStartTimeout: *clientTimeout,
-		},
-		SimDurationLimit: *simTimeLimit,
+	env := libhive.SimEnv{
+		LogDir:             *testResultsRoot,
+		SimLogLevel:        *simLogLevel,
+		SimTestPattern:     *simTestPattern,
+		SimParallelism:     *simParallelism,
+		SimRandomSeed:      *simRandomSeed,
+		SimDurationLimit:   *simTimeLimit,
+		ClientStartTimeout: *clientTimeout,
 	}
-	clientList := splitAndTrim(*clients, ",")
-	if err := runner.initClients(ctx, clientList); err != nil {
+	runner := libhive.NewRunner(inv, builder, cb)
+
+	// Parse the client list.
+	// It can be supplied as a comma-separated list, or as a YAML file.
+	var clientList []libhive.ClientDesignator
+	if *clientsFile == "" {
+		clientList, err = libhive.ParseClientList(&inv, *clients)
+		if err != nil {
+			fatal("-client:", err)
+		}
+	} else {
+		clientList, err = parseClientsFile(&inv, *clientsFile)
+		if err != nil {
+			fatal("-client-file:", err)
+		}
+		// If YAML file is used, the list can be filtered by the -client flag.
+		if flagIsSet("client") {
+			filter := strings.Split(*clients, ",")
+			clientList = libhive.FilterClients(clientList, filter)
+		}
+	}
+	hiveInfo := libhive.HiveInfo{
+		Command:        os.Args,
+		ClientFile:     clientList,
+		ClientFilePath: *clientsFile,
+	}
+
+	// Build clients and simulators.
+	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
 		fatal(err)
 	}
-
 	if *simDevMode {
-		log15.Info("running in simulator development mode")
-		runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
-	} else if len(simList) > 0 {
-		if err := runner.initSimulators(ctx, simList); err != nil {
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint, hiveInfo)
+		return
+	}
+
+	// Run simulators.
+	var failCount int
+	for _, sim := range simList {
+		result, err := runner.Run(ctx, sim, env, hiveInfo)
+		if err != nil {
 			fatal(err)
 		}
-		if err := runner.runSimulations(ctx, simList); err != nil {
-			fatal(err)
-		}
-	}
-}
-
-type simRunner struct {
-	inv       libhive.Inventory
-	container libhive.ContainerBackend
-	builder   libhive.Builder
-	env       libhive.SimEnv
-
-	// This holds the image names of all built simulators.
-	simImages map[string]string
-
-	// This is the time limit for a single simulation run.
-	SimDurationLimit time.Duration
-}
-
-// initClients builds client images.
-func (r *simRunner) initClients(ctx context.Context, clientList []string) error {
-	r.env.Definitions = make(map[string]*libhive.ClientDefinition)
-
-	if len(clientList) == 0 {
-		return errors.New("client list is empty, cannot simulate")
+		failCount += result.TestsFailed
+		slog.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
-	var anyBuilt bool
-	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
-	for _, client := range clientList {
-		if !r.inv.HasClient(client) {
-			return fmt.Errorf("unknown client %q", client)
-		}
-		meta, err := r.builder.ReadClientMetadata(client)
-		if err != nil {
-			return err
-		}
-		image, err := r.builder.BuildClientImage(ctx, client)
-		if err != nil {
-			continue
-		}
-		anyBuilt = true
-		version, err := r.builder.ReadFile(image, "/version.txt")
-		if err != nil {
-			log15.Warn("can't read version info of "+client, "image", image, "err", err)
-		}
-		r.env.Definitions[client] = &libhive.ClientDefinition{
-			Name:    client,
-			Version: strings.TrimSpace(string(version)),
-			Image:   image,
-			Meta:    *meta,
-		}
-	}
-	if !anyBuilt {
-		return errors.New("all clients failed to build")
-	}
-	return nil
-}
-
-// initSimulators builds simulator images.
-func (r *simRunner) initSimulators(ctx context.Context, simList []string) error {
-	r.simImages = make(map[string]string)
-
-	log15.Info(fmt.Sprintf("building %d simulators...", len(simList)))
-	for _, sim := range simList {
-		image, err := r.builder.BuildSimulatorImage(ctx, sim)
-		if err != nil {
-			return err
-		}
-		r.simImages[sim] = image
-	}
-	return nil
-}
-
-func (r *simRunner) runSimulations(ctx context.Context, simList []string) error {
-	log15.Info("creating output directory", "folder", r.env.LogDir)
-	if err := os.MkdirAll(r.env.LogDir, 0755); err != nil {
-		log15.Crit("failed to create logs folder", "err", err)
-		return err
-	}
-
-	for _, sim := range simList {
-		if err := r.run(ctx, sim); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string) error {
-	tm := libhive.NewTestManager(r.env, r.container, -1)
-	defer func() {
-		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
-		}
-	}()
-
-	addr, err := net.ResolveTCPAddr("tcp4", endpoint)
-	if err != nil {
-		log15.Error(fmt.Sprintf("failed to resolve %s", endpoint), "err", err)
-		return err
-	}
-
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
-		return err
-	}
-
-	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
-	server := &http.Server{Handler: tm.API()}
-	defer shutdownServer(server)
-
-	go server.Serve(listener)
-
-	// wait for interrupt
-	<-ctx.Done()
-	return nil
-}
-
-// run runs one simulation.
-func (r *simRunner) run(ctx context.Context, sim string) error {
-	log15.Info(fmt.Sprintf("running simulation: %s", sim))
-
-	// Start the simulation API.
-	tm := libhive.NewTestManager(r.env, r.container, -1)
-	defer func() {
-		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
-		}
-	}()
-	addr, server, err := startTestSuiteAPI(tm)
-	if err != nil {
-		log15.Error("failed to start simulator API", "error", err)
-		return err
-	}
-	defer shutdownServer(server)
-
-	// Create the simulator container.
-	opts := libhive.ContainerOptions{
-		Env: map[string]string{
-			"HIVE_SIMULATOR":    "http://" + addr.String(),
-			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
-			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
-			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
-		},
-	}
-	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
-	if err != nil {
-		return err
-	}
-
-	// Set the log file, and notify TestManager about the container.
-	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID)
-	opts.LogFile = filepath.Join(r.env.LogDir, logbasename)
-	tm.SetSimContainerInfo(containerID, logbasename)
-
-	log15.Debug("starting simulator container")
-	sc, err := r.container.StartContainer(ctx, containerID, opts)
-	if err != nil {
-		return err
-	}
-	slogger := log15.New("sim", sim, "container", sc.ID[:8])
-	slogger.Debug("started simulator container")
-	defer func() {
-		slogger.Debug("deleting simulator container")
-		r.container.DeleteContainer(sc.ID)
-	}()
-
-	// Wait for simulator exit.
-	done := make(chan struct{})
-	go func() {
-		sc.Wait()
-		close(done)
-	}()
-
-	// if we have a simulation time limit, apply it.
-	var timeout <-chan time.Time
-	if r.SimDurationLimit != 0 {
-		tt := time.NewTimer(r.SimDurationLimit)
-		defer tt.Stop()
-		timeout = tt.C
-	}
-
-	// Wait for simulation to end.
-	select {
-	case <-done:
-	case <-timeout:
-		slogger.Info("simulation timed out")
-	case <-ctx.Done():
-		slogger.Info("interrupted, shutting down")
-		return errors.New("simulation interrupted")
-	}
-	return nil
-}
-
-// startTestSuiteAPI starts an HTTP webserver listening for simulator commands
-// on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
-	// Find the IP address of the host container
-	bridge, err := libdocker.LookupBridgeIP(log15.Root())
-	if err != nil {
-		log15.Error("failed to lookup bridge IP", "error", err)
-		return nil, nil, err
-	}
-	log15.Debug("docker bridge IP found", "ip", bridge)
-
-	// Serve connections until the listener is terminated
-	log15.Debug("starting simulator API server")
-
-	// Start the API webserver for simulators to coordinate with
-	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error("failed to listen on bridge adapter", "err", err)
-		return nil, nil, err
-	}
-	laddr := listener.Addr()
-	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API()}
-
-	go server.Serve(listener)
-	return laddr, server, nil
-}
-
-// shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(server *http.Server) {
-	log15.Debug("terminating simulator server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log15.Debug("simulation API server shutdown failed", "err", err)
+	switch failCount {
+	case 0:
+	case 1:
+		fatal(errors.New("1 test failed"))
+	default:
+		fatal(fmt.Errorf("%d tests failed", failCount))
 	}
 }
 
@@ -365,10 +266,39 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func splitAndTrim(input, sep string) []string {
-	list := strings.Split(input, sep)
-	for i := range list {
-		list[i] = strings.TrimSpace(list[i])
+func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesignator, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
 	}
-	return list
+	defer f.Close()
+	return libhive.ParseClientListYAML(inv, f)
+}
+
+func flagIsSet(name string) bool {
+	var found bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
+// convertLogLevel maps log level from range 0-5 to the range used by package slog.
+// Input levels are ordered in increasing amounts of messages, i.e. level zero is silent
+// and level 5 means everything is printed.
+func convertLogLevel(level int) slog.Level {
+	switch level {
+	case 0:
+		return 99
+	case 1:
+		return slog.LevelError
+	case 2:
+		return slog.LevelWarn
+	case 3:
+		return slog.LevelInfo
+	default:
+		return slog.LevelDebug
+	}
 }

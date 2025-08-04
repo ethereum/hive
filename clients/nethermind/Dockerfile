@@ -1,28 +1,27 @@
-ARG branch=latest
-FROM nethermindeth/hive:$branch
+## Build Nethermind Via Pre-Built Image:
+ARG baseimage=nethermindeth/nethermind
+ARG tag=master
+FROM $baseimage:$tag
 
-RUN apt-get update && apt-get install -y wget
-RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \
-    echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c && \
-    chmod +x /usr/local/bin/jq
+RUN apt-get update && apt-get install -y jq && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Create version.txt
+RUN dotnet /nethermind/nethermind.dll --version \
+    | head -1 | sed 's/Version:[[:space:]]*\(.*\)/\1/' > /version.txt
+
+# Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
 ADD mkconfig.jq /mkconfig.jq
-ADD enode.sh /enode.sh
 ADD nethermind.sh /nethermind.sh
-
-RUN chmod +x /nethermind.sh
-
-# Add the enode script.
-RUN mkdir /hive-bin
 ADD enode.sh /hive-bin/enode.sh
-RUN chmod +x /hive-bin/enode.sh
 
-# Write the version file.
-RUN dotnet /nethermind/Nethermind.Runner.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
+# Set execute permissions for scripts
+RUN chmod +x /nethermind.sh /hive-bin/enode.sh
 
-ENV NETHERMIND_HIVE_ENABLED true
-
+# Expose networking ports
 EXPOSE 8545 30303 30303/udp
+
+ENV NETHERMIND_HIVECONFIG_ENABLED true
 ENTRYPOINT ["/nethermind.sh"]

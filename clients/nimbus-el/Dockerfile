@@ -1,35 +1,22 @@
-# Docker container spec for building the master branch of nimbus.
+ARG tag=master
+ARG baseimage=statusim/nimbus-eth1
 
-FROM debian:buster-slim AS build
+FROM $baseimage:$tag AS source
 
-RUN apt-get update \
- && apt-get install -y --fix-missing build-essential make git libpcre3-dev librocksdb-dev \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+FROM debian:testing-slim AS deploy
 
-ENV NPROC=2
+SHELL ["/bin/bash", "-c"]
 
-RUN git clone --depth 1 --branch master https://github.com/status-im/nimbus-eth1.git \
- && cd nimbus-eth1 \
- && git checkout master \
- && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
+RUN apt-get clean \
+    && apt-get update \
+    && apt-get install -y build-essential librocksdb-dev jq curl \
+    && apt -y upgrade
 
-RUN cd nimbus-eth1 && \
-    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus && \
-    mv build/nimbus /usr/bin/
+RUN ldd --version
 
-# --------------------------------- #
-# Starting new image to reduce size #
-# --------------------------------- #
-FROM debian:buster-slim AS deploy
+COPY --from=source /home/user/nimbus-eth1/build/nimbus_execution_client /usr/bin/nimbus_execution_client
 
-RUN apt-get update \
- && apt-get install -y librocksdb-dev bash curl jq\
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-COPY --from=build /usr/bin/nimbus /usr/bin/nimbus
-RUN usr/bin/nimbus --version > /version.txt
+RUN usr/bin/nimbus_execution_client --version > /version.txt
 
 # Add genesis mapper script.
 ADD genesis.json /genesis.json

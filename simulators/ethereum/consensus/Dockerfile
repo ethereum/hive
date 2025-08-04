@@ -1,9 +1,11 @@
 # This simulation runs the ethereum consensus tests.
 FROM golang:1-alpine as builder
+ARG GOPROXY
+ENV GOPROXY=${GOPROXY}
 RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 
 # Clone the tests repo.
-RUN git clone --depth 1 https://github.com/ethereum/tests.git /tests
+RUN git clone --depth 1 --recurse-submodules https://github.com/ethereum/tests.git /tests
 
 # Build the simulator executable.
 ADD . /source

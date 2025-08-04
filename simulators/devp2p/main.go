@@ -1,15 +1,20 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
-	"sync"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/shogo82148/go-tap"
 )
+
+// Location of the test chain files. They are copied from
+// go-ethereum/cmd/devp2p/internal/ethtest/testdata by the simulator dockerfile.
+const testChainDir = "/testchain"
 
 func main() {
 	discv4 := hivesim.Suite{
@@ -17,14 +22,71 @@ func main() {
 		Description: "This suite runs Discovery v4 protocol tests.",
 		Tests: []hivesim.AnyTest{
 			hivesim.ClientTestSpec{
-				Role:       "eth1",
-				Parameters: hivesim.Params{"HIVE_LOGLEVEL": "5"},
-				AlwaysRun:  true,
-				Run:        runDiscoveryTest,
+				Role: "eth1",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "5",
+				},
+				AlwaysRun: true,
+				Run:       runDiscv4Test,
 			},
 		},
 	}
 
+	discv5 := hivesim.Suite{
+		Name:        "discv5",
+		Description: "This suite runs Discovery v5 protocol tests.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "5",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, (*hivesim.Client).EnodeURL)
+				},
+			},
+			hivesim.ClientTestSpec{
+				Role: "beacon",
+				Parameters: hivesim.Params{
+					"HIVE_LOGLEVEL":        "5",
+					"HIVE_CHECK_LIVE_PORT": "4000",
+				},
+				Files: map[string]string{
+					"/hive/input/genesis.ssz": "./init/beacon/genesis.ssz",
+					"/hive/input/config.yaml": "./init/beacon/config.yaml",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, getBeaconENR)
+				},
+			},
+			hivesim.ClientTestSpec{
+				Role: "portal",
+				Parameters: hivesim.Params{
+					"HIVE_CHECK_LIVE_PORT": "8545",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, getPortalENR)
+				},
+			},
+		},
+	}
+
+	forkenv := loadTestChainConfig()
 	eth := hivesim.Suite{
 		Name:        "eth",
 		Description: "This suite tests a client's ability to accurately respond to basic eth protocol messages.",
@@ -34,18 +96,10 @@ func main() {
 				Name: "client launch",
 				Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "4",
-				},
+				Parameters: forkenv,
 				Files: map[string]string{
-					"genesis.json": "./init/genesis.json",
-					"chain.rlp":    "./init/halfchain.rlp",
+					"genesis.json": testChainDir + "/genesis.json",
+					"chain.rlp":    testChainDir + "/chain.rlp",
 				},
 				AlwaysRun: true,
 				Run:       runEthTest,
@@ -62,18 +116,10 @@ Results from the test tool are reported as individual sub-tests.`,
 				Name: "client launch",
 				Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "4",
-				},
+				Parameters: forkenv,
 				Files: map[string]string{
-					"genesis.json": "./init/genesis.json",
-					"chain.rlp":    "./init/halfchain.rlp",
+					"genesis.json": testChainDir + "/genesis.json",
+					"chain.rlp":    testChainDir + "/chain.rlp",
 				},
 				AlwaysRun: true,
 				Run:       runSnapTest,
@@ -81,7 +127,19 @@ Results from the test tool are reported as individual sub-tests.`,
 		},
 	}
 
-	hivesim.MustRun(hivesim.New(), discv4, eth, snap)
+	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
+}
+
+func loadTestChainConfig() hivesim.Params {
+	content, err := os.ReadFile(testChainDir + "/forkenv.json")
+	if err != nil {
+		panic(err)
+	}
+	var p hivesim.Params
+	if err := json.Unmarshal(content, &p); err != nil {
+		panic(err)
+	}
+	return p
 }
 
 func runEthTest(t *hivesim.T, c *hivesim.Client) {
@@ -89,8 +147,16 @@ func runEthTest(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "rlpx", "eth-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	cmd := exec.Command("./devp2p", "rlpx", "eth-test",
+		"--tap",
+		"--run", pattern,
+		"--node", enode,
+		"--chain", testChainDir,
+		"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+		"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+	)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
@@ -101,44 +167,82 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "rlpx", "snap-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	cmd := exec.Command("./devp2p", "rlpx", "snap-test",
+		"--tap",
+		"--run", pattern,
+		"--node", enode,
+		"--chain", testChainDir,
+		"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+		"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+	)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
 }
 
-var createNetworkOnce sync.Once
+const network = "network1"
 
-func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
-	nodeURL, err := c.EnodeURL()
-	if err != nil {
-		t.Fatal("can't get client enode URL:", err)
-	}
+var networkCreated = make(map[hivesim.SuiteID]bool)
 
-	// Create a separate network to be able to send the client traffic from two separate IP addrs.
-	const network = "network1"
-	createNetworkOnce.Do(func() {
+// createNetwork ensures there is a separate network to be able to send the client traffic
+// from two separate IP addrs.
+func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
+	if !networkCreated[t.SuiteID] {
 		if err := t.Sim.CreateNetwork(t.SuiteID, network); err != nil {
 			t.Fatal("can't create network:", err)
 		}
 		if err := t.Sim.ConnectContainer(t.SuiteID, network, "simulation"); err != nil {
 			t.Fatal("can't connect simulation to network1:", err)
 		}
-	})
-
-	// Connect both simulation and client to this network.
-	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
-		t.Fatal("can't connect client to network1:", err)
+		networkCreated[t.SuiteID] = true
 	}
 	// Find our IPs on the bridge network and network1.
-	bridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
+	var err error
+	bridgeIP, err = t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container:", err)
 	}
-	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
+	net1IP, err = t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container on network1:", err)
+	}
+	return bridgeIP, net1IP
+}
+
+func runDiscv5Test(t *hivesim.T, c *hivesim.Client, getENR func(*hivesim.Client) (string, error)) {
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
+	}
+
+	nodeURL, err := getENR(c)
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	t.Log("ENR:", nodeURL)
+
+	// Run the test tool.
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--listen1", bridgeIP, "--listen2", net1IP, nodeURL)
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runDiscv4Test(t *hivesim.T, c *hivesim.Client) {
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	nodeURL, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
 	}
 
 	// Run the test tool.
@@ -179,20 +283,57 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("error parsing TAP: %v", err)
 	}
-	// Forward results to hive.
 	for {
 		test, err := parser.Next()
-		if err == io.EOF {
-			return nil
-		} else if err != nil {
+		if test == nil {
+			if err == io.EOF {
+				return nil
+			}
 			return err
 		}
+		// Forward result to hive.
 		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
-		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
+		testID, err := t.Sim.StartTest(t.SuiteID, hivesim.TestStartInfo{Name: name})
 		if err != nil {
 			return fmt.Errorf("can't report sub-test result: %v", err)
 		}
 		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
 		t.Sim.EndTest(t.SuiteID, testID, result)
 	}
+	return nil
+}
+
+func getBeaconENR(c *hivesim.Client) (string, error) {
+	url := fmt.Sprintf("http://%v:4000/eth/v1/node/identity", c.IP)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP request to get ENR failed with status code %d", resp.StatusCode)
+	}
+	var responseJSON struct {
+		Data struct {
+			ENR string `json:"enr"`
+		} `json:"data"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&responseJSON)
+	if err != nil {
+		return "", err
+	}
+	return responseJSON.Data.ENR, nil
+}
+
+func getPortalENR(c *hivesim.Client) (string, error) {
+	var nodeInfoResult struct {
+		ENR string `json:"enr"`
+	}
+	if err := c.RPC().Call(&nodeInfoResult, "discv5_nodeInfo"); err != nil {
+		return "", err
+	}
+	if nodeInfoResult.ENR == "" {
+		return "", fmt.Errorf("missing 'enr' in discv5_nodeInfo response")
+	}
+	return nodeInfoResult.ENR, nil
 }

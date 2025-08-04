@@ -74,10 +74,12 @@ func TestSuiteReporting(t *testing.T) {
 	}
 }
 
-// removeTimestamps removes test timestamps in results so they can be
+// removeTimestamps removes test timestamps and runtime metadata in results so they can be
 // compared using reflect.DeepEqual.
 func removeTimestamps(result map[libhive.TestSuiteID]*libhive.TestSuite) {
 	for _, suite := range result {
+		// Clear runtime metadata that varies between test runs
+		suite.RunMetadata = nil
 		for _, test := range suite.TestCases {
 			test.Start = time.Time{}
 			test.End = time.Time{}
@@ -148,7 +150,7 @@ func TestSkipping(t *testing.T) {
 		sort.Strings(cases)
 
 		if !reflect.DeepEqual(cases, test.WantRun) {
-			t.Errorf("pattern %q wrong exected test cases: %v", test.Pattern, cases)
+			t.Errorf("pattern %q wrong executed test cases: %v", test.Pattern, cases)
 		}
 	}
 }

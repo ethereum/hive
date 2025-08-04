@@ -21,14 +21,11 @@
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
-#  - HIVE_LOGLEVEL             client log level
 #  - HIVE_MINER                address to credit with mining rewards
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #
 # These flags are NOT supported by Erigon
 #
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_GRAPHQL_ENABLED      turns on GraphQL server
 #  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
@@ -39,7 +36,7 @@ set -e
 erigon=/usr/local/bin/erigon
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
-    FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
+    FLAGS="$FLAGS --log.console.verbosity=$HIVE_LOGLEVEL"
 fi
 
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -47,13 +44,13 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
 fi
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
+# Disable PoW validation.
+FLAGS="$FLAGS --fakepow"
 
 # Create the data directory.
 mkdir /erigon-hive-datadir
-FLAGS="$FLAGS --datadir /erigon-hive-datadir --syncmode=full"
+FLAGS="$FLAGS --datadir /erigon-hive-datadir"
+FLAGS="$FLAGS --db.size.limit 2GB"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
@@ -66,9 +63,14 @@ fi
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis
-echo "Supplied genesis state:"
-cat /genesis.json
+# Dump genesis. 
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    echo "Supplied genesis state:"
+    cat /genesis.json
+fi
 
 echo "Command flags till now:"
 echo $FLAGS
@@ -124,17 +126,23 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     fi
 fi
 
-# Launch the main client.
-FLAGS="$FLAGS --nat=none"
+# Configure RPC.
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
+FLAGS="$FLAGS --ws --ws.port=8546"
+
+# Increase blob slots for tests
+FLAGS="$FLAGS --txpool.blobslots=1000 --txpool.totalblobpoollimit=10000"
+
+# Disable performance optimization incompatible with the tests
+FLAGS="$FLAGS --sync.parallel-state-flushing=false"
+
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
     echo -n $JWT_SECRET > /jwt.secret
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3,engine --engine.addr=0.0.0.0"
-    FLAGS="$FLAGS --ws"
-    FLAGS="$FLAGS --authrpc.jwtsecret=/jwt.secret"
-else
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
-    FLAGS="$FLAGS --ws"
+    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 fi
+
+# Launch the main client.
+FLAGS="$FLAGS --nat=none"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS

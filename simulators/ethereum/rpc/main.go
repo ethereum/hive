@@ -31,6 +31,7 @@ var clientEnv = hivesim.Params{
 	"HIVE_CLIQUE_PERIOD":     "1",
 	"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
 	"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
+	"HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED": "0",
 }
 
 var files = map[string]string{

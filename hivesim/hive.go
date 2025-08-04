@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -20,27 +22,41 @@ import (
 
 // Simulation wraps the simulation HTTP API provided by hive.
 type Simulation struct {
-	url string
-	m   testMatcher
+	url  string
+	m    testMatcher
+	docs *docsCollector
+	ll   int
 }
 
 // New looks up the hive host URI using the HIVE_SIMULATOR environment variable
 // and connects to it. It will panic if HIVE_SIMULATOR is not set.
+// If HIVE_DOCS_MODE is set to "true", it will inhibit most of the functionality
+// in order to simplify execution for documentation generation.
 func New() *Simulation {
-	url, isSet := os.LookupEnv("HIVE_SIMULATOR")
-	if !isSet {
-		panic("HIVE_SIMULATOR environment variable not set")
+	var (
+		docs *docsCollector
+		url  string
+	)
+	if cc := os.Getenv("HIVE_DOCS_MODE"); cc == "true" {
+		docs = NewDocsCollector()
+	} else {
+		var isSet bool
+		if url, isSet = os.LookupEnv("HIVE_SIMULATOR"); !isSet {
+			panic("HIVE_SIMULATOR environment variable not set")
+		} else if url == "" {
+			panic("HIVE_SIMULATOR environment variable is empty")
+		}
 	}
-	if url == "" {
-		panic("HIVE_SIMULATOR environment variable is empty")
-	}
-	sim := &Simulation{url: url}
+	sim := &Simulation{url: url, docs: docs}
 	if p := os.Getenv("HIVE_TEST_PATTERN"); p != "" {
 		m, err := parseTestPattern(p)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Warning: ignoring invalid test pattern regexp: "+err.Error())
 		}
 		sim.m = m
+	}
+	if ll := os.Getenv("HIVE_LOGLEVEL"); ll != "" {
+		sim.ll, _ = strconv.Atoi(ll)
 	}
 	return sim
 }
@@ -75,18 +91,29 @@ func (sim *Simulation) TestPattern() (suiteExpr string, testNameExpr string) {
 	return se, te
 }
 
+// CollectTestsOnly returns true if the simulation is running in collect-tests-only mode.
+func (sim *Simulation) CollectTestsOnly() bool {
+	return sim.docs != nil
+}
+
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
 func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestResult) error {
+	if sim.docs != nil {
+		return sim.docs.EndTest(testSuite, test, testResult)
+	}
 	url := fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test)
 	return post(url, &testResult, nil)
 }
 
 // StartSuite signals the start of a test suite.
-func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
+func (sim *Simulation) StartSuite(suite *simapi.TestRequest, simlog string) (SuiteID, error) {
+	if sim.docs != nil {
+		return sim.docs.StartSuite(suite, simlog)
+	}
 	var (
 		url  = fmt.Sprintf("%s/testsuite", sim.url)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = suite
 		resp SuiteID
 	)
 	err := post(url, req, &resp)
@@ -95,15 +122,21 @@ func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, er
 
 // EndSuite signals the end of a test suite.
 func (sim *Simulation) EndSuite(testSuite SuiteID) error {
+	if sim.docs != nil {
+		return sim.docs.EndSuite(testSuite)
+	}
 	url := fmt.Sprintf("%s/testsuite/%d", sim.url, testSuite)
 	return requestDelete(url)
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier.
-func (sim *Simulation) StartTest(testSuite SuiteID, name string, description string) (TestID, error) {
+func (sim *Simulation) StartTest(testSuite SuiteID, test TestStartInfo) (TestID, error) {
+	if sim.docs != nil {
+		return sim.docs.StartTest(testSuite, test)
+	}
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = test
 		resp TestID
 	)
 	err := post(url, req, &resp)
@@ -113,11 +146,16 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
 func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
+	if sim.docs != nil {
+		return sim.docs.ClientTypes()
+	}
 	var (
 		url  = fmt.Sprintf("%s/clients", sim.url)
 		resp []*ClientDefinition
 	)
 	err := get(url, &resp)
+	// remove null items
+	resp = slices.DeleteFunc(resp, func(cd *ClientDefinition) bool { return cd == nil })
 	return resp, err
 }
 
@@ -126,6 +164,9 @@ func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
+	if sim.docs != nil {
+		return "", nil, errors.New("StartClient is not supported in docs mode")
+	}
 	clientType, ok := parameters["CLIENT"]
 	if !ok {
 		return "", nil, errors.New("missing 'CLIENT' parameter")
@@ -136,6 +177,9 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 // StartClientWithOptions starts a new node (or other container) with specified options.
 // Returns container id and ip.
 func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+	if sim.docs != nil {
+		return "", nil, errors.New("StartClientWithOptions is not supported in docs mode")
+	}
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
 		resp simapi.StartNodeResponse
@@ -165,7 +209,36 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
+	if sim.docs != nil {
+		return errors.New("StopClient is not supported in docs mode")
+	}
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, nodeid), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
+}
+
+// PauseClient signals to the host that the node needs to be paused.
+func (sim *Simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+	if sim.docs != nil {
+		return errors.New("PauseClient is not supported in docs mode")
+	}
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
+}
+
+// UnpauseClient signals to the host that the node needs to be unpaused.
+func (sim *Simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+	if sim.docs != nil {
+		return errors.New("UnpauseClient is not supported in docs mode")
+	}
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
 	if err != nil {
 		return err
 	}
@@ -175,11 +248,17 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 
 // ClientEnodeURL returns the enode URL of a running client.
 func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
+	if sim.docs != nil {
+		return "", errors.New("ClientEnodeURL is not supported in docs mode")
+	}
 	return sim.ClientEnodeURLNetwork(testSuite, test, node, "bridge")
 }
 
 // ClientEnodeURLCustomNetwork returns the enode URL of a running client in a custom network.
 func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
+	if sim.docs != nil {
+		return "", errors.New("ClientEnodeURLNetwork is not supported in docs mode")
+	}
 	resp, err := sim.ClientExec(testSuite, test, node, []string{"enode.sh"})
 	if err != nil {
 		return "", err
@@ -218,6 +297,9 @@ func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, nod
 
 // ClientExec runs a command in a running client.
 func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
+	if sim.docs != nil {
+		return nil, errors.New("ClientExec is not supported in docs mode")
+	}
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
 		req  = &simapi.ExecRequest{Command: cmd}
@@ -230,12 +312,18 @@ func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string,
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
 func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
+	if sim.docs != nil {
+		return errors.New("CreateNetwork is not supported in docs mode")
+	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName)
 	return post(url, nil, nil)
 }
 
 // RemoveNetwork sends a request to the hive server to remove the given network.
 func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
+	if sim.docs != nil {
+		return errors.New("RemoveNetwork is not supported in docs mode")
+	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, network)
 	return requestDelete(url)
 }
@@ -243,6 +331,9 @@ func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
 // ConnectContainer sends a request to the hive server to connect the given
 // container to the given network.
 func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
+	if sim.docs != nil {
+		return errors.New("ConnectContainer is not supported in docs mode")
+	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	return post(url, nil, nil)
 }
@@ -250,6 +341,9 @@ func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID 
 // DisconnectContainer sends a request to the hive server to disconnect the given
 // container from the given network.
 func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, containerID string) error {
+	if sim.docs != nil {
+		return errors.New("DisconnectContainer is not supported in docs mode")
+	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	return requestDelete(url)
 }
@@ -257,6 +351,9 @@ func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, container
 // ContainerNetworkIP returns the IP address of a container on the given network. If the
 // container ID is "simulation", it returns the IP address of the simulator container.
 func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
+	if sim.docs != nil {
+		return "", errors.New("ContainerNetworkIP is not supported in docs mode")
+	}
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 		resp string

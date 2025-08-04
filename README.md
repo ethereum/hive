@@ -5,8 +5,8 @@ Hive is a system for running integration tests against Ethereum clients.
 Ethereum Foundation maintains two public Hive instances to check for consensus, p2p and
 blockchain compatibility:
 
-- eth1 consensus, rpc, p2p tests are on <https://hivetests1.ethdevops.io>
-- 'merge' testing runs on <https://hivetests2.ethdevops.io>
+- eth1 consensus, graphql and p2p tests are on <https://hivetests.ethdevops.io>
+- Engine API integration and rpc tests are on <https://hivetests2.ethdevops.io>
 
 **To read more about hive, please check [the documentation][doc].**
 
@@ -19,9 +19,9 @@ for validating Ethereum client implementations.
 - go-ethereum:
   - Genesis chain config couldn't handle present but empty settings: [#2790](https://github.com/ethereum/go-ethereum/pull/2790)
   - Data race between remote block import and local block mining: [#2793](https://github.com/ethereum/go-ethereum/pull/2793)
-  - Downloader didn't penalize incompatible forks hashly enough: [#2801](https://github.com/ethereum/go-ethereum/pull/2801)
+  - Downloader didn't penalize incompatible forks harshly enough: [#2801](https://github.com/ethereum/go-ethereum/pull/2801)
 - Nethermind:
-  - Bug in p2p whith bonding nodes algorithm found by Hive: [#1894](https://github.com/NethermindEth/nethermind/pull/1894)
+  - Bug in p2p with bonding nodes algorithm found by Hive: [#1894](https://github.com/NethermindEth/nethermind/pull/1894)
   - Difference in return value for 'r' parameter in getTransactionByHash: [#2372](https://github.com/NethermindEth/nethermind/issues/2372)
   - CREATE/CREATE2 behavior when account already has max nonce [#3698](https://github.com/NethermindEth/nethermind/pull/3698)
   - Blake2 performance issue with non-vectorized code [#3837](https://github.com/NethermindEth/nethermind/pull/3837)
@@ -36,7 +36,7 @@ We follow the [Collective Code Construction Contract (C4)][c4], code contributio
 as expanded and explained in [The ZeroMQ Process][zmq-process]. The core idea being that
 any patch that successfully solves an issue (bug/feature) and doesn't break any existing
 code/contracts must be optimistically merged by maintainers. Followup patches may be used
-to for additional polishes – and patches may even be outright reverted if they turn out to
+for additional polishes – and patches may even be outright reverted if they turn out to
 have a negative impact – but no change must be rejected based on personal values.
 
 ### License

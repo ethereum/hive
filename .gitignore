@@ -3,3 +3,8 @@ workspace
 .idea/
 # build output
 /hive
+
+# build output for rust simulators and hivesim-rs files
+simulators/**/target
+hivesim-rs/Cargo.lock
+hivesim-rs/target

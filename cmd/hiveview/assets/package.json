@@ -1,0 +1,12 @@
+{
+  "name": "hiveview",
+  "version": "0.0.1",
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/ethereum/hive"
+  },
+  "license": "GPLv3"
+}

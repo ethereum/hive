@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,244 +19,23 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-type envvars map[string]int
-
-var ruleset = map[string]envvars{
-	"Frontier": {
-		"HIVE_FORK_HOMESTEAD":      2000,
-		"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      2000,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"Homestead": {
-		"HIVE_FORK_HOMESTEAD":      0,
-		"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      2000,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"EIP150": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"EIP158": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"Byzantium": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"Constantinople": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"ConstantinopleFix": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"Istanbul": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       0,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"Berlin": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       0,
-		"HIVE_FORK_BERLIN":         0,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"FrontierToHomesteadAt5": {
-		"HIVE_FORK_HOMESTEAD":      5,
-		"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      2000,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"HomesteadToEIP150At5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//		"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      5,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"HomesteadToDaoAt5": {
-		"HIVE_FORK_HOMESTEAD":      0,
-		"HIVE_FORK_DAO_BLOCK":      5,
-		"HIVE_FORK_TANGERINE":      2000,
-		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_BYZANTIUM":      2000,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"EIP158ToByzantiumAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      5,
-		"HIVE_FORK_CONSTANTINOPLE": 2000,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"ByzantiumToConstantinopleAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 5,
-		"HIVE_FORK_PETERSBURG":     2000,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"ByzantiumToConstantinopleFixAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 5,
-		"HIVE_FORK_PETERSBURG":     5,
-		"HIVE_FORK_ISTANBUL":       2000,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"ConstantinopleFixToIstanbulAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       5,
-		"HIVE_FORK_BERLIN":         2000,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"IstanbulToBerlinAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       0,
-		"HIVE_FORK_BERLIN":         5,
-		"HIVE_FORK_LONDON":         2000,
-	},
-	"BerlinToLondonAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       0,
-		"HIVE_FORK_BERLIN":         0,
-		"HIVE_FORK_LONDON":         5,
-	},
-	"London": {
-		"HIVE_FORK_HOMESTEAD": 0,
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":      0,
-		"HIVE_FORK_SPURIOUS":       0,
-		"HIVE_FORK_BYZANTIUM":      0,
-		"HIVE_FORK_CONSTANTINOPLE": 0,
-		"HIVE_FORK_PETERSBURG":     0,
-		"HIVE_FORK_ISTANBUL":       0,
-		"HIVE_FORK_BERLIN":         0,
-		"HIVE_FORK_LONDON":         0,
-	},
+func main() {
+	suites := []hivesim.Suite{
+		makeSuite("consensus", "BlockchainTests"),
+		makeSuite("legacy", "LegacyTests/Constantinople/BlockchainTests"),
+		makeSuite("legacy-cancun", "LegacyTests/Cancun/BlockchainTests"),
+	}
+	client := hivesim.New()
+	for _, suite := range suites {
+		hivesim.MustRunSuite(client, suite)
+	}
 }
 
-func main() {
+func makeSuite(name string, testsDirectory string) hivesim.Suite {
 	suite := hivesim.Suite{
-		Name: "consensus",
-		Description: "The 'consensus' test suite executes BlockchainTests from the " +
-			"offical test repository (https://github.com/ethereum/tests). For every test, it starts an instance of the client, " +
+		Name: name,
+		Description: "The '" + name + "' test suite executes BlockchainTests from the " +
+			"official test repository (https://github.com/ethereum/tests). For every test, it starts an instance of the client, " +
 			"and makes it import the RLP blocks. After import phase, the node is queried about it's latest blocks, which is matched " +
 			"to the expected last blockhash according to the test.",
 	}
@@ -266,14 +44,16 @@ func main() {
 		Description: "This is a meta-test. It loads the blockchain test files and " +
 			"launches the actual client tests. Any errors in test files will be reported " +
 			"through this test.",
-		Run:       loaderTest,
+		Run: func(t *hivesim.T) {
+			runTestsLoader(t, testsDirectory)
+		},
 		AlwaysRun: true,
 	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+	return suite
 }
 
-// loaderTest loads the blockchain test files and spawns the client tests.
-func loaderTest(t *hivesim.T) {
+// runTestsLoader loads the blockchain test files and spawns the client tests.
+func runTestsLoader(t *hivesim.T, testsDirectory string) {
 	clientTypes, err := t.Sim.ClientTypes()
 	if err != nil {
 		t.Fatal("can't get client types:", err)
@@ -290,11 +70,12 @@ func loaderTest(t *hivesim.T) {
 	t.Log("parallelism:", parallelism)
 
 	// Find the tests directory.
-	testPath, isset := os.LookupEnv("TESTPATH")
+	basePath, isset := os.LookupEnv("TESTPATH")
 	if !isset {
 		t.Fatal("$TESTPATH not set")
 	}
-	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testPath)
+	t.Log("testsDirectory:", testsDirectory)
+	fileRoot := filepath.Join(basePath, testsDirectory)
 
 	// Spawn workers.
 	var wg sync.WaitGroup
@@ -353,7 +134,7 @@ func testLink(filepath string) string {
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			t.Logf("unable to walk path: %s", err)
+			t.Errorf("unable to walk path: %s", err)
 			return err
 		}
 		if info.IsDir() {
@@ -396,7 +177,7 @@ type testcase struct {
 // validate returns error if the test's chain rules are not supported.
 func (tc *testcase) validate() error {
 	net := tc.blockTest.json.Network
-	if _, exist := ruleset[net]; !exist {
+	if _, exist := envForks[net]; !exist {
 		return fmt.Errorf("network `%v` not defined in ruleset", net)
 	}
 	return nil
@@ -465,9 +246,9 @@ func (tc *testcase) run(t *hivesim.T) {
 
 // updateEnv sets environment variables from the test
 func (tc *testcase) updateEnv(env hivesim.Params) {
-	// Environment variables for rules.
-	rules := ruleset[tc.blockTest.json.Network]
-	for k, v := range rules {
+	// Environment variables for fork rules
+	forks := envForks[tc.blockTest.json.Network]
+	for k, v := range forks {
 		env[k] = fmt.Sprintf("%d", v)
 	}
 	// Possibly disable POW.
@@ -479,15 +260,16 @@ func (tc *testcase) updateEnv(env hivesim.Params) {
 // toGethGenesis creates the genesis specification from a test block.
 func toGethGenesis(test *btJSON) *core.Genesis {
 	genesis := &core.Genesis{
-		Nonce:      test.Genesis.Nonce.Uint64(),
-		Timestamp:  test.Genesis.Timestamp.Uint64(),
-		ExtraData:  test.Genesis.ExtraData,
-		GasLimit:   test.Genesis.GasLimit,
-		Difficulty: test.Genesis.Difficulty,
-		Mixhash:    test.Genesis.MixHash,
-		Coinbase:   test.Genesis.Coinbase,
-		Alloc:      test.Pre,
-		BaseFee:    test.Genesis.BaseFee,
+		Nonce:         test.Genesis.Nonce.Uint64(),
+		Timestamp:     test.Genesis.Timestamp.Uint64(),
+		ExtraData:     test.Genesis.ExtraData,
+		GasLimit:      test.Genesis.GasLimit,
+		Difficulty:    test.Genesis.Difficulty,
+		Mixhash:       test.Genesis.MixHash,
+		Coinbase:      test.Genesis.Coinbase,
+		Alloc:         test.Pre,
+		BaseFee:       test.Genesis.BaseFee,
+		ExcessBlobGas: test.Genesis.ExcessBlobGas,
 	}
 	return genesis
 }
@@ -504,7 +286,7 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	genesis := toGethGenesis(&tc.blockTest.json)
 	genBytes, _ := json.Marshal(genesis)
 	genesisFile := filepath.Join(rootDir, "genesis.json")
-	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
+	if err := os.WriteFile(genesisFile, genBytes, 0777); err != nil {
 		return rootDir, "", nil, fmt.Errorf("failed writing genesis: %v", err)
 	}
 
@@ -512,7 +294,7 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	for i, block := range tc.blockTest.json.Blocks {
 		rlpdata := common.FromHex(block.Rlp)
 		fname := fmt.Sprintf("%s/%04d.rlp", blockDir, i+1)
-		if err := ioutil.WriteFile(fname, rlpdata, 0777); err != nil {
+		if err := os.WriteFile(fname, rlpdata, 0777); err != nil {
 			return rootDir, genesisFile, blocks, fmt.Errorf("failed writing block %d: %v", i, err)
 		}
 		blocks = append(blocks, fname)
@@ -573,8 +355,19 @@ func compareGenesis(have string, want btHeader) (string, error) {
 	cmp(haveGenesis.ExtraData, want.ExtraData, "extraData")
 	cmp(haveGenesis.Difficulty, want.Difficulty, "difficulty")
 	cmp(haveGenesis.Timestamp, want.Timestamp, "timestamp")
-	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
 	cmp(haveGenesis.GasLimit, want.GasLimit, "gasLimit")
-	cmp(haveGenesis.GasUsed, want.GasUsed, "gasused")
+	cmp(haveGenesis.GasUsed, want.GasUsed, "gasUsed")
+	cmp(haveGenesis.Nonce, want.Nonce, "nonce")
+	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
+	if haveGenesis.ExcessBlobGas != nil && want.ExcessBlobGas != nil {
+		cmp(*haveGenesis.ExcessBlobGas, *want.ExcessBlobGas, "excessBlobGas")
+	} else {
+		cmp(haveGenesis.ExcessBlobGas, want.ExcessBlobGas, "excessBlobGas")
+	}
+	if haveGenesis.BlobGasUsed != nil && want.BlobGasUsed != nil {
+		cmp(*haveGenesis.BlobGasUsed, *want.BlobGasUsed, "blobGasUsed")
+	} else {
+		cmp(haveGenesis.BlobGasUsed, want.BlobGasUsed, "blobGasUsed")
+	}
 	return output, nil
 }
