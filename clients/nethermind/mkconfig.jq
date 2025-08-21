@@ -111,6 +111,9 @@ def base_config:
     "Sync": {
       "SnapServingEnabled": true,
     },
+    "Discovery": {
+      "DiscoveryVersion": "All"
+    },
   }
 ;
 
