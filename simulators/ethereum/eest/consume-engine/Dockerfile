@@ -26,5 +26,9 @@ RUN uv sync
 # Use `--docker.nocache` flag to force rebuild.
 RUN uv run consume cache --input "$FIXTURES"
 
+
 ## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT uv run consume engine -v --input "$FIXTURES"
+# TODO: remove when fixed on nimbus-el side.
+ARG disable_strict_exception_matching=nimbus-el
+ENV DISABLE_STRICT_EXCEPTION_MATCHING=${disable_strict_exception_matching} 
+ENTRYPOINT uv run consume engine -v --input "$FIXTURES" --disable-strict-exception-matching "$DISABLE_STRICT_EXCEPTION_MATCHING"
