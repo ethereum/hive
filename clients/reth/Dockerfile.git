@@ -8,6 +8,7 @@ FROM rust:latest as builder
 ARG github=paradigmxyz/reth
 ARG tag=main
 
+RUN rustup update stable && rustup default stable
 RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
     && echo "Cloning: $github - $tag" \
     && git clone --depth 1 --branch $tag https://github.com/$github reth \
