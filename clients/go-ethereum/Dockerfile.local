@@ -6,8 +6,8 @@ RUN apk add --update bash curl jq git make gcc libc-dev linux-headers
 # Default local client path: clients/go-ethereum/<go-ethereum>
 ARG local_path=go-ethereum
 
-# Copy the go.mod file and download dependencies in a separate layer
-COPY $local_path/go.mod go-ethereum/
+# Copy go.mod and go.sum and download dependencies in a separate layer
+COPY $local_path/go.mod $local_path/go.sum go-ethereum/
 RUN cd go-ethereum && go mod download
 
 # Copy the source code
