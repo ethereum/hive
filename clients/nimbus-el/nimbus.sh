@@ -71,7 +71,7 @@ fi
 
 # Configure the chain.
 jq -f /mapper.jq /genesis.json > /genesis-start.json
-FLAGS="$FLAGS --custom-network:/genesis-start.json"
+FLAGS="$FLAGS --network:/genesis-start.json"
 
 # Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then

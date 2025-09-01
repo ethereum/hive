@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/triedb"
 	"golang.org/x/exp/slices"
 )
@@ -109,9 +108,6 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
 	engine := beacon.New(ethash.NewFaker())
-	if g.genesis.Config.MergeNetsplitBlock != nil {
-		engine.TestingTTDBlock(g.genesis.Config.MergeNetsplitBlock.Uint64())
-	}
 
 	// Init genesis block.
 	trieconfig := *triedb.HashDefaults
@@ -135,10 +131,9 @@ func (g *generator) run() error {
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
 	db := rawdb.NewMemoryDatabase()
-	cacheconfig := core.DefaultCacheConfigWithScheme("hash")
-	cacheconfig.Preimages = true
-	vmconfig := vm.Config{EnablePreimageRecording: true}
-	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil)
+	config := core.DefaultConfig().WithStateScheme("hash")
+	config.Preimages = true
+	blockchain, err := core.NewBlockChain(db, g.genesis, engine, config)
 	if err != nil {
 		return nil, fmt.Errorf("can't create blockchain: %v", err)
 	}
