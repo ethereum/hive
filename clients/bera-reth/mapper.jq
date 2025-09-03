@@ -76,5 +76,13 @@ def to_bool:
         "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
       }
     },
+    "berachain": (if env.HIVE_PRAGUE1_TIMESTAMP then {
+      "prague1": {
+        "time": env.HIVE_PRAGUE1_TIMESTAMP|to_int,
+        "baseFeeChangeDenominator": (if env.HIVE_PRAGUE1_BASE_FEE_CHANGE_DENOMINATOR then env.HIVE_PRAGUE1_BASE_FEE_CHANGE_DENOMINATOR|to_int else 48 end),
+        "minimumBaseFeeWei": (if env.HIVE_PRAGUE1_MINIMUM_BASE_FEE_WEI then env.HIVE_PRAGUE1_MINIMUM_BASE_FEE_WEI|to_int else 1000000000 end),
+        "polDistributorAddress": (env.HIVE_PRAGUE1_POL_DISTRIBUTOR_ADDRESS // "0x4200000000000000000000000000000000000042")
+      }
+    } else null end),
   }|remove_empty
 }

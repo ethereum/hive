@@ -46,6 +46,12 @@ var (
 		"shanghai",
 		"cancun",
 		"prague",
+		"prague1",
+	}
+
+	// berachain-specific forks that extend standard forks:
+	berachainForkNames = []string{
+		"prague1", // extends prague
 	}
 )
 
@@ -105,6 +111,11 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 		case "prague":
 			chaincfg.PragueTime = &timestamp
 			chaincfg.BlobScheduleConfig.Prague = params.DefaultPragueBlobConfig
+		case "prague1":
+			chaincfg.Berachain.Prague1.Time = &timestamp
+			chaincfg.Berachain.Prague1.MinimumBaseFeeWei = 1000000000
+			chaincfg.Berachain.Prague1.BaseFeeChangeDenominator = 8
+			chaincfg.Berachain.Prague1.PoLDistributorAddress = common.HexToAddress("0x4200000000000000000000000000000000000042")
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
@@ -120,6 +131,9 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 }
 
 func (cfg *generatorConfig) genesisDifficulty() *big.Int {
+	if cfg.berachain {
+		return new(big.Int).SetUint64(0)
+	}
 	return new(big.Int).Set(params.MinimumDifficulty)
 }
 
@@ -147,7 +161,9 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	addPragueSystemContracts(g.Alloc)
 	addSnapTestContract(g.Alloc)
 	addEmitContract(g.Alloc)
-
+	if cfg.berachain {
+		addMockPoLContracts(g.Config.Berachain, g.Alloc)
+	}
 	return &g
 }
 
@@ -155,6 +171,20 @@ func addCancunSystemContracts(ga types.GenesisAlloc) {
 	ga[params.BeaconRootsAddress] = types.Account{
 		Balance: big.NewInt(42),
 		Code:    params.BeaconRootsCode,
+	}
+}
+
+func addMockPoLContracts(cfg params.BerachainConfig, ga types.GenesisAlloc) {
+	// Copied from the eth-genesis used in beacon-kit local devnet
+	ga[cfg.Prague1.PoLDistributorAddress] = types.Account{
+		Balance: big.NewInt(0),
+		Code:    common.FromHex("608060405234801561000f575f80fd5b5060043610610034575f3560e01c8063163db71b1461003857806360644a6b14610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b610065610060366004610183565b610067565b005b3373fffffffffffffffffffffffffffffffffffffffe146100b4576040517f5e742c5a00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b5f805490806100c2836101f1565b90915550506040517f999da65b0000000000000000000000000000000000000000000000000000000081527342000000000000000000000000000000000000439063999da65b90610119908590859060040161024d565b5f604051808303815f87803b158015610130575f80fd5b505af1158015610142573d5f803e3d5ffd5b505050507f60b106db8802e863a4a9dc4af78cb0dd63feb55ad4ee60f0453c13309bfdbdd4828260405161017792919061024d565b60405180910390a15050565b5f8060208385031215610194575f80fd5b823567ffffffffffffffff8111156101aa575f80fd5b8301601f810185136101ba575f80fd5b803567ffffffffffffffff8111156101d0575f80fd5b8560208284010111156101e1575f80fd5b6020919091019590945092505050565b5f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8203610246577f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5060010190565b60208152816020820152818360408301375f818301604090810191909152601f9092017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016010191905056fea2646970667358221220e6dfa8c5d72bb391aff9e891c09a1f86d26cfd1d112aaab4b577bcbc5b94bafe64736f6c634300081a0033"),
+		Nonce:   1,
+	}
+	ga[common.HexToAddress("0x4200000000000000000000000000000000000043")] = types.Account{
+		Balance: big.NewInt(0),
+		Code:    common.FromHex("608060405234801561000f575f80fd5b5060043610610034575f3560e01c80634b28f9a214610038578063999da65b14610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b6100656100603660046100b8565b610067565b005b5f8054908061007583610126565b91905055507fb3a8fa51f8d3759f320e88b7f8d3fb73a2a51b31b3324b37833c4816cf41e7c45f546040516100ac91815260200190565b60405180910390a15050565b5f80602083850312156100c9575f80fd5b823567ffffffffffffffff8111156100df575f80fd5b8301601f810185136100ef575f80fd5b803567ffffffffffffffff811115610105575f80fd5b856020828401011115610116575f80fd5b6020919091019590945092505050565b5f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361017b577f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b506001019056fea2646970667358221220e5db2a9698e23f84b7c83d023ea72ca3f01627daffa1ff16ae15918143d892a564736f6c634300081a0033"),
+		Nonce:   1,
 	}
 }
 
@@ -194,6 +224,25 @@ func addEmitContract(ga types.GenesisAlloc) {
 func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	lastIndex := cfg.lastForkIndex()
 	forks := allForkNames[:lastIndex+1]
+
+	// Remove berachain-specific forks if berachain is not configured
+	if !cfg.berachain {
+		var filteredForks []string
+		for _, fork := range forks {
+			isBerachainFork := false
+			for _, beraFork := range berachainForkNames {
+				if fork == beraFork {
+					isBerachainFork = true
+					break
+				}
+			}
+			if !isBerachainFork {
+				filteredForks = append(filteredForks, fork)
+			}
+		}
+		forks = filteredForks
+	}
+
 	forkBlocks := make(map[string]uint64)
 
 	// If merged chain is specified, schedule all pre-merge forks at block zero.
@@ -221,6 +270,7 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	for _, f := range forks {
 		forkBlocks[f] = uint64(cfg.chainLength)
 	}
+
 	return forkBlocks
 }
 

@@ -62,5 +62,12 @@ func (g *generator) writeForkEnv() error {
 		}
 	}
 
+	if cfg.Berachain.Prague1.Time != nil {
+		setTime("HIVE_PRAGUE1_TIMESTAMP", cfg.Berachain.Prague1.Time)
+		env["HIVE_PRAGUE1_BASE_FEE_CHANGE_DENOMINATOR"] = fmt.Sprint(cfg.Berachain.Prague1.BaseFeeChangeDenominator)
+		env["HIVE_PRAGUE1_MINIMUM_BASE_FEE_WEI"] = fmt.Sprint(cfg.Berachain.Prague1.MinimumBaseFeeWei)
+		env["HIVE_PRAGUE1_POL_DISTRIBUTOR_ADDRESS"] = fmt.Sprint(cfg.Berachain.Prague1.PoLDistributorAddress)
+	}
+
 	return g.writeJSON("forkenv.json", env)
 }
