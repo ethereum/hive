@@ -71,7 +71,7 @@ fi
 
 # Configure the chain.
 jq -f /mapper.jq /genesis.json > /genesis-start.json
-FLAGS="$FLAGS --custom-network:/genesis-start.json"
+FLAGS="$FLAGS --network:/genesis-start.json"
 
 # Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
@@ -107,8 +107,8 @@ set -e
 
 # Configure RPC
 FLAGS="$FLAGS --http-address:0.0.0.0 --http-port:8545"
-FLAGS="$FLAGS --rpc --rpc-api:eth,debug"
-FLAGS="$FLAGS --ws --ws-api:eth,debug"
+FLAGS="$FLAGS --rpc --rpc-api:eth,debug,admin"
+FLAGS="$FLAGS --ws --ws-api:eth,debug,admin"
 
 # Configure graphql
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then

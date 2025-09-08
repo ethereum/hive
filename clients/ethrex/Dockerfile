@@ -1,5 +1,5 @@
 ARG baseimage=ghcr.io/lambdaclass/ethrex
-ARG tag=latest
+ARG tag=unstable
 
 FROM $baseimage:$tag AS builder
 

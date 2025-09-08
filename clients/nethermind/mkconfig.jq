@@ -46,14 +46,14 @@ def json_rpc_config:
     {
       "JsonRpc": {
         "JwtSecretFile": "/jwt.secret",
-        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health"],
-        "AdditionalRpcUrls": ["http://0.0.0.0:8550|http;ws|debug;net;eth;subscribe;engine;web3;client|no-auth", "http://0.0.0.0:8551|http;ws|debug;net;eth;subscribe;engine;web3;client"]
+        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin"],
+        "AdditionalRpcUrls": ["http://0.0.0.0:8550|http;ws|debug;net;eth;subscribe;engine;web3;client;admin|no-auth", "http://0.0.0.0:8551|http;ws|debug;net;eth;subscribe;engine;web3;client;admin"]
       }
     }
   else
     {
       "JsonRpc": {
-        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health"]
+        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin"]
       }
     }
   end
@@ -95,6 +95,7 @@ def base_config:
       "Enabled": true,
       "Host": "0.0.0.0",
       "Port": 8545,
+      "GasCap": 50000000,
       "WebSocketsPort": 8546,
     },
     "Network": {
@@ -110,6 +111,9 @@ def base_config:
     },
     "Sync": {
       "SnapServingEnabled": true,
+    },
+    "Discovery": {
+      "DiscoveryVersion": "All"
     },
   }
 ;

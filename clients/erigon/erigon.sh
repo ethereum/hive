@@ -142,7 +142,10 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 fi
 
+# Disable Caplin
+FLAGS="$FLAGS --externalcl"
+
 # Launch the main client.
-FLAGS="$FLAGS --nat=none"
+FLAGS="$FLAGS --nat=none --no-downloader"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS

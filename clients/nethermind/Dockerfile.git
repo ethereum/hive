@@ -18,7 +18,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
 WORKDIR /nethermind
 
-RUN apt-get update && apt-get install -y jq libsnappy-dev libc6-dev libc6 && \
+RUN apt-get update && apt-get install -y jq curl libsnappy-dev libc6-dev libc6 && \
     rm -rf /var/lib/apt/lists/*
 
 # Create version.txt

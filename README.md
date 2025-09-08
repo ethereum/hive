@@ -5,8 +5,8 @@ Hive is a system for running integration tests against Ethereum clients.
 Ethereum Foundation maintains two public Hive instances to check for consensus, p2p and
 blockchain compatibility:
 
-- eth1 consensus, graphql and p2p tests are on <https://hivetests.ethdevops.io>
-- Engine API integration and rpc tests are on <https://hivetests2.ethdevops.io>
+- eth1 consensus, EngineAPI, RPC tests, graphql and p2p tests are on <https://hive.ethpandaops.io>
+ 
 
 **To read more about hive, please check [the documentation][doc].**
 
@@ -25,6 +25,13 @@ for validating Ethereum client implementations.
   - Difference in return value for 'r' parameter in getTransactionByHash: [#2372](https://github.com/NethermindEth/nethermind/issues/2372)
   - CREATE/CREATE2 behavior when account already has max nonce [#3698](https://github.com/NethermindEth/nethermind/pull/3698)
   - Blake2 performance issue with non-vectorized code [#3837](https://github.com/NethermindEth/nethermind/pull/3837)
+- Besu:
+  - Missing v result for blob and pending tx [#8196](https://github.com/hyperledger/besu/pull/8196)
+  - EIP-7702 - skip CodeDelegation processing for invalid recid [#8212](https://github.com/hyperledger/besu/pull/8212)
+  - LogTopic - empty list is wildcard topic [#8420](https://github.com/hyperledger/besu/pull/8420)
+  - RLP Block Importer - move worldstate head only if import successful [#8447](https://github.com/hyperledger/besu/pull/8447)
+  - Bug in Bonsai Archive mode when storage to delete could be null: [#8434](https://github.com/hyperledger/besu/pull/8434)
+  - Bug in estimating gas - if no gas params set, tx was being estimated as a FRONTIER tx but should be 1559 [#8472](https://github.com/hyperledger/besu/pull/8472)
 
 ### Contributions
 
