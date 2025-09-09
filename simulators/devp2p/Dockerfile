@@ -7,7 +7,7 @@ ENV GOPROXY=${GOPROXY}
 RUN apk add --update git gcc musl-dev linux-headers
 RUN git clone https://github.com/ethereum/go-ethereum.git /go-ethereum
 WORKDIR /go-ethereum
-RUN git checkout v1.15.11
+RUN git checkout v1.16.3
 RUN go build -v ./cmd/devp2p
 
 # Build the simulator executable.
