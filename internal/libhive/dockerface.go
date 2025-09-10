@@ -81,7 +81,6 @@ type ContainerOptions struct {
 type ContainerInfo struct {
 	ID      string // docker container ID
 	IP      string // IP address
-	MAC     string // MAC address. TODO: remove
 	LogFile string
 
 	// The wait function returns when the container is stopped.
