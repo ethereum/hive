@@ -47,11 +47,13 @@ var (
 		"cancun",
 		"prague",
 		"prague1",
+		"prague2",
 	}
 
 	// berachain-specific forks that extend standard forks:
 	berachainForkNames = []string{
-		"prague1", // extends prague
+		"prague1",
+		"prague2",
 	}
 )
 
@@ -114,8 +116,12 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 		case "prague1":
 			chaincfg.Berachain.Prague1.Time = &timestamp
 			chaincfg.Berachain.Prague1.MinimumBaseFeeWei = 1000000000
-			chaincfg.Berachain.Prague1.BaseFeeChangeDenominator = 8
+			chaincfg.Berachain.Prague1.BaseFeeChangeDenominator = 48
 			chaincfg.Berachain.Prague1.PoLDistributorAddress = common.HexToAddress("0x4200000000000000000000000000000000000042")
+		case "prague2":
+			chaincfg.Berachain.Prague2.Time = &timestamp
+			// Set to 1 so that it doesn't get omitted.
+			chaincfg.Berachain.Prague2.MinimumBaseFeeWei = 1
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
@@ -259,11 +265,27 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 		}
 	}
 	// Schedule remaining forks according to interval.
-	for block := 0; block <= cfg.chainLength && len(forks) > 0; {
+	block := 0
+	pragueReached := false
+	for len(forks) > 0 && block <= cfg.chainLength {
 		fork := forks[0]
 		forks = forks[1:]
 		forkBlocks[fork] = uint64(block)
-		block += cfg.forkInterval
+		
+		// Special case for berachain: only apply fork-interval after prague
+		if cfg.berachain {
+			if fork == "prague" {
+				pragueReached = true
+			}
+			// Only start incrementing after we've processed prague
+			if pragueReached {
+				block += cfg.forkInterval
+			}
+			// Before prague, block stays at 0
+		} else {
+			// Normal case: always apply interval
+			block += cfg.forkInterval
+		}
 	}
 	// If the chain length cannot accommodate the spread of forks with the chosen
 	// interval, schedule the remaining forks at the last block.

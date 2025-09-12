@@ -25,7 +25,7 @@ type generatorConfig struct {
 	forkInterval int    // number of blocks between forks
 	lastFork     string // last enabled fork
 	merged       bool   // create a proof-of-stake chain
-	berachain    bool   // create a berachain with prague1 fork
+	berachain    bool   // create a berachain with prague1 and prague2 forks
 
 	// chain options
 	txInterval  int // frequency of blocks containing transactions

@@ -76,13 +76,17 @@ def to_bool:
         "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 5007716 end)
       }
     },
-    "berachain": (if env.HIVE_PRAGUE1_TIMESTAMP then {
-      "prague1": {
+    "berachain": (if env.HIVE_PRAGUE1_TIMESTAMP or env.HIVE_PRAGUE2_TIMESTAMP then {
+      "prague1": (if env.HIVE_PRAGUE1_TIMESTAMP then {
         "time": env.HIVE_PRAGUE1_TIMESTAMP|to_int,
         "baseFeeChangeDenominator": (if env.HIVE_PRAGUE1_BASE_FEE_CHANGE_DENOMINATOR then env.HIVE_PRAGUE1_BASE_FEE_CHANGE_DENOMINATOR|to_int else 48 end),
         "minimumBaseFeeWei": (if env.HIVE_PRAGUE1_MINIMUM_BASE_FEE_WEI then env.HIVE_PRAGUE1_MINIMUM_BASE_FEE_WEI|to_int else 1000000000 end),
         "polDistributorAddress": (env.HIVE_PRAGUE1_POL_DISTRIBUTOR_ADDRESS // "0x4200000000000000000000000000000000000042")
-      }
+      } else null end),
+      "prague2": (if env.HIVE_PRAGUE2_TIMESTAMP then {
+        "time": env.HIVE_PRAGUE2_TIMESTAMP|to_int,
+        "minimumBaseFeeWei": (if env.HIVE_PRAGUE2_MINIMUM_BASE_FEE_WEI then env.HIVE_PRAGUE2_MINIMUM_BASE_FEE_WEI|to_int else 0 end)
+      } else null end)
     } else null end),
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   }|remove_empty

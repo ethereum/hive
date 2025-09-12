@@ -13,8 +13,8 @@ github.com/allegro/bigcache v1.2.1 h1:hg1sY1raCwic3Vnsvje6TT7/pnZba83LeFck5NrFKS
 github.com/allegro/bigcache v1.2.1/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/berachain/bera-geth v0.0.0-20250902021903-a88a847a3952 h1:vndfA8WiHa8esiwwGdZ8d26KLwMMSF7WH411eLUVLxs=
-github.com/berachain/bera-geth v0.0.0-20250902021903-a88a847a3952/go.mod h1:9pCNmfY3sME0pmWe6Egl7kDM+ws4hQYJ+sFMZgZ/Xnc=
+github.com/berachain/bera-geth v0.0.0-20250911203914-65267adfcba8 h1:BL13ojjDILCOqLFoN1o7/WZdKwdWxD6XWZyX4aSJQn4=
+github.com/berachain/bera-geth v0.0.0-20250911203914-65267adfcba8/go.mod h1:IFR3yddocg7rSgWtbYr4rnDz1u+ytj6wpUjl4m9yM2Y=
 github.com/bits-and-blooms/bitset v1.20.0 h1:2F+rfL86jE2d/bmw7OhqUg2Sj/1rURkBn3MdfoPyRVU=
 github.com/bits-and-blooms/bitset v1.20.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=

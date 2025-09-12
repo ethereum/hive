@@ -80,4 +80,4 @@ require (
 
 replace github.com/ethereum/hive/hiveproxy => ./hiveproxy
 
-replace github.com/ethereum/go-ethereum => github.com/berachain/bera-geth v0.0.0-20250902021903-a88a847a3952
+replace github.com/ethereum/go-ethereum => github.com/berachain/bera-geth v0.0.0-20250911203914-65267adfcba8

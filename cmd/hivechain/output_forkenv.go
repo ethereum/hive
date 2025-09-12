@@ -69,5 +69,10 @@ func (g *generator) writeForkEnv() error {
 		env["HIVE_PRAGUE1_POL_DISTRIBUTOR_ADDRESS"] = fmt.Sprint(cfg.Berachain.Prague1.PoLDistributorAddress)
 	}
 
+	if cfg.Berachain.Prague2.Time != nil {
+		setTime("HIVE_PRAGUE2_TIMESTAMP", cfg.Berachain.Prague2.Time)
+		env["HIVE_PRAGUE2_MINIMUM_BASE_FEE_WEI"] = fmt.Sprint(cfg.Berachain.Prague2.MinimumBaseFeeWei)
+	}
+
 	return g.writeJSON("forkenv.json", env)
 }
