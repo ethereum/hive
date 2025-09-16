@@ -97,7 +97,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 			if respBytes == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
-			expectedData := msg.data
+			data := msg.data
 			resp := string(bytes.TrimSpace(respBytes))
 			t.Log("<< ", resp)
 			if !gjson.Valid(resp) {
@@ -106,12 +106,13 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 
 			// Patch JSON to remove error messages and data. We only do this in the specific case
 			// where an error is expected AND returned by the client.
+			// Ref https://www.jsonrpc.org/specification#error_object
 			var errorRedacted bool
-			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
+			if gjson.Get(resp, "error").Exists() && gjson.Get(data, "error").Exists() {
 				resp, _ = sjson.Delete(resp, "error.message")
-				expectedData, _ = sjson.Delete(expectedData, "error.message")
+				data, _ = sjson.Delete(data, "error.message")
 				resp, _ = sjson.Delete(resp, "error.data")
-				expectedData, _ = sjson.Delete(expectedData, "error.data")
+				data, _ = sjson.Delete(data, "error.data")
 				errorRedacted = true
 			}
 
@@ -124,7 +125,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				Indent:           "  ",
 				CompareNumbers:   numbersEqual,
 			}
-			diffStatus, diffText := jsondiff.Compare([]byte(resp), []byte(expectedData), opts)
+			diffStatus, diffText := jsondiff.Compare([]byte(resp), []byte(data), opts)
 
 			// If there is a discrepancy, return error.
 			if diffStatus != jsondiff.FullMatch {
