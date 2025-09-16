@@ -104,12 +104,14 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// Patch JSON to remove error messages. We only do this in the specific case
+			// Patch JSON to remove error messages and data. We only do this in the specific case
 			// where an error is expected AND returned by the client.
 			var errorRedacted bool
 			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
 				resp, _ = sjson.Delete(resp, "error.message")
 				expectedData, _ = sjson.Delete(expectedData, "error.message")
+				resp, _ = sjson.Delete(resp, "error.data")
+				expectedData, _ = sjson.Delete(expectedData, "error.data")
 				errorRedacted = true
 			}
 
