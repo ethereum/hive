@@ -1,0 +1,39 @@
+## Build geth from source from a local directory called ethrex.
+FROM rust:latest as builder
+
+# Default local client path: clients/ethrex/ethrex
+ARG local_path=ethrex
+COPY $local_path ethrex
+
+WORKDIR ethrex
+RUN apt-get update && \
+    apt-get install -y libclang-dev pkg-config build-essential 
+RUN make build
+RUN cp target/debug/ethrex /usr/local/bin/ethrex
+
+FROM debian:latest
+RUN apt-get update && apt-get install -y bash curl jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled binary from builder
+COPY --from=builder /usr/local/bin/ethrex .
+
+# Add genesis mapper script.
+ADD genesis.json /genesis.json
+ADD mapper.jq /mapper.jq
+
+# Add the startup script.
+ADD ethrex.sh /ethrex.sh
+RUN chmod +x /ethrex.sh
+
+# Add the enode URL retriever script.
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
+
+# Create version.txt
+RUN ./ethrex --version | sed -e 's/ethrex \(.*\)/\1/' > /version.txt
+
+# Export the usual networking ports to allow outside access to the node.
+EXPOSE 8545 8546 30303 30303/udp
+
+ENTRYPOINT ["/ethrex.sh"]
