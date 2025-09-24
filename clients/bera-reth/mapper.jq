@@ -88,5 +88,6 @@ def to_bool:
         "minimumBaseFeeWei": (if env.HIVE_PRAGUE2_MINIMUM_BASE_FEE_WEI then env.HIVE_PRAGUE2_MINIMUM_BASE_FEE_WEI|to_int else 0 end)
       } else null end)
     } else null end),
+    "depositContractAddress": "0x0000000000000000000000000000000000000000"
   }|remove_empty
 }
