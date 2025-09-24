@@ -104,6 +104,16 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
+			// For speconly tests, only check that keys are present, not values
+			if test.speconly {
+				if err := compareKeysOnly(resp, expectedData); err != nil {
+					t.Log("note: speconly test - checking keys only, not values")
+					return err
+				}
+				respBytes = nil
+				continue
+			}
+
 			// Patch JSON to remove error messages. We only do this in the specific case
 			// where an error is expected AND returned by the client.
 			var errorRedacted bool
@@ -137,6 +147,70 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 
 	if respBytes != nil {
 		t.Fatalf("unhandled response in test case")
+	}
+	return nil
+}
+
+func checkJSONStructure(expected, actual gjson.Result, path string) []string {
+	var errors []string
+
+	buildPath := func(key string) string {
+		if path != "" {
+			return path + "." + key
+		}
+		return key
+	}
+
+	if expected.Type != gjson.JSON {
+		return errors
+	}
+
+	if expected.IsArray() {
+		if !actual.IsArray() {
+			errors = append(errors, fmt.Sprintf("%s: expected array but got %s", path, actual.Type))
+		}
+		return errors
+	}
+
+	// Check all expected keys exist with correct types
+	expected.ForEach(func(key, value gjson.Result) bool {
+		keyPath := buildPath(key.String())
+		actualValue := actual.Get(key.String())
+
+		if !actualValue.Exists() {
+			errors = append(errors, fmt.Sprintf("%s: missing key", keyPath))
+			return true
+		}
+
+		if value.Type != actualValue.Type && !(value.Type == gjson.JSON && actualValue.Type == gjson.JSON) {
+			errors = append(errors, fmt.Sprintf("%s: type mismatch (expected %s, got %s)",
+				keyPath, value.Type, actualValue.Type))
+			return true
+		}
+
+		if value.IsObject() || value.IsArray() {
+			errors = append(errors, checkJSONStructure(value, actualValue, keyPath)...)
+		}
+		return true
+	})
+
+	// Check for unexpected keys
+	if actual.IsObject() {
+		actual.ForEach(func(key, value gjson.Result) bool {
+			if !expected.Get(key.String()).Exists() {
+				errors = append(errors, fmt.Sprintf("%s: unexpected key in response", buildPath(key.String())))
+			}
+			return true
+		})
+	}
+
+	return errors
+}
+
+func compareKeysOnly(actualJSON, expectedJSON string) error {
+	errors := checkJSONStructure(gjson.Parse(expectedJSON), gjson.Parse(actualJSON), "")
+	if len(errors) > 0 {
+		return fmt.Errorf("response structure errors: %s", strings.Join(errors, "; "))
 	}
 	return nil
 }
