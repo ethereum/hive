@@ -104,19 +104,9 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// Patch JSON to remove error messages. We only do this in the specific case
-			// where an error is expected AND returned by the client.
-			var errorRedacted bool
+			// For speconly tests, ensure the response type matches the expected type.
 			hasError := gjson.Get(resp, "error").Exists()
-			if hasError && gjson.Get(expectedData, "error").Exists() {
-				resp, _ = sjson.Delete(resp, "error.message")
-				expectedData, _ = sjson.Delete(expectedData, "error.message")
-				errorRedacted = true
-			}
-
-			// For speconly tests, only check that keys are present, not values
 			if !hasError && test.speconly {
-				t.Log("note: speconly test - type-checking response")
 				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
 				if len(errors) > 0 {
 					for _, err := range errors {
@@ -124,7 +114,17 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 					}
 					return fmt.Errorf("response type does not match expected")
 				}
+				respBytes = nil
 				continue
+			}
+
+			// Patch JSON to remove error messages. We only do this in the specific case
+			// where an error is expected AND returned by the client.
+			var errorRedacted bool
+			if hasError && gjson.Get(expectedData, "error").Exists() {
+				resp, _ = sjson.Delete(resp, "error.message")
+				expectedData, _ = sjson.Delete(expectedData, "error.message")
+				errorRedacted = true
 			}
 
 			// Compare responses.
