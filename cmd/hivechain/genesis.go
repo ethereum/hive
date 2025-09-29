@@ -46,6 +46,7 @@ var (
 		"shanghai",
 		"cancun",
 		"prague",
+		"osaka",
 	}
 )
 
@@ -105,6 +106,9 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 		case "prague":
 			chaincfg.PragueTime = &timestamp
 			chaincfg.BlobScheduleConfig.Prague = params.DefaultPragueBlobConfig
+		case "osaka":
+			chaincfg.OsakaTime = &timestamp
+			chaincfg.BlobScheduleConfig.Osaka = params.DefaultOsakaBlobConfig
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
