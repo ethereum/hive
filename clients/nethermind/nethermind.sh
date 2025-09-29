@@ -93,4 +93,4 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     LOG_FLAG="--log $LOG"
 fi
 echo "Running Nethermind..."
-dotnet /nethermind/nethermind.dll --config /configs/test.cfg $LOG_FLAG
+/nethermind/nethermind --config /configs/test.cfg $LOG_FLAG

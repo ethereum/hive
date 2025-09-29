@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y jq curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
-RUN dotnet /nethermind/nethermind.dll --version \
+RUN /nethermind/nethermind --version \
     | head -1 | sed 's/Version:[[:space:]]*\(.*\)/\1/' > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
