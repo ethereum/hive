@@ -1,8 +1,11 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/tidwall/gjson"
 )
 
 func TestCompareKeysOnly(t *testing.T) {
@@ -11,7 +14,7 @@ func TestCompareKeysOnly(t *testing.T) {
 		actual      string
 		expected    string
 		shouldError bool
-		errorMsg    string
+		errors      []string
 	}{
 		{
 			name:        "matching keys with different values",
@@ -24,14 +27,14 @@ func TestCompareKeysOnly(t *testing.T) {
 			actual:      `{"id":1,"jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":"0x123","jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "missing key",
+			errors:      []string{".result: missing key"},
 		},
 		{
 			name:        "extra key in actual is not allowed",
 			actual:      `{"id":1,"result":"0x123","jsonrpc":"2.0","extra":"field"}`,
 			expected:    `{"id":1,"result":"0x456","jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "unexpected key",
+			errors:      []string{".extra: unexpected key in response"},
 		},
 		{
 			name:        "nested objects - matching structure",
@@ -44,14 +47,14 @@ func TestCompareKeysOnly(t *testing.T) {
 			actual:      `{"id":1,"result":{"block":"0x1"},"jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":{"block":"0x2","hash":"0xdef"},"jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "missing key",
+			errors:      []string{".result.hash: missing key"},
 		},
 		{
 			name:        "nested objects - extra nested key",
 			actual:      `{"id":1,"result":{"block":"0x1","hash":"0xabc","extra":"key"},"jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":{"block":"0x2","hash":"0xdef"},"jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "unexpected key",
+			errors:      []string{".result.extra: unexpected key in response"},
 		},
 		{
 			name:        "arrays - only check structure exists",
@@ -64,7 +67,7 @@ func TestCompareKeysOnly(t *testing.T) {
 			actual:      `{"id":1,"result":null,"jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":"0x123","jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "type mismatch",
+			errors:      []string{".result: type mismatch (expected String, got Null)"},
 		},
 		{
 			name:        "null when null expected - ok",
@@ -77,29 +80,29 @@ func TestCompareKeysOnly(t *testing.T) {
 			actual:      `{"id":"1","result":"0x123","jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":"0x456","jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "type mismatch",
+			errors:      []string{".id: type mismatch (expected Number, got String)"},
 		},
 		{
 			name:        "object when array expected - type mismatch",
 			actual:      `{"id":1,"result":{"key":"value"},"jsonrpc":"2.0"}`,
 			expected:    `{"id":1,"result":[1,2,3],"jsonrpc":"2.0"}`,
 			shouldError: true,
-			errorMsg:    "expected array",
+			errors:      []string{".result: expected array but got JSON"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := compareKeysOnly(tt.actual, tt.expected)
+			err := checkJSONStructure(gjson.Parse(tt.expected), gjson.Parse(tt.actual), ".")
 			if tt.shouldError {
-				if err == nil {
+				if len(err) == 0 {
 					t.Errorf("expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errorMsg, err.Error())
+				} else if !slices.Equal(err, tt.errors) {
+					t.Errorf("errors mismatch\n  got: %v\n want: %v", err, tt.errors)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
+				if len(err) > 0 {
+					t.Errorf("unexpected errors: %v", err)
 				}
 			}
 		})

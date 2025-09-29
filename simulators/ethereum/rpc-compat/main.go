@@ -104,23 +104,27 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, only check that keys are present, not values
-			if test.speconly {
-				if err := compareKeysOnly(resp, expectedData); err != nil {
-					t.Log("note: speconly test - checking keys only, not values")
-					return err
-				}
-				respBytes = nil
-				continue
-			}
-
 			// Patch JSON to remove error messages. We only do this in the specific case
 			// where an error is expected AND returned by the client.
 			var errorRedacted bool
-			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
+			hasError := gjson.Get(resp, "error").Exists()
+			if hasError && gjson.Get(expectedData, "error").Exists() {
 				resp, _ = sjson.Delete(resp, "error.message")
 				expectedData, _ = sjson.Delete(expectedData, "error.message")
 				errorRedacted = true
+			}
+
+			// For speconly tests, only check that keys are present, not values
+			if test.speconly && !hasError {
+				t.Log("note: speconly test - type-checking response")
+				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
+				if len(errors) > 0 {
+					for _, err := range errors {
+						t.Log(err)
+					}
+					return fmt.Errorf("response type does not match expected")
+				}
+				continue
 			}
 
 			// Compare responses.
@@ -151,14 +155,16 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	return nil
 }
 
+// checkJSONStructure checks whether the `actual` value matches the type structure
+// of the `expected` value.
 func checkJSONStructure(expected, actual gjson.Result, path string) []string {
 	var errors []string
 
 	buildPath := func(key string) string {
-		if path != "" {
+		if path != "." {
 			return path + "." + key
 		}
-		return key
+		return "." + key
 	}
 
 	if expected.Type != gjson.JSON {
@@ -205,14 +211,6 @@ func checkJSONStructure(expected, actual gjson.Result, path string) []string {
 	}
 
 	return errors
-}
-
-func compareKeysOnly(actualJSON, expectedJSON string) error {
-	errors := checkJSONStructure(gjson.Parse(expectedJSON), gjson.Parse(actualJSON), "")
-	if len(errors) > 0 {
-		return fmt.Errorf("response structure errors: %s", strings.Join(errors, "; "))
-	}
-	return nil
 }
 
 func numbersEqual(a, b json.Number) bool {
