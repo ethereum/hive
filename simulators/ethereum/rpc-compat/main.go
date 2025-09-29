@@ -115,7 +115,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 			}
 
 			// For speconly tests, only check that keys are present, not values
-			if test.speconly && !hasError {
+			if !hasError && test.speconly {
 				t.Log("note: speconly test - type-checking response")
 				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
 				if len(errors) > 0 {
