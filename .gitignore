@@ -8,3 +8,8 @@ workspace
 simulators/**/target
 hivesim-rs/Cargo.lock
 hivesim-rs/target
+
+# workspace logs
+hiveview
+
+tmp

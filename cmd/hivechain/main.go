@@ -68,6 +68,7 @@ func generateCommand(args []string) {
 	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
 	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
 	flag.BoolVar(&cfg.merged, "pos", false, "Create a PoS (merged) chain")
+	flag.BoolVar(&cfg.berachain, "berachain", false, "Create a chain with Berachain forks")
 	flag.CommandLine.Parse(args)
 
 	if *outlist != "" {
