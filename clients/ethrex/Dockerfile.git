@@ -1,0 +1,57 @@
+### Build Ethrex From Git:
+## Pulls ethrex from a git repository and builds it from source.
+
+## Builder stage: Compiles ethrex from a git repository
+FROM rust:latest as builder
+
+ARG github=lambdaclass/ethrex
+ARG tag=main
+
+RUN rustup update stable && rustup default stable
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    cmake \
+    git \
+    libclang-dev \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN echo "Cloning: $github - $tag" \
+    && git clone --depth 1 --branch $tag https://github.com/$github ethrex \
+    && cd ethrex \
+    && cargo build --release --locked \
+    && cp target/release/ethrex /usr/local/bin/ethrex
+
+## Final stage: Sets up the environment for running ethrex
+FROM ubuntu:24.04
+
+WORKDIR /usr/local/bin
+
+# Copy compiled binary from builder
+COPY --from=builder /usr/local/bin/ethrex /usr/local/bin/ethrex
+
+# Install script tooling
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends bash curl jq \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add genesis mapper script, startup script, and enode URL retriever script
+ADD genesis.json /genesis.json
+ADD mapper.jq /mapper.jq
+ADD ethrex.sh /ethrex.sh
+RUN chmod +x /ethrex.sh
+
+RUN mkdir -p /hive-bin
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
+
+# Create version.txt
+RUN /usr/local/bin/ethrex --version | sed -e 's/ethrex \(.*\)/\1/' > /version.txt
+
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 8546 30303 30303/udp
+
+ENTRYPOINT ["/ethrex.sh"]

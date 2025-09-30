@@ -48,6 +48,7 @@ var (
 		"prague",
 		"prague1",
 		"prague2",
+		"osaka",
 	}
 
 	// berachain-specific forks that extend standard forks:
@@ -113,6 +114,9 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 		case "prague":
 			chaincfg.PragueTime = &timestamp
 			chaincfg.BlobScheduleConfig.Prague = params.DefaultPragueBlobConfig
+		case "osaka":
+			chaincfg.OsakaTime = &timestamp
+			chaincfg.BlobScheduleConfig.Osaka = params.DefaultOsakaBlobConfig
 		case "prague1":
 			chaincfg.Berachain.Prague1.Time = &timestamp
 			chaincfg.Berachain.Prague1.MinimumBaseFeeWei = 1000000000
@@ -271,7 +275,7 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 		fork := forks[0]
 		forks = forks[1:]
 		forkBlocks[fork] = uint64(block)
-		
+
 		// Special case for berachain: only apply fork-interval after prague
 		if cfg.berachain {
 			if fork == "prague" {
