@@ -59,6 +59,7 @@ def to_bool:
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
     "osakaTime": env.HIVE_OSAKA_TIMESTAMP|to_int,
+    "amsterdamTime": env.HIVE_AMSTERDAM_TIMESTAMP|to_int,
     "bpo1Time": env.HIVE_BPO1_TIMESTAMP|to_int,
     "bpo2Time": env.HIVE_BPO2_TIMESTAMP|to_int,
     "bpo3Time": env.HIVE_BPO3_TIMESTAMP|to_int,

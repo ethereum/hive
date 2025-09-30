@@ -47,6 +47,8 @@ func (g *generator) writeForkEnv() error {
 	setTime("HIVE_SHANGHAI_TIMESTAMP", cfg.ShanghaiTime)
 	setTime("HIVE_CANCUN_TIMESTAMP", cfg.CancunTime)
 	setTime("HIVE_PRAGUE_TIMESTAMP", cfg.PragueTime)
+	setTime("HIVE_OSAKA_TIMESTAMP", cfg.OsakaTime)
+	setTime("HIVE_AMSTERDAM_TIMESTAMP", cfg.AmsterdamTime)
 
 	// blob schedule
 	if cfg.BlobScheduleConfig != nil {

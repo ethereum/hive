@@ -174,6 +174,9 @@ def clique_engine:
     "eip7934TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
     "eip7934MaxRlpBlockSize": "0x800000",
 
+    # Amsterdam
+    "eip7928TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
