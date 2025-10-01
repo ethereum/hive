@@ -68,10 +68,10 @@ fi
 
 # Generate the config file.
 mkdir /configs
-jq -n -f /mkconfig.jq > /configs/test.cfg
+jq -n -f /mkconfig.jq > /configs/test.json
 
-echo "test.cfg"
-cat /configs/test.cfg
+echo "test.json"
+cat /configs/test.json
 
 # Set bootnode.
 if [ -n "$HIVE_BOOTNODE" ]; then
@@ -93,4 +93,4 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     LOG_FLAG="--log $LOG"
 fi
 echo "Running Nethermind..."
-dotnet /nethermind/nethermind.dll --config /configs/test.cfg $LOG_FLAG
+/nethermind/nethermind --config /configs/test.json $LOG_FLAG
