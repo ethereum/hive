@@ -96,7 +96,7 @@ else
 fi
 
 # Set amount of milliseconds between each broadcast
-FLAGS="$FLAGS --p2p.tx-broadcasting-interval=4"
+FLAGS="$FLAGS --p2p.tx-broadcasting-interval=5"
 
 FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
 
