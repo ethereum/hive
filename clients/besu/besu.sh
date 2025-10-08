@@ -162,6 +162,11 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-secret /jwtsecret"
 fi
 
+# Disable parallel transaction processing
+if [ "$HIVE_PARALLEL_TX_PROCESSING_DISABLED" = "true" ]; then
+    FLAGS="$FLAGS --bonsai-parallel-tx-processing-enabled=false"
+fi
+
 # Start Besu.
 if [ -z "$HAS_IMPORT" ]; then
     cmd="$besu $FLAGS $RPCFLAGS"
