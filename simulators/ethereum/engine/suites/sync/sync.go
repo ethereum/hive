@@ -177,8 +177,35 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 	return result
 }
 
+// Ethrex sync test variant generator
+type EthrexSyncVariantGenerator struct{}
+
+func (EthrexSyncVariantGenerator) Configure(*big.Int, string, string) []SyncTestVariant {
+	return []SyncTestVariant{
+		{
+			Name: "Full",
+			MainClientConfig: hivesim.Params{
+				"HIVE_NODETYPE": "full",
+			},
+			SyncClientConfig: hivesim.Params{
+				"HIVE_NODETYPE": "full",
+			},
+		},
+		{
+			Name: "Snap",
+			MainClientConfig: hivesim.Params{
+				"HIVE_NODETYPE": "snap",
+			},
+			SyncClientConfig: hivesim.Params{
+				"HIVE_NODETYPE": "snap",
+			},
+		},
+	}
+}
+
 // Lists the types of sync supported by each client.
 var ClientToSyncVariantGenerator = map[string]SyncVariantGenerator{
 	"go-ethereum": GethSyncVariantGenerator{},
 	"nethermind":  NethermindSyncVariantGenerator{},
+	"ethrex":      EthrexSyncVariantGenerator{},
 }
