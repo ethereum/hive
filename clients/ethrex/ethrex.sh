@@ -32,6 +32,17 @@ else
     cat /genesis.json
 fi
 
+# Configure the sync mode
+if [ "$HIVE_NODETYPE" == "full" ]; then
+    FLAGS="$FLAGS --syncmode full"
+fi
+if [ "$HIVE_NODETYPE" == "snap" ]; then
+    FLAGS="$FLAGS --syncmode snap"
+fi
+if [ "$HIVE_NODETYPE" == "" ]; then
+    FLAGS="$FLAGS --syncmode full"
+fi
+
 echo "Command flags till now:"
 echo $FLAGS
 
