@@ -41,7 +41,7 @@ Each client runs as a source for all other clients (including itself).`,
 	}
 	snapSuite.Add(hivesim.ClientTestSpec{
 		Role:        "eth1_snap",
-		Name:        "CLIENT as snap sync server",
+		Name:        "CLIENT as snap-sync server",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
 		Parameters:  params,
 		Files:       sourceFiles,
@@ -99,7 +99,7 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client, role string, params hivesim.
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
 		Role:        role,
-		Name:        fmt.Sprintf("sync %s -> CLIENT", source.Type),
+		Name:        fmt.Sprintf("sync CLIENT from %s", source.Type),
 		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
 		Parameters:  sinkParams,
 		Files:       sinkFiles,
