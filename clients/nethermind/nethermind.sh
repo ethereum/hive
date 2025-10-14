@@ -88,6 +88,7 @@ if [ -n "$HIVE_BOOTNODE" ]; then
 fi
 
 # Configure logging.
+export NO_COLOR=1
 LOG_FLAG=""
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     case "$HIVE_LOGLEVEL" in
@@ -100,5 +101,6 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     esac
     LOG_FLAG="--log $LOG"
 fi
+
 echo "Running Nethermind..."
 /nethermind/nethermind --config /configs/test.json $LOG_FLAG
