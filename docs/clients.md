@@ -17,9 +17,9 @@ client definitions wrap an existing Ethereum client, and building the client fro
 may take a long time, it is usually best to base the hive client wrapper on a pre-built
 docker image from Docker Hub.
 
-The client Dockerfile should support an optional argument named `branch`, which specifies
-the requested client version. This argument can be set by users by appending it to the
-client name like:
+The client Dockerfile should support an optional argument `tag`, which specifies the
+requested client version. This argument can be set by users by appending it to the client
+name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
