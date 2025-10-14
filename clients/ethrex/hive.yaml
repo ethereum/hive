@@ -1,0 +1,3 @@
+roles:
+  - "eth1"
+  - "eth1_snap"  # client implements snap protocol
