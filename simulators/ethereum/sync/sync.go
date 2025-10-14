@@ -33,25 +33,50 @@ func main() {
 		panic(err)
 	}
 
-	var suite = hivesim.Suite{
-		Name: "sync",
-		Description: `This suite of tests verifies that clients can sync from each other in different modes.
-For each client, we test if it can serve as a sync source for all other clients (including itself).`,
+	// Run snap sync tests.
+	var snapSuite = hivesim.Suite{
+		Name: "snapsync",
+		Description: `This suite runs clients against each other in snap-sync mode.
+Each client runs as a source for all other clients (including itself).`,
 	}
-	suite.Add(hivesim.ClientTestSpec{
-		Role:        "eth1",
-		Name:        "CLIENT as sync source",
+	snapSuite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1_snap",
+		Name:        "CLIENT as snap sync server",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
 		Parameters:  params,
 		Files:       sourceFiles,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
-			runSourceTest(t, c, params)
+			params = params.Set("HIVE_NODETYPE", "snap")
+			runSourceTest(t, c, "eth1_snap", params)
 		},
 	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+	sim := hivesim.New()
+	snapClients, _ := sim.ClientsWithRole("eth1_snap")
+	if len(snapClients) > 0 {
+		hivesim.MustRunSuite(hivesim.New(), snapSuite)
+	}
+
+	// Run full sync tests.
+	var fullSuite = hivesim.Suite{
+		Name: "sync",
+		Description: `This suite runs clients against each other in full-sync mode.
+Each client runs as a source for all other clients (including itself).`,
+	}
+	fullSuite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
+		Name:        "CLIENT as sync server",
+		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
+		Parameters:  params,
+		Files:       sourceFiles,
+		Run: func(t *hivesim.T, c *hivesim.Client) {
+			params = params.Set("HIVE_NODETYPE", "full")
+			runSourceTest(t, c, "eth1", params)
+		},
+	})
+	hivesim.MustRunSuite(hivesim.New(), fullSuite)
 }
 
-func runSourceTest(t *hivesim.T, c *hivesim.Client, params hivesim.Params) {
+func runSourceTest(t *hivesim.T, c *hivesim.Client, role string, params hivesim.Params) {
 	// Check whether the source has imported its chain.rlp correctly.
 	source := &node{c}
 	if err := source.checkHead(); err != nil {
@@ -73,7 +98,7 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client, params hivesim.Params) {
 
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
-		Role:        "eth1",
+		Role:        role,
 		Name:        fmt.Sprintf("sync %s -> CLIENT", source.Type),
 		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
 		Parameters:  sinkParams,
