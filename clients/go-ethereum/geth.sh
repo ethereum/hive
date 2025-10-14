@@ -66,27 +66,23 @@ else
 fi
 
 # Handle any client mode or operation requests
-if [ "$HIVE_NODETYPE" == "archive" ]; then
-    FLAGS="$FLAGS --syncmode full --gcmode archive"
-fi
-if [ "$HIVE_NODETYPE" == "full" ]; then
-    FLAGS="$FLAGS --syncmode full"
-fi
-if [ "$HIVE_NODETYPE" == "light" ]; then
-    FLAGS="$FLAGS --syncmode light"
-fi
-if [ "$HIVE_NODETYPE" == "snap" ]; then
-    FLAGS="$FLAGS --syncmode snap"
-fi
-if [ "$HIVE_NODETYPE" == "" ]; then
-    FLAGS="$FLAGS --syncmode snap"
-fi
+case "$HIVE_NODETYPE" in
+    "" | full)
+        FLAGS="$FLAGS --syncmode full" ;;
+    archive)
+        FLAGS="$FLAGS --syncmode full --gcmode archive" ;;
+    snap)
+        FLAGS="$FLAGS --syncmode snap" ;;
+    *)
+        echo "Unsupported HIVE_NODETYPE = $HIVE_NODETYPE"
+        exit 1 ;;
+esac
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis. 
+# Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
