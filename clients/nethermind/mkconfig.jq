@@ -28,7 +28,7 @@ def keystore_config:
 
 def merge_config:
   if env.HIVE_TERMINAL_TOTAL_DIFFICULTY != null then
-    { 
+    {
       "Merge": {
         "Enabled": true,
         "TerminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY,
@@ -60,13 +60,12 @@ def json_rpc_config:
 ;
 
 def sync_config:
-  if env.HIVE_SYNC_CONFIG != null then
-    {
-      "Sync": ( env.HIVE_SYNC_CONFIG | fromjson | remove_empty )
-    }
-  else
-    {}
-  end
+  {
+    "Sync": {
+      "SnapSync": (env.HIVE_NODETYPE == "snap"),
+      "FastBlocks": (env.HIVE_NODETYPE != "archive"),
+    },
+  }
 ;
 
 def txpool_config:

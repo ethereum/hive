@@ -66,6 +66,14 @@ else
     cat /chainspec/test.json
 fi
 
+# Check sync mode.
+case "$HIVE_NODETYPE" in
+    "" | full | archive | snap) ;;
+    *)
+        echo "Unsupported HIVE_NODETYPE = $HIVE_NODETYPE"
+        exit 1 ;;
+esac
+
 # Generate the config file.
 mkdir /configs
 jq -n -f /mkconfig.jq > /configs/test.json
