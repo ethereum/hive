@@ -49,6 +49,9 @@ besu=/opt/besu/bin/besu
 # See https://github.com/hyperledger/besu/issues/1464
 export BESU_OPTS="-Dsecp256k1.randomize=false"
 
+# Use bonsai storage.
+FLAGS="--data-storage-format=BONSAI"
+
 # Configure logging.
 LOG=info
 case "$HIVE_LOGLEVEL" in
@@ -58,7 +61,7 @@ case "$HIVE_LOGLEVEL" in
     4)   LOG=DEBUG ;;
     5)   LOG=TRACE ;;
 esac
-FLAGS="--logging=$LOG --data-storage-format=BONSAI"
+FLAGS="$FLAGS --logging=$LOG --color-enabled=false"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
