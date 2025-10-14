@@ -95,6 +95,9 @@ else
     echo "Warning: HIVE_TERMINAL_TOTAL_DIFFICULTY not supported."
 fi
 
+# Set amount of milliseconds between each transaction broadcast
+FLAGS="$FLAGS --p2p.tx-broadcasting-interval=5"
+
 FLAGS="$FLAGS  $HIVE_ETHREX_FLAGS"
 
 # Launch the main client.
