@@ -63,7 +63,6 @@ def sync_config:
   {
     "Sync": {
       "SnapSync": (env.HIVE_NODETYPE == "snap"),
-      "FastBlocks": (env.HIVE_NODETYPE != "archive"),
     },
   }
 ;
