@@ -36,11 +36,6 @@ var (
 		Description: `
 	Test Engine API exchange capabilities.`[1:],
 	}
-	syncSuite = hivesim.Suite{
-		Name: "engine-sync",
-		Description: `
-        Test Engine API sync, pre/post merge.`[1:],
-	}
 	withdrawals = hivesim.Suite{
 		Name: "engine-withdrawals",
 		Description: `
@@ -90,7 +85,6 @@ func main() {
 	hivesim.MustRunSuite(simulator, engine)
 	hivesim.MustRunSuite(simulator, auth)
 	hivesim.MustRunSuite(simulator, excap)
-	// hivesim.MustRunSuite(simulator, syncSuite)
 	hivesim.MustRunSuite(simulator, withdrawals)
 	hivesim.MustRunSuite(simulator, cancun)
 }
