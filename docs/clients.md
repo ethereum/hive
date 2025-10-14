@@ -78,7 +78,7 @@ certain ways. In order to run tests against multiple Ethereum clients, for examp
 simulator needs to be able to configure all clients for a specific blockchain and make
 them join the peer-to-peer network used for testing.
 
-## Eth1 Client Requirements
+## Execution-Layer Client Requirements
 
 This section describes the requirements for the `eth1` client role.
 
@@ -143,25 +143,19 @@ may map these to command line flags or use them to generate a config file, for e
 | `HIVE_FORK_BERLIN`         | decimal       | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal       | [London][london-spec] transition block         |
 
-## LES client/server roles
+## Snap sync roles
 
-Eth1 clients containing an implementation of [LES] may additionally support roles
-`eth1_les_client` and `eth1_les_server`.
-
-For the client role, the following additional variables should be supported:
+Execution-layer clients with an implementation of the [snap] protocol should support the
+`eth1_snap` role.
 
 | Variable                   | Value         |                                                |
 |----------------------------|---------------|------------------------------------------------|
-| `HIVE_NODETYPE`            | "light"       | enables LES client mode                        |
-
-For the server role, the following additional variables should be supported:
-
-| Variable                   | Value         |                                                |
-|----------------------------|---------------|------------------------------------------------|
-| `HIVE_LES_SERVER`          | 0 - 1         | if set to 1, LES server should be enabled      |
+| `HIVE_NODETYPE`            | "snap"        | forces the node to use snap sync               |
 
 
-[LES]: https://github.com/ethereum/devp2p/blob/master/caps/les.md
+
+
+[snap]: https://github.com/ethereum/devp2p/blob/master/caps/snap.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
 [hive-client-yaml]: ./commandline.md#client-build-parameters
 [geth-genesis-jq]: ../clients/go-ethereum/mapper.jq
