@@ -65,7 +65,7 @@ mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 FLAGS="$FLAGS --genesis-file=/genesis.json "
 
-# Dump genesis. 
+# Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
@@ -132,15 +132,16 @@ else
 fi
 
 # Configure sync mode
-#
-# light: not supported, full sync (per default)
-# not set: fast sync
-# archive, full or merge tests: full sync (per default)
-if [ "$HIVE_NODETYPE" == "light" ]; then
-    echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
-elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
-    FLAGS="$FLAGS --sync-mode=SNAP"
-fi
+case "$HIVE_NODETYPE" in
+    "" | "full" | "archive")
+        syncmode=FULL ;;
+    snap)
+        syncmode=SNAP ;;
+    *)
+        echo "Unsupported HIVE_NODETYPE = $HIVE_NODETYPE"
+        exit 1 ;;
+esac
+FLAGS="$FLAGS --sync-mode=$syncmode"
 
 # Enable Snap Server.
 FLAGS="$FLAGS --Xsnapsync-server-enabled"
