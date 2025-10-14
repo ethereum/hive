@@ -159,6 +159,21 @@ func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
 	return resp, err
 }
 
+// ClientsWithRole returns the clients which are tagged with the given role.
+func (sim *Simulation) ClientsWithRole(role string) ([]*ClientDefinition, error) {
+	cs, err := sim.ClientTypes()
+	if err != nil {
+		return nil, err
+	}
+	var filtered []*ClientDefinition
+	for _, c := range cs {
+		if c.HasRole(role) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered, nil
+}
+
 // StartClient starts a new node (or other container) with the specified parameters. One
 // parameter must be named CLIENT and should contain one of the client types from
 // GetClientTypes. The input is used as environment variables in the new container.
