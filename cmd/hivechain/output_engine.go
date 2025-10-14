@@ -110,11 +110,18 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 }
 
 func (g *generator) block2fcu(b *types.Block) *rpcRequest {
+	finalized := g.blockchain.CurrentFinalBlock()
 	fc := engine.ForkchoiceStateV1{
 		HeadBlockHash:      b.Hash(),
 		SafeBlockHash:      b.Hash(),
 		FinalizedBlockHash: b.Hash(),
 	}
+	// Set finalized to the block at the configured distance,
+	// but only when notifying about a block that is above finalized.
+	if b.NumberU64() > finalized.Number.Uint64() {
+		fc.FinalizedBlockHash = finalized.Hash()
+	}
+
 	var method string
 	cfg := g.genesis.Config
 	switch {

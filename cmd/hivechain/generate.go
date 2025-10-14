@@ -27,9 +27,10 @@ type generatorConfig struct {
 	merged       bool   // create a proof-of-stake chain
 
 	// chain options
-	txInterval  int // frequency of blocks containing transactions
-	txCount     int // number of txs in block
-	chainLength int // number of generated blocks
+	txInterval        int // frequency of blocks containing transactions
+	txCount           int // number of txs in block
+	chainLength       int // number of generated blocks
+	finalizedDistance int // distance of finalized block from head
 
 	// output options
 	outputs   []string // enabled outputs
@@ -138,11 +139,20 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 		return nil, fmt.Errorf("can't create blockchain: %v", err)
 	}
 
+	// Process blocks.
 	i, err := blockchain.InsertChain(chain)
 	if err != nil {
 		blockchain.Stop()
 		return nil, fmt.Errorf("chain validation error (block %d): %v", chain[i].Number(), err)
 	}
+
+	// Set finalized block.
+	headNum := blockchain.CurrentHeader().Number.Uint64()
+	finalizedNum := uint64(0)
+	if headNum > uint64(g.cfg.finalizedDistance) {
+		finalizedNum = headNum - uint64(g.cfg.finalizedDistance)
+	}
+	blockchain.SetFinalized(blockchain.GetHeaderByNumber(finalizedNum))
 	return blockchain, nil
 }
 

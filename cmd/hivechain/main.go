@@ -65,6 +65,7 @@ func generateCommand(args []string) {
 	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
 	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
 	flag.IntVar(&cfg.forkInterval, "fork-interval", 0, "Number of blocks between fork activations")
+	flag.IntVar(&cfg.finalizedDistance, "finalized-distance", 0, "Distance of finalized block from head")
 	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
 	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
 	flag.BoolVar(&cfg.merged, "pos", false, "Create a PoS (merged) chain")
