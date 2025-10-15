@@ -2,11 +2,18 @@
 FROM golang:1-alpine as builder
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY}
+ARG branch=main
+ENV GIT_REF=${branch}
 
 RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 
 # Clone the tests repo.
-RUN git clone --depth 1 https://github.com/ethereum/execution-apis.git /execution-apis
+# Allow the user to specify a branch or commit to checkout
+RUN git init /execution-apis && \
+    cd /execution-apis && \
+    git remote add origin https://github.com/ethereum/execution-apis.git && \
+    git fetch --depth 1 origin $GIT_REF && \
+    git checkout FETCH_HEAD;
 
 # To run local tests, copy the directory into the same as the simulator and
 # uncomment the line below
