@@ -81,13 +81,15 @@ func (s ExchangeCapabilitiesSpec) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (s ExchangeCapabilitiesSpec) Execute(t *test.Env) {
-	if returnedCapabilities, err := t.HiveEngine.ExchangeCapabilities(t.TestContext, s.MinimalExpectedCapabilitiesSet); err != nil {
+	t.HiveEngine.PrepareDefaultAuthCallToken()
+
+	returnedCapabilities, err := t.HiveEngine.ExchangeCapabilities(t.TestContext, s.MinimalExpectedCapabilitiesSet)
+	if err != nil {
 		t.Fatalf("FAIL (%s): Unable request capabilities: %v", t.TestName, err)
-	} else {
-		for _, cap := range s.MinimalExpectedCapabilitiesSet {
-			if !slices.Contains(returnedCapabilities, cap) {
-				t.Fatalf("FAIL (%s): Expected capability (%s) not found", t.TestName, cap)
-			}
+	}
+	for _, cap := range s.MinimalExpectedCapabilitiesSet {
+		if !slices.Contains(returnedCapabilities, cap) {
+			t.Fatalf("FAIL (%s): Expected capability (%s) not found", t.TestName, cap)
 		}
 	}
 }
