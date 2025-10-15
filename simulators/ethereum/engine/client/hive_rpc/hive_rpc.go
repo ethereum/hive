@@ -283,19 +283,17 @@ func (ec *HiveRPCEngineClient) PrepareAuthCallToken(jwtSecretBytes []byte, iat t
 	return nil
 }
 
-func (ec *HiveRPCEngineClient) PrepareDefaultAuthCallToken() error {
+func (ec *HiveRPCEngineClient) PrepareDefaultAuthCallToken() {
 	ec.PrepareAuthCallToken(ec.JWTSecretBytes, time.Now())
-	return nil
 }
 
 // Engine API Call Methods
 
 // Forkchoice Updated API Calls
 func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	ec.PrepareDefaultAuthCallToken()
+
 	var result api.ForkChoiceResponse
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return result, err
-	}
 	ec.latestFcUStateSent = fcState
 	ec.latestPAttrSent = pAttributes
 	err := ec.c.CallContext(ctx,
@@ -322,6 +320,8 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV3(ctx context.Context, fcState 
 // Get Payload API Calls
 
 func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
+	ec.PrepareDefaultAuthCallToken()
+
 	var (
 		executableData        typ.ExecutableData
 		blockValue            *big.Int
@@ -330,11 +330,6 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 		err                   error
 		rpcString             = fmt.Sprintf("engine_getPayloadV%d", version)
 	)
-
-	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
-		return executableData, nil, nil, nil, err
-	}
-
 	if version >= 2 {
 		var response typ.ExecutionPayloadEnvelope
 		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
@@ -367,50 +362,33 @@ func (ec *HiveRPCEngineClient) GetPayloadV3(ctx context.Context, payloadId *api.
 
 // Get Payload Bodies API Calls
 func (ec *HiveRPCEngineClient) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {
-	var (
-		result []*typ.ExecutionPayloadBodyV1
-		err    error
-	)
-	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
-	}
+	ec.PrepareDefaultAuthCallToken()
 
-	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", hexutil.Uint64(start), hexutil.Uint64(count))
+	var result []*typ.ExecutionPayloadBodyV1
+	err := ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", hexutil.Uint64(start), hexutil.Uint64(count))
 	return result, err
 }
 
 func (ec *HiveRPCEngineClient) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error) {
-	var (
-		result []*typ.ExecutionPayloadBodyV1
-		err    error
-	)
-	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
-	}
+	ec.PrepareDefaultAuthCallToken()
 
-	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByHashV1", hashes)
+	var result []*typ.ExecutionPayloadBodyV1
+	err := ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByHashV1", hashes)
 	return result, err
 }
 
 // Get Blob Bundle API Calls
 func (ec *HiveRPCEngineClient) GetBlobsBundleV1(ctx context.Context, payloadId *api.PayloadID) (*typ.BlobsBundle, error) {
-	var (
-		result typ.BlobsBundle
-		err    error
-	)
-	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
-	}
+	ec.PrepareDefaultAuthCallToken()
 
-	err = ec.c.CallContext(ctx, &result, "engine_getBlobsBundleV1", payloadId)
+	var result typ.BlobsBundle
+	err := ec.c.CallContext(ctx, &result, "engine_getBlobsBundleV1", payloadId)
 	return &result, err
 }
 
 // New Payload API Call Methods
 func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *typ.ExecutableData) (result api.PayloadStatusV1, err error) {
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return result, err
-	}
+	ec.PrepareDefaultAuthCallToken()
 
 	if version >= 3 {
 		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, payload.VersionedHashes, payload.ParentBeaconBlockRoot)
@@ -437,18 +415,15 @@ func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *typ.Ex
 }
 
 // Exchange Transition Configuration API Call Methods
+
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
 	var result api.TransitionConfigurationV1
 	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) ExchangeCapabilities(ctx context.Context, clCapabilities []string) ([]string, error) {
-	var result []string
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return result, err
-	}
-	err := ec.c.CallContext(ctx, &result, "engine_exchangeCapabilities", clCapabilities)
+func (ec *HiveRPCEngineClient) ExchangeCapabilities(ctx context.Context, clCapabilities []string) (result []string, err error) {
+	err = ec.c.CallContext(ctx, &result, "engine_exchangeCapabilities", clCapabilities)
 	return result, err
 }
 
