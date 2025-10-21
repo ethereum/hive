@@ -4,20 +4,20 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 ## Default fixtures/git-ref
 ARG fixtures=stable@latest
 ENV FIXTURES=${fixtures}
-ARG branch=main
+ARG branch=forks/osaka
 ENV GIT_REF=${branch}
 
 ## Clone and install EEST
 RUN apt-get update && apt-get install -y git
 
 # Allow the user to specify a branch or commit to checkout
-RUN git init execution-spec-tests && \
-    cd execution-spec-tests && \
-    git remote add origin https://github.com/ethereum/execution-spec-tests.git && \
+RUN git init execution-specs && \
+    cd execution-specs && \
+    git remote add origin https://github.com/ethereum/execution-specs.git && \
     git fetch --depth 1 origin $GIT_REF && \
-    git checkout FETCH_HEAD
+    git checkout FETCH_HEAD;
 
-WORKDIR /execution-spec-tests
+WORKDIR /execution-specs/packages/tests
 RUN uv sync
 
 # Cache the fixtures. This is done to avoid re-downloading the fixtures every time
