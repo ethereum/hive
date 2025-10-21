@@ -79,6 +79,18 @@ def txpool_config:
   end
 ;
 
+def network_static_peers_config:
+  if env.HIVE_BOOTNODE != null then
+    {
+      "Network": {
+        "OnlyStaticPeers": true
+      }
+    }
+  else
+    {}
+  end
+;
+
 def base_config:
   {
     "Init": {
@@ -110,11 +122,8 @@ def base_config:
     "Sync": {
       "SnapServingEnabled": true,
     },
-    "Discovery": {
-      "DiscoveryVersion": "All"
-    },
   }
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config
+base_config * network_static_peers_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config
