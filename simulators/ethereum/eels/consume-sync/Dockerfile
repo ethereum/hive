@@ -1,4 +1,4 @@
-# Builds and runs the EEST (execution-spec-tests) consume rlp simulator
+# Builds and runs the EELS (execution-specs) consume sync simulator
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ## Default fixtures/git-ref
@@ -6,7 +6,7 @@ ARG fixtures=stable@latest
 ENV FIXTURES=${fixtures}
 ARG branch=""
 
-## Clone and install EEST
+## Clone and install EELS
 RUN apt-get update && apt-get install -y git
 
 # Clone repo and use the default branch if none specified
@@ -26,5 +26,5 @@ WORKDIR /execution-specs/packages/tests
 RUN uv run consume cache --input "$FIXTURES"
 RUN uv sync
 
-## Define `consume rlp` entry point using the local fixtures
-ENTRYPOINT uv run consume rlp -v --input "$FIXTURES"
+## Define `consume sync` entry point using the local fixtures
+ENTRYPOINT uv run consume sync -v --input "$FIXTURES"
