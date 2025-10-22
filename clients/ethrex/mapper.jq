@@ -110,7 +110,7 @@ def to_bool:
         "target": (if env.HIVE_BPO5_BLOB_TARGET then env.HIVE_BPO5_BLOB_TARGET|to_int else 9 end),
         "max": (if env.HIVE_BPO5_BLOB_MAX then env.HIVE_BPO5_BLOB_MAX|to_int else 14 end),
         "baseFeeUpdateFraction": (if env.HIVE_BPO5_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO5_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 8832827 end)
-      },
+      }
     },
     "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa"
   }|remove_empty
