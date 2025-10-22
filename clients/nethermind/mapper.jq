@@ -200,6 +200,12 @@ def clique_engine:
           "max": (if env.HIVE_OSAKA_BLOB_MAX then env.HIVE_OSAKA_BLOB_MAX|to_hex else "0x9" end),
           "baseFeeUpdateFraction": (if env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_OSAKA_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
       } else null end,
+      if env.HIVE_AMSTERDAM_TIMESTAMP then {
+          "timestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
+          "target": (if env.HIVE_AMSTERDAM_BLOB_TARGET then env.HIVE_AMSTERDAM_BLOB_TARGET|to_hex else "0x6" end),
+          "max": (if env.HIVE_AMSTERDAM_BLOB_MAX then env.HIVE_AMSTERDAM_BLOB_MAX|to_hex else "0x9" end),
+          "baseFeeUpdateFraction": (if env.HIVE_AMSTERDAM_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_AMSTERDAM_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x4c6964" end)
+      } else null end,
       if env.HIVE_BPO1_TIMESTAMP then {
           "timestamp": env.HIVE_BPO1_TIMESTAMP|to_hex,
           "target": (if env.HIVE_BPO1_BLOB_TARGET then env.HIVE_BPO1_BLOB_TARGET|to_hex else "0x9" end),
