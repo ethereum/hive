@@ -173,6 +173,7 @@ func (m *modInvokeEmit) txInfo() any {
 	return m.txs
 }
 
+// genCallData produces the calldata for the 'emit' contract.
 func (m *modInvokeEmit) genCallData(ctx *genBlockContext) []byte {
 	d := make([]byte, 8)
 	binary.BigEndian.PutUint64(d, ctx.TxRandomValue())

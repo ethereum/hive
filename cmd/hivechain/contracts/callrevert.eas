@@ -8,6 +8,12 @@
     push 0                      ; [offset]
     calldataload                ; [word]
 
+    ;; Access a storage slot. This exists to ensure we can test access list
+    ;; generation in case of a failed call.
+    push 0x42ff                 ; [slot]
+    sload                       ; [v]
+    pop                         ; []
+
     ;; if word == 0 revert with panic
     iszero                      ; [word==0]
     iszero                      ; [word!=0]
@@ -41,7 +47,7 @@
 ;;;
 #define s_error = .selector("Error(string)")
 #define errmsg = "user error"
-#define errmsg_word = errmsg << 255-.bitlen(errmsg)
+#define errmsg_word = errmsg << (255 - .bitlen(errmsg))
 
 error:
     push s_error << (28*8)      ; [sel]

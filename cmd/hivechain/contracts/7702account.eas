@@ -1,4 +1,6 @@
+;;; -*- mode: asm -*-
 ;;; This code is installed as a delegation destination for testing EIP-7702.
+;;; When called, it just returns the caller address.
 
 #pragma target "prague"
 
