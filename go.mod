@@ -41,6 +41,7 @@ require (
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
+	github.com/fjl/geas v0.3.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -78,3 +79,5 @@ require (
 )
 
 replace github.com/ethereum/hive/hiveproxy => ./hiveproxy
+
+tool github.com/fjl/geas/cmd/geas
