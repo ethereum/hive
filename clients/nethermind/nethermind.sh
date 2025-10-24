@@ -83,8 +83,7 @@ cat /configs/test.json
 
 # Set bootnode.
 if [ -n "$HIVE_BOOTNODE" ]; then
-    mkdir -p /nethermind/Data
-    echo "[\"$HIVE_BOOTNODE\"]" > /nethermind/Data/static-nodes.json
+    echo "[\"$HIVE_BOOTNODE\"]" > /nethermind/static-nodes.json
 fi
 
 # Configure logging.
