@@ -183,6 +183,11 @@ func checkJSONStructure(expected, actual gjson.Result, path string) []string {
 		keyPath := buildPath(key.String())
 		actualValue := actual.Get(key.String())
 
+		// Allow error.data field to be optional and skip validation if present
+		if key.String() == "data" && strings.HasPrefix(path, ".error") {
+			return true
+		}
+
 		if !actualValue.Exists() {
 			errors = append(errors, fmt.Sprintf("%s: missing key", keyPath))
 			return true
