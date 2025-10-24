@@ -8,7 +8,7 @@
 #define theOutput = 0xffee
 
     calldatasize                ; [size]
-    push .bytelen(theInput)     ; [exp, iszero]
+    push len(theInput)          ; [exp, iszero]
     eq                          ; [size==exp]
     jumpi @compare              ; []
     %revert("wrong-calldatasize")
@@ -16,7 +16,7 @@
 compare:
     push 0                      ; [offset]
     calldataload                ; [calldata]
-    push 256-.bitlen(theInput)  ; [shft, calldata]
+    push 256-intbits(theInput)  ; [shft, calldata]
     shr                         ; [data]
     push theInput               ; [expv, data]
     eq                          ; [data==expv]
@@ -27,8 +27,8 @@ return:
     push theOutput              ; [v]
     push 0                      ; [offset, v]
     mstore                      ; []
-    push .bytelen(theOutput)    ; [size]
-    push 32-.bytelen(theInput)  ; [offset, size]
+    push len(theOutput)         ; [size]
+    push 32-len(theInput)       ; [offset, size]
     return                      ; []
 
 
@@ -36,7 +36,7 @@ return:
     push $error                 ; [value]
     push 0                      ; [offset, value]
     mstore                      ; []
-    push .bytelen($error)       ; [size]
-    push 32-.bytelen($error)    ; [offset, size]
+    push len($error)            ; [size]
+    push 32-len($error)         ; [offset, size]
     revert
 }

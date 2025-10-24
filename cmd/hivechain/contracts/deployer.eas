@@ -3,15 +3,16 @@
 
 #pragma target "frontier"
 
-    push @.end                  ; [end]
+    push @end                   ; [end]
     codesize                    ; [codesize, end]
     sub                         ; [size]
     ;; copy to memory
     dup1                        ; [size, size]
-    push @.end                  ; [offset, size, size]
+    push @end                   ; [offset, size, size]
     push 0                      ; [destOffset, offset, size, size]
     codecopy                    ; [size]
     ;; return memory content
     push 0                      ; [offset, size]
     return                      ; []
+
 .end:
