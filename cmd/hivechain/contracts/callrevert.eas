@@ -47,7 +47,7 @@
 ;;;
 #define s_error = selector("Error(string)")
 #define errmsg = "user error"
-#define errmsg_word = errmsg << (256 - len(errmsg)*8)
+#define errmsg_word = errmsg << (255 - intbits(errmsg))
 
 error:
     push s_error << (28*8)      ; [sel]
