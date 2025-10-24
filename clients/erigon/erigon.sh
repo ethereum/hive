@@ -59,6 +59,9 @@ else
     FLAGS="$FLAGS --networkid 1337"
 fi
 
+# Enable commitment history (this flag must be enabled when initializing the chaindata)
+FLAGS="$FLAGS --prune.experimental.include-commitment-history"
+
 # Configure the chain.
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
