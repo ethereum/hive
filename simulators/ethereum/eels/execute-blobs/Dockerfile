@@ -17,7 +17,7 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
         git checkout FETCH_HEAD; \
     fi
 
-WORKDIR /execution-specs/packages/tests
+WORKDIR /execution-specs/packages/testing
 RUN uv sync
 
 ## Define `consume engine` entry point using the local fixtures
