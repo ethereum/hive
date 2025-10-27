@@ -17,7 +17,7 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
         git checkout FETCH_HEAD; \
     fi
 
-WORKDIR /execution-specs/packages/tests
+WORKDIR /execution-specs/packages/testing
 
 # Cache the fixtures. This is done to avoid re-downloading the fixtures every time
 # the container starts.
