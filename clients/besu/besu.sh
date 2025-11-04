@@ -147,7 +147,7 @@ esac
 FLAGS="$FLAGS --sync-mode=$syncmode"
 
 # Enable Snap Server.
-FLAGS="$FLAGS --Xsnapsync-server-enabled"
+FLAGS="$FLAGS --snapsync-server-enabled"
 
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
