@@ -81,9 +81,6 @@ echo $FLAGS
 echo "Initializing database with genesis state..."
 $reth init $FLAGS --chain /genesis.json
 
-# Make sure pruner doesn't start
-echo -e "[prune]\\nblock_interval = 500_000" >> $DATADIR/reth.toml
-
 # make sure we use the same genesis each time
 FLAGS="$FLAGS --chain /genesis.json"
 
@@ -165,8 +162,8 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 fi
 
-# Configure NAT
-FLAGS="$FLAGS --nat none"
+# Configure NAT and disable pruning
+FLAGS="$FLAGS --nat none --block-interval 500000"
 
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"

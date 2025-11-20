@@ -10,7 +10,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-const apiVersion = "1.25"
+const apiVersion = "1.44"
 
 // Config is the configuration of the docker backend.
 type Config struct {

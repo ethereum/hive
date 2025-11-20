@@ -8,6 +8,12 @@
     push 0                      ; [offset]
     calldataload                ; [word]
 
+    ;; Access a storage slot. This exists to ensure we can test access list
+    ;; generation in case of a failed call.
+    push 0x42ff                 ; [slot]
+    sload                       ; [v]
+    pop                         ; []
+
     ;; if word == 0 revert with panic
     iszero                      ; [word==0]
     iszero                      ; [word!=0]
@@ -19,7 +25,7 @@
 ;;;
 ;;;     selector :: 4  ||  value :: 32
 ;;;
-#define s_panic = .selector("Panic(uint256)")
+#define s_panic = selector("Panic(uint256)")
 #define panicv = 0x01 ;; == assert(false)
 
     push s_panic << (28*8)      ; [sel]
@@ -39,9 +45,9 @@
 ;;;
 ;;;     selector :: 4  ||  0x20 :: 32  ||  len :: 32  ||  data :: len
 ;;;
-#define s_error = .selector("Error(string)")
+#define s_error = selector("Error(string)")
 #define errmsg = "user error"
-#define errmsg_word = errmsg << 255-.bitlen(errmsg)
+#define errmsg_word = errmsg << (255 - intbits(errmsg))
 
 error:
     push s_error << (28*8)      ; [sel]
@@ -50,13 +56,13 @@ error:
     push 0x20                   ; [ptr]
     push 4                      ; [offset, ptr]
     mstore                      ; []
-    push .bytelen(errmsg)       ; [len]
+    push len(errmsg)            ; [len]
     push 36                     ; [offset, len]
     mstore                      ; []
     push errmsg_word            ; [data]
     push 68                     ; [offset, data]
     mstore                      ; []
 
-    push 68 + .bytelen(errmsg)  ; [length]
+    push 68 + len(errmsg)       ; [length]
     push 0                      ; [offset, length]
     revert

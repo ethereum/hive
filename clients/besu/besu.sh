@@ -147,7 +147,7 @@ esac
 FLAGS="$FLAGS --sync-mode=$syncmode"
 
 # Enable Snap Server.
-FLAGS="$FLAGS --Xsnapsync-server-enabled"
+FLAGS="$FLAGS --snapsync-server-enabled"
 
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
@@ -164,6 +164,11 @@ RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=DEBUG,ETH,NET,WEB3,ADMIN --rpc
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
     RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-secret /jwtsecret"
+fi
+
+# Disable parallel transaction processing
+if [ "$HIVE_PARALLEL_TX_PROCESSING_DISABLED" = "true" ]; then
+    FLAGS="$FLAGS --bonsai-parallel-tx-processing-enabled=false"
 fi
 
 # Start Besu.
