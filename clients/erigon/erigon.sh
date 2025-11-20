@@ -130,6 +130,11 @@ fi
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,trace,eth,net,txpool,web3,testing"
 FLAGS="$FLAGS --ws --ws.port=8546"
 
+# Configure GraphQL.
+if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
+    FLAGS="$FLAGS --graphql"
+fi
+
 # Increase blob slots for tests
 FLAGS="$FLAGS --txpool.blobslots=1000 --txpool.totalblobpoollimit=10000"
 
