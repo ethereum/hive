@@ -62,6 +62,7 @@ func generateCommand(args []string) {
 		outlist = flag.String("outputs", "", "Enabled output modules")
 	)
 	flag.IntVar(&cfg.chainLength, "length", 2, "The length of the pow chain to generate")
+	flag.Uint64Var(&cfg.gasLimit, "gaslimit", defaultGasLimit, "Block gas limit of the chain")
 	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
 	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
 	flag.IntVar(&cfg.forkInterval, "fork-interval", 0, "Number of blocks between fork activations")

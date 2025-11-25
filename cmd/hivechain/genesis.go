@@ -15,8 +15,9 @@ import (
 var initialBalance, _ = new(big.Int).SetString("1000000000000000000000000000000000000", 10)
 
 const (
-	genesisBaseFee = params.InitialBaseFee
-	blocktimeSec   = 10 // hard-coded in core.GenerateChain
+	genesisBaseFee  = params.InitialBaseFee
+	blocktimeSec    = 10 // hard-coded in core.GenerateChain
+	defaultGasLimit = 100_000_000
 )
 
 // Ethereum mainnet forks in order of introduction.
@@ -135,7 +136,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	// Block attributes.
 	g.Difficulty = cfg.genesisDifficulty()
 	g.ExtraData = []byte("hivechain")
-	g.GasLimit = 300_000_000
+	g.GasLimit = cfg.gasLimit
 	zero := new(big.Int)
 	if g.Config.IsLondon(zero) {
 		g.BaseFee = big.NewInt(genesisBaseFee)
