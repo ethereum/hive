@@ -1,3 +1,8 @@
-PUSH 190000
-PUSH 0
-LOG0
+;;; -*- mode: asm -*-
+;;; outputs a single large log event
+
+#pragma target "frontier"
+
+    push 190000
+    push 0
+    log0
