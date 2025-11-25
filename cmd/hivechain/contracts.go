@@ -29,6 +29,9 @@ var emitCode []byte
 //go:embed bytecode/7702account.bin
 var mod7702AccountCode []byte
 
+//go:embed bytecode/largelogs.bin
+var modLargeReceiptCode []byte
+
 // //go:embed bytecode/deposit.bin
 // var depositCode []byte
 //

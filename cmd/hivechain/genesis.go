@@ -135,7 +135,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	// Block attributes.
 	g.Difficulty = cfg.genesisDifficulty()
 	g.ExtraData = []byte("hivechain")
-	g.GasLimit = params.GenesisGasLimit * 8
+	g.GasLimit = 300_000_000
 	zero := new(big.Int)
 	if g.Config.IsLondon(zero) {
 		g.BaseFee = big.NewInt(genesisBaseFee)
