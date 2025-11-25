@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -126,8 +127,22 @@ func (g *generator) run() error {
 		return err
 	}
 
+	// Write output files.
 	g.blockchain = bc
-	return g.write()
+	if err := g.write(); err != nil {
+		return err
+	}
+
+	// Check if some modifiers did not run.
+	if len(g.virgins) > 0 {
+		names := make([]string, len(g.virgins))
+		for i, m := range g.virgins {
+			names[i] = m.name
+		}
+		sort.Strings(names)
+		fmt.Println("warning: some modifiers did not run:", strings.Join(names, ", "))
+	}
+	return nil
 }
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
