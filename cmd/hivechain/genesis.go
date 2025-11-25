@@ -150,7 +150,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	addCancunSystemContracts(g.Alloc)
 	addPragueSystemContracts(g.Alloc)
 	addSnapTestContract(g.Alloc)
-	addEmitContract(g.Alloc)
+	addModContracts(g.Alloc)
 
 	return &g
 }
@@ -182,12 +182,19 @@ func addSnapTestContract(ga types.GenesisAlloc) {
 	}
 }
 
-const emitAddr = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
+const (
+	emitAddr      = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
+	largeLogsAddr = "0x8dcd17433742f4c0ca53122ab541d0ba67fc27ff"
+)
 
-func addEmitContract(ga types.GenesisAlloc) {
-	addr := common.HexToAddress(emitAddr)
-	ga[addr] = types.Account{
+// addModContracts adds the contracts used by block modifiers.
+func addModContracts(ga types.GenesisAlloc) {
+	ga[common.HexToAddress(emitAddr)] = types.Account{
 		Code:    emitCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(largeLogsAddr)] = types.Account{
+		Code:    modLargeReceiptCode,
 		Balance: new(big.Int),
 	}
 }

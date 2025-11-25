@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -11,7 +12,7 @@ func init() {
 		const logCost = 1607055
 		const pushCost = 10
 		return &modLargeReceipt{
-			gasLimit: logCost + pushCost + params.TxGasContractCreation + params.TxDataNonZeroGasEIP2028*8,
+			gasLimit: logCost + pushCost + params.TxGas,
 			txCount:  56,
 		}
 	})
@@ -32,12 +33,13 @@ func (m *modLargeReceipt) apply(ctx *genBlockContext) bool {
 	}
 
 	sender := ctx.TxSenderAccount()
+	contract := common.HexToAddress(largeLogsAddr)
 	for range m.txCount {
 		ctx.AddNewTx(sender, &types.LegacyTx{
 			Nonce:    ctx.AccountNonce(sender.addr),
 			Gas:      m.gasLimit,
 			GasPrice: ctx.TxGasFeeCap(),
-			Data:     modLargeReceiptCode,
+			To:       &contract,
 		})
 	}
 	m.block = ctx.NumberU64()
