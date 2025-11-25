@@ -151,7 +151,6 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	addPragueSystemContracts(g.Alloc)
 	addSnapTestContract(g.Alloc)
 	addEmitContract(g.Alloc)
-	addLargeLogsContract(g.Alloc)
 
 	return &g
 }
@@ -189,16 +188,6 @@ func addEmitContract(ga types.GenesisAlloc) {
 	addr := common.HexToAddress(emitAddr)
 	ga[addr] = types.Account{
 		Code:    emitCode,
-		Balance: new(big.Int),
-	}
-}
-
-const logAddr = "0x8ef217433742f4c0ca53122ab541d0ba67fc27ff"
-
-func addLargeLogsContract(ga types.GenesisAlloc) {
-	addr := common.HexToAddress(logAddr)
-	ga[addr] = types.Account{
-		Code:    modLargeReceiptCode,
 		Balance: new(big.Int),
 	}
 }
