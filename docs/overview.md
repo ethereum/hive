@@ -70,7 +70,9 @@ This section explains what happens during a simulation run.
 For a single run, the user provides the name of the simulator to run, and a set of client
 names to run against. For example:
 
-    ./hive --sim ethereum/sync --client go-ethereum,besu,nethermind
+```bash
+./hive --sim ethereum/sync --client go-ethereum,besu,nethermind
+```
 
 Hive first builds simulator and client images using docker. It expects a Dockerfile in the
 `./simulators/ethereum/sync` directory as well as a Dockerfile for each client (in
@@ -111,36 +113,38 @@ stopped and removed. The `hive` command then exits as well.
 The results of simulation runs are stored in the 'result directory'. For every test suite
 executed by a simulator, a JSON file like the following is created:
 
-    {
-      "id": 0,
-      "name": "sync",
-      "description": "This test suite verifies that...",
-      "clientVersions": {
-        "besu": "",
-        "go-ethereum": ""
+```json
+{
+  "id": 0,
+  "name": "sync",
+  "description": "This test suite verifies that...",
+  "clientVersions": {
+    "besu": "",
+    "go-ethereum": ""
+  },
+  "simLog": "1612356621-simulator-a9a2e71a6aabe509bbde35c79e7f0ed9c259a642c19ba0da6167fa9efd0ea5a1.log",
+  "testCases": {
+    "1": {
+      "name": "besu as sync source",
+      "description": "This loads the test chain...",
+      "start": "2021-02-03T12:50:21.77396767Z",
+      "end": "2021-02-03T12:51:56.080650164Z",
+      "summaryResult": {
+        "pass": true,
+        "details": ""
       },
-      "simLog": "1612356621-simulator-a9a2e71a6aabe509bbde35c79e7f0ed9c259a642c19ba0da6167fa9efd0ea5a1.log"
-      "testCases": {
-        "1": {
-          "name": "besu as sync source",
-          "description": "This loads the test chain...",
-          "start": "2021-02-03T12:50:21.77396767Z",
-          "end": "2021-02-03T12:51:56.080650164Z",
-          "summaryResult": {
-            "pass": true,
-            "details": ""
-          },
-          "clientInfo": {
-            "893a6ea2": {
-              "ip": "172.17.0.4",
-              "name": "besu",
-              "instantiatedAt": "2021-02-03T12:51:04.371913809Z",
-              "logFile": "besu/client-893a6ea2.log"
-            }
-          }
+      "clientInfo": {
+        "893a6ea2": {
+          "ip": "172.17.0.4",
+          "name": "besu",
+          "instantiatedAt": "2021-02-03T12:51:04.371913809Z",
+          "logFile": "besu/client-893a6ea2.log"
         }
       }
     }
+  }
+}
+```
 
 The result directory also contains log files of simulator and client output.
 
