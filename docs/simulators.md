@@ -54,7 +54,7 @@ Example:
 
 `/simulators/my-simulator/hive_context.txt`:
 
-```bash
+```text
 ../..
 ```
 
@@ -71,7 +71,7 @@ use (
 
 `/simulators/my-simulator/Dockerfile`:
 
-```Dockerfile
+```dockerfile
 # ...
 ADD ./simulators/my-simulator/hive.go.work /source/go.work
 ADD ./my-shared-code /source/my-shared-code
