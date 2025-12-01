@@ -242,7 +242,8 @@ func (b *ContainerBackend) UnpauseContainer(containerID string) error {
 // CreateNetwork creates a docker network.
 func (b *ContainerBackend) CreateNetwork(name string) (string, error) {
 	network, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
-		Name: name,
+		Name:       name,
+		Attachable: true,
 	})
 	if err != nil {
 		return "", err
