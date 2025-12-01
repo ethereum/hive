@@ -387,7 +387,7 @@ configuration:
 ```json
 {
   "client": "<client type>",
-  "networks: ["<network>"],
+  "networks": ["<network>"],
   "environment": {
     "HIVE_xxx": "<value>",
     "HIVE_yyy": "<value>"
