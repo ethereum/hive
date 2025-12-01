@@ -22,8 +22,7 @@ Ethereum Foundation operates a public instance of Hive to check for consensus
 compatibility, peer-to-peer networking spec compliance, and user API support for most
 Ethereum client implementations.
 
-You can find the latest test results at <https://hivetests.ethdevops.io/>
-and <https://hivetests2.ethdevops.io/>.
+You can find the latest test results at <https://hive.ethpandaops.io>.
 
 ## Overview of available simulators
 

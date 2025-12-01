@@ -3,4 +3,6 @@
 
 # Ignore any local build artifacts and runtime caches
 hive
+hivechain
+hiveview
 workspace
