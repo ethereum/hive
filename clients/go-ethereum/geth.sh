@@ -137,11 +137,6 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 
-# Configure LES.
-if [ "$HIVE_LES_SERVER" == "1" ]; then
-  FLAGS="$FLAGS --light.serve 50 --light.nosyncserve"
-fi
-
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,txpool,web3"
