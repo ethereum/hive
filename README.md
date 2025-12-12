@@ -6,11 +6,10 @@ Ethereum Foundation maintains two public Hive instances to check for consensus, 
 blockchain compatibility:
 
 - eth1 consensus, EngineAPI, RPC tests, graphql and p2p tests are on <https://hive.ethpandaops.io>
- 
 
 **To read more about hive, please check [the documentation][doc].**
 
-### Trophies
+## Trophies
 
 If you find a bug in your client implementation due to this project, please be so kind as
 to add it here to the trophy list. It could help prove that `hive` is indeed a useful tool
@@ -33,7 +32,7 @@ for validating Ethereum client implementations.
   - Bug in Bonsai Archive mode when storage to delete could be null: [#8434](https://github.com/hyperledger/besu/pull/8434)
   - Bug in estimating gas - if no gas params set, tx was being estimated as a FRONTIER tx but should be 1559 [#8472](https://github.com/hyperledger/besu/pull/8472)
 
-### Contributions
+## Contributions
 
 This project takes a different approach to code contributions than your usual FOSS project
 with well ingrained maintainers and relatively few external contributors. It is an

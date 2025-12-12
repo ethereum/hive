@@ -53,20 +53,25 @@ specifically for the Go modules copied into the docker build.
 Example:
 
 `/simulators/my-simulator/hive_context.txt`:
-```
+
+```text
 ../..
 ```
+
 `/simulators/my-simulator/hive.go.work`:
-```
+
+```go
 go 1.18
 
 use (
-	./my-shared-code
-	./my-simulator
+    ./my-shared-code
+    ./my-simulator
 )
 ```
+
 `/simulators/my-simulator/Dockerfile`:
-```Dockerfile
+
+```dockerfile
 # ...
 ADD ./simulators/my-simulator/hive.go.work /source/go.work
 ADD ./my-shared-code /source/my-shared-code
@@ -75,14 +80,16 @@ WORKDIR /source/my-simulator
 RUN go build -v .
 # ...
 ```
+
 `/go.work`:
-```
+
+```go
 go 1.18
 
 use (
-	// ... -- other go modules in hive
-	./simulators/my-shared-code
-	./simulators/my-simulator
+    // ... -- other go modules in hive
+    ./simulators/my-shared-code
+    ./simulators/my-simulator
 )
 ```
 
@@ -108,49 +115,53 @@ hivesim] for more information about writing simulators in Go.
 Simulators are contained in the hive repository as independent Go modules. To create one,
 first create a new subdirectory in `./simulators` and initialize a Go module there:
 
-    mkdir ./simulators/ethereum/my-simulation
-    cd ./simulators/ethereum/my-simulation
-    go mod init github.com/ethereum/hive/simulators/ethereum/my-simulation
-    go get github.com/ethereum/hive/hivesim@latest
+```bash
+mkdir ./simulators/ethereum/my-simulation
+cd ./simulators/ethereum/my-simulation
+go mod init github.com/ethereum/hive/simulators/ethereum/my-simulation
+go get github.com/ethereum/hive/hivesim@latest
+```
 
 Now create the simulator program file `my-simulation.go`.
 
-    package main
+```go
+package main
 
-    import "github.com/ethereum/hive/hivesim"
+import "github.com/ethereum/hive/hivesim"
 
-    func main() {
-        suite := hivesim.Suite{
-            Name:        "my-suite",
-            Description: "This test suite performs some tests.",
-        }
-        // add a plain test (does not run a client)
-        suite.Add(hivesim.TestSpec{
-            Name:        "the-test",
-            Description: "This is an example test case.",
-            Run: runMyTest,
-        })
-        // add a client test (starts the client)
-        suite.Add(hivesim.ClientTestSpec{
-            Name:        "the-test-2",
-            Description: "This is an example test case.",
-            Files: map[string]string{"/genesis.json": "genesis.json"},
-            Run: runMyClientTest,
-        })
-
-        // Run the tests. This waits until all tests of the suite
-        // have executed.
-        hivesim.MustRunSuite(hivesim.New(), suite)
+func main() {
+    suite := hivesim.Suite{
+        Name:        "my-suite",
+        Description: "This test suite performs some tests.",
     }
+    // add a plain test (does not run a client)
+    suite.Add(hivesim.TestSpec{
+        Name:        "the-test",
+        Description: "This is an example test case.",
+        Run: runMyTest,
+    })
+    // add a client test (starts the client)
+    suite.Add(hivesim.ClientTestSpec{
+        Name:        "the-test-2",
+        Description: "This is an example test case.",
+        Files: map[string]string{"/genesis.json": "genesis.json"},
+        Run: runMyClientTest,
+    })
+
+    // Run the tests. This waits until all tests of the suite
+    // have executed.
+    hivesim.MustRunSuite(hivesim.New(), suite)
+}
 
 
-    func runMyTest(t *hivesim.T) {
-        // write your test code here
-    }
+func runMyTest(t *hivesim.T) {
+    // write your test code here
+}
 
-    func runMyClientTest(t *hivesim.T, c *hivesim.Client) {
-        // write your test code here
-    }
+func runMyClientTest(t *hivesim.T, c *hivesim.Client) {
+    // write your test code here
+}
+```
 
 ### Generating Test Case Documentation
 
@@ -172,19 +183,19 @@ all the test suites will be included, along with the links to all test suite mar
 For every test suite a `TESTS-<Suite Name>.md` file will be generated, containing the listing of
 all test cases included in the suite.
 
-The `Location` field of the `hivesim.Suite` can be used to specify a subdirectory where the 
+The `Location` field of the `hivesim.Suite` can be used to specify a subdirectory where the
 markdown file for this given suite will be placed.
 
 The `Category` field of `hivesim.TestSpec` or `hivesim.ClientTestSpec` can be used to generate
 test categories in which the test cases will be grouped for readability purposes.
 
 The following environment variables can be used to configure document generation:
+
 - `HIVE_DOCS_MODE`: Enable test case documentation generation (set to "true").
 - `HIVE_SIMULATOR_NAME`: Name of the simulator for which the documentation is being generated.
 If unset, the path of the simulator executable will be used to parse the simulator's name.
 - `HIVE_DOCS_OUTPUT_DIR`: Output root directory for all generated markdown files.
 If unset, the current working directory will be used.
-
 
 ### Creating the Dockerfile
 
@@ -196,17 +207,19 @@ found in the `simulators/devp2p/init/` directory. You can copy an existing genes
 or create your own. Make sure to add all support files to container in the Dockerfile. The
 Dockerfile might look like this:
 
-    FROM golang:1-alpine AS builder
-    RUN apk --no-cache add gcc musl-dev linux-headers
-    ADD . /source
-    WORKDIR /source
-    RUN go build -o ./sim .
+```dockerfile
+FROM golang:1-alpine AS builder
+RUN apk --no-cache add gcc musl-dev linux-headers
+ADD . /source
+WORKDIR /source
+RUN go build -o ./sim .
 
-    # Build the runner container.
-    FROM alpine:latest
-    ADD . /
-    COPY --from=builder /source/sim /
-    ENTRYPOINT ["./sim"]
+# Build the runner container.
+FROM alpine:latest
+ADD . /
+COPY --from=builder /source/sim /
+ENTRYPOINT ["./sim"]
+```
 
 You can test this build by running `docker build .` in the simulator directory.
 
@@ -214,7 +227,9 @@ You can test this build by running `docker build .` in the simulator directory.
 
 Finally, go back to the root of the repository (`cd ../../..`) and run the simulation.
 
-    ./hive --sim my-simulation --client go-ethereum,besu
+```bash
+./hive --sim my-simulation --client go-ethereum,besu
+```
 
 You can check the results using [hiveview].
 
@@ -226,68 +241,88 @@ endpoints consume and respond with payloads of type `application/json`.
 When there is an error, the response will have a non 2xx status code and a response
 body containing JSON like:
 
-    {"error": "error message here"}
+```json
+{"error": "error message here"}
+```
 
 ### Suite and Test Case Endpoints
 
 #### Creating a test suite
 
-    POST /testsuite
-    content-type: application/json
+```http
+POST /testsuite
+content-type: application/json
 
-    {"name": "test-suite-name", "description": "this suite does..."}
+{"name": "test-suite-name", "description": "this suite does..."}
+```
 
 This request signals the start of a test suite. The API responds with a test suite ID.
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    1
+1
+```
 
 #### Ending a test suite
 
-    DELETE /testsuite/{suite}
+```http
+DELETE /testsuite/{suite}
+```
 
 This request ends a test suite. The simulator must end all running test cases before
 ending the test suite.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 #### Creating a test case
 
-    POST /testsuite/{suite}/test
-    content-type: application/json
+```http
+POST /testsuite/{suite}/test
+content-type: application/json
 
-    {"name": "test case name", "description": "..."}
+{"name": "test case name", "description": "..."}
+```
 
 The API responds with a test case ID.
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    2
+2
+```
 
 #### Ending a test case
 
-    POST /testsuite/{suite}/test/{test}
-    content-type: application/json
+```http
+POST /testsuite/{suite}/test/{test}
+content-type: application/json
 
-    {"pass": true, "details": "this is the test output"}
+{"pass": true, "details": "this is the test output"}
+```
 
 This request reports the result of a test case and ends the test case. Clients launched in
 the context of the test case are terminated by this request.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 ### Working with clients
 
 #### Getting available client types
 
-    GET /clients
+```http
+GET /clients
+```
 
 This returns a JSON array of client definitions available to the simulation run. Clients
 have a `name`, `version`, and `meta` for metadata as defined in the [client interface
@@ -295,64 +330,70 @@ documentation].
 
 Response
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    [
-      {
-        "name": "go-ethereum",
-        "version": "Geth/v1.10.0-unstable-8e547eec-20210224/linux-amd64/go1.16",
-        "meta": {
-          "roles": [
-            "eth1"
-          ]
-        }
-      },
-      {
-        "name": "besu",
-        "version": "besu/v21.1.1-dev-f1c74ed2/linux-x86_64/oracle_openjdk-java-11",
-        "meta": {
-          "roles": [
-            "eth1"
-          ]
-        }
-      }
-    ]
+[
+  {
+    "name": "go-ethereum",
+    "version": "Geth/v1.10.0-unstable-8e547eec-20210224/linux-amd64/go1.16",
+    "meta": {
+      "roles": [
+        "eth1"
+      ]
+    }
+  },
+  {
+    "name": "besu",
+    "version": "besu/v21.1.1-dev-f1c74ed2/linux-x86_64/oracle_openjdk-java-11",
+    "meta": {
+      "roles": [
+        "eth1"
+      ]
+    }
+  }
+]
+```
 
 #### Starting a client container
 
-    POST /testsuite/{suite}/test/{test}/node
-    content-type: multipart/form-data; boundary=--boundary--
+```http
+POST /testsuite/{suite}/test/{test}/node
+content-type: multipart/form-data; boundary=--boundary--
 
-    --boundary--
-    content-disposition: form-data; name=config
+--boundary--
+content-disposition: form-data; name=config
 
-    {
-      "client": "go-ethereum_latest",
-      "environment": {"HIVE_CHAIN_ID": "8"}
-    }
-    --boundary--
-    content-disposition: form-data; name=/genesis.json; filename=genesis.json
+{
+  "client": "go-ethereum_latest",
+  "environment": {"HIVE_CHAIN_ID": "8"}
+}
+--boundary--
+content-disposition: form-data; name=/genesis.json; filename=genesis.json
 
-    {
-      "difficulty": "0x20000",
-      "gasLimit": "0xFFFFFFFF",
-      ...
-    }
-    --boundary----
+{
+  "difficulty": "0x20000",
+  "gasLimit": "0xFFFFFFFF",
+  ...
+}
+--boundary----
+```
 
 This request starts a client container. Unlike with other requests, this request must be
 encoded as multipart/form-data. The `config` form parameter contains a client launch
 configuration:
 
-    {
-      "client": "<client type>",
-      "networks: ["<network>"],
-      "environment": {
-        "HIVE_xxx": "<value>",
-        "HIVE_yyy": "<value>"
-      }
-    }
+```json
+{
+  "client": "<client type>",
+  "networks": ["<network>"],
+  "environment": {
+    "HIVE_xxx": "<value>",
+    "HIVE_yyy": "<value>"
+  }
+}
+```
 
 The `"client"` field is mandatory and gives the client type to be started. It must match
 one of the names returned by the `/clients` endpoint.
@@ -373,85 +414,109 @@ This is because multipart/form-data does not support specifying directory compon
 
 Response:
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    {"id": "<container-id>", "ip": "172.1.2.4"}
+{"id": "<container-id>", "ip": "172.1.2.4"}
+```
 
 #### Getting client information
 
-    GET /testsuite/{suite}/test/{test}/node/{container}
+```http
+GET /testsuite/{suite}/test/{test}/node/{container}
+```
 
 This request returns basic information about a running client.
 
 Response:
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    {"id":"abcdef1234","name":"go-ethereum_latest"}
+{"id":"abcdef1234","name":"go-ethereum_latest"}
+```
 
 #### Running client scripts
 
-    POST /testsuite/{suite}/test/{test}/node/{container}/exec
-    content-type: application/json
+```http
+POST /testsuite/{suite}/test/{test}/node/{container}/exec
+content-type: application/json
 
-    {
-      "command": ["my-script", "arg1"]
-    }
+{
+  "command": ["my-script", "arg1"]
+}
+```
 
 This request invokes a script in the client container. The script must be present in the
 client container's filesystem in the `/hive-bin` directory.
 
 Response:
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    {
-      "exitCode": 0,
-      "stdout": "output",
-      "stderr": "error output"
-    }
+{
+  "exitCode": 0,
+  "stdout": "output",
+  "stderr": "error output"
+}
+```
 
 #### Stopping a client
 
-    DELETE /testsuite/{suite}/test/{test}/node/{container}
+```http
+DELETE /testsuite/{suite}/test/{test}/node/{container}
+```
 
 This terminates the given client container immediately. Using this endpoint is usually not
 required because all clients associated with a test will be shut down when the test ends.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 ### Networks
 
 #### Creating a network
 
-    POST /testsuite/{suite}/network/{network}
+```http
+POST /testsuite/{suite}/network/{network}
+```
 
 This request creates a network. Unlike with other APIs, networks do not have IDs. Instead,
 the network name is assigned by the simulator.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 #### Removing a network
 
-    DELETE /testsuite/{suite}/network/{network}
+```http
+DELETE /testsuite/{suite}/network/{network}
+```
 
 This request removes a network. Note: the request will fail if any containers are still
 connected to the network.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 #### Connecting containers to a network
 
-    POST /testsuite/{suite}/network/{network}/{container}
+```http
+POST /testsuite/{suite}/network/{network}/{container}
+```
 
 This request connects a client container to a network. You can use any client container ID
 as the `container`. You can also use `"simulation"` as the container ID, in which case the
@@ -459,31 +524,41 @@ container running the simulator will be connected.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 #### Disconnecting a container from a network
 
-    DELETE /testsuite/{suite}/network/{network}/{container}
+```http
+DELETE /testsuite/{suite}/network/{network}/{container}
+```
 
 This request disconnects a container from a network. As with the connect request, use any
 client container ID or `"simulation"` as the `container` value.
 
 Response:
 
-    200 OK
+```http
+200 OK
+```
 
 #### Getting the client IP
 
-    GET /testsuite/{suite}/network/{network}/{container}
+```http
+GET /testsuite/{suite}/network/{network}/{container}
+```
 
 This returns the IP of a container on the given network.
 
 Response:
 
-    200 OK
-    content-type: application/json
+```http
+200 OK
+content-type: application/json
 
-    "172.22.0.2"
+"172.22.0.2"
+```
 
 [client interface documentation]: ./clients.md
 [package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
