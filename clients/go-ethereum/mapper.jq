@@ -31,7 +31,7 @@ def to_bool:
 # Replace config in input.
 . + {
   "config": {
-    "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),/
+    "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
     "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
       "period": env.HIVE_CLIQUE_PERIOD|to_int,
     } end),
