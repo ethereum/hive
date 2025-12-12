@@ -49,6 +49,7 @@ type GethNodeTestConfiguration struct {
 	// Chain to import
 	ChainFile string
 }
+
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
 	ChainFile string
@@ -344,9 +345,7 @@ func encodeBlockNumber(number uint64) []byte {
 }
 
 func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
-	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
 	db := n.eth.ChainDb()
-	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(db, block)
 
 	// write real info (fixes fake number test)
@@ -367,7 +366,6 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	if err != nil {
 		return errors.Wrap(err, "failed to create state db")
 	}
-	statedb.StartPrefetcher("chain", nil)
 	var failedProcessing bool
 	result, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
 	if err != nil || result == nil {
@@ -375,7 +373,7 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	} else {
 		rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), result.Receipts)
 	}
-	root, err := statedb.Commit(block.NumberU64(), false)
+	root, err := statedb.Commit(block.NumberU64(), false, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to commit state")
 	}

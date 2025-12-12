@@ -63,7 +63,7 @@ func PeerEngineClient(engine client.EngineClient, consensusEngine *clmock.CLMock
 		return nil, fmt.Errorf("error dialing enode: %v", err)
 	}
 
-	if err = conn.Peer(nil); err != nil {
+	if err = conn.Peer(); err != nil {
 		return nil, err
 	}
 	return conn, nil
@@ -95,11 +95,9 @@ func (d *P2PDest) Dial() (*Conn, error) {
 	conn.remoteKey = pubKey
 	// set default p2p capabilities
 	conn.caps = []p2p.Cap{
-		{Name: "eth", Version: 66},
-		{Name: "eth", Version: 67},
-		{Name: "eth", Version: 68},
+		{Name: "eth", Version: 69},
 	}
-	conn.ourHighestProtoVersion = 68
+	conn.ourHighestProtoVersion = 69
 	return &conn, nil
 }
 

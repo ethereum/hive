@@ -124,7 +124,7 @@ type BlobsBundle struct {
 	Proofs      []KZGProof      `json:"proofs"      gencodec:"required"`
 }
 
-func (bb *BlobsBundle) FromBeaconBlobsBundle(src *beacon.BlobsBundleV1) error {
+func (bb *BlobsBundle) FromBeaconBlobsBundle(src *beacon.BlobsBundle) error {
 	if src == nil {
 		return errors.New("nil blobs bundle")
 	}

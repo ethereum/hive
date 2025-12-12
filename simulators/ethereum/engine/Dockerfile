@@ -1,5 +1,5 @@
 # This simulation runs Engine API tests.
-FROM golang:1.22-alpine as builder
+FROM golang:1.25-alpine as builder
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY}
 

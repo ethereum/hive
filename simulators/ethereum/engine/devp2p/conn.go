@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -86,7 +85,7 @@ func (msg Pong) Code() int     { return 0x03 }
 func (msg Pong) ReqID() uint64 { return 0 }
 
 // Status is the network packet for the status message for eth/64 and later.
-type Status eth.StatusPacket
+type Status eth.StatusPacket69
 
 func (msg Status) Code() int     { return 16 }
 func (msg Status) ReqID() uint64 { return 0 }
@@ -272,11 +271,11 @@ func (c *Conn) Write(msg Message) (uint32, error) {
 
 // peer performs both the protocol handshake and the status message
 // exchange with the node in order to peer with it.
-func (c *Conn) Peer(status *Status) error {
+func (c *Conn) Peer() error {
 	if err := c.handshake(); err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
 	}
-	if _, err := c.statusExchange(status); err != nil {
+	if _, err := c.statusExchange(); err != nil {
 		return fmt.Errorf("status exchange failed: %v", err)
 	}
 	return nil
@@ -343,10 +342,11 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 }
 
 // statusExchange performs a `Status` message exchange with the given node.
-func (c *Conn) statusExchange(status *Status) (Message, error) {
+func (c *Conn) statusExchange() (Message, error) {
 	defer c.SetDeadline(time.Time{})
 	c.SetDeadline(time.Now().Add(20 * time.Second))
 	localForkID := c.consensusEngine.ForkID()
+
 	// read status message from client
 	var message Message
 loop:
@@ -357,7 +357,7 @@ loop:
 		}
 		switch msg := msg.(type) {
 		case *Status:
-			if have, want := msg.Head, c.consensusEngine.LatestHeader.Hash(); have != want {
+			if have, want := msg.LatestBlockHash, c.consensusEngine.LatestHeader.Hash(); have != want {
 				return nil, fmt.Errorf("wrong head block in status, want:  %#x (block %d) have %#x",
 					want, c.consensusEngine.LatestHeader.Number.Uint64(), have)
 			}
@@ -378,20 +378,19 @@ loop:
 			return nil, fmt.Errorf("bad status message: %s", pretty.Sdump(msg))
 		}
 	}
+
 	// make sure eth protocol version is set for negotiation
 	if c.negotiatedProtoVersion == 0 {
 		return nil, errors.New("eth protocol version must be set in Conn")
 	}
-	if status == nil {
-		// default status message
-		status = &Status{
-			ProtocolVersion: uint32(c.negotiatedProtoVersion),
-			NetworkID:       c.consensusEngine.Genesis.Config.ChainID.Uint64(),
-			TD:              c.consensusEngine.ChainTotalDifficulty,
-			Head:            c.consensusEngine.LatestHeader.Hash(),
-			Genesis:         c.consensusEngine.GenesisBlock().Hash(),
-			ForkID:          localForkID,
-		}
+	// default status message
+	status := &Status{
+		ProtocolVersion: uint32(c.negotiatedProtoVersion),
+		NetworkID:       c.consensusEngine.Genesis.Config.ChainID.Uint64(),
+		LatestBlock:     c.consensusEngine.LatestHeader.Number.Uint64(),
+		LatestBlockHash: c.consensusEngine.LatestHeader.Hash(),
+		Genesis:         c.consensusEngine.GenesisBlock().Hash(),
+		ForkID:          localForkID,
 	}
 	if _, err := c.Write(status); err != nil {
 		return nil, fmt.Errorf("write to connection failed: %v", err)
@@ -430,30 +429,6 @@ func (c *Conn) readAndServe(timeout time.Duration) (Message, error) {
 		}
 	}
 	return nil, errorf("no message received within %v", timeout)
-}
-
-// headersRequest executes the given `GetBlockHeaders` request.
-func (c *Conn) headersRequest(request *GetBlockHeaders, reqID uint64) ([]*types.Header, error) {
-	defer c.SetReadDeadline(time.Time{})
-	c.SetReadDeadline(time.Now().Add(20 * time.Second))
-
-	// write request
-	request.RequestId = reqID
-	if _, err := c.Write(request); err != nil {
-		return nil, fmt.Errorf("could not write to connection: %v", err)
-	}
-
-	// wait for response
-	msg, err := c.WaitForResponse(timeout, request.RequestId)
-	if err != nil {
-		return nil, err
-	}
-	resp, ok := msg.(*BlockHeaders)
-	if !ok {
-		return nil, fmt.Errorf("unexpected message received: %s", pretty.Sdump(msg))
-	}
-	headers := []*types.Header(resp.BlockHeadersRequest)
-	return headers, nil
 }
 
 // WaitForResponse reads from the connection until a response with the expected
