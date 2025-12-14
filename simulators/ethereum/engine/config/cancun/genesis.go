@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // ConfigGenesis configures the genesis block for the Cancun fork.
@@ -17,6 +18,13 @@ func ConfigGenesis(genesis *core.Genesis, forkTimestamp uint64) error {
 	genesis.Config.CancunTime = &forkTimestamp
 	if *genesis.Config.ShanghaiTime > forkTimestamp {
 		return fmt.Errorf("cancun fork must be after shanghai fork")
+	}
+	genesis.Config.BlobScheduleConfig = &params.BlobScheduleConfig{
+		Cancun: &params.BlobConfig{
+			Target:         3,
+			Max:            6,
+			UpdateFraction: 3338477,
+		},
 	}
 	if genesis.Timestamp >= forkTimestamp {
 		if genesis.BlobGasUsed == nil {
