@@ -156,7 +156,9 @@ if [ "$HIVE_ALLOW_UNPROTECTED_TX" != "" ]; then
 fi
 
 # Run the go-ethereum implementation with the requested flags.
-FLAGS="$FLAGS --nat=none"
+ip=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+FLAGS="$FLAGS --nat=extip:$ip"
+
 # Disable disk space free monitor
 FLAGS="$FLAGS --datadir.minfreedisk=0"
 echo "Running go-ethereum with flags $FLAGS"
