@@ -152,9 +152,6 @@ Execution-layer clients with an implementation of the [snap] protocol should sup
 |----------------------------|---------------|------------------------------------------------|
 | `HIVE_NODETYPE`            | "snap"        | forces the node to use snap sync               |
 
-
-
-
 [snap]: https://github.com/ethereum/devp2p/blob/master/caps/snap.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
 [hive-client-yaml]: ./commandline.md#client-build-parameters
