@@ -10,13 +10,25 @@
   "JsonRpc": {
     "Enabled": true,
     "Host": "0.0.0.0",
-    "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Rpc"]
-  },
+    "EnabledModules": [
+      "Debug",
+      "Eth",
+      "Subscribe",
+      "Trace",
+      "TxPool",
+      "Web3",
+      "Personal",
+      "Proof",
+      "Net",
+      "Parity",
+      "Health",
+      "Rpc"
+    ]
   },
   "Network": {
     "DiscoveryPort": 30303,
     "P2PPort": 30303,
-    "ExternalIp": "127.0.0.1",
+    "ExternalIp": "127.0.0.1"
   },
   "Hive": {
     "ChainFile": "/chain.rlp",

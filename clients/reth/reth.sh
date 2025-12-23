@@ -153,8 +153,8 @@ if [ -n "${HIVE_CLIQUE_PRIVATEKEY}" ] || [ -n "${HIVE_CLIQUE_PERIOD}" ]; then
 fi
 
 # Configure RPC.
-FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
-FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,trace,eth,net,web3"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,trace,eth,net,web3"
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
