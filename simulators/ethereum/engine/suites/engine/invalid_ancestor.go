@@ -497,7 +497,7 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 							}
 
 							if err := secondaryClient.SetBlock(block, previousPayload.Number, previousPayload.StateRoot); err != nil {
-								t.Fatalf("FAIL (%s): TEST ISSUE - Failed to set invalid block: %v", t.TestName, err)
+								t.Fatalf("FAIL (%s): TEST ISSUE - Failed to reset to valid chain block: %v", t.TestName, err)
 							}
 						}
 					}
