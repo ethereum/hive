@@ -400,7 +400,7 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	}
 
 	if _, err := bc.SetCanonical(block); err != nil {
-		panic(err)
+		return err
 	}
 	// Restore processor
 	if failedProcessing {

@@ -713,7 +713,11 @@ func (cl *CLMocker) BroadcastNewPayload(ed *typ.ExecutableData, version int) []E
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)
 			responses[i].Error = err
 		} else {
-			cl.Logf("CLMocker: Executed payload on %s: %v", ec.ID(), execPayloadResp)
+			if execPayloadResp.ValidationError == nil {
+				cl.Logf("CLMocker: Executed payload on %s: status=%s, latestValidHash=%v, validationError=<nil>", ec.ID(), execPayloadResp.Status, execPayloadResp.LatestValidHash)
+			} else {
+				cl.Logf("CLMocker: Executed payload on %s: status=%s, latestValidHash=%v, validationError=%s", ec.ID(), execPayloadResp.Status, execPayloadResp.LatestValidHash, *execPayloadResp.ValidationError)
+			}
 			responses[i].ExecutePayloadResponse = &execPayloadResp
 		}
 	}
