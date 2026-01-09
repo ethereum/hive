@@ -505,6 +505,16 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	return newCaseID, nil
 }
 
+// logFileSize returns the current size of a log file in bytes.
+// Returns 0 if the file doesn't exist or cannot be read.
+func logFileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
+
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
@@ -532,6 +542,15 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.LogOffsets = offsets
 	}
 	testCase.SummaryResult = *result
+
+	// Capture log end offsets for all clients before stopping them.
+	// This enables log filtering when a client serves multiple tests.
+	for _, v := range testCase.ClientInfo {
+		if v.LogOffsets != nil && manager.config.LogDir != "" {
+			logFilePath := filepath.Join(manager.config.LogDir, filepath.FromSlash(v.LogFile))
+			v.LogOffsets.End = logFileSize(logFilePath)
+		}
+	}
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {

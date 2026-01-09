@@ -296,12 +296,15 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Start it!
 	info, err := api.backend.StartContainer(ctx, containerID, options)
 	if info != nil {
+		// Capture the current log file size as the starting offset for this test.
+		logBegin := logFileSize(logFilePath)
 		clientInfo := &ClientInfo{
 			ID:             info.ID,
 			IP:             info.IP,
 			Name:           clientDef.Name,
 			InstantiatedAt: time.Now(),
 			LogFile:        logPath,
+			LogOffsets:     &TestLogOffsets{Begin: logBegin},
 			wait:           info.Wait,
 		}
 
