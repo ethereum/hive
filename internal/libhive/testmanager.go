@@ -173,6 +173,18 @@ func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuit
 	return suite, ok
 }
 
+// IsTestInSuite checks if a test belongs to the given running suite.
+func (manager *TestManager) IsTestInSuite(testSuite TestSuiteID, test TestID) (*TestCase, bool) {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+	suite, ok := manager.runningTestSuites[testSuite]
+	if !ok {
+		return nil, false
+	}
+	tc, ok := suite.TestCases[test]
+	return tc, ok
+}
+
 // IsTestRunning checks if the test is still running and returns it if so.
 func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 	manager.testCaseMutex.RLock()
