@@ -327,9 +327,18 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
     for (let instanceID in clientInfo) {
         let instanceInfo = clientInfo[instanceID];
         let logfile = routes.resultsRoot + instanceInfo.logFile;
-        let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+        let url = routes.clientLog(
+            suiteData.suiteID,
+            suiteData.name,
+            testIndex,
+            logfile,
+            instanceInfo.logOffsets  // Pass byte offsets if available
+        );
         let link = html.makeLink(url, instanceInfo.name);
         link.classList.add('log-link');
+        if (instanceInfo.logOffsets) {
+            link.title = `Filtered: bytes ${instanceInfo.logOffsets.begin}-${instanceInfo.logOffsets.end}`;
+        }
         links.push(link.outerHTML);
     }
     return links.join(', ');

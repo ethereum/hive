@@ -18,6 +18,18 @@ $(document).ready(function () {
         line = parseInt(window.location.hash.substr(2));
     }
 
+    // Check for byte range parameters (for multi-test client log highlighting).
+    let byteBegin = queryParam('begin');
+    let byteEnd = queryParam('end');
+    let byteRange = null;
+    if (byteBegin !== null && byteEnd !== null) {
+        let begin = parseInt(byteBegin, 10);
+        let end = parseInt(byteEnd, 10);
+        if (!isNaN(begin) && !isNaN(end)) {
+            byteRange = { begin, end };
+        }
+    }
+
     // Get suite context.
     let suiteFile = queryParam('suiteid');
     let suiteName = queryParam('suitename');
@@ -42,7 +54,7 @@ $(document).ready(function () {
     if (file) {
         $('#fileload').val(file);
         showText('Loading file...');
-        fetchFile(file, line);
+        fetchFile(file, line, byteRange);
         return;
     }
 
@@ -50,27 +62,31 @@ $(document).ready(function () {
     showText(document.getElementById('exampletext').innerHTML);
 });
 
-// setHL sets the highlight on a line number.
-function setHL(num, scroll) {
+// setHL sets the highlight on a line number or range.
+function setHL(startNum, scroll, endNum) {
     // out with the old
     $('.highlighted').removeClass('highlighted');
-    if (!num) {
+    if (!startNum) {
         return;
     }
 
     let contentArea = document.getElementById('file-content');
     let gutter = document.getElementById('gutter');
-    let numElem = gutter.children[num - 1];
-    if (!numElem) {
-        console.error('invalid line number:', num);
-        return;
+    endNum = endNum || startNum;  // Single line if no end specified
+
+    for (let num = startNum; num <= endNum; num++) {
+        let numElem = gutter.children[num - 1];
+        let lineElem = contentArea.children[num - 1];
+        if (numElem) $(numElem).addClass('highlighted');
+        if (lineElem) $(lineElem).addClass('highlighted');
     }
-    // in with the new
-    let lineElem = contentArea.children[num - 1];
-    $(numElem).addClass('highlighted');
-    $(lineElem).addClass('highlighted');
+
     if (scroll) {
-        numElem.scrollIntoView();
+        let contextLines = 5;  // Show a few lines before the highlight for context.
+        let scrollTarget = Math.max(0, startNum - 1 - contextLines);
+        if (gutter.children[scrollTarget]) {
+            gutter.children[scrollTarget].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 }
 
@@ -168,7 +184,7 @@ function lineNumberClicked() {
 }
 
 // fetchFile loads up a new file to view
-async function fetchFile(url, line /* optional jump to line */ ) {
+async function fetchFile(url, line, byteRange) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
     let text;
     try {
@@ -181,7 +197,42 @@ async function fetchFile(url, line /* optional jump to line */ ) {
     let title = url.replace(resultsRE, '');
     showTitle(null, title);
     showText(text);
-    setHL(line, true);
+
+    // Highlight byte range if provided, otherwise use line number
+    if (byteRange) {
+        let lineRange = byteRangeToLineNumbers(text, byteRange);
+        setHL(lineRange.start, true, lineRange.end);
+    } else {
+        setHL(line, true);
+    }
+}
+
+// byteRangeToLineNumbers converts byte offsets to line numbers.
+// Encodes text to UTF-8 bytes once, then counts newlines (0x0A) directly.
+// The range [begin, end) is exclusive on end, so a trailing newline at
+// position end-1 does not extend the highlight into the next line.
+function byteRangeToLineNumbers(text, byteRange) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(text);
+
+    let startLine = 1, endLine = 1, foundStart = false;
+    const newlineByte = 0x0A;  // '\n' in UTF-8
+
+    for (let bytePos = 0; bytePos < bytes.length && bytePos < byteRange.end; bytePos++) {
+        if (!foundStart && bytePos >= byteRange.begin) {
+            startLine = endLine;
+            foundStart = true;
+        }
+        if (bytes[bytePos] === newlineByte) {
+            endLine++;
+        }
+    }
+    // If end falls right after a newline, the line counter has already been
+    // bumped to the next line which belongs to the following test. Back up.
+    if (byteRange.end > 0 && byteRange.end <= bytes.length && bytes[byteRange.end - 1] === newlineByte) {
+        endLine = Math.max(startLine, endLine - 1);
+    }
+    return { start: startLine, end: endLine };
 }
 
 // fetchTestLog loads the suite file and displays the output of a test.
