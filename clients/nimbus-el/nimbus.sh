@@ -86,9 +86,8 @@ fi
 set +e
 
 # Load the test chain if present
-RLPFILES=""
 if [ -f /chain.rlp ]; then
-  RLPFILES="$RLPFILES /chain.rlp"
+  FLAGS="$FLAGS --debug-bootstrap-blocks-file:/chain.rlp"
 else
   echo "Warning: chain.rlp not found."
 fi
@@ -96,13 +95,11 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  RLPFILES="$RLPFILES $(ls /blocks | sort -n | sed 's|^|/blocks/|')"
+  for f in $(ls /blocks | sort -n); do
+    FLAGS="$FLAGS --debug-bootstrap-blocks-file:/blocks/$f"
+  done
 else
   echo "Warning: blocks folder not found."
-fi
-
-if [ -n "$RLPFILES" ]; then
-  FLAGS="$FLAGS --debug-bootstrap-blocks-file:$RLPFILES"
 fi
 
 set -e
