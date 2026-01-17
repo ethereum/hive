@@ -102,7 +102,7 @@ else
 fi
 
 if [ -n "$RLPFILES" ]; then
-  FLAGS="$FLAGS --bootstrap-blocks-file:$RLPFILES"
+  FLAGS="$FLAGS --debug-bootstrap-blocks-file:$RLPFILES"
 fi
 
 set -e
