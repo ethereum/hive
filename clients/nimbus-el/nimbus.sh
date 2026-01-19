@@ -48,7 +48,7 @@
 set -e
 
 nimbus=/usr/bin/nimbus_execution_client
-FLAGS="--nat:extip:0.0.0.0 "
+FLAGS="--nat:extip:0.0.0.0 --debug-dynamic-batch-size:true"
 
 loglevel=DEBUG
 case "$HIVE_LOGLEVEL" in
@@ -86,11 +86,8 @@ fi
 set +e
 
 # Load the test chain if present
-echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-  CMD="import-rlp /chain.rlp"
-  echo "Running nimbus: $nimbus $CMD $FLAGS"
-  $nimbus $CMD $FLAGS
+  FLAGS="$FLAGS --debug-bootstrap-blocks-file:/chain.rlp"
 else
   echo "Warning: chain.rlp not found."
 fi
@@ -98,7 +95,9 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && $nimbus import-rlp `ls | sort -n` $FLAGS)
+  for f in $(ls /blocks | sort -n); do
+    FLAGS="$FLAGS --debug-bootstrap-blocks-file:/blocks/$f"
+  done
 else
   echo "Warning: blocks folder not found."
 fi
