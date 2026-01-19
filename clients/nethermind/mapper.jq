@@ -210,13 +210,13 @@ def clique_engine:
           "timestamp": env.HIVE_BPO1_TIMESTAMP|to_hex,
           "target": (if env.HIVE_BPO1_BLOB_TARGET then env.HIVE_BPO1_BLOB_TARGET|to_hex else "0xa" end),
           "max": (if env.HIVE_BPO1_BLOB_MAX then env.HIVE_BPO1_BLOB_MAX|to_hex else "0xf" end),
-          "baseFeeUpdateFraction": (if env.HIVE_BPO1_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO1_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x7f60d1" end)
+          "baseFeeUpdateFraction": (if env.HIVE_BPO1_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO1_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0x7f5a51" end)
       } else null end,
       if env.HIVE_BPO2_TIMESTAMP then {
           "timestamp": env.HIVE_BPO2_TIMESTAMP|to_hex,
           "target": (if env.HIVE_BPO2_BLOB_TARGET then env.HIVE_BPO2_BLOB_TARGET|to_hex else "0xe" end),
           "max": (if env.HIVE_BPO2_BLOB_MAX then env.HIVE_BPO2_BLOB_MAX|to_hex else "0x15" end),
-          "baseFeeUpdateFraction": (if env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0xb2543f" end)
+          "baseFeeUpdateFraction": (if env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION|to_hex else "0xb24b3f" end)
       } else null end,
       if env.HIVE_BPO3_TIMESTAMP then {
           "timestamp": env.HIVE_BPO3_TIMESTAMP|to_hex,
