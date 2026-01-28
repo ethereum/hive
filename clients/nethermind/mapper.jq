@@ -175,7 +175,11 @@ def clique_engine:
     "eip7934MaxRlpBlockSize": "0x800000",
 
     # Amsterdam
+    "eip7708TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
+    "eip7778TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
+    "eip7843TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
     "eip7928TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
+    "eip8024TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
 
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
