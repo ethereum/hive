@@ -1,7 +1,6 @@
 {
   "Init": {
     "WebSocketsEnabled": false,
-    "IsMining": false,
     "UseMemDb": true,
     "ChainSpecPath": "/chainspec/test.json",
     "BaseDbPath": "nethermind_db/hive",
