@@ -28,7 +28,6 @@ var (
 	Pending                     = big.NewInt(-2)
 	Finalized                   = big.NewInt(-3)
 	Safe                        = big.NewInt(-4)
-	InvalidParamsError          = -32602
 	MAX_INITCODE_SIZE           = 49152
 
 	MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK uint64 = 16
@@ -1180,7 +1179,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					},
 				)
 				r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 
 				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
 				// (CLMock uses V1 by default)
@@ -1216,7 +1215,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				}
 				r := t.TestEngine.TestEngineNewPayloadV2(payloadWithEmptyWithdrawalsList)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 
 				// Send valid ExecutionPayloadV1 using engine_newPayloadV2
 				r = t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
@@ -1270,7 +1269,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					},
 				)
 				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 			}
 
 			// Send some withdrawals
@@ -1312,7 +1311,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				}
 				r := t.TestEngine.TestEngineNewPayloadV2(nilWithdrawalsPayload)
 				r.ExpectationDescription = "Sent shanghai payload using ExecutionPayloadV1, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 
 				// Verify the list of withdrawals returned on the payload built
 				// completely matches the list provided in the
@@ -1950,7 +1949,7 @@ func (req GetPayloadBodyRequestByRange) Verify(_ *rand.Rand, reqIndex int, testE
 			Sent start (%d) or count (%d) to engine_getPayloadBodiesByRangeV1 with a
 			value less than 1, therefore error is expected.
 			`, req.Start, req.Count)
-		r.ExpectErrorCode(InvalidParamsError)
+		r.ExpectErrorCode(*globals.INVALID_PARAMS_ERROR)
 		return
 	}
 	latestPayloadNumber := payloadHistory.LatestPayloadNumber()
