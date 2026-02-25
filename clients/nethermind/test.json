@@ -22,7 +22,8 @@
       "Net",
       "Parity",
       "Health",
-      "Rpc"
+      "Rpc",
+      "Testing"
     ]
   },
   "Network": {

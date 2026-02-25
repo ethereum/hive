@@ -138,13 +138,8 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Configure RPC.
-FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3"
-FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,txpool,web3"
-
-if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
-    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.port=8551 --authrpc.jwtsecret /jwtsecret"
-fi
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3,testing"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,txpool,web3,testing"
 
 # Configure GraphQL.
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
