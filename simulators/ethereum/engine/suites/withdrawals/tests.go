@@ -1256,8 +1256,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		OnPayloadProducerSelected: func() {
 
 			if !ws.SkipBaseVerifications {
-				// Try to send a PayloadAttributesV1 with null withdrawals after
-				// Shanghai
+				// Try to send ForkchoiceUpdatedV2 with nil withdrawals after
+				// Shanghai.
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
@@ -1269,8 +1269,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Withdrawals:           nil,
 					},
 				)
-				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectationDescription = "Sent shanghai ForkchoiceUpdatedV2 with nil withdrawals, error is expected"
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 			}
 
 			// Send some withdrawals
