@@ -1180,7 +1180,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					},
 				)
 				r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 
 				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
 				// (CLMock uses V1 by default)
@@ -1270,7 +1270,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					},
 				)
 				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 			}
 
 			// Send some withdrawals
