@@ -223,6 +223,18 @@ func (manager *TestManager) Terminate() error {
 	return nil
 }
 
+// SetMultiTestContext marks a test case as a multi-test lifecycle owner.
+func (manager *TestManager) SetMultiTestContext(test TestID) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
+	tc, ok := manager.runningTestCases[test]
+	if !ok {
+		return ErrNoSuchTestCase
+	}
+	tc.MultiTestContext = true
+	return nil
+}
+
 // GetNodeInfo gets some info on a client belonging to some test
 func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
 	manager.testCaseMutex.RLock()

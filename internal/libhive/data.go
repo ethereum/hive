@@ -146,6 +146,10 @@ type TestCase struct {
 	End           time.Time              `json:"end"`
 	SummaryResult TestResult             `json:"summaryResult"` // The result of the whole test case.
 	ClientInfo    map[string]*ClientInfo `json:"clientInfo"`    // Info about each client.
+
+	// MultiTestContext is true when this test case is the lifecycle owner
+	// for clients shared across multiple tests (via registerMultiTestNode).
+	MultiTestContext bool `json:"multiTestContext,omitempty"`
 }
 
 // TestResult represents the result of a test case.

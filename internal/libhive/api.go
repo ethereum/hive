@@ -484,6 +484,13 @@ func (api *simAPI) registerMultiTestNode(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Mark the source test as a multi-test context (lifecycle owner).
+	if err := api.tm.SetMultiTestContext(sourceTestID); err != nil {
+		slog.Error("API: can't set multi-test context", "sourceTest", sourceTestID, "error", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	slog.Info("API: multi-test node registered", "node", node, "sourceTest", sourceTestID, "targetTest", targetTestID)
 	serveOK(w)
 }
