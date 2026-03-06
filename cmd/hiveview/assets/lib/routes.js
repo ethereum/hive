@@ -20,13 +20,17 @@ export function testLog(suiteID, suiteName, testIndex) {
     return 'viewer.html?' + params.toString();
 }
 
-export function clientLog(suiteID, suiteName, testIndex, file) {
+export function clientLog(suiteID, suiteName, testIndex, file, logOffsets) {
     let params = new URLSearchParams({
         'suiteid': suiteID,
         'suitename': suiteName,
         'testid': testIndex,
         'file': file,
     });
+    if (logOffsets) {
+        params.set('begin', logOffsets.begin);
+        params.set('end', logOffsets.end);
+    }
     return 'viewer.html?' + params.toString();
 }
 

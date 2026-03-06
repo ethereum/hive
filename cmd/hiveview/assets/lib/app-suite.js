@@ -110,10 +110,14 @@ function showSuiteData(data, suiteID) {
         $('#testsuite_clients').html(html.makeDefinitionList(data.clientVersions));
     }
 
-    // Convert test cases to list.
+    // Convert test cases to list, filtering out multi-test client contexts
+    // which are infrastructure (client lifecycle) rather than real tests.
     let cases = [];
     for (var k in data.testCases) {
         let tc = data.testCases[k];
+        if (tc.multiTestContext) {
+            continue;
+        }
         tc['testIndex'] = k;
         tc['duration'] = testCaseDuration(tc);
         cases.push(tc);
@@ -327,9 +331,18 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
     for (let instanceID in clientInfo) {
         let instanceInfo = clientInfo[instanceID];
         let logfile = routes.resultsRoot + instanceInfo.logFile;
-        let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+        let url = routes.clientLog(
+            suiteData.suiteID,
+            suiteData.name,
+            testIndex,
+            logfile,
+            instanceInfo.logOffsets
+        );
         let link = html.makeLink(url, instanceInfo.name);
         link.classList.add('log-link');
+        if (instanceInfo.logOffsets) {
+            link.title = `Filtered: bytes ${instanceInfo.logOffsets.begin}-${instanceInfo.logOffsets.end}`;
+        }
         links.push(link.outerHTML);
     }
     return links.join(', ');
