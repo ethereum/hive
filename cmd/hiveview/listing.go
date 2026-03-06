@@ -77,6 +77,9 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 		Versions: s.ClientVersions,
 	}
 	for _, test := range s.TestCases {
+		if test.MultiTestContext {
+			continue
+		}
 		e.NTests++
 		if test.SummaryResult.Pass {
 			e.Passes++

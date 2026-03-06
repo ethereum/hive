@@ -40,6 +40,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager, hive Hive
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/test/{target}", api.registerMultiTestNode).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
 	// post because the delete http verb does not always support a message body
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
@@ -296,12 +297,15 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Start it!
 	info, err := api.backend.StartContainer(ctx, containerID, options)
 	if info != nil {
+		// Capture the current log file size as the starting offset for this test.
+		logBegin := LogFileSize(logFilePath)
 		clientInfo := &ClientInfo{
 			ID:             info.ID,
 			IP:             info.IP,
 			Name:           clientDef.Name,
 			InstantiatedAt: time.Now(),
 			LogFile:        logPath,
+			LogOffsets:     &TestLogOffsets{Begin: logBegin},
 			wait:           info.Wait,
 		}
 
@@ -419,6 +423,72 @@ func (api *simAPI) unpauseClient(w http.ResponseWriter, r *http.Request) {
 	default:
 		serveOK(w)
 	}
+}
+
+// registerMultiTestNode registers a client from one test with another test.
+// This enables client reuse across multiple tests while maintaining proper
+// clientInfo association for UI visibility in each individual test.
+func (api *simAPI) registerMultiTestNode(w http.ResponseWriter, r *http.Request) {
+	suiteID, sourceTestID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	vars := mux.Vars(r)
+	node := vars["node"]
+	targetStr := vars["target"]
+	targetTestID, err := strconv.Atoi(targetStr)
+	if err != nil {
+		serveError(w, fmt.Errorf("invalid target test ID: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Get the client info from the source test.
+	nodeInfo, err := api.tm.GetNodeInfo(suiteID, sourceTestID, node)
+	if err != nil {
+		slog.Error("API: can't find node", "node", node, "sourceTest", sourceTestID, "error", err)
+		serveError(w, err, http.StatusNotFound)
+		return
+	}
+
+	// Create a copy of the client info without the wait function.
+	// This ensures the target test won't stop the container when it ends -
+	// only the source test (which started the client) should stop it.
+	//
+	// Create a NEW LogOffsets with Begin set to the current log file size.
+	// Each test gets its own byte range in the log file.
+	var logOffsets *TestLogOffsets
+	if nodeInfo.LogFile != "" {
+		logFilePath := filepath.Join(api.tm.config.LogDir, filepath.FromSlash(nodeInfo.LogFile))
+		logOffsets = &TestLogOffsets{Begin: LogFileSize(logFilePath)}
+	}
+	multiTestNodeInfo := &ClientInfo{
+		ID:             nodeInfo.ID,
+		IP:             nodeInfo.IP,
+		Name:           nodeInfo.Name,
+		InstantiatedAt: nodeInfo.InstantiatedAt,
+		LogFile:        nodeInfo.LogFile,
+		LogOffsets:     logOffsets,
+		// wait is intentionally nil - target tests shouldn't stop the client
+	}
+
+	// Register the client with the target test.
+	err = api.tm.RegisterNode(TestID(targetTestID), node, multiTestNodeInfo)
+	if err != nil {
+		slog.Error("API: can't register multi-test node", "node", node, "targetTest", targetTestID, "error", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Mark the source test as a multi-test context (lifecycle owner).
+	// UI consumers can use this to hide infrastructure test cases.
+	if sourceTest, ok := api.tm.IsTestRunning(sourceTestID); ok {
+		sourceTest.MultiTestContext = true
+	}
+
+	slog.Info("API: multi-test node registered", "node", node, "sourceTest", sourceTestID, "targetTest", targetTestID)
+	serveOK(w)
 }
 
 // getNodeStatus returns the status of a client container.

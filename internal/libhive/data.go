@@ -146,6 +146,11 @@ type TestCase struct {
 	End           time.Time              `json:"end"`
 	SummaryResult TestResult             `json:"summaryResult"` // The result of the whole test case.
 	ClientInfo    map[string]*ClientInfo `json:"clientInfo"`    // Info about each client.
+
+	// MultiTestContext is true when this test case is the lifecycle owner
+	// for clients shared across multiple tests (via registerMultiTestNode).
+	// UI consumers may choose to hide these infrastructure test cases.
+	MultiTestContext bool `json:"multiTestContext,omitempty"`
 }
 
 // TestResult represents the result of a test case.
@@ -170,7 +175,12 @@ type ClientInfo struct {
 	IP             string    `json:"ip"`
 	Name           string    `json:"name"`
 	InstantiatedAt time.Time `json:"instantiatedAt"`
-	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
+	LogFile        string    `json:"logFile"` // Relative path to the logfile.
+
+	// LogOffsets contains byte offsets into LogFile for the portion of the log
+	// relevant to this test case. This enables filtering log output when a single
+	// client container serves multiple tests.
+	LogOffsets *TestLogOffsets `json:"logOffsets,omitempty"`
 
 	wait func()
 }
@@ -196,4 +206,14 @@ type ExecInfo struct {
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
 	ExitCode int    `json:"exitCode"`
+}
+
+// LogFileSize returns the current size of a log file in bytes.
+// Returns 0 if the file doesn't exist or cannot be read.
+func LogFileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
 }
