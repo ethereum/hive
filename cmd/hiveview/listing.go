@@ -152,7 +152,7 @@ func parseSuite(fsys fs.FS, path string) (*libhive.TestSuite, fs.FileInfo) {
 }
 
 func suiteValid(s *libhive.TestSuite) bool {
-	return s.SimulatorLog != ""
+	return s.Name != ""
 }
 
 func skipFile(f string) bool {
