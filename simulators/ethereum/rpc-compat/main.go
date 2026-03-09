@@ -118,14 +118,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				continue
 			}
 
-			// Patch JSON to remove error messages. We only do this in the specific case
-			// where an error is expected AND returned by the client.
+			// Patch JSON to remove error messages wherever both the client and expected
+			// response contain an error object. This handles both top-level JSON-RPC
+			// errors and nested errors (e.g. eth_simulateV1 calls[].error.message).
 			var errorRedacted bool
-			if hasError && gjson.Get(expectedData, "error").Exists() {
-				resp, _ = sjson.Delete(resp, "error.message")
-				expectedData, _ = sjson.Delete(expectedData, "error.message")
-				errorRedacted = true
-			}
+			resp, expectedData, errorRedacted = redactErrorMessages("", gjson.Parse(resp), gjson.Parse(expectedData), resp, expectedData, false)
 
 			// Compare responses.
 			opts := &jsondiff.Options{
@@ -153,6 +150,55 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 		t.Fatalf("unhandled response in test case")
 	}
 	return nil
+}
+
+// redactErrorMessages recursively walks both JSON trees and removes "message"
+// from any "error" object found at any depth where both the client response and
+// expected data contain an error object with a message. This ensures error message
+// text (which is client-specific) is not compared. Returns the modified strings
+// and whether any redaction occurred.
+func redactErrorMessages(path string, rv, ev gjson.Result, resp, expected string, redacted bool) (string, string, bool) {
+	if ev.IsObject() {
+		ev.ForEach(func(key, val gjson.Result) bool {
+			rvChild := rv.Get(key.String())
+			if !rvChild.Exists() {
+				return true
+			}
+			var childPath string
+			if path == "" {
+				childPath = key.String()
+			} else {
+				childPath = path + "." + key.String()
+			}
+			if key.String() == "error" {
+				if val.Get("message").Exists() && rvChild.Get("message").Exists() {
+					resp, _ = sjson.Delete(resp, childPath+".message")
+					expected, _ = sjson.Delete(expected, childPath+".message")
+					redacted = true
+				}
+			} else {
+				resp, expected, redacted = redactErrorMessages(childPath, rvChild, val, resp, expected, redacted)
+			}
+			return true
+		})
+	} else if ev.IsArray() {
+		var i int
+		ev.ForEach(func(_, val gjson.Result) bool {
+			rvChild := rv.Get(fmt.Sprintf("%d", i))
+			var childPath string
+			if path == "" {
+				childPath = fmt.Sprintf("%d", i)
+			} else {
+				childPath = fmt.Sprintf("%s.%d", path, i)
+			}
+			if rvChild.Exists() {
+				resp, expected, redacted = redactErrorMessages(childPath, rvChild, val, resp, expected, redacted)
+			}
+			i++
+			return true
+		})
+	}
+	return resp, expected, redacted
 }
 
 // checkJSONStructure checks whether the `actual` value matches the type structure
