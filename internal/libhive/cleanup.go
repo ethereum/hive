@@ -102,7 +102,7 @@ func ListHiveContainers(ctx context.Context, client *docker.Client, instanceID s
 		return nil
 	}
 
-	fmt.Printf("%-12s %-20s %-12s %-12s %-20s %-10s %s\n", 
+	fmt.Printf("%-12s %-20s %-12s %-12s %-20s %-10s %s\n",
 		"CONTAINER ID", "NAME", "TYPE", "STATUS", "CREATED", "INSTANCE", "DETAILS")
 	fmt.Println(strings.Repeat("-", 120))
 

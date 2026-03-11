@@ -14,11 +14,11 @@ var (
 
 // VersionInfo contains comprehensive git version information
 type VersionInfo struct {
-	Commit      string    `json:"commit"`
-	CommitDate  string    `json:"commitDate,omitempty"`
-	BuildDate   string    `json:"buildDate,omitempty"`
-	Branch      string    `json:"branch,omitempty"`
-	Dirty       bool      `json:"dirty,omitempty"`
+	Commit     string `json:"commit"`
+	CommitDate string `json:"commitDate,omitempty"`
+	BuildDate  string `json:"buildDate,omitempty"`
+	Branch     string `json:"branch,omitempty"`
+	Dirty      bool   `json:"dirty,omitempty"`
 }
 
 // ClientConfigInfo contains client configuration details
@@ -29,9 +29,9 @@ type ClientConfigInfo struct {
 
 // RunMetadata contains comprehensive metadata about a test run
 type RunMetadata struct {
-	HiveCommand    []string          `json:"hiveCommand"`    // Full command with args
-	HiveVersion    VersionInfo       `json:"hiveVersion"`    // Hive git info
-	ClientConfig   *ClientConfigInfo `json:"clientConfig,omitempty"` // Client config file
+	HiveCommand  []string          `json:"hiveCommand"`            // Full command with args
+	HiveVersion  VersionInfo       `json:"hiveVersion"`            // Hive git info
+	ClientConfig *ClientConfigInfo `json:"clientConfig,omitempty"` // Client config file
 }
 
 // GetHiveVersion returns the current Hive version information
@@ -40,7 +40,7 @@ func GetHiveVersion() VersionInfo {
 		Commit:    hiveCommit,
 		BuildDate: buildDate,
 	}
-	
+
 	// Fall back to runtime detection if build-time info not available
 	if info.Commit == "" {
 		if buildInfo, ok := debug.ReadBuildInfo(); ok {
@@ -54,17 +54,16 @@ func GetHiveVersion() VersionInfo {
 			}
 		}
 	}
-	
+
 	// Try to get additional git info at runtime (only if git available)
 	if output, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
 		info.Branch = strings.TrimSpace(string(output))
 	}
-	
+
 	// Check if working directory is dirty
 	if err := exec.Command("git", "diff", "--quiet").Run(); err != nil {
 		info.Dirty = true
 	}
-	
+
 	return info
 }
-
