@@ -24,12 +24,12 @@ loop:
     push 32                     ; [32, ptr]
     add                         ; [newptr]
     push p_outputEnd            ; [end, newptr]
-    dup2                        ; [newptr, end, newtpr]
+    dup2                        ; [newptr, end, newptr]
     lt                          ; [newptr<end, newptr]
     jumpi @loop                 ; [newptr]
     pop                         ; []
 
     ;; code was built, return it
     push outputSize             ; [size]
-    push p_output               ; [size, offset]
+    push p_output               ; [offset, size]
     return                      ; []

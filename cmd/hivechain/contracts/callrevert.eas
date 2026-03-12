@@ -10,14 +10,14 @@
 
     ;; Access a storage slot. This exists to ensure we can test access list
     ;; generation in case of a failed call.
-    push 0x42ff                 ; [slot]
-    sload                       ; [v]
-    pop                         ; []
+    push 0x42ff                 ; [slot, word]
+    sload                       ; [v, word]
+    pop                         ; [word]
 
     ;; if word == 0 revert with panic
     iszero                      ; [word==0]
     iszero                      ; [word!=0]
-    jumpi @error                ; [word]
+    jumpi @error                ; []
 
 
 ;;; Solidity ABI `Panic(17)`
