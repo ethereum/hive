@@ -1,5 +1,5 @@
 ## Build Besu Via Pre-Built Image:
-ARG baseimage=hyperledger/besu
+ARG baseimage=besu-eth/besu
 ARG tag=develop
 FROM $baseimage:$tag
 
