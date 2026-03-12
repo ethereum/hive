@@ -9,14 +9,14 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get clean \
     && apt-get update \
-    && apt-get install -y build-essential librocksdb-dev jq curl \
+    && apt-get install -y build-essential jq curl \
     && apt -y upgrade
 
 RUN ldd --version
 
-COPY --from=source /home/user/nimbus-eth1/build/nimbus_execution_client /usr/bin/nimbus_execution_client
+COPY --from=source /home/user/nimbus-eth1/build/nimbus /usr/bin/nimbus
 
-RUN usr/bin/nimbus_execution_client --version > /version.txt
+RUN usr/bin/nimbus --version > /version.txt
 
 # Add genesis mapper script.
 ADD genesis.json /genesis.json
