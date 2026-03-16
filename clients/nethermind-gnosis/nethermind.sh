@@ -53,24 +53,17 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo -n $JWT_SECRET > /jwt.secret
 fi
 
-
 # Generate the genesis and chainspec file.
 mkdir -p /chainspec
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
 
-echo "==="
-echo "Original genesis:"
-cat /genesis.json
-echo "==="
-# Dump genesis.
+# Dump genesis. 
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.accounts[] | select(.balance == "0x123450000000000000000" or has("builtin")))' /chainspec/test.json
 else
-   echo "==="
     echo "Supplied genesis state:"
     cat /chainspec/test.json
-    echo "==="
 fi
 
 # Check sync mode.
@@ -82,9 +75,8 @@ case "$HIVE_NODETYPE" in
 esac
 
 # Generate the config file.
-mkdir -p /configs
+mkdir /configs
 jq -n -f /mkconfig.jq > /configs/test.json
-
 
 echo "test.json"
 cat /configs/test.json
@@ -108,5 +100,6 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     esac
     LOG_FLAG="--log $LOG"
 fi
+
 echo "Running Nethermind..."
 /nethermind/nethermind --config /configs/test.json $LOG_FLAG

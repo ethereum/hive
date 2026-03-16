@@ -1,5 +1,5 @@
 ARG baseimage=ghcr.io/gnosischain/reth_gnosis
-ARG tag=master
+ARG tag=v1.0.2
 
 FROM $baseimage:$tag as builder
 

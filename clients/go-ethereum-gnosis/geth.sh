@@ -60,8 +60,8 @@ FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
 else
-    # Unless otherwise specified by hive, we try to avoid mainnet networkid.
-    # If geth detects mainnet network id, then it tries to bump memory quite a lot
+    # Unless otherwise specified by hive, we try to avoid mainnet networkid. If geth detects mainnet network id,
+    # then it tries to bump memory quite a lot
     FLAGS="$FLAGS --networkid 1337"
 fi
 
@@ -137,14 +137,9 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 
-# Configure LES.
-if [ "$HIVE_LES_SERVER" == "1" ]; then
-  FLAGS="$FLAGS --light.serve 50 --light.nosyncserve"
-fi
-
 # Configure RPC.
-FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3"
-FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,txpool,web3"
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3,testing"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,txpool,web3,testing"
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
@@ -160,8 +155,10 @@ if [ "$HIVE_ALLOW_UNPROTECTED_TX" != "" ]; then
     FLAGS="$FLAGS --rpc.allow-unprotected-txs"
 fi
 
-# Run the go-ethereum-gnosis implementation with the requested flags.
-FLAGS="$FLAGS --nat=none"
+# Run the go-ethereum implementation with the requested flags.
+ip=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+FLAGS="$FLAGS --nat=extip:$ip"
+
 # Disable disk space free monitor
 FLAGS="$FLAGS --datadir.minfreedisk=0"
 echo "Running go-ethereum-gnosis with flags $FLAGS"
