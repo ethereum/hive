@@ -1,14 +1,17 @@
-# Pulls reth gnosis from a git repository and builds it from source.
+### Build Reth-Gnosis From Git:
+## Pulls reth-gnosis from a git repository and builds it from source.
 
 ## Builder stage: Compiles reth from a git repository
-FROM rust:latest AS builder
+FROM rust:latest as builder
+
 ARG github=gnosischain/reth_gnosis
 ARG tag=master
 
+RUN rustup update stable && rustup default stable
 RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
     && echo "Cloning: $github - $tag" \
-    && git clone --depth 1 --branch $tag https://github.com/$github reth_gnosis \
-    && cd reth_gnosis && cargo build --release \
+    && git clone --depth 1 --branch $tag https://github.com/$github reth \
+    && cd reth && cargo build --release \
     && cp target/release/reth /usr/local/bin/reth
 
 ## Final stage: Sets up the environment for running reth
@@ -19,21 +22,17 @@ RUN apt-get update && apt-get install -y bash curl jq \
 # Copy compiled binary from builder
 COPY --from=builder /usr/local/bin/reth /usr/local/bin/reth
 
-# Add default genesis file and genesis mapper script.
+# Add genesis mapper script, startup script, and enode URL retriever script
 COPY genesis.json /genesis.json
 COPY mapper.jq /mapper.jq
-
-# Inject the startup script.
 COPY reth.sh /reth.sh
-RUN chmod +x /reth.sh
-
-# Inject the enode id retriever script.
-RUN mkdir /hive-bin
 COPY enode.sh /hive-bin/enode.sh
-RUN chmod +x /hive-bin/enode.sh
+
+# Set execute permissions for scripts
+RUN chmod +x /reth.sh /hive-bin/enode.sh
 
 # Create version.txt
-RUN /usr/local/bin/reth --version | sed -e 's/reth \(.*\)/\1/' > /version.txt
+RUN /usr/local/bin/reth --version | head -2 | awk 'NR==1 {gsub("reth Version: ", ""); version=$0} NR==2 {gsub("Commit SHA: ", ""); sha=substr($0, 1, 8)} END {print version"+"sha}' > /version.txt
 
 # Export the usual networking ports
 EXPOSE 8545 8546 30303 30303/udp

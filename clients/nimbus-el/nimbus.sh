@@ -47,7 +47,7 @@
 # Immediately abort the script on any error encountered
 set -e
 
-nimbus=/usr/bin/nimbus_execution_client
+nimbus="/usr/bin/nimbus executionClient"
 FLAGS="--nat:extip:0.0.0.0 --debug-dynamic-batch-size:true"
 
 loglevel=DEBUG
