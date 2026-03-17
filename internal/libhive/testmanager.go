@@ -181,6 +181,8 @@ func (manager *TestManager) IsTestInSuite(testSuite TestSuiteID, test TestID) (*
 	if !ok {
 		return nil, false
 	}
+	manager.testCaseMutex.RLock()
+	defer manager.testCaseMutex.RUnlock()
 	tc, ok := suite.TestCases[test]
 	return tc, ok
 }
