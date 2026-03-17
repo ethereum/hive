@@ -1,60 +1,43 @@
-package libhive
+package libhive_test
 
 import (
-	"context"
-	"net"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ethereum/hive/internal/fakes"
+	"github.com/ethereum/hive/internal/libhive"
+	"github.com/ethereum/hive/internal/simapi"
 )
 
-// noopBackend is a minimal ContainerBackend for testing.
-type noopBackend struct{}
-
-func (noopBackend) Build(context.Context, Builder) error                      { return nil }
-func (noopBackend) SetHiveInstanceInfo(string, string)                        {}
-func (noopBackend) GetDockerClient() interface{}                              { return nil }
-func (noopBackend) ServeAPI(context.Context, http.Handler) (APIServer, error) { return nil, nil }
-func (noopBackend) CreateContainer(context.Context, string, ContainerOptions) (string, error) {
-	return "", nil
-}
-func (noopBackend) StartContainer(context.Context, string, ContainerOptions) (*ContainerInfo, error) {
-	return nil, nil
-}
-func (noopBackend) DeleteContainer(string) error  { return nil }
-func (noopBackend) PauseContainer(string) error   { return nil }
-func (noopBackend) UnpauseContainer(string) error { return nil }
-func (noopBackend) RunProgram(context.Context, string, []string) (*ExecInfo, error) {
-	return nil, nil
-}
-func (noopBackend) NetworkNameToID(string) (string, error)     { return "", nil }
-func (noopBackend) CreateNetwork(string) (string, error)       { return "", nil }
-func (noopBackend) RemoveNetwork(string) error                 { return nil }
-func (noopBackend) ContainerIP(string, string) (net.IP, error) { return nil, nil }
-func (noopBackend) ConnectContainer(string, string) error      { return nil }
-func (noopBackend) DisconnectContainer(string, string) error   { return nil }
-
 func TestRegisterMultiTestNode(t *testing.T) {
-	// Set up a TestManager with a temporary log directory.
-	logDir := t.TempDir()
-	config := SimEnv{LogDir: logDir}
-	tm := &TestManager{
-		config:            config,
-		backend:           noopBackend{},
-		runningTestSuites: make(map[TestSuiteID]*TestSuite),
-		runningTestCases:  make(map[TestID]*TestCase),
-		results:           make(map[TestSuiteID]*TestSuite),
-		networks:          make(map[TestSuiteID]map[string]string),
-	}
+	// Track container deletions to verify lifecycle behavior.
+	var deletedContainers []string
+	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+		DeleteContainer: func(containerID string) error {
+			deletedContainers = append(deletedContainers, containerID)
+			return nil
+		},
+	})
 
-	// Create a test suite.
+	logDir := t.TempDir()
+	clients := []*libhive.ClientDefinition{{Name: "test-client", Image: "test-client-image"}}
+	tm := libhive.NewTestManager(libhive.SimEnv{LogDir: logDir}, backend, clients, libhive.HiveInfo{})
+	handler := tm.API()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	// Create suite and tests via exported Go methods.
 	suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
 	if err != nil {
 		t.Fatal("StartTestSuite:", err)
 	}
-
-	// Create source and target tests.
 	sourceTestID, err := tm.StartTest(suiteID, "source-test", "source test")
 	if err != nil {
 		t.Fatal("StartTest (source):", err)
@@ -64,44 +47,24 @@ func TestRegisterMultiTestNode(t *testing.T) {
 		t.Fatal("StartTest (target):", err)
 	}
 
-	// Create a fake log file with some content.
+	// Create the client log directory (file is written after we know the container ID).
 	clientLogDir := filepath.Join(logDir, "test-client")
 	if err := os.MkdirAll(clientLogDir, 0755); err != nil {
 		t.Fatal("MkdirAll:", err)
 	}
-	logFilePath := filepath.Join(clientLogDir, "client-abc123.log")
+
+	// Start a client on the source test via HTTP (this sets wait via the backend).
+	containerID := startClientHTTP(t, srv.URL, suiteID, sourceTestID)
+
+	// Write initial log content now that we know the container ID.
+	logFilePath := filepath.Join(clientLogDir, "client-"+containerID+".log")
 	initialContent := []byte("line 1\nline 2\nline 3\n")
 	if err := os.WriteFile(logFilePath, initialContent, 0644); err != nil {
 		t.Fatal("WriteFile:", err)
 	}
 
-	// Register a client with the source test (simulates startClient).
-	logPath := "test-client/client-abc123.log"
-	sourceClient := &ClientInfo{
-		ID:         "abc123",
-		IP:         "192.168.1.1",
-		Name:       "test-client",
-		LogFile:    logPath,
-		LogOffsets: &TestLogOffsets{Begin: 0},
-		wait:       func() {}, // non-nil: source test owns the lifecycle
-	}
-	if err := tm.RegisterNode(sourceTestID, "abc123", sourceClient); err != nil {
-		t.Fatal("RegisterNode (source):", err)
-	}
-
-	// Simulate registerMultiTestNode: register client with target test (wait=nil).
-	currentLogSize := logFileSize(logFilePath)
-	multiTestClient := &ClientInfo{
-		ID:         "abc123",
-		IP:         "192.168.1.1",
-		Name:       "test-client",
-		LogFile:    logPath,
-		LogOffsets: &TestLogOffsets{Begin: currentLogSize},
-		// wait is nil: target test should NOT stop the container
-	}
-	if err := tm.RegisterNode(targetTestID, "abc123", multiTestClient); err != nil {
-		t.Fatal("RegisterNode (target):", err)
-	}
+	// Register multi-test node on target test via HTTP.
+	registerMultiTestNodeHTTP(t, srv.URL, suiteID, sourceTestID, containerID, targetTestID)
 
 	// Append more content to the log (simulates client activity during target test).
 	additionalContent := []byte("line 4\nline 5\n")
@@ -112,68 +75,121 @@ func TestRegisterMultiTestNode(t *testing.T) {
 	f.Write(additionalContent)
 	f.Close()
 
-	// End the target test — client should NOT be stopped (wait=nil).
-	targetResult := &TestResult{Pass: true, Details: "target test passed"}
+	// End target test — container should NOT be deleted (wait is nil for multi-test copy).
+	targetResult := &libhive.TestResult{Pass: true, Details: "target test passed"}
 	if err := tm.EndTest(suiteID, targetTestID, targetResult); err != nil {
 		t.Fatal("EndTest (target):", err)
 	}
-
-	// Verify: target test is no longer running.
-	if _, running := tm.IsTestRunning(targetTestID); running {
-		t.Fatal("Target test should no longer be running")
+	if len(deletedContainers) != 0 {
+		t.Fatalf("Expected no container deletions after ending target test, got %v", deletedContainers)
 	}
 
-	// Verify: the source test's client should still be running.
-	sourceCase, running := tm.IsTestRunning(sourceTestID)
-	if !running {
-		t.Fatal("Source test should still be running")
-	}
-	sourceClientInfo := sourceCase.ClientInfo["abc123"]
-	if sourceClientInfo == nil {
-		t.Fatal("Source client info should exist")
-	}
-	if sourceClientInfo.wait == nil {
-		t.Fatal("Source client's wait should NOT be nil (it owns lifecycle)")
-	}
-
-	// Verify: log byte offsets were set correctly on the multi-test client.
-	if multiTestClient.LogOffsets.Begin != int64(len(initialContent)) {
-		t.Fatalf("Multi-test client LogOffsets.Begin = %d, want %d",
-			multiTestClient.LogOffsets.Begin, len(initialContent))
-	}
-	expectedEnd := int64(len(initialContent) + len(additionalContent))
-	if multiTestClient.LogOffsets.End != expectedEnd {
-		t.Fatalf("Multi-test client LogOffsets.End = %d, want %d",
-			multiTestClient.LogOffsets.End, expectedEnd)
-	}
-
-	// End the source test — client SHOULD be stopped (wait != nil).
-	sourceResult := &TestResult{Pass: true, Details: "source test passed"}
+	// End source test — container SHOULD be deleted (wait is non-nil, source owns lifecycle).
+	sourceResult := &libhive.TestResult{Pass: true, Details: "source test passed"}
 	if err := tm.EndTest(suiteID, sourceTestID, sourceResult); err != nil {
 		t.Fatal("EndTest (source):", err)
 	}
+	if len(deletedContainers) != 1 || deletedContainers[0] != containerID {
+		t.Fatalf("Expected container %q to be deleted, got %v", containerID, deletedContainers)
+	}
 
-	// Verify: source client LogOffsets.End was also captured.
+	// End the suite so results are available.
+	if err := tm.EndTestSuite(suiteID); err != nil {
+		t.Fatal("EndTestSuite:", err)
+	}
+
+	// Verify log offsets via Results().
+	results := tm.Results()
+	suite, ok := results[suiteID]
+	if !ok {
+		t.Fatal("Suite not found in results")
+	}
+
+	// Check target test's client log offsets.
+	targetCase := suite.TestCases[targetTestID]
+	if targetCase == nil {
+		t.Fatal("Target test case not found in results")
+	}
+	targetClient := targetCase.ClientInfo[containerID]
+	if targetClient == nil {
+		t.Fatal("Target client info not found")
+	}
+	if targetClient.LogOffsets.Begin != int64(len(initialContent)) {
+		t.Fatalf("Target client LogOffsets.Begin = %d, want %d",
+			targetClient.LogOffsets.Begin, len(initialContent))
+	}
+	expectedEnd := int64(len(initialContent) + len(additionalContent))
+	if targetClient.LogOffsets.End != expectedEnd {
+		t.Fatalf("Target client LogOffsets.End = %d, want %d",
+			targetClient.LogOffsets.End, expectedEnd)
+	}
+
+	// Check source test's client log offsets.
+	sourceCase := suite.TestCases[sourceTestID]
+	if sourceCase == nil {
+		t.Fatal("Source test case not found in results")
+	}
+	sourceClient := sourceCase.ClientInfo[containerID]
+	if sourceClient == nil {
+		t.Fatal("Source client info not found")
+	}
+	if sourceClient.LogOffsets.Begin != 0 {
+		t.Fatalf("Source client LogOffsets.Begin = %d, want 0", sourceClient.LogOffsets.Begin)
+	}
 	if sourceClient.LogOffsets.End != expectedEnd {
 		t.Fatalf("Source client LogOffsets.End = %d, want %d",
 			sourceClient.LogOffsets.End, expectedEnd)
 	}
 }
 
-func TestLogFileSize(t *testing.T) {
-	// Non-existent file should return 0.
-	if got := logFileSize("/nonexistent/path/file.log"); got != 0 {
-		t.Fatalf("logFileSize(nonexistent) = %d, want 0", got)
+// startClientHTTP starts a client on the given test via the HTTP API and returns the container ID.
+func startClientHTTP(t *testing.T, baseURL string, suiteID libhive.TestSuiteID, testID libhive.TestID) string {
+	t.Helper()
+
+	config, err := json.Marshal(simapi.NodeConfig{Client: "test-client"})
+	if err != nil {
+		t.Fatal("marshal NodeConfig:", err)
 	}
 
-	// Create a temp file with known content.
-	tmpFile := filepath.Join(t.TempDir(), "test.log")
-	content := []byte("hello world\n")
-	if err := os.WriteFile(tmpFile, content, 0644); err != nil {
-		t.Fatal("WriteFile:", err)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	writer.WriteField("config", string(config))
+	writer.Close()
+
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node", baseURL, suiteID, testID)
+	resp, err := http.Post(url, writer.FormDataContentType(), &body)
+	if err != nil {
+		t.Fatal("POST startClient:", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("startClient returned status %d", resp.StatusCode)
 	}
 
-	if got := logFileSize(tmpFile); got != int64(len(content)) {
-		t.Fatalf("logFileSize = %d, want %d", got, len(content))
+	var nodeResp simapi.StartNodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&nodeResp); err != nil {
+		t.Fatal("decode StartNodeResponse:", err)
+	}
+	if nodeResp.ID == "" {
+		t.Fatal("startClient returned empty container ID")
+	}
+	return nodeResp.ID
+}
+
+// registerMultiTestNodeHTTP registers an existing node with a target test via the HTTP API.
+func registerMultiTestNodeHTTP(t *testing.T, baseURL string, suiteID libhive.TestSuiteID, sourceTestID libhive.TestID, nodeID string, targetTestID libhive.TestID) {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/register/%d",
+		baseURL, suiteID, sourceTestID, nodeID, targetTestID)
+	resp, err := http.Post(url, "", nil)
+	if err != nil {
+		t.Fatal("POST registerMultiTestNode:", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("registerMultiTestNode returned status %d", resp.StatusCode)
 	}
 }
