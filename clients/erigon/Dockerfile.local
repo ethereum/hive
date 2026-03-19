@@ -2,7 +2,7 @@
 ### Requires a copy of erigon/ -> hive/clients/erigon/
 
 ## Builder stage: Compiles erigon from a local directory
-FROM golang:1.25.0-trixie as builder
+FROM golang:1.25.7-trixie as builder
 
 # Default local client path: clients/erigon/<erigon>
 ARG local_path=erigon
