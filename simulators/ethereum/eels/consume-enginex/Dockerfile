@@ -1,4 +1,4 @@
-# Builds and runs the EELS (execution-specs) consume engine simulator
+# Builds and runs the EELS (execution-specs) consume enginex simulator
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ## Default fixtures/git-ref
@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y git
 RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
     cd execution-specs && \
     if [ -n "$branch" ]; then \
-        git fetch --depth 1 origin "$branch" && \
-        git checkout FETCH_HEAD; \
+    git fetch --depth 1 origin "$branch" && \
+    git checkout FETCH_HEAD; \
     fi
 
 WORKDIR /execution-specs/packages/testing
@@ -27,8 +27,8 @@ RUN uv sync
 RUN uv run consume cache --input "$FIXTURES"
 
 
-## Define `consume engine` entry point using the local fixtures
+## Define `consume enginex` entry point using the local fixtures
 # TODO: remove when fixed on nimbus-el side.
 ARG disable_strict_exception_matching=nimbus-el
 ENV DISABLE_STRICT_EXCEPTION_MATCHING=${disable_strict_exception_matching}
-ENTRYPOINT uv run consume engine -v --input "$FIXTURES" --disable-strict-exception-matching "$DISABLE_STRICT_EXCEPTION_MATCHING"
+ENTRYPOINT uv run consume enginex -v --input "$FIXTURES" --disable-strict-exception-matching "$DISABLE_STRICT_EXCEPTION_MATCHING"

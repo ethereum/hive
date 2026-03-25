@@ -46,7 +46,7 @@ set -e
 
 besu=/opt/besu/bin/besu
 
-# See https://github.com/hyperledger/besu/issues/1464
+# See https://github.com/besu-eth/besu/issues/1464
 export BESU_OPTS="-Dsecp256k1.randomize=false"
 
 # Use bonsai storage.
@@ -99,7 +99,7 @@ fi
 if [ -d /blocks ]; then
     HAS_IMPORT=1
     blocks=`echo /blocks/* | sort -n`
-    # See https://github.com/hyperledger/besu/issues/1992#issuecomment-796528168
+    # See https://github.com/besu-eth/besu/issues/1992#issuecomment-796528168
     # We import and run Besu in one go, to not have to instantiate the JRE twice.
     # However, besu has some special logic, and if only one file is imported, it
     # exits if that file fails to import.
