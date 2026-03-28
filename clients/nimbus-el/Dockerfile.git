@@ -5,7 +5,7 @@ FROM debian:testing-slim AS build
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get clean && apt update \
- && apt -y install curl build-essential git-lfs
+ && apt -y install ca-certificates curl build-essential git-lfs
 
 RUN ldd --version
 
