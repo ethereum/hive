@@ -157,11 +157,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 // expected data contain an error object with a message. This ensures error message
 // text (which is client-specific) is not compared. Returns the modified strings
 // and whether any redaction occurred.
-func redactErrorMessages(path string, rv, ev gjson.Result, resp, expected string, redacted bool) (string, string, bool) {
-	if ev.IsObject() {
-		ev.ForEach(func(key, val gjson.Result) bool {
-			rvChild := rv.Get(key.String())
-			if !rvChild.Exists() {
+func redactErrorMessages(path string, respVal, expectedVal gjson.Result, resp, expected string, redacted bool) (string, string, bool) {
+	if expectedVal.IsObject() {
+		expectedVal.ForEach(func(key, val gjson.Result) bool {
+			respChild := respVal.Get(key.String())
+			if !respChild.Exists() {
 				return true
 			}
 			var childPath string
@@ -171,28 +171,28 @@ func redactErrorMessages(path string, rv, ev gjson.Result, resp, expected string
 				childPath = path + "." + key.String()
 			}
 			if key.String() == "error" {
-				if val.Get("message").Exists() && rvChild.Get("message").Exists() {
+				if val.Get("message").Exists() && respChild.Get("message").Exists() {
 					resp, _ = sjson.Delete(resp, childPath+".message")
 					expected, _ = sjson.Delete(expected, childPath+".message")
 					redacted = true
 				}
 			} else {
-				resp, expected, redacted = redactErrorMessages(childPath, rvChild, val, resp, expected, redacted)
+				resp, expected, redacted = redactErrorMessages(childPath, respChild, val, resp, expected, redacted)
 			}
 			return true
 		})
-	} else if ev.IsArray() {
+	} else if expectedVal.IsArray() {
 		var i int
-		ev.ForEach(func(_, val gjson.Result) bool {
-			rvChild := rv.Get(fmt.Sprintf("%d", i))
+		expectedVal.ForEach(func(_, val gjson.Result) bool {
+			respChild := respVal.Get(fmt.Sprintf("%d", i))
 			var childPath string
 			if path == "" {
 				childPath = fmt.Sprintf("%d", i)
 			} else {
 				childPath = fmt.Sprintf("%s.%d", path, i)
 			}
-			if rvChild.Exists() {
-				resp, expected, redacted = redactErrorMessages(childPath, rvChild, val, resp, expected, redacted)
+			if respChild.Exists() {
+				resp, expected, redacted = redactErrorMessages(childPath, respChild, val, resp, expected, redacted)
 			}
 			i++
 			return true
