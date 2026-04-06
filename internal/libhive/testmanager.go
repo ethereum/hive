@@ -173,6 +173,20 @@ func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuit
 	return suite, ok
 }
 
+// IsTestInSuite checks if a test belongs to the given running suite.
+func (manager *TestManager) IsTestInSuite(testSuite TestSuiteID, test TestID) (*TestCase, bool) {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+	suite, ok := manager.runningTestSuites[testSuite]
+	if !ok {
+		return nil, false
+	}
+	manager.testCaseMutex.RLock()
+	defer manager.testCaseMutex.RUnlock()
+	tc, ok := suite.TestCases[test]
+	return tc, ok
+}
+
 // IsTestRunning checks if the test is still running and returns it if so.
 func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 	manager.testCaseMutex.RLock()
@@ -208,6 +222,18 @@ func (manager *TestManager) Terminate() error {
 		manager.doEndSuite(suiteID)
 	}
 
+	return nil
+}
+
+// SetMultiTestContext marks a test case as a multi-test lifecycle owner.
+func (manager *TestManager) SetMultiTestContext(test TestID) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
+	tc, ok := manager.runningTestCases[test]
+	if !ok {
+		return ErrNoSuchTestCase
+	}
+	tc.MultiTestContext = true
 	return nil
 }
 
@@ -505,6 +531,16 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	return newCaseID, nil
 }
 
+// logFileSize returns the current size of a log file in bytes.
+// Returns 0 if the file doesn't exist or cannot be read.
+func logFileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
+
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
@@ -532,6 +568,15 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		result.LogOffsets = offsets
 	}
 	testCase.SummaryResult = *result
+
+	// Capture log end offsets for all clients before stopping them.
+	// This enables log filtering when a client serves multiple tests.
+	for _, v := range testCase.ClientInfo {
+		if v.LogOffsets != nil && manager.config.LogDir != "" {
+			logFilePath := filepath.Join(manager.config.LogDir, filepath.FromSlash(v.LogFile))
+			v.LogOffsets.End = logFileSize(logFilePath)
+		}
+	}
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {

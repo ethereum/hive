@@ -9,16 +9,16 @@
 
     ;; hash calldata
     calldatasize                ; [size]
-    dup1                        ; [size]
+    dup1                        ; [size, size]
     push 0                      ; [offset, size, size]
-    dup1                        ; [dest, offset, size, size]
+    dup1                        ; [offset, offset, size, size]
     calldatacopy                ; [size]
     push 0                      ; [offset, size]
     keccak256                   ; [hash]
 
     ;; write a storage entry
-    push s_counter              ; [slot]
-    sload                       ; [addr, counter, hash]
+    push s_counter              ; [slot, hash]
+    sload                       ; [counter, hash]
     dup1                        ; [counter, counter, hash]
     dup3                        ; [hash, counter, counter, hash]
     sstore                      ; [counter, hash]
@@ -33,7 +33,7 @@
     ;; emit log
     push 0                      ; [offset, counter, hash]
     mstore                      ; [hash]
-    push "emit"                 ; [topic1, hash=topic2]
-    push 32                     ; [size, topic1, topic2]
-    push 0                      ; [offset, size, topic1, topic2]
+    push "emit"                 ; [topic1, hash]
+    push 32                     ; [size, topic1, hash]
+    push 0                      ; [offset, size, topic1, hash]
     log2                        ; []

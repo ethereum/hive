@@ -8,7 +8,7 @@
 #define theOutput = 0xffee
 
     calldatasize                ; [size]
-    push len(theInput)          ; [exp, iszero]
+    push len(theInput)          ; [exp, size]
     eq                          ; [size==exp]
     jumpi @compare              ; []
     %revert("wrong-calldatasize")

@@ -66,7 +66,7 @@ func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
 	if expr == "" {
 		return nil, nil
 	}
-	re, err := regexp.Compile(expr)
+	re, err := regexp.Compile(expr + "$")
 	if err != nil {
 		return nil, err
 	}
