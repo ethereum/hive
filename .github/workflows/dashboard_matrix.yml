@@ -25,71 +25,71 @@ jobs:
       matrix:
         include:
           - client: nethermind-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'withdrawals'
             parallelism: 8
           - client: erigon-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'withdrawals'
             parallelism: 8
           - client: reth-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'withdrawals'
             parallelism: 8
           - client: go-ethereum-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'withdrawals'
             parallelism: 8
           - client: nethermind-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'cancun'
             parallelism: 8
           - client: erigon-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'cancun'
             parallelism: 8
           - client: reth-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'cancun'
             parallelism: 8
           - client: go-ethereum-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'cancun'
             parallelism: 8
           - client: nethermind-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-api'
             parallelism: 10
           - client: erigon-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-api'
             parallelism: 12
           - client: reth-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-api'
             parallelism: 12
           - client: go-ethereum-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-api'
             parallelism: 12
           - client: nethermind-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-auth'
             parallelism: 1
           - client: nethermind-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-exchange-capabilities'
             parallelism: 1
           - client: erigon-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-exchange-capabilities'
             parallelism: 1
           - client: reth-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-exchange-capabilities'
             parallelism: 1
           - client: go-ethereum-gnosis
-            simulator: 'ethereum/gnosis-engine'
+            simulator: 'gnosis/engine'
             suite: 'engine-exchange-capabilities'
             parallelism: 1
     steps:

@@ -22,7 +22,7 @@ Supported clients:
 
 Supported simulators:
 
-- ethereum/gnosis-engine
+- gnosis/engine
 
 The above simulator contains rewritten `ethereum/engine` tests with gnosis specific libraries and configurations.
 Following suites are supported:

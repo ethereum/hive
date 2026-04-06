@@ -4,7 +4,7 @@
 TEST_NAME="/Blob Transaction Ordering, Single Account, Dual Blob"
 EXPERIMENT="debug"
 CLIENT="nethermind-gnosis"
-SIMULATOR="ethereum/gnosis-engine"
+SIMULATOR="gnosis/engine"
 SIMULATOR_LOG_LEVEL=3
 CLIENT_LOG_LEVEL=3
 PROXY=""

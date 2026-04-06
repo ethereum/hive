@@ -33,10 +33,10 @@ on:
       simulator:
         description: "Hive simulator"
         required: true
-        default: "ethereum/gnosis-engine"
+        default: "gnosis/engine"
         type: choice
         options:
-          - ethereum/gnosis-engine
+          - gnosis/engine
           - smoke
       parallelism:
         description: "Parallelism"
