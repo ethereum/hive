@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/hive/hiveproxy"
@@ -16,7 +17,14 @@ const hiveproxyTag = "hive/hiveproxy"
 
 // Build builds the hiveproxy image.
 func (cb *ContainerBackend) Build(ctx context.Context, b libhive.Builder) error {
-	return b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
+	if err := b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source); err != nil {
+		// If it already Exists its okay, no need to fail
+		if strings.Contains(err.Error(), "AlreadyExists") {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // ServeAPI starts the API server.
