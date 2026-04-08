@@ -86,6 +86,13 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 	return nil
 }
 
+// imageAlreadyExists reports whether a build failed only because a concurrent
+// hive process already produced the identical image, a benign cross-process
+// race when multiple simulations share one Docker daemon.
+func imageAlreadyExists(err error) bool {
+	return strings.Contains(err.Error(), "AlreadyExists")
+}
+
 func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
 	nocache := false
 	if b.config.NoCachePattern != nil {
