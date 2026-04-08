@@ -1,0 +1,36 @@
+FROM rust:latest AS builder
+
+ARG github=ReamLabs/ream
+ARG tag=master
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    ca-certificates \
+    git \
+    libclang-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+RUN echo "Cloning: $github - $tag" \
+    && git clone https://github.com/$github ream \
+    && cd ream \
+    && git checkout $tag \
+    && cargo build --release --locked --bin ream
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y bash ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /src/ream/target/release/ream /usr/bin/ream
+COPY validators.yaml /assets/lean/validators.yaml
+COPY ream.sh /ream.sh
+
+RUN chmod +x /ream.sh \
+    && ream --version | head -1 > /version.txt
+
+EXPOSE 5052 9000/udp 8080
+
+ENTRYPOINT ["/ream.sh"]
