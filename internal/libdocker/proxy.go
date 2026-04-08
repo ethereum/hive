@@ -16,7 +16,11 @@ const hiveproxyTag = "hive/hiveproxy"
 
 // Build builds the hiveproxy image.
 func (cb *ContainerBackend) Build(ctx context.Context, b libhive.Builder) error {
-	return b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
+	err := b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
+	if err != nil && !imageAlreadyExists(err) {
+		return err
+	}
+	return nil
 }
 
 // ServeAPI starts the API server.
