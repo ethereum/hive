@@ -4,7 +4,7 @@ use ::std::{boxed::Box, future::Future, pin::Pin};
 use async_trait::async_trait;
 use core::fmt::Debug;
 use dyn_clone::DynClone;
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use jsonrpsee_http_client::{HttpClient, HttpClientBuilder};
 use std::collections::HashMap;
 use std::net::IpAddr;
 
