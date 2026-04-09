@@ -1,0 +1,8 @@
+[workspace]
+members = ["hivesim-rs", "simulators/lean"]
+exclude = ["simulators/portal"]
+default-members = ["simulators/lean"]
+resolver = "2"
+
+[patch."https://github.com/ethereum/hive"]
+hivesim = { path = "hivesim-rs" }
