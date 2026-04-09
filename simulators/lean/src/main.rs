@@ -1,5 +1,10 @@
 #![warn(clippy::unwrap_used)]
 
+mod scenarios;
+
+use std::{collections::HashMap, time::Duration};
+
+use crate::scenarios::rpc_compat::run_rpc_compat_lean_suite;
 use hivesim::dyn_async;
 use hivesim::types::ClientDefinition;
 use hivesim::{run_suite, Client, Simulation, Suite, Test, TestSpec};
@@ -26,7 +31,21 @@ async fn main() {
         client: None,
     });
 
-    run_suite(Simulation::new(), vec![api_smoke]).await;
+    let mut rpc_compat = Suite {
+        name: "rpc-compat".to_string(),
+        description: "".to_string(),
+        tests: vec![],
+    };
+
+    rpc_compat.add(TestSpec {
+        name: "rpc-compat".to_string(),
+        description: "Launches lean clients and checks all potential RPC cases".to_string(),
+        always_run: false,
+        run: run_rpc_compat_lean_suite,
+        client: None,
+    });
+
+    run_suite(Simulation::new(), vec![api_smoke, rpc_compat]).await;
 }
 
 fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
