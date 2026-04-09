@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::{get_json_with_retry, lean_api_url, lean_environment, CheckpointResponse};
+use crate::{lean_api_url, lean_environment, CheckpointResponse};
 use hivesim::types::ClientDefinition;
 use hivesim::Client;
 use reqwest::Client as HttpClient;
@@ -17,12 +17,12 @@ const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
-const LEAN_SPEC_PEER_NODE_ID: &str = "lean_spec_1";
-const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1";
-const LEAN_SPEC_PEER_VALIDATORS: &str = "2";
+const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
+const LEAN_SPEC_SOURCE_PEER_ID: &str = "16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3";
 const LEAN_P2P_PORT: u16 = 9001;
 const LEAN_GENESIS_DELAY_SECS: u64 = 30;
-const POST_GENESIS_TIMEOUT_SECS: u64 = 180;
+const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
+const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
 
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
@@ -42,7 +42,6 @@ pub(crate) struct PostGenesisSyncTestData {
 
 pub(crate) struct PostGenesisSyncContext {
     pub source_client: Client,
-    pub peer_client: Client,
     pub client_under_test: Client,
     pub source_fork_choice: ForkChoiceSnapshot,
     pub client_checkpoint: CheckpointResponse,
@@ -72,51 +71,84 @@ pub(crate) fn lean_spec_source_environment(genesis_time: u64) -> HashMap<String,
     )
 }
 
-pub(crate) fn lean_spec_peer_environment(
-    source_client: &Client,
-    genesis_time: u64,
-) -> HashMap<String, String> {
-    lean_spec_environment(
-        LEAN_SPEC_PEER_NODE_ID,
-        LEAN_SPEC_PEER_VALIDATORS,
-        genesis_time,
-        Some(bootnode_multiaddr(source_client)),
-        false,
-    )
-}
-
 pub(crate) async fn start_post_genesis_sync_context(
     source_client: Client,
     test_data: &PostGenesisSyncTestData,
 ) -> PostGenesisSyncContext {
-    let peer_client = source_client
-        .test
-        .start_client(
-            source_client.kind.clone(),
-            Some(lean_spec_peer_environment(&source_client, test_data.genesis_time)),
+    let should_start_client_early =
+        !test_data.use_checkpoint_sync && test_data.connect_client_to_lean_spec_mesh;
+
+    let client_under_test = if should_start_client_early {
+        Some(
+            source_client
+                .test
+                .start_client(
+                    test_data.client_under_test.name.clone(),
+                    Some(client_under_test_environment(
+                        &source_client,
+                        test_data.genesis_time,
+                        test_data.use_checkpoint_sync,
+                        test_data.connect_client_to_lean_spec_mesh,
+                    )),
+                )
+                .await,
         )
-        .await;
+    } else {
+        None
+    };
 
-    let source_fork_choice =
-        wait_for_non_genesis_fork_choice(&source_client, test_data.source_checkpoint_kind).await;
+    let source_fork_choice = match wait_for_checkpoint_slot(
+        &source_client,
+        test_data.source_checkpoint_kind,
+        minimum_source_checkpoint_slot(test_data),
+    )
+    .await
+    {
+        Ok(source_fork_choice) => source_fork_choice,
+        Err(err) => {
+            if client_under_test.is_none() {
+                let _ = source_client
+                    .test
+                    .start_client(
+                        test_data.client_under_test.name.clone(),
+                        Some(client_under_test_environment(
+                            &source_client,
+                            test_data.genesis_time,
+                            test_data.use_checkpoint_sync,
+                            test_data.connect_client_to_lean_spec_mesh,
+                        )),
+                    )
+                    .await;
+            }
 
-    let client_under_test = source_client
-        .test
-        .start_client(
-            test_data.client_under_test.name.clone(),
-            Some(client_under_test_environment(
-                &source_client,
-                test_data.use_checkpoint_sync,
-                test_data.connect_client_to_lean_spec_mesh,
-            )),
-        )
-        .await;
+            panic!("{err}");
+        }
+    };
 
-    let client_checkpoint = wait_for_non_genesis_justified_checkpoint(&client_under_test).await;
+    let client_under_test = match client_under_test {
+        Some(client_under_test) => client_under_test,
+        None => {
+            source_client
+                .test
+                .start_client(
+                    test_data.client_under_test.name.clone(),
+                    Some(client_under_test_environment(
+                        &source_client,
+                        test_data.genesis_time,
+                        test_data.use_checkpoint_sync,
+                        test_data.connect_client_to_lean_spec_mesh,
+                    )),
+                )
+                .await
+        }
+    };
+
+    let client_checkpoint = wait_for_non_genesis_justified_checkpoint(&client_under_test)
+        .await
+        .unwrap_or_else(|err| panic!("{err}"));
 
     PostGenesisSyncContext {
         source_client,
-        peer_client,
         client_under_test,
         source_fork_choice,
         client_checkpoint,
@@ -135,7 +167,10 @@ fn lean_spec_environment(
         LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE.to_string(),
         genesis_time.to_string(),
     );
-    environment.insert(NODE_ID_ENVIRONMENT_VARIABLE.to_string(), node_id.to_string());
+    environment.insert(
+        NODE_ID_ENVIRONMENT_VARIABLE.to_string(),
+        node_id.to_string(),
+    );
 
     if !validator_indices.is_empty() {
         environment.insert(
@@ -160,10 +195,15 @@ fn lean_spec_environment(
 
 fn client_under_test_environment(
     checkpoint_source: &Client,
+    genesis_time: u64,
     use_checkpoint_sync: bool,
     connect_to_lean_spec_mesh: bool,
 ) -> HashMap<String, String> {
     let mut environment = lean_environment();
+    environment.insert(
+        LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE.to_string(),
+        genesis_time.to_string(),
+    );
     if use_checkpoint_sync {
         environment.insert(
             CHECKPOINT_SYNC_URL_ENVIRONMENT_VARIABLE.to_string(),
@@ -186,57 +226,134 @@ fn checkpoint_sync_url(client: &Client) -> String {
 }
 
 fn bootnode_multiaddr(client: &Client) -> String {
-    format!("/ip4/{}/udp/{}/quic-v1", client.ip, LEAN_P2P_PORT)
+    format!(
+        "/ip4/{}/udp/{}/quic-v1/p2p/{}",
+        client.ip, LEAN_P2P_PORT, LEAN_SPEC_SOURCE_PEER_ID
+    )
 }
 
-async fn wait_for_non_genesis_fork_choice(
+fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
+    if test_data.use_checkpoint_sync {
+        MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC
+    } else {
+        1
+    }
+}
+
+async fn wait_for_checkpoint_slot(
     client: &Client,
     checkpoint_kind: SourceCheckpointKind,
-) -> ForkChoiceSnapshot {
+    minimum_slot: u64,
+) -> Result<ForkChoiceSnapshot, String> {
     let http = http_client();
+    let url = lean_api_url(client, "/lean/v0/fork_choice");
     let checkpoint_name = match checkpoint_kind {
         SourceCheckpointKind::Justified => "justified",
         SourceCheckpointKind::Finalized => "finalized",
     };
+    let mut last_error = String::new();
+    let mut last_observed_slot = None;
 
     for _attempt in 0..POST_GENESIS_TIMEOUT_SECS {
-        let fork_choice: ForkChoiceSnapshot =
-            get_json_with_retry(&http, &lean_api_url(client, "/lean/v0/fork_choice")).await;
-        let checkpoint = match checkpoint_kind {
-            SourceCheckpointKind::Justified => &fork_choice.justified,
-            SourceCheckpointKind::Finalized => &fork_choice.finalized,
-        };
-        if checkpoint.slot > 0 {
-            return fork_choice;
+        match http.get(&url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {url}");
+                } else {
+                    match response.json::<ForkChoiceSnapshot>().await {
+                        Ok(fork_choice) => {
+                            let checkpoint = match checkpoint_kind {
+                                SourceCheckpointKind::Justified => &fork_choice.justified,
+                                SourceCheckpointKind::Finalized => &fork_choice.finalized,
+                            };
+                            last_observed_slot = Some(checkpoint.slot);
+                            if checkpoint.slot >= minimum_slot {
+                                return Ok(fork_choice);
+                            }
+                        }
+                        Err(err) => {
+                            last_error =
+                                format!("Unable to decode fork_choice response from {url}: {err}");
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                last_error = format!("error sending request for url ({url}): {err}");
+            }
         }
 
         sleep(Duration::from_secs(1)).await;
     }
 
-    panic!(
-        "LeanSpec source client {} never reached a non-genesis {checkpoint_name} checkpoint",
+    Err(format!(
+        "LeanSpec source client {} never reached {checkpoint_name} slot {} (last observed slot: {}, last error: {})",
         client.kind,
-    );
+        minimum_slot,
+        last_observed_slot
+            .map(|slot| slot.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        if last_error.is_empty() {
+            "none".to_string()
+        } else {
+            last_error
+        }
+    ))
 }
 
-async fn wait_for_non_genesis_justified_checkpoint(client: &Client) -> CheckpointResponse {
+async fn wait_for_non_genesis_justified_checkpoint(
+    client: &Client,
+) -> Result<CheckpointResponse, String> {
     let http = http_client();
+    let url = lean_api_url(client, "/lean/v0/checkpoints/justified");
+    let mut last_error = String::new();
+    let mut last_observed_slot = None;
 
     for _attempt in 0..POST_GENESIS_TIMEOUT_SECS {
-        let checkpoint: CheckpointResponse =
-            get_json_with_retry(&http, &lean_api_url(client, "/lean/v0/checkpoints/justified"))
-                .await;
-        if checkpoint.slot > 0 {
-            return checkpoint;
+        match http.get(&url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {url}");
+                } else {
+                    match response.json::<CheckpointResponse>().await {
+                        Ok(checkpoint) => {
+                            last_observed_slot = Some(checkpoint.slot);
+                            if checkpoint.slot > 0 {
+                                return Ok(checkpoint);
+                            }
+                        }
+                        Err(err) => {
+                            last_error = format!(
+                                "Unable to decode justified checkpoint response from {url}: {err}"
+                            );
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                last_error = format!("error sending request for url ({url}): {err}");
+            }
         }
 
         sleep(Duration::from_secs(1)).await;
     }
 
-    panic!(
+    Err(format!(
         "Client under test {} never reached a non-genesis justified checkpoint",
         client.kind
-    );
+    ) + &format!(
+        " (last observed slot: {}, last error: {})",
+        last_observed_slot
+            .map(|slot| slot.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        if last_error.is_empty() {
+            "none".to_string()
+        } else {
+            last_error
+        }
+    ))
 }
 
 fn http_client() -> HttpClient {

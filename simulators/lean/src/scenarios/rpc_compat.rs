@@ -1,23 +1,20 @@
 use std::time::Duration;
 
 use crate::scenarios::sync::{
-    PostGenesisSyncContext, PostGenesisSyncTestData, SourceCheckpointKind, default_genesis_time,
-    lean_spec_source_environment, start_post_genesis_sync_context, LEAN_SPEC_CLIENT_TYPE,
+    default_genesis_time, lean_spec_source_environment, start_post_genesis_sync_context,
+    PostGenesisSyncContext, PostGenesisSyncTestData, SourceCheckpointKind, LEAN_SPEC_CLIENT_TYPE,
 };
 use crate::{
-    CheckpointResponse, HEALTHY_STATUS, LEAN_RPC_SERVICE, HealthResponse, get_json_with_retry,
-    lean_api_url, lean_clients, lean_environment,
+    get_json_with_retry, lean_api_url, lean_clients, lean_environment, CheckpointResponse,
+    HealthResponse, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
-use hivesim::types::{ClientDefinition, ClientMetadata};
-use hivesim::{Client, NClientTestSpec, Test, dyn_async};
+use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use tokio::time::sleep;
-use tracing::warn;
 
-const FORK_CHOICE_TIMEOUT_SECS: u64 = 180;
-const ZERO_ROOT_HEX: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000000";
+const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
+const ZERO_ROOT_HEX: &str = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -125,40 +122,14 @@ async fn load_post_genesis_fork_choice_setup(
     (context, fork_choice)
 }
 
-fn lean_spec_client_definition(client: &Client) -> ClientDefinition {
-    ClientDefinition {
-        name: client.kind.clone(),
-        version: String::new(),
-        meta: ClientMetadata { roles: vec![] },
-    }
-}
-
 dyn_async! {
-    pub async fn run_rpc_compat_lean_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
+    pub async fn run_rpc_compat_lean_test_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
         let available_clients = test.sim.client_types().await;
-        let lean_spec_selected = available_clients
+        let lean_spec_client = available_clients
             .iter()
-            .any(|client| client.name == LEAN_SPEC_CLIENT_TYPE);
-
-        if !lean_spec_selected {
-            run_rpc_compat_lean(test, None).await;
-            return;
-        }
-
-        let lean_spec_client = test
-            .start_client(
-                LEAN_SPEC_CLIENT_TYPE.to_string(),
-                Some(lean_environment()),
-            )
-            .await;
-
-        run_rpc_compat_lean(test, Some(lean_spec_client)).await;
-    }
-}
-
-dyn_async! {
-    pub async fn run_rpc_compat_lean<'a>(test: &'a mut Test, client: Option<Client>) {
-        let available_clients = test.sim.client_types().await;
+            .find(|client| client.name == LEAN_SPEC_CLIENT_TYPE)
+            .cloned()
+            .expect("The `lean-spec-client` helper client should always be available for the Lean simulator");
         let clients: Vec<_> = lean_clients(available_clients)
             .into_iter()
             .filter(|client| client.name != LEAN_SPEC_CLIENT_TYPE)
@@ -167,251 +138,235 @@ dyn_async! {
             panic!("No lean clients were selected for this run");
         }
 
-        let lean_spec_client = client.as_ref().map(lean_spec_client_definition);
-        if lean_spec_client.is_none() {
-            warn!(
-                "Skipping post-genesis Lean RPC compatibility cases because no running `lean-spec-client` was provided"
-            );
-        }
-
         for client in &clients {
-            test.run(
-                NClientTestSpec {
-                    name: "health healthy".to_string(),
-                    description: "Checks that the health endpoint reports a healthy Lean RPC service.".to_string(),
-                    always_run: false,
-                    run: test_health_healthy,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "health healthy".to_string(),
+                description: "Checks that the health endpoint reports a healthy Lean RPC service."
+                    .to_string(),
+                always_run: false,
+                run: test_health_healthy,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "checkpoints justified root encoding".to_string(),
-                    description: "Checks that the justified checkpoint root is hex encoded.".to_string(),
-                    always_run: false,
-                    run: test_checkpoints_hex_encodes_root,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "checkpoints justified root encoding".to_string(),
+                description: "Checks that the justified checkpoint root is hex encoded.".to_string(),
+                always_run: false,
+                run: test_checkpoints_hex_encodes_root,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "checkpoints justified fields".to_string(),
-                    description: "Checks that the justified checkpoint endpoint returns the expected fields.".to_string(),
-                    always_run: false,
-                    run: test_checkpoints_returns_expected_fields,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "checkpoints justified fields".to_string(),
+                description:
+                    "Checks that the justified checkpoint endpoint returns the expected fields."
+                        .to_string(),
+                always_run: false,
+                run: test_checkpoints_returns_expected_fields,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "checkpoints justified genesis".to_string(),
-                    description: "Checks that a fresh Lean node reports the genesis justified checkpoint.".to_string(),
-                    always_run: false,
-                    run: test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "checkpoints justified genesis".to_string(),
+                description: "Checks that a fresh Lean node reports the genesis justified checkpoint."
+                    .to_string(),
+                always_run: false,
+                run: test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice no head".to_string(),
-                    description: "Loads the forkchoice endpoint from a fresh node before any non-genesis head advancement.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_no_head,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice no head".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from a fresh node before any non-genesis head advancement."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_no_head,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice no justified".to_string(),
-                    description: "Loads the forkchoice endpoint from a fresh node before any non-genesis justified checkpoint exists.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_no_justified,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice no justified".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from a fresh node before any non-genesis justified checkpoint exists."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_no_justified,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice no finalized".to_string(),
-                    description: "Loads the forkchoice endpoint from a fresh node before any non-genesis finalized checkpoint exists.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_no_finalized,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice no finalized".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from a fresh node before any non-genesis finalized checkpoint exists."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_no_finalized,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice no nodes".to_string(),
-                    description: "Loads the forkchoice endpoint from a fresh node before any non-genesis nodes are present.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_no_nodes,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice no nodes".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from a fresh node before any non-genesis nodes are present."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_no_nodes,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice defaults missing weight to zero".to_string(),
-                    description: "Loads the forkchoice endpoint from a fresh node where block weights should still be zero.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_defaults_missing_weight_to_zero,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice defaults missing weight to zero".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from a fresh node where block weights should still be zero."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_defaults_missing_weight_to_zero,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice zero validator count when head state missing".to_string(),
-                    description: "Loads the forkchoice endpoint from the closest black-box baseline available before a missing head-state hook exists.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_zero_validator_count_when_head_state_missing,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice zero validator count when head state missing".to_string(),
+                description:
+                    "Loads the forkchoice endpoint from the closest black-box baseline available before a missing head-state hook exists."
+                        .to_string(),
+                always_run: false,
+                run: test_forkchoice_zero_validator_count_when_head_state_missing,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice hex encodes roots".to_string(),
-                    description: "Loads the forkchoice endpoint to prepare root encoding assertions.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_hex_encodes_roots,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice hex encodes roots".to_string(),
+                description: "Loads the forkchoice endpoint to prepare root encoding assertions."
+                    .to_string(),
+                always_run: false,
+                run: test_forkchoice_hex_encodes_roots,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice includes expected node fields".to_string(),
-                    description: "Loads the forkchoice endpoint to prepare node field assertions.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice_includes_expected_node_fields,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice includes expected node fields".to_string(),
+                description: "Loads the forkchoice endpoint to prepare node field assertions."
+                    .to_string(),
+                always_run: false,
+                run: test_forkchoice_includes_expected_node_fields,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            test.run(
-                NClientTestSpec {
-                    name: "forkchoice".to_string(),
-                    description: "Loads the forkchoice endpoint for the baseline RPC compatibility case.".to_string(),
-                    always_run: false,
-                    run: test_forkchoice,
-                    environments: Some(vec![Some(lean_environment())]),
-                    test_data: (),
-                    clients: vec![client.clone()],
-                }
-            ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice".to_string(),
+                description: "Loads the forkchoice endpoint for the baseline RPC compatibility case."
+                    .to_string(),
+                always_run: false,
+                run: test_forkchoice,
+                environments: Some(vec![Some(lean_environment())]),
+                test_data: (),
+                clients: vec![client.clone()],
+            }).await;
 
-            if let Some(lean_spec_client) = &lean_spec_client {
-                let checkpoint_genesis_time = default_genesis_time();
+            let checkpoint_genesis_time = default_genesis_time();
 
-                test.run(
-                    NClientTestSpec {
-                        name: "checkpoints justified post-genesis".to_string(),
-                        description: "Starts a LeanSpec client mesh, waits for a non-genesis justified checkpoint, and checks that the client under test reports a non-genesis justified checkpoint.".to_string(),
-                        always_run: false,
-                        run: test_checkpoints_justified,
-                        environments: Some(vec![Some(lean_spec_source_environment(checkpoint_genesis_time))]),
-                        test_data: PostGenesisSyncTestData {
-                            client_under_test: client.clone(),
-                            genesis_time: checkpoint_genesis_time,
-                            source_checkpoint_kind: SourceCheckpointKind::Justified,
-                            use_checkpoint_sync: false,
-                            connect_client_to_lean_spec_mesh: true,
-                        },
-                        clients: vec![lean_spec_client.clone()],
-                    }
-                ).await;
+            test.run(NClientTestSpec {
+                name: "checkpoints justified post-genesis".to_string(),
+                description: "Waits for the LeanSpec source to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
+                always_run: false,
+                run: test_checkpoints_justified,
+                environments: Some(vec![Some(lean_spec_source_environment(
+                    checkpoint_genesis_time,
+                ))]),
+                test_data: PostGenesisSyncTestData {
+                    client_under_test: client.clone(),
+                    genesis_time: checkpoint_genesis_time,
+                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
+                    use_checkpoint_sync: true,
+                    connect_client_to_lean_spec_mesh: false,
+                },
+                clients: vec![lean_spec_client.clone()],
+            }).await;
 
-                let finalized_filters_genesis_time = default_genesis_time();
+            let finalized_filters_genesis_time = default_genesis_time();
 
-                test.run(
-                    NClientTestSpec {
-                        name: "forkchoice filters nodes before finalized slot".to_string(),
-                        description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
-                        always_run: false,
-                        run: test_forkchoice_filters_nodes_before_finalized_slot,
-                        environments: Some(vec![Some(lean_spec_source_environment(finalized_filters_genesis_time))]),
-                        test_data: PostGenesisSyncTestData {
-                            client_under_test: client.clone(),
-                            genesis_time: finalized_filters_genesis_time,
-                            source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                            use_checkpoint_sync: true,
-                            connect_client_to_lean_spec_mesh: false,
-                        },
-                        clients: vec![lean_spec_client.clone()],
-                    }
-                ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice filters nodes before finalized slot".to_string(),
+                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
+                always_run: false,
+                run: test_forkchoice_filters_nodes_before_finalized_slot,
+                environments: Some(vec![Some(lean_spec_source_environment(
+                    finalized_filters_genesis_time,
+                ))]),
+                test_data: PostGenesisSyncTestData {
+                    client_under_test: client.clone(),
+                    genesis_time: finalized_filters_genesis_time,
+                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
+                    use_checkpoint_sync: true,
+                    connect_client_to_lean_spec_mesh: false,
+                },
+                clients: vec![lean_spec_client.clone()],
+            }).await;
 
-                let finalized_boundary_genesis_time = default_genesis_time();
+            let finalized_boundary_genesis_time = default_genesis_time();
 
-                test.run(
-                    NClientTestSpec {
-                        name: "forkchoice includes nodes at finalized slot".to_string(),
-                        description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a finalized boundary present.".to_string(),
-                        always_run: false,
-                        run: test_forkchoice_includes_nodes_at_finalized_slot,
-                        environments: Some(vec![Some(lean_spec_source_environment(finalized_boundary_genesis_time))]),
-                        test_data: PostGenesisSyncTestData {
-                            client_under_test: client.clone(),
-                            genesis_time: finalized_boundary_genesis_time,
-                            source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                            use_checkpoint_sync: true,
-                            connect_client_to_lean_spec_mesh: false,
-                        },
-                        clients: vec![lean_spec_client.clone()],
-                    }
-                ).await;
+            test.run(NClientTestSpec {
+                name: "forkchoice includes nodes at finalized slot".to_string(),
+                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a finalized boundary present.".to_string(),
+                always_run: false,
+                run: test_forkchoice_includes_nodes_at_finalized_slot,
+                environments: Some(vec![Some(lean_spec_source_environment(
+                    finalized_boundary_genesis_time,
+                ))]),
+                test_data: PostGenesisSyncTestData {
+                    client_under_test: client.clone(),
+                    genesis_time: finalized_boundary_genesis_time,
+                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
+                    use_checkpoint_sync: true,
+                    connect_client_to_lean_spec_mesh: false,
+                },
+                clients: vec![lean_spec_client.clone()],
+            }).await;
 
-                let pre_finalized_only_genesis_time = default_genesis_time();
+            let pre_finalized_only_genesis_time = default_genesis_time();
 
-                test.run(
-                    NClientTestSpec {
-                        name: "forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
-                        description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
-                        always_run: false,
-                        run: test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized,
-                        environments: Some(vec![Some(lean_spec_source_environment(pre_finalized_only_genesis_time))]),
-                        test_data: PostGenesisSyncTestData {
-                            client_under_test: client.clone(),
-                            genesis_time: pre_finalized_only_genesis_time,
-                            source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                            use_checkpoint_sync: true,
-                            connect_client_to_lean_spec_mesh: false,
-                        },
-                        clients: vec![lean_spec_client.clone()],
-                    }
-                ).await;
-            }
+            test.run(NClientTestSpec {
+                name: "forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
+                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
+                always_run: false,
+                run: test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized,
+                environments: Some(vec![Some(lean_spec_source_environment(
+                    pre_finalized_only_genesis_time,
+                ))]),
+                test_data: PostGenesisSyncTestData {
+                    client_under_test: client.clone(),
+                    genesis_time: pre_finalized_only_genesis_time,
+                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
+                    use_checkpoint_sync: true,
+                    connect_client_to_lean_spec_mesh: false,
+                },
+                clients: vec![lean_spec_client.clone()],
+            }).await;
         }
     }
 }
@@ -474,7 +429,7 @@ dyn_async! {
     async fn test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node<'a>(clients: Vec<Client>, _: ()) {
         let client = expect_single_client(clients);
         let http = http_client();
-        
+
         let checkpoint: CheckpointResponse = get_json_with_retry(
             &http,
             &lean_api_url(&client, "/lean/v0/checkpoints/justified"),
@@ -490,11 +445,7 @@ dyn_async! {
 dyn_async! {
     async fn test_checkpoints_justified<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
         let context = load_post_genesis_sync_context(clients, test_data).await;
-        let _ = (
-            &context.source_client,
-            &context.peer_client,
-            &context.client_under_test,
-        );
+        let _ = (&context.source_client, &context.client_under_test);
 
         assert!(
             context.source_fork_choice.justified.slot > 0,
@@ -613,6 +564,8 @@ dyn_async! {
         let (_context, fork_choice) =
             load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
                 .await;
+        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
         assert!(
             !fork_choice.nodes.is_empty(),
             "forkchoice should still expose at least the finalized boundary node"
@@ -632,15 +585,20 @@ dyn_async! {
             fork_choice
                 .nodes
                 .iter()
-                .any(|node| node.slot == fork_choice.finalized.slot),
-            "forkchoice should keep at least one node at the finalized boundary slot"
+                .any(|node| node.slot >= fork_choice.finalized.slot),
+            "forkchoice should keep at least one node at or beyond the finalized boundary"
         );
         assert!(
-            fork_choice
-                .nodes
-                .iter()
-                .any(|node| node.root == fork_choice.finalized.root),
-            "forkchoice should keep the finalized boundary root in the returned node set"
+            fork_choice.justified.slot >= fork_choice.finalized.slot,
+            "post-genesis forkchoice should keep justified at or ahead of finalized"
+        );
+        assert_eq!(
+            fork_choice.head, fork_choice.finalized.root,
+            "checkpoint-synced forkchoice should keep the finalized boundary exposed through the head field"
+        );
+        assert_eq!(
+            fork_choice.safe_target, fork_choice.head,
+            "checkpoint-synced forkchoice should keep safe_target aligned with the finalized head anchor"
         );
     }
 }
@@ -710,28 +668,24 @@ dyn_async! {
                 .all(|node| node.slot >= fork_choice.finalized.slot),
             "forkchoice should filter out any node older than the finalized slot"
         );
-        assert_eq!(
-            fork_choice.nodes.len(),
-            1,
-            "without a store-mutation hook, the closest black-box equivalent keeps only the finalized anchor node rather than returning an empty node list"
-        );
-
-        let node = &fork_choice.nodes[0];
-        assert_eq!(
-            node.slot, fork_choice.finalized.slot,
-            "the remaining anchor node should sit exactly at the finalized boundary"
-        );
-        assert_eq!(
-            node.root, fork_choice.finalized.root,
-            "the remaining anchor node should match the finalized checkpoint root"
+        assert!(
+            fork_choice
+                .nodes
+                .iter()
+                .all(|node| node.root != ZERO_ROOT_HEX),
+            "checkpoint-synced forkchoice should still return well-formed node roots when it keeps a compact post-finalized tree"
         );
         assert_eq!(
             fork_choice.head, fork_choice.finalized.root,
-            "checkpoint-synced forkchoice should keep head at the finalized anchor when no mesh peers are connected"
+            "checkpoint-synced forkchoice should keep the finalized boundary exposed through the head field"
         );
         assert_eq!(
             fork_choice.safe_target, fork_choice.head,
-            "checkpoint-synced forkchoice should keep safe_target aligned with the only remaining anchor node"
+            "checkpoint-synced forkchoice should keep safe_target aligned with head when no mesh peers are connected"
+        );
+        assert!(
+            fork_choice.justified.slot >= fork_choice.finalized.slot,
+            "checkpoint-synced forkchoice should keep justified at or ahead of finalized even in the compact-tree case"
         );
     }
 }

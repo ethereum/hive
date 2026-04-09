@@ -8,12 +8,14 @@ from pathlib import Path
 
 import yaml
 
-KEYS_DIR = Path("/app/packages/testing/src/consensus_testing/test_keys/prod_scheme")
+KEYS_DIR = Path("/app/hive/prod_scheme")
 OUTPUT_DIR = Path("/tmp/lean-spec-client")
 GENESIS_DIR = OUTPUT_DIR / "genesis"
 KEYS_OUT_DIR = OUTPUT_DIR / "keys"
 MANIFEST_DIR = KEYS_OUT_DIR / "hash-sig-keys"
 VALIDATOR_COUNT = 3
+GENESIS_PUBKEY_FIELD = "attestation_public"
+GENESIS_SECRET_FIELD = "attestation_secret"
 
 
 def load_validator(index: int) -> dict[str, str]:
@@ -42,11 +44,7 @@ def write_genesis(validators: list[dict[str, str]], genesis_time: int) -> None:
         "GENESIS_TIME": genesis_time,
         "NUM_VALIDATORS": len(validators),
         "GENESIS_VALIDATORS": [
-            {
-                "attestation_pubkey": f"0x{validator['attestation_public']}",
-                "proposal_pubkey": f"0x{validator['proposal_public']}",
-            }
-            for validator in validators
+            f"0x{validator[GENESIS_PUBKEY_FIELD]}" for validator in validators
         ],
     }
 
@@ -62,7 +60,7 @@ def write_validator_keys(
 
     manifest = {
         "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
-        "hash_function": "Poseidon1",
+        "hash_function": "Poseidon2",
         "encoding": "TargetSum",
         "lifetime": 32,
         "log_num_active_epochs": 5,
@@ -72,21 +70,17 @@ def write_validator_keys(
     }
 
     for index, validator in enumerate(validators):
-        attestation_file = f"validator_{index}_attestation.ssz"
-        proposal_file = f"validator_{index}_proposal.ssz"
+        secret_key_file = f"validator_{index}_sk.ssz"
 
-        (MANIFEST_DIR / attestation_file).write_bytes(
-            bytes.fromhex(validator["attestation_secret"])
+        (MANIFEST_DIR / secret_key_file).write_bytes(
+            bytes.fromhex(validator[GENESIS_SECRET_FIELD])
         )
-        (MANIFEST_DIR / proposal_file).write_bytes(bytes.fromhex(validator["proposal_secret"]))
 
         manifest["validators"].append(
             {
                 "index": index,
-                "attestation_pubkey_hex": f"0x{validator['attestation_public']}",
-                "proposal_pubkey_hex": f"0x{validator['proposal_public']}",
-                "attestation_privkey_file": attestation_file,
-                "proposal_privkey_file": proposal_file,
+                "pubkey_hex": f"0x{validator[GENESIS_PUBKEY_FIELD]}",
+                "privkey_file": secret_key_file,
             }
         )
 

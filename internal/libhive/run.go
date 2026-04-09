@@ -21,6 +21,42 @@ var (
 	errSimTimeout   = errors.New("simulation timed out")
 )
 
+const (
+	leanSimulatorName  = "lean"
+	leanSpecClientName = "lean-spec-client"
+)
+
+func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simList []string) []ClientDesignator {
+	if !containsSimulator(simList, leanSimulatorName) {
+		return clientList
+	}
+	if _, ok := inv.Clients[leanSpecClientName]; !ok {
+		return clientList
+	}
+	if containsClientDesignator(clientList, leanSpecClientName) {
+		return clientList
+	}
+	return append(clientList, ClientDesignator{Client: leanSpecClientName})
+}
+
+func containsSimulator(simList []string, simulator string) bool {
+	for _, sim := range simList {
+		if sim == simulator {
+			return true
+		}
+	}
+	return false
+}
+
+func containsClientDesignator(clientList []ClientDesignator, clientName string) bool {
+	for _, client := range clientList {
+		if client.Client == clientName || client.Name() == clientName {
+			return true
+		}
+	}
+	return false
+}
+
 // Runner executes a simulation runs.
 type Runner struct {
 	inv       Inventory
@@ -42,6 +78,7 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 
 // Build builds client and simulator images.
 func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string, simBuildArgs map[string]string) error {
+	clientList = ensureLeanHelperClient(r.inv, clientList, simList)
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
@@ -166,7 +203,11 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		// Unspecified, make all clients available.
 		clientDefs = append(clientDefs, r.clientDefs...)
 	} else {
-		for _, client := range env.ClientList {
+		clientList := env.ClientList
+		if sim == leanSimulatorName {
+			clientList = ensureLeanHelperClient(r.inv, clientList, []string{sim})
+		}
+		for _, client := range clientList {
 			found := false
 			for _, def := range r.clientDefs {
 				if def.Name == client.Client {
