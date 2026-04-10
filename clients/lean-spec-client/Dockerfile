@@ -32,6 +32,7 @@ FROM python:3.12-slim
 ARG tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -55,12 +56,19 @@ ENV LEAN_ENV=prod \
 
 USER root
 
-COPY download_leanspec_prod_keys.py /app/hive/download_leanspec_prod_keys.py
 COPY leanspec-client.sh /app/hive/leanspec-client.sh
 COPY lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
-COPY prepare_leanspec_assets.py /app/hive/prepare_leanspec_assets.py
 
-RUN python /app/hive/download_leanspec_prod_keys.py \
+RUN mkdir -p /app/hive/prod_scheme /tmp/leansig \
+    && curl -fsSL \
+        https://github.com/leanEthereum/leansig-test-keys/releases/download/leanSpec-ad9a3226/prod_scheme.tar.gz \
+        -o /tmp/leansig/prod_scheme.tar.gz \
+    && tar --warning=no-unknown-keyword -xzf /tmp/leansig/prod_scheme.tar.gz -C /tmp/leansig \
+        prod_scheme/0.json \
+        prod_scheme/1.json \
+        prod_scheme/2.json \
+    && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme/ \
+    && rm -rf /tmp/leansig \
     && chown -R leanspec:leanspec /app /app/hive \
     && chmod +x /app/hive/leanspec-client.sh \
     && printf "lean-spec-client %s\n" "$tag" > /version.txt

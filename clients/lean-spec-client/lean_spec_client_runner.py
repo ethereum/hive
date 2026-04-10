@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import shutil
+import time
 from contextlib import suppress
 from pathlib import Path
 from typing import Final
 
+import yaml
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Checkpoint
@@ -22,6 +26,7 @@ from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.quic.connection import QuicConnectionManager
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.types import Bytes32
 
@@ -29,10 +34,14 @@ GOSSIP_FORK_DIGEST: Final = "devnet0"
 LISTEN_ADDR: Final = "/ip4/0.0.0.0/udp/9001/quic-v1"
 API_PORT: Final = 5052
 BOOTNODE_DIAL_TIMEOUT_SECS: Final = 10.0
+STATUS_REFRESH_INTERVAL_SECS: Final = 1.0
 DEFAULT_NODE_ID: Final = "lean_spec_0"
 PREPARED_ASSETS_DIR: Final = Path("/tmp/lean-spec-client")
+SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme")
+GENESIS_DIR: Final = PREPARED_ASSETS_DIR / "genesis"
 GENESIS_CONFIG_PATH: Final = PREPARED_ASSETS_DIR / "genesis" / "config.yaml"
 VALIDATOR_KEYS_DIR: Final = PREPARED_ASSETS_DIR / "keys"
+MANIFEST_DIR: Final = VALIDATOR_KEYS_DIR / "hash-sig-keys"
 VALIDATORS_YAML_PATH: Final = VALIDATOR_KEYS_DIR / "validators.yaml"
 VALIDATOR_MANIFEST_PATH: Final = (
     VALIDATOR_KEYS_DIR / "hash-sig-keys" / "validator-keys-manifest.yaml"
@@ -40,6 +49,12 @@ VALIDATOR_MANIFEST_PATH: Final = (
 HELPER_IDENTITY_PRIVATE_KEY_HEX: Final = (
     "1111111111111111111111111111111111111111111111111111111111111111"
 )
+HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: Final = (
+    "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY"
+)
+VALIDATOR_COUNT: Final = 3
+GENESIS_PUBKEY_FIELD: Final = "attestation_public"
+GENESIS_SECRET_FIELD: Final = "attestation_secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
 
@@ -58,6 +73,86 @@ def parse_bootnodes() -> list[str]:
         return []
 
     return [bootnode for bootnode in raw_bootnodes.split(",") if bootnode]
+
+
+def parse_validator_indices() -> list[int]:
+    raw_indices = os.environ.get("HIVE_LEAN_VALIDATOR_INDICES", "")
+    if not raw_indices:
+        return []
+
+    return [int(index) for index in raw_indices.split(",") if index]
+
+
+def load_validator(index: int) -> dict[str, str]:
+    with (SOURCE_KEYS_DIR / f"{index}.json").open(encoding="utf-8") as key_file:
+        return json.load(key_file)
+
+
+def prepare_output_dirs() -> None:
+    if PREPARED_ASSETS_DIR.exists():
+        shutil.rmtree(PREPARED_ASSETS_DIR)
+
+    GENESIS_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def write_genesis(validators: list[dict[str, str]], genesis_time: int) -> None:
+    genesis = {
+        "GENESIS_TIME": genesis_time,
+        "NUM_VALIDATORS": len(validators),
+        "GENESIS_VALIDATORS": [
+            f"0x{validator[GENESIS_PUBKEY_FIELD]}" for validator in validators
+        ],
+    }
+
+    with GENESIS_CONFIG_PATH.open("w", encoding="utf-8") as genesis_file:
+        yaml.safe_dump(genesis, genesis_file, sort_keys=False)
+
+
+def write_validator_keys(
+    validators: list[dict[str, str]], node_id: str, validator_indices: list[int]
+) -> None:
+    with VALIDATORS_YAML_PATH.open("w", encoding="utf-8") as validators_file:
+        yaml.safe_dump({node_id: validator_indices}, validators_file, sort_keys=False)
+
+    manifest = {
+        "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+        "hash_function": "Poseidon2",
+        "encoding": "TargetSum",
+        "lifetime": 32,
+        "log_num_active_epochs": 5,
+        "num_active_epochs": 32,
+        "num_validators": len(validators),
+        "validators": [],
+    }
+
+    for index, validator in enumerate(validators):
+        secret_key_file = f"validator_{index}_sk.ssz"
+
+        (MANIFEST_DIR / secret_key_file).write_bytes(
+            bytes.fromhex(validator[GENESIS_SECRET_FIELD])
+        )
+
+        manifest["validators"].append(
+            {
+                "index": index,
+                "pubkey_hex": f"0x{validator[GENESIS_PUBKEY_FIELD]}",
+                "privkey_file": secret_key_file,
+            }
+        )
+
+    with VALIDATOR_MANIFEST_PATH.open("w", encoding="utf-8") as manifest_file:
+        yaml.safe_dump(manifest, manifest_file, sort_keys=False)
+
+
+def prepare_runtime_assets(node_id: str) -> None:
+    genesis_time = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", int(time.time()) + 30))
+    validator_indices = parse_validator_indices()
+    validators = [load_validator(index) for index in range(VALIDATOR_COUNT)]
+
+    prepare_output_dirs()
+    write_genesis(validators, genesis_time)
+    write_validator_keys(validators, node_id, validator_indices)
 
 
 def resolve_bootnode(bootnode: str) -> str:
@@ -119,6 +214,29 @@ def subscribe_gossip_topics(
         event_source.subscribe_gossip_topic(topic)
 
 
+def current_status(node: Node) -> Status:
+    store = node.sync_service.store
+    head_root = store.head
+    head_block = store.blocks[head_root]
+    return Status(
+        finalized=store.latest_finalized,
+        head=Checkpoint(root=head_root, slot=head_block.slot),
+    )
+
+
+def refresh_status(event_source: LiveNetworkEventSource, node: Node) -> None:
+    event_source.set_status(current_status(node))
+
+
+async def keep_status_current(
+    event_source: LiveNetworkEventSource,
+    node: Node,
+) -> None:
+    while True:
+        refresh_status(event_source, node)
+        await asyncio.sleep(STATUS_REFRESH_INTERVAL_SECS)
+
+
 async def start_listener_and_gossipsub(
     event_source: LiveNetworkEventSource,
 ) -> asyncio.Task[None]:
@@ -165,6 +283,7 @@ async def run() -> None:
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
+    prepare_runtime_assets(node_id)
     genesis = load_genesis()
     validator_registry = load_validator_registry(node_id)
     bootnodes = parse_bootnodes()
@@ -182,8 +301,12 @@ async def run() -> None:
         assigned_validators,
     )
 
+    identity_private_key_hex = os.environ.get(
+        HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+        HELPER_IDENTITY_PRIVATE_KEY_HEX,
+    )
     identity_key = IdentityKeypair.from_bytes(
-        Bytes32(bytes.fromhex(HELPER_IDENTITY_PRIVATE_KEY_HEX))
+        Bytes32(bytes.fromhex(identity_private_key_hex))
     )
     connection_manager = await QuicConnectionManager.create(identity_key)
     event_source = await LiveNetworkEventSource.create(connection_manager=connection_manager)
@@ -207,13 +330,24 @@ async def run() -> None:
         config=ApiServerConfig(port=API_PORT),
         store_getter=lambda: node.sync_service.store,
     )
+    refresh_status(event_source, node)
 
-    head_block = node.store.blocks[node.store.head]
-    status = Status(
-        finalized=node.store.latest_finalized,
-        head=Checkpoint(root=node.store.head, slot=head_block.slot),
-    )
-    event_source.set_status(status)
+    published_blocks: dict[Bytes32, object] = {}
+    if node.validator_service is not None:
+        original_on_block = node.validator_service.on_block
+
+        async def cache_and_publish_block(block: object) -> None:
+            block_root = hash_tree_root(block.message.block)
+            published_blocks[block_root] = block
+            await original_on_block(block)
+            refresh_status(event_source, node)
+
+        node.validator_service.on_block = cache_and_publish_block
+
+    async def lookup_published_block(root: Bytes32) -> object | None:
+        return published_blocks.get(root)
+
+    event_source.set_block_lookup(lookup_published_block)
 
     await dial_bootnodes(event_source, bootnodes)
     listener_task = await start_listener_and_gossipsub(event_source)
@@ -224,10 +358,14 @@ async def run() -> None:
         name="lean-spec-node",
     )
     api_task = asyncio.create_task(api_server.run(), name="lean-spec-api")
+    status_task = asyncio.create_task(
+        keep_status_current(event_source, node),
+        name="lean-spec-status",
+    )
 
     try:
         done, pending = await asyncio.wait(
-            {node_task, api_task},
+            {node_task, api_task, status_task},
             return_when=asyncio.FIRST_EXCEPTION,
         )
         for task in done:
@@ -246,6 +384,9 @@ async def run() -> None:
             await node_task
         with suppress(asyncio.CancelledError):
             await api_task
+        status_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await status_task
 
 
 def main() -> None:

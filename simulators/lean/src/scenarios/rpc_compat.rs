@@ -72,6 +72,8 @@ async fn wait_for_non_genesis_fork_choice_response(
     client: &Client,
     checkpoint_kind: SourceCheckpointKind,
 ) -> ForkChoiceResponse {
+    let mut stalled_post_genesis_attempts = 0;
+
     for _attempt in 0..FORK_CHOICE_TIMEOUT_SECS {
         let fork_choice = load_fork_choice_response(client).await;
         let checkpoint_slot = match checkpoint_kind {
@@ -80,6 +82,25 @@ async fn wait_for_non_genesis_fork_choice_response(
         };
         if checkpoint_slot > 0 {
             return fork_choice;
+        }
+
+        if matches!(checkpoint_kind, SourceCheckpointKind::Finalized) {
+            let has_post_genesis_progress = fork_choice.justified.slot > 0
+                || fork_choice.nodes.iter().any(|node| node.slot > 0);
+
+            if has_post_genesis_progress {
+                stalled_post_genesis_attempts += 1;
+                if stalled_post_genesis_attempts >= 30 {
+                    panic!(
+                        "Client {} advanced post-genesis but never reported a non-genesis finalized forkchoice checkpoint (justified slot: {}, max node slot: {})",
+                        client.kind,
+                        fork_choice.justified.slot,
+                        fork_choice.nodes.iter().map(|node| node.slot).max().unwrap_or(0)
+                    );
+                }
+            } else {
+                stalled_post_genesis_attempts = 0;
+            }
         }
 
         sleep(Duration::from_secs(1)).await;
@@ -331,10 +352,10 @@ dyn_async! {
             let finalized_boundary_genesis_time = default_genesis_time();
 
             test.run(NClientTestSpec {
-                name: "forkchoice includes nodes at finalized slot".to_string(),
-                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a finalized boundary present.".to_string(),
+                name: "forkchoice keeps nodes at or beyond finalized slot".to_string(),
+                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
                 always_run: false,
-                run: test_forkchoice_includes_nodes_at_finalized_slot,
+                run: test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot,
                 environments: Some(vec![Some(lean_spec_source_environment(
                     finalized_boundary_genesis_time,
                 ))]),
@@ -541,6 +562,7 @@ dyn_async! {
             load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
                 .await;
         assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
         assert!(
             !fork_choice.nodes.is_empty(),
             "forkchoice should still expose at least the finalized boundary node"
@@ -560,7 +582,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_includes_nodes_at_finalized_slot<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
+    async fn test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
         let (_context, fork_choice) =
             load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
                 .await;
@@ -592,14 +614,7 @@ dyn_async! {
             fork_choice.justified.slot >= fork_choice.finalized.slot,
             "post-genesis forkchoice should keep justified at or ahead of finalized"
         );
-        assert_eq!(
-            fork_choice.head, fork_choice.finalized.root,
-            "checkpoint-synced forkchoice should keep the finalized boundary exposed through the head field"
-        );
-        assert_eq!(
-            fork_choice.safe_target, fork_choice.head,
-            "checkpoint-synced forkchoice should keep safe_target aligned with the finalized head anchor"
-        );
+        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
     }
 }
 
@@ -654,10 +669,6 @@ dyn_async! {
                 .await;
         assert_hex_root(&fork_choice.head, "forkchoice head");
         assert!(
-            !fork_choice.nodes.is_empty(),
-            "checkpoint-synced forkchoice should still expose the finalized anchor node"
-        );
-        assert!(
             fork_choice.finalized.slot > 0,
             "post-genesis forkchoice setup should advance finalized beyond genesis"
         );
@@ -669,24 +680,18 @@ dyn_async! {
             "forkchoice should filter out any node older than the finalized slot"
         );
         assert!(
-            fork_choice
-                .nodes
-                .iter()
-                .all(|node| node.root != ZERO_ROOT_HEX),
-            "checkpoint-synced forkchoice should still return well-formed node roots when it keeps a compact post-finalized tree"
-        );
-        assert_eq!(
-            fork_choice.head, fork_choice.finalized.root,
-            "checkpoint-synced forkchoice should keep the finalized boundary exposed through the head field"
-        );
-        assert_eq!(
-            fork_choice.safe_target, fork_choice.head,
-            "checkpoint-synced forkchoice should keep safe_target aligned with head when no mesh peers are connected"
+            fork_choice.nodes.is_empty()
+                || fork_choice
+                    .nodes
+                    .iter()
+                    .all(|node| node.root != ZERO_ROOT_HEX),
+            "forkchoice should still return well-formed node roots when it exposes post-finalized nodes"
         );
         assert!(
             fork_choice.justified.slot >= fork_choice.finalized.slot,
-            "checkpoint-synced forkchoice should keep justified at or ahead of finalized even in the compact-tree case"
+            "post-genesis forkchoice should keep justified at or ahead of finalized"
         );
+        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
     }
 }
 
