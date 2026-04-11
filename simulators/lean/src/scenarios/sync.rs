@@ -10,6 +10,10 @@ use tokio::time::sleep;
 
 pub(crate) const LEAN_SPEC_CLIENT_TYPE: &str = "lean-spec-client";
 
+pub(crate) fn is_lean_spec_client_name(name: &str) -> bool {
+    name == LEAN_SPEC_CLIENT_TYPE || name.starts_with("lean-spec-client_")
+}
+
 const CHECKPOINT_SYNC_URL_ENVIRONMENT_VARIABLE: &str = "HIVE_CHECKPOINT_SYNC_URL";
 const BOOTNODES_ENVIRONMENT_VARIABLE: &str = "HIVE_BOOTNODES";
 const LEAN_GENESIS_VALIDATORS_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_VALIDATORS";

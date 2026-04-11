@@ -81,7 +81,13 @@ fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
 // This is statically done in code right now for the sake of getting a working version, later it will be changed to allow for a flag to specify
 // which devnet is being tested
 pub(crate) fn selected_lean_devnet() -> LeanDevnet {
-    LeanDevnet::Devnet3
+    match include_str!("../devnet.txt").trim() {
+        "devnet3" => LeanDevnet::Devnet3,
+        "devnet4" => LeanDevnet::Devnet4,
+        other => {
+            panic!("Unsupported Lean devnet selection `{other}` in simulators/lean/devnet.txt")
+        }
+    }
 }
 
 pub(crate) fn selected_lean_devnet_label() -> &'static str {

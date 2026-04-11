@@ -42,6 +42,9 @@ func NewBuilder(client *docker.Client, cfg *Config, auth *docker.AuthConfigurati
 func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDesignator) (string, error) {
 	dir := b.config.Inventory.ClientDirectory(client)
 	tag := fmt.Sprintf("hive/clients/%s:latest", client.Name())
+	if client.Nametag == "devnet3" || client.Nametag == "devnet4" {
+		tag = fmt.Sprintf("hive/clients/%s:%s", client.Client, client.Nametag)
+	}
 	dockerFile := client.Dockerfile()
 	err := b.buildImage(ctx, dir, dockerFile, tag, client.BuildArgs)
 	return tag, err

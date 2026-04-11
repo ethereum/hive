@@ -22,8 +22,13 @@ var (
 )
 
 const (
-	leanSimulatorName  = "lean"
-	leanSpecClientName = "lean-spec-client"
+	leanSimulatorName    = "lean"
+	leanSpecClientName   = "lean-spec-client"
+	leanRoleName         = "lean"
+	leanHelperRoleName   = "lean-helper"
+	leanDevnet3Label     = "devnet3"
+	leanDevnet4Label     = "devnet4"
+	leanDevnetConfigPath = "simulators/lean/devnet.txt"
 )
 
 func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simList []string) []ClientDesignator {
@@ -37,6 +42,63 @@ func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simLis
 		return clientList
 	}
 	return append(clientList, ClientDesignator{Client: leanSpecClientName})
+}
+
+func prepareLeanClientList(inv Inventory, clientList []ClientDesignator, simList []string) ([]ClientDesignator, error) {
+	if !containsSimulator(simList, leanSimulatorName) {
+		return clientList, nil
+	}
+
+	clientList = ensureLeanHelperClient(inv, clientList, simList)
+	devnetLabel, err := selectedLeanDevnetLabel(inv)
+	if err != nil {
+		return nil, err
+	}
+
+	prepared := make([]ClientDesignator, len(clientList))
+	copy(prepared, clientList)
+	for i := range prepared {
+		if !isLeanSimulationClient(inv, prepared[i].Client) {
+			continue
+		}
+		if prepared[i].Nametag == "" {
+			prepared[i].Nametag = devnetLabel
+		}
+	}
+	return prepared, nil
+}
+
+func selectedLeanDevnetLabel(inv Inventory) (string, error) {
+	configPath := filepath.Join(inv.BaseDir, leanDevnetConfigPath)
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", fmt.Errorf("unable to read Lean devnet selection from %s: %w", configPath, err)
+	}
+
+	label := strings.TrimSpace(string(content))
+	switch label {
+	case leanDevnet3Label, leanDevnet4Label:
+		return label, nil
+	default:
+		return "", fmt.Errorf("unsupported Lean devnet selection %q in %s", label, configPath)
+	}
+}
+
+func isLeanSimulationClient(inv Inventory, clientName string) bool {
+	if clientName == leanSpecClientName {
+		return true
+	}
+
+	client, ok := inv.Clients[clientName]
+	if !ok {
+		return false
+	}
+	for _, role := range client.Meta.Roles {
+		if role == leanRoleName || role == leanHelperRoleName {
+			return true
+		}
+	}
+	return false
 }
 
 func containsSimulator(simList []string, simulator string) bool {
@@ -78,7 +140,11 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 
 // Build builds client and simulator images.
 func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string, simBuildArgs map[string]string) error {
-	clientList = ensureLeanHelperClient(r.inv, clientList, simList)
+	var err error
+	clientList, err = prepareLeanClientList(r.inv, clientList, simList)
+	if err != nil {
+		return err
+	}
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
@@ -101,6 +167,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 	for _, client := range clientList {
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
+			slog.Error("client build failed", "client", client.Name(), "err", err)
 			continue
 		}
 		anyBuilt = true
@@ -205,7 +272,11 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 	} else {
 		clientList := env.ClientList
 		if sim == leanSimulatorName {
-			clientList = ensureLeanHelperClient(r.inv, clientList, []string{sim})
+			var err error
+			clientList, err = prepareLeanClientList(r.inv, clientList, []string{sim})
+			if err != nil {
+				return SimResult{}, err
+			}
 		}
 		for _, client := range clientList {
 			found := false

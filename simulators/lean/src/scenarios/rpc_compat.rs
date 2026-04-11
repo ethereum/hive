@@ -1,8 +1,9 @@
 use std::time::Duration;
 
 use crate::scenarios::sync::{
-    default_genesis_time, lean_spec_source_environment, start_post_genesis_sync_context,
-    PostGenesisSyncContext, PostGenesisSyncTestData, SourceCheckpointKind, LEAN_SPEC_CLIENT_TYPE,
+    default_genesis_time, is_lean_spec_client_name, lean_spec_source_environment,
+    start_post_genesis_sync_context, PostGenesisSyncContext, PostGenesisSyncTestData,
+    SourceCheckpointKind,
 };
 use crate::{
     get_json_with_retry, lean_api_url, lean_clients, lean_environment, selected_lean_devnet_label,
@@ -414,12 +415,12 @@ dyn_async! {
         let available_clients = test.sim.client_types().await;
         let lean_spec_client = available_clients
             .iter()
-            .find(|client| client.name == LEAN_SPEC_CLIENT_TYPE)
+            .find(|client| is_lean_spec_client_name(&client.name))
             .cloned()
             .expect("The `lean-spec-client` helper client should always be available for the Lean simulator");
         let clients: Vec<_> = lean_clients(available_clients)
             .into_iter()
-            .filter(|client| client.name != LEAN_SPEC_CLIENT_TYPE)
+            .filter(|client| !is_lean_spec_client_name(&client.name))
             .collect();
         if clients.is_empty() {
             panic!("No lean clients were selected for this run");

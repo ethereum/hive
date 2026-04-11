@@ -60,6 +60,8 @@ ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
 PROPOSAL_PUBKEY_FIELD: Final = "proposal_public"
 PROPOSAL_SECRET_FIELD: Final = "proposal_secret"
+LEGACY_PUBLIC_FIELD: Final = "public"
+LEGACY_SECRET_FIELD: Final = "secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
 
@@ -98,7 +100,33 @@ def uses_latest_leanspec_format() -> bool:
 
 def load_validator(index: int) -> dict[str, str]:
     with (source_keys_dir() / f"{index}.json").open(encoding="utf-8") as key_file:
-        return json.load(key_file)
+        validator = json.load(key_file)
+
+    if {
+        ATTESTATION_PUBKEY_FIELD,
+        ATTESTATION_SECRET_FIELD,
+        PROPOSAL_PUBKEY_FIELD,
+        PROPOSAL_SECRET_FIELD,
+    }.issubset(validator):
+        return validator
+
+    if {LEGACY_PUBLIC_FIELD, LEGACY_SECRET_FIELD}.issubset(validator):
+        # Latest published devnet4 helper bundles currently expose a single
+        # XMSS keypair per validator. LeanSpec still expects separate
+        # attestation/proposal entries, so we mirror the same key material
+        # into both roles for test-only helper startup compatibility.
+        return {
+            ATTESTATION_PUBKEY_FIELD: validator[LEGACY_PUBLIC_FIELD],
+            ATTESTATION_SECRET_FIELD: validator[LEGACY_SECRET_FIELD],
+            PROPOSAL_PUBKEY_FIELD: validator[LEGACY_PUBLIC_FIELD],
+            PROPOSAL_SECRET_FIELD: validator[LEGACY_SECRET_FIELD],
+        }
+
+    raise ValueError(
+        f"Unsupported validator key format for validator {index}: "
+        f"expected either split attestation/proposal fields or "
+        f"{LEGACY_PUBLIC_FIELD!r}/{LEGACY_SECRET_FIELD!r}"
+    )
 
 
 def source_keys_dir() -> Path:
@@ -324,10 +352,17 @@ def extract_inner_block(signed_block: object) -> object:
         return getattr(signed_block, "block")
 
     message = getattr(signed_block, "message", None)
-    if message is not None and hasattr(message, "block"):
-        return message.block
+    if message is not None:
+        if hasattr(message, "block"):
+            return message.block
 
-    raise AttributeError("Signed block has neither `.block` nor `.message.block`")
+        # Latest LeanSpec SignedBlock wraps the Block directly in `.message`.
+        if hasattr(message, "slot") and hasattr(message, "parent_root"):
+            return message
+
+    raise AttributeError(
+        "Signed block has neither `.block`, `.message.block`, nor a block-like `.message`"
+    )
 
 
 async def keep_status_current(

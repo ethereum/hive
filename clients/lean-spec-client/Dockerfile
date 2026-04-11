@@ -30,7 +30,7 @@ RUN uv sync --frozen
 FROM python:3.12-slim AS builder-devnet4
 
 ARG github=leanEthereum/leanSpec
-ARG devnet4_tag=2a30f80994f642f9523b85aba936f2f2e5b17529
+ARG devnet4_tag=ad9a3226
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -59,7 +59,9 @@ RUN uv sync --frozen
 FROM python:3.12-slim
 
 ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
-ARG devnet4_tag=2a30f80994f642f9523b85aba936f2f2e5b17529
+ARG devnet4_tag=ad9a3226
+ARG devnet3_keys_tag=leanSpec-ad9a3226
+ARG devnet4_keys_tag=leanSpec-ad9a3226
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -93,17 +95,25 @@ USER root
 
 COPY leanspec-client.sh /app/hive/leanspec-client.sh
 COPY lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
-COPY devnet4_keys /app/hive/prod_scheme_devnet4
 
-RUN mkdir -p /app/hive/prod_scheme_devnet3 /tmp/leansig \
+RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /tmp/leansig \
     && curl -fsSL \
-        https://github.com/leanEthereum/leansig-test-keys/releases/download/leanSpec-ad9a3226/prod_scheme.tar.gz \
-        -o /tmp/leansig/prod_scheme.tar.gz \
-    && tar --warning=no-unknown-keyword -xzf /tmp/leansig/prod_scheme.tar.gz -C /tmp/leansig \
+        https://github.com/leanEthereum/leansig-test-keys/releases/download/$devnet3_keys_tag/prod_scheme.tar.gz \
+        -o /tmp/leansig/prod_scheme_devnet3.tar.gz \
+    && tar --warning=no-unknown-keyword -xzf /tmp/leansig/prod_scheme_devnet3.tar.gz -C /tmp/leansig \
         prod_scheme/0.json \
         prod_scheme/1.json \
         prod_scheme/2.json \
-    && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet3/
+    && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet3/ \
+    && rm -rf /tmp/leansig/prod_scheme \
+    && curl -fsSL \
+        https://github.com/leanEthereum/leansig-test-keys/releases/download/$devnet4_keys_tag/prod_scheme.tar.gz \
+        -o /tmp/leansig/prod_scheme_devnet4.tar.gz \
+    && tar --warning=no-unknown-keyword -xzf /tmp/leansig/prod_scheme_devnet4.tar.gz -C /tmp/leansig \
+        prod_scheme/0.json \
+        prod_scheme/1.json \
+        prod_scheme/2.json \
+    && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet4/
 
 RUN ls -l /app/hive/prod_scheme_devnet4 \
     && test -f /app/hive/prod_scheme_devnet4/0.json \
