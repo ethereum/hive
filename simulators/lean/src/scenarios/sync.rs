@@ -12,6 +12,9 @@ pub(crate) const LEAN_SPEC_CLIENT_TYPE: &str = "lean-spec-client";
 
 const CHECKPOINT_SYNC_URL_ENVIRONMENT_VARIABLE: &str = "HIVE_CHECKPOINT_SYNC_URL";
 const BOOTNODES_ENVIRONMENT_VARIABLE: &str = "HIVE_BOOTNODES";
+const LEAN_GENESIS_VALIDATORS_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_VALIDATORS";
+const LEAN_GENESIS_VALIDATOR_ENTRIES_ENVIRONMENT_VARIABLE: &str =
+    "HIVE_LEAN_GENESIS_VALIDATOR_ENTRIES";
 const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
@@ -23,6 +26,18 @@ const LEAN_P2P_PORT: u16 = 9001;
 const LEAN_GENESIS_DELAY_SECS: u64 = 30;
 const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
 const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
+const HELPER_METADATA_PORT: u16 = 5053;
+
+#[derive(Debug, Deserialize)]
+struct HelperGenesisValidatorEntry {
+    attestation_public_key: String,
+    proposal_public_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HelperGenesisMetadata {
+    genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
+}
 
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
@@ -36,6 +51,7 @@ pub(crate) struct PostGenesisSyncTestData {
     pub client_under_test: ClientDefinition,
     pub genesis_time: u64,
     pub source_checkpoint_kind: SourceCheckpointKind,
+    pub wait_for_client_justified_checkpoint: bool,
     pub use_checkpoint_sync: bool,
     pub connect_client_to_lean_spec_mesh: bool,
 }
@@ -44,7 +60,7 @@ pub(crate) struct PostGenesisSyncContext {
     pub source_client: Client,
     pub client_under_test: Client,
     pub source_fork_choice: ForkChoiceSnapshot,
-    pub client_checkpoint: CheckpointResponse,
+    pub client_checkpoint: Option<CheckpointResponse>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +91,14 @@ pub(crate) async fn start_post_genesis_sync_context(
     source_client: Client,
     test_data: &PostGenesisSyncTestData,
 ) -> PostGenesisSyncContext {
+    let source_genesis_validator_entries = load_finalized_genesis_validators(&source_client)
+        .await
+        .unwrap_or_else(|err| {
+            panic!(
+                "Unable to load finalized genesis validators from {}: {err}",
+                source_client.kind
+            )
+        });
     let should_start_client_early =
         !test_data.use_checkpoint_sync && test_data.connect_client_to_lean_spec_mesh;
 
@@ -87,6 +111,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                     Some(client_under_test_environment(
                         &source_client,
                         test_data.genesis_time,
+                        &source_genesis_validator_entries,
                         test_data.use_checkpoint_sync,
                         test_data.connect_client_to_lean_spec_mesh,
                     )),
@@ -114,6 +139,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                         Some(client_under_test_environment(
                             &source_client,
                             test_data.genesis_time,
+                            &source_genesis_validator_entries,
                             test_data.use_checkpoint_sync,
                             test_data.connect_client_to_lean_spec_mesh,
                         )),
@@ -135,6 +161,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                     Some(client_under_test_environment(
                         &source_client,
                         test_data.genesis_time,
+                        &source_genesis_validator_entries,
                         test_data.use_checkpoint_sync,
                         test_data.connect_client_to_lean_spec_mesh,
                     )),
@@ -143,9 +170,15 @@ pub(crate) async fn start_post_genesis_sync_context(
         }
     };
 
-    let client_checkpoint = wait_for_non_genesis_justified_checkpoint(&client_under_test)
-        .await
-        .unwrap_or_else(|err| panic!("{err}"));
+    let client_checkpoint = if test_data.wait_for_client_justified_checkpoint {
+        Some(
+            wait_for_non_genesis_justified_checkpoint(&client_under_test)
+                .await
+                .unwrap_or_else(|err| panic!("{err}")),
+        )
+    } else {
+        None
+    };
 
     PostGenesisSyncContext {
         source_client,
@@ -196,6 +229,7 @@ fn lean_spec_environment(
 fn client_under_test_environment(
     checkpoint_source: &Client,
     genesis_time: u64,
+    source_genesis_validator_entries: &[HelperGenesisValidatorEntry],
     use_checkpoint_sync: bool,
     connect_to_lean_spec_mesh: bool,
 ) -> HashMap<String, String> {
@@ -204,6 +238,37 @@ fn client_under_test_environment(
         LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE.to_string(),
         genesis_time.to_string(),
     );
+    if source_genesis_validator_entries
+        .iter()
+        .all(|entry| entry.proposal_public_key.is_some())
+    {
+        environment.insert(
+            LEAN_GENESIS_VALIDATOR_ENTRIES_ENVIRONMENT_VARIABLE.to_string(),
+            source_genesis_validator_entries
+                .iter()
+                .map(|entry| {
+                    format!(
+                        "{}|{}",
+                        entry.attestation_public_key,
+                        entry
+                            .proposal_public_key
+                            .as_ref()
+                            .expect("proposal key should exist for structured entries")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    } else {
+        environment.insert(
+            LEAN_GENESIS_VALIDATORS_ENVIRONMENT_VARIABLE.to_string(),
+            source_genesis_validator_entries
+                .iter()
+                .map(|entry| entry.attestation_public_key.clone())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
     if use_checkpoint_sync {
         environment.insert(
             CHECKPOINT_SYNC_URL_ENVIRONMENT_VARIABLE.to_string(),
@@ -361,4 +426,39 @@ fn http_client() -> HttpClient {
         .timeout(Duration::from_secs(5))
         .build()
         .expect("Unable to build HTTP client")
+}
+
+async fn load_finalized_genesis_validators(
+    client: &Client,
+) -> Result<Vec<HelperGenesisValidatorEntry>, String> {
+    let http = http_client();
+    let url = format!("http://{}:{}/hive/genesis", client.ip, HELPER_METADATA_PORT);
+    let mut last_error = String::new();
+
+    for _attempt in 0..30 {
+        match http.get(&url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {url}");
+                } else {
+                    match response.json::<HelperGenesisMetadata>().await {
+                        Ok(metadata) => return Ok(metadata.genesis_validator_entries),
+                        Err(err) => {
+                            last_error = format!("Unable to decode helper genesis metadata: {err}")
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                last_error = format!("error sending request for url ({url}): {err}");
+            }
+        }
+
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    Err(format!(
+        "Unable to load helper genesis metadata from {url}: {last_error}"
+    ))
 }

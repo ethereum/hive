@@ -13,33 +13,23 @@ use tokio::time::sleep;
 
 const HIVE_CHECK_LIVE_PORT: &str = "HIVE_CHECK_LIVE_PORT";
 const HIVE_LEAN_DEVNET_LABEL: &str = "HIVE_LEAN_DEVNET_LABEL";
-const HIVE_LEAN_SPEC_CUTOFF_HASH: &str = "HIVE_LEAN_SPEC_CUTOFF_HASH";
-const HIVE_LEAN_REAM_IMAGE: &str = "HIVE_LEAN_REAM_IMAGE";
 const LEAN_HTTP_PORT: u16 = 5052;
 const LEAN_ROLE: &str = "lean";
 const HEALTHY_STATUS: &str = "healthy";
 const LEAN_RPC_SERVICE: &str = "lean-rpc-api";
 
-#[derive(Clone, Copy, Debug)]
-struct LeanDevnetProfile {
-    label: &'static str,
-    lean_spec_cutoff_hash: &'static str,
-    ream_image: &'static str,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum LeanDevnet {
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LeanDevnet {
     Devnet3,
+    Devnet4,
 }
 
 impl LeanDevnet {
-    fn profile(self) -> LeanDevnetProfile {
+    fn label(self) -> &'static str {
         match self {
-            Self::Devnet3 => LeanDevnetProfile {
-                label: "devnet3",
-                lean_spec_cutoff_hash: "be853180d21aa36d6401b8c1541aa6fcaad5008d",
-                ream_image: "ghcr.io/reamlabs/ream:latest-devnet3",
-            },
+            Self::Devnet3 => "devnet3",
+            Self::Devnet4 => "devnet4",
         }
     }
 }
@@ -59,13 +49,13 @@ struct CheckpointResponse {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-    let devnet_profile = selected_lean_devnet_profile();
+    let devnet_label = selected_lean_devnet_label();
 
     let mut rpc_compat = Suite {
         name: "rpc-compat".to_string(),
         description: format!(
             "Runs Lean RPC compatibility tests against the selected lean clients using the {} profile.",
-            devnet_profile.label
+            devnet_label
         ),
         tests: vec![],
     };
@@ -90,26 +80,19 @@ fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
 
 // This is statically done in code right now for the sake of getting a working version, later it will be changed to allow for a flag to specify
 // which devnet is being tested
-fn selected_lean_devnet_profile() -> LeanDevnetProfile {
-    LeanDevnet::Devnet3.profile()
+pub(crate) fn selected_lean_devnet() -> LeanDevnet {
+    LeanDevnet::Devnet3
+}
+
+pub(crate) fn selected_lean_devnet_label() -> &'static str {
+    selected_lean_devnet().label()
 }
 
 fn lean_environment() -> HashMap<String, String> {
-    let devnet_profile = selected_lean_devnet_profile();
+    let devnet_label = selected_lean_devnet_label();
     HashMap::from([
         (HIVE_CHECK_LIVE_PORT.to_string(), LEAN_HTTP_PORT.to_string()),
-        (
-            HIVE_LEAN_DEVNET_LABEL.to_string(),
-            devnet_profile.label.to_string(),
-        ),
-        (
-            HIVE_LEAN_SPEC_CUTOFF_HASH.to_string(),
-            devnet_profile.lean_spec_cutoff_hash.to_string(),
-        ),
-        (
-            HIVE_LEAN_REAM_IMAGE.to_string(),
-            devnet_profile.ream_image.to_string(),
-        ),
+        (HIVE_LEAN_DEVNET_LABEL.to_string(), devnet_label.to_string()),
     ])
 }
 

@@ -1,13 +1,23 @@
-ARG baseimage=ghcr.io/reamlabs/ream
-ARG tag=latest-devnet3
+ARG devnet3_baseimage=ghcr.io/reamlabs/ream
+ARG devnet3_tag=latest-devnet3
+ARG devnet4_baseimage=ghcr.io/reamlabs/ream
+ARG devnet4_tag=latest-devnet4
 
-FROM $baseimage:$tag
+FROM $devnet3_baseimage:$devnet3_tag AS devnet3
+FROM $devnet4_baseimage:$devnet4_tag AS devnet4
+FROM $devnet3_baseimage:$devnet3_tag
 
 COPY validators.yaml /assets/lean/validators.yaml
+COPY --from=devnet3 /usr/local/bin/ream /usr/local/bin/ream-devnet3
+COPY --from=devnet4 /usr/local/bin/ream /usr/local/bin/ream-devnet4
 ADD ream.sh /ream.sh
 
 RUN chmod +x /ream.sh \
-    && ream --version | head -1 > /version.txt
+    && /usr/local/bin/ream-devnet3 --version | head -1 > /version-devnet3.txt \
+    && /usr/local/bin/ream-devnet4 --version | head -1 > /version-devnet4.txt \
+    && printf "ream devnet3: %s\nream devnet4: %s\n" \
+        "$(cat /version-devnet3.txt)" \
+        "$(cat /version-devnet4.txt)" > /version.txt
 
 EXPOSE 5052 9000/udp 8080
 

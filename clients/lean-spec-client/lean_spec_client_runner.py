@@ -12,6 +12,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Final
 
+from aiohttp import web
 import yaml
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
@@ -33,11 +34,13 @@ from lean_spec.types import Bytes32
 GOSSIP_FORK_DIGEST: Final = "devnet0"
 LISTEN_ADDR: Final = "/ip4/0.0.0.0/udp/9001/quic-v1"
 API_PORT: Final = 5052
+HELPER_METADATA_PORT: Final = 5053
 BOOTNODE_DIAL_TIMEOUT_SECS: Final = 10.0
 STATUS_REFRESH_INTERVAL_SECS: Final = 1.0
 DEFAULT_NODE_ID: Final = "lean_spec_0"
 PREPARED_ASSETS_DIR: Final = Path("/tmp/lean-spec-client")
-SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme")
+DEVNET3_SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme_devnet3")
+DEVNET4_SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme_devnet4")
 GENESIS_DIR: Final = PREPARED_ASSETS_DIR / "genesis"
 GENESIS_CONFIG_PATH: Final = PREPARED_ASSETS_DIR / "genesis" / "config.yaml"
 VALIDATOR_KEYS_DIR: Final = PREPARED_ASSETS_DIR / "keys"
@@ -53,8 +56,10 @@ HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: Final = (
     "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY"
 )
 VALIDATOR_COUNT: Final = 3
-GENESIS_PUBKEY_FIELD: Final = "attestation_public"
-GENESIS_SECRET_FIELD: Final = "attestation_secret"
+ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
+ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
+PROPOSAL_PUBKEY_FIELD: Final = "proposal_public"
+PROPOSAL_SECRET_FIELD: Final = "proposal_secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
 
@@ -83,9 +88,24 @@ def parse_validator_indices() -> list[int]:
     return [int(index) for index in raw_indices.split(",") if index]
 
 
+def devnet_label() -> str:
+    return os.environ.get("HIVE_LEAN_DEVNET_LABEL", "devnet3")
+
+
+def uses_latest_leanspec_format() -> bool:
+    return devnet_label() == "devnet4"
+
+
 def load_validator(index: int) -> dict[str, str]:
-    with (SOURCE_KEYS_DIR / f"{index}.json").open(encoding="utf-8") as key_file:
+    with (source_keys_dir() / f"{index}.json").open(encoding="utf-8") as key_file:
         return json.load(key_file)
+
+
+def source_keys_dir() -> Path:
+    if uses_latest_leanspec_format():
+        return DEVNET4_SOURCE_KEYS_DIR
+
+    return DEVNET3_SOURCE_KEYS_DIR
 
 
 def prepare_output_dirs() -> None:
@@ -97,13 +117,20 @@ def prepare_output_dirs() -> None:
 
 
 def write_genesis(validators: list[dict[str, str]], genesis_time: int) -> None:
-    genesis = {
-        "GENESIS_TIME": genesis_time,
-        "NUM_VALIDATORS": len(validators),
-        "GENESIS_VALIDATORS": [
-            f"0x{validator[GENESIS_PUBKEY_FIELD]}" for validator in validators
-        ],
-    }
+    genesis = {"GENESIS_TIME": genesis_time, "NUM_VALIDATORS": len(validators)}
+
+    if uses_latest_leanspec_format():
+        genesis["GENESIS_VALIDATORS"] = [
+            {
+                "attestation_pubkey": f"0x{validator[ATTESTATION_PUBKEY_FIELD]}",
+                "proposal_pubkey": f"0x{validator[PROPOSAL_PUBKEY_FIELD]}",
+            }
+            for validator in validators
+        ]
+    else:
+        genesis["GENESIS_VALIDATORS"] = [
+            f"0x{validator[ATTESTATION_PUBKEY_FIELD]}" for validator in validators
+        ]
 
     with GENESIS_CONFIG_PATH.open("w", encoding="utf-8") as genesis_file:
         yaml.safe_dump(genesis, genesis_file, sort_keys=False)
@@ -127,19 +154,40 @@ def write_validator_keys(
     }
 
     for index, validator in enumerate(validators):
-        secret_key_file = f"validator_{index}_sk.ssz"
+        if uses_latest_leanspec_format():
+            attestation_secret_key_file = f"validator_{index}_att_sk.ssz"
+            proposal_secret_key_file = f"validator_{index}_prop_sk.ssz"
 
-        (MANIFEST_DIR / secret_key_file).write_bytes(
-            bytes.fromhex(validator[GENESIS_SECRET_FIELD])
-        )
+            (MANIFEST_DIR / attestation_secret_key_file).write_bytes(
+                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+            )
+            (MANIFEST_DIR / proposal_secret_key_file).write_bytes(
+                bytes.fromhex(validator[PROPOSAL_SECRET_FIELD])
+            )
 
-        manifest["validators"].append(
-            {
-                "index": index,
-                "pubkey_hex": f"0x{validator[GENESIS_PUBKEY_FIELD]}",
-                "privkey_file": secret_key_file,
-            }
-        )
+            manifest["validators"].append(
+                {
+                    "index": index,
+                    "attestation_pubkey_hex": f"0x{validator[ATTESTATION_PUBKEY_FIELD]}",
+                    "proposal_pubkey_hex": f"0x{validator[PROPOSAL_PUBKEY_FIELD]}",
+                    "attestation_privkey_file": attestation_secret_key_file,
+                    "proposal_privkey_file": proposal_secret_key_file,
+                }
+            )
+        else:
+            secret_key_file = f"validator_{index}_sk.ssz"
+
+            (MANIFEST_DIR / secret_key_file).write_bytes(
+                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+            )
+
+            manifest["validators"].append(
+                {
+                    "index": index,
+                    "pubkey_hex": f"0x{validator[ATTESTATION_PUBKEY_FIELD]}",
+                    "privkey_file": secret_key_file,
+                }
+            )
 
     with VALIDATOR_MANIFEST_PATH.open("w", encoding="utf-8") as manifest_file:
         yaml.safe_dump(manifest, manifest_file, sort_keys=False)
@@ -153,6 +201,49 @@ def prepare_runtime_assets(node_id: str) -> None:
     prepare_output_dirs()
     write_genesis(validators, genesis_time)
     write_validator_keys(validators, node_id, validator_indices)
+
+
+def helper_genesis_metadata() -> dict[str, object]:
+    with GENESIS_CONFIG_PATH.open(encoding="utf-8") as genesis_file:
+        genesis_config = yaml.safe_load(genesis_file)
+
+    validators = genesis_config.get("GENESIS_VALIDATORS", [])
+    if uses_latest_leanspec_format():
+        genesis_validator_entries = [
+            {
+                "attestation_public_key": validator["attestation_pubkey"],
+                "proposal_public_key": validator["proposal_pubkey"],
+            }
+            for validator in validators
+        ]
+    else:
+        genesis_validator_entries = [
+            {
+                "attestation_public_key": validator,
+                "proposal_public_key": None,
+            }
+            for validator in validators
+        ]
+
+    return {
+        "genesis_time": genesis_config["GENESIS_TIME"],
+        "genesis_validator_entries": genesis_validator_entries,
+    }
+
+
+async def start_metadata_server(metadata: dict[str, object]) -> web.AppRunner:
+    async def metadata_handler(_request: web.Request) -> web.Response:
+        return web.json_response(metadata)
+
+    app = web.Application()
+    app.router.add_get("/hive/genesis", metadata_handler)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=HELPER_METADATA_PORT)
+    await site.start()
+    logger.info("Helper metadata server listening on 0.0.0.0:%d", HELPER_METADATA_PORT)
+    return runner
 
 
 def resolve_bootnode(bootnode: str) -> str:
@@ -228,6 +319,17 @@ def refresh_status(event_source: LiveNetworkEventSource, node: Node) -> None:
     event_source.set_status(current_status(node))
 
 
+def extract_inner_block(signed_block: object) -> object:
+    if hasattr(signed_block, "block"):
+        return getattr(signed_block, "block")
+
+    message = getattr(signed_block, "message", None)
+    if message is not None and hasattr(message, "block"):
+        return message.block
+
+    raise AttributeError("Signed block has neither `.block` nor `.message.block`")
+
+
 async def keep_status_current(
     event_source: LiveNetworkEventSource,
     node: Node,
@@ -285,6 +387,7 @@ async def run() -> None:
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
     prepare_runtime_assets(node_id)
     genesis = load_genesis()
+    metadata = helper_genesis_metadata()
     validator_registry = load_validator_registry(node_id)
     bootnodes = parse_bootnodes()
     is_aggregator = os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
@@ -330,16 +433,17 @@ async def run() -> None:
         config=ApiServerConfig(port=API_PORT),
         store_getter=lambda: node.sync_service.store,
     )
+    metadata_runner = await start_metadata_server(metadata)
     refresh_status(event_source, node)
 
     published_blocks: dict[Bytes32, object] = {}
     if node.validator_service is not None:
         original_on_block = node.validator_service.on_block
 
-        async def cache_and_publish_block(block: object) -> None:
-            block_root = hash_tree_root(block.message.block)
-            published_blocks[block_root] = block
-            await original_on_block(block)
+        async def cache_and_publish_block(signed_block: object) -> None:
+            block_root = hash_tree_root(extract_inner_block(signed_block))
+            published_blocks[block_root] = signed_block
+            await original_on_block(signed_block)
             refresh_status(event_source, node)
 
         node.validator_service.on_block = cache_and_publish_block
@@ -377,6 +481,7 @@ async def run() -> None:
     finally:
         api_server.stop()
         node.stop()
+        await metadata_runner.cleanup()
         listener_task.cancel()
         with suppress(asyncio.CancelledError):
             await listener_task
