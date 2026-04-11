@@ -10,7 +10,6 @@ RUN echo "fn main() {}" > ./src/main.rs
 RUN cargo build --release --locked
 
 COPY src ./src
-COPY devnet.txt ./devnet.txt
 RUN touch -a -m ./src/main.rs
 RUN cargo build --release --locked
 

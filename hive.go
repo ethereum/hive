@@ -15,11 +15,13 @@ import (
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"github.com/lmittmann/tint"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/lmittmann/tint"
 )
 
 type buildArgs map[string]string
+
+type leanDevnetFlag string
 
 func (args *buildArgs) String() string {
 	var kv []string
@@ -37,6 +39,19 @@ func (args *buildArgs) Set(value string) error {
 		return errors.New("invalid build argument format, expected ARG=VALUE")
 	}
 	(*args)[parts[0]] = parts[1]
+	return nil
+}
+
+func (label *leanDevnetFlag) String() string {
+	return string(*label)
+}
+
+func (label *leanDevnetFlag) Set(value string) error {
+	normalized, err := libhive.NormalizeLeanDevnetLabel(value)
+	if err != nil {
+		return err
+	}
+	*label = leanDevnetFlag(normalized)
 	return nil
 }
 
@@ -58,6 +73,7 @@ Otherwise, it looks for files in the $HOME directory:
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
+		simLeanDevnet         leanDevnetFlag
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simTestExact          = flag.Bool("sim.limit.exact", false, "Exact `expression` match for tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -94,6 +110,7 @@ Otherwise, it looks for files in the $HOME directory:
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
 	simBuildArgs := make(buildArgs)
 	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
+	flag.Var(&simLeanDevnet, "sim.lean-devnet", "Lean devnet `label` to use when running the lean simulator (`devnet3` or `devnet4`).")
 
 	// Parse the flags and configure the logger.
 	flag.Parse()
@@ -126,6 +143,9 @@ Otherwise, it looks for files in the $HOME directory:
 	if *simPattern != "" && *simDevMode {
 		slog.Warn("--sim is ignored when using --dev mode")
 		simList = nil
+	}
+	if simLeanDevnet != "" && !containsString(simList, "lean") {
+		fatal("--sim.lean-devnet only works when running the lean simulator")
 	}
 	if *simTestExact && *simTestPattern != "" {
 		pattern := "^" + regexp.QuoteMeta(*simTestPattern) + "$"
@@ -209,6 +229,7 @@ Otherwise, it looks for files in the $HOME directory:
 		SimRandomSeed:      *simRandomSeed,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
+		LeanDevnetLabel:    simLeanDevnet.String(),
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 
@@ -238,7 +259,7 @@ Otherwise, it looks for files in the $HOME directory:
 	}
 
 	// Build clients and simulators.
-	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
+	if err := runner.Build(ctx, clientList, simList, simBuildArgs, env.LeanDevnetLabel); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
@@ -288,6 +309,15 @@ func flagIsSet(name string) bool {
 		}
 	})
 	return found
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // convertLogLevel maps log level from range 0-5 to the range used by package slog.

@@ -2,7 +2,7 @@
 
 mod scenarios;
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, env, time::Duration};
 
 use crate::scenarios::rpc_compat::run_rpc_compat_lean_test_suite;
 use hivesim::types::ClientDefinition;
@@ -78,15 +78,16 @@ fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
         .collect()
 }
 
-// This is statically done in code right now for the sake of getting a working version, later it will be changed to allow for a flag to specify
-// which devnet is being tested
 pub(crate) fn selected_lean_devnet() -> LeanDevnet {
-    match include_str!("../devnet.txt").trim() {
+    match env::var(HIVE_LEAN_DEVNET_LABEL)
+        .unwrap_or_else(|_| LeanDevnet::Devnet3.label().to_string())
+        .trim()
+    {
         "devnet3" => LeanDevnet::Devnet3,
         "devnet4" => LeanDevnet::Devnet4,
-        other => {
-            panic!("Unsupported Lean devnet selection `{other}` in simulators/lean/devnet.txt")
-        }
+        other => panic!(
+            "Unsupported Lean devnet selection `{other}` in environment variable {HIVE_LEAN_DEVNET_LABEL}"
+        ),
     }
 }
 

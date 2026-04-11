@@ -14,6 +14,14 @@ LeanSpec helper image generates and caches a small fixed set of validator keys
 at image-build time so the tests do not need to regenerate them on every
 container start.
 
+Select the Lean devnet profile at runtime with:
+
+`./hive --sim lean --sim.lean-devnet devnet3 --client ream`
+
+or:
+
+`./hive --sim lean --sim.lean-devnet devnet4 --client ream`
+
 This gives us a simple onboarding path for new lean clients while leaving a clear place to grow:
 
 - p2p behavior,

@@ -22,13 +22,12 @@ var (
 )
 
 const (
-	leanSimulatorName    = "lean"
-	leanSpecClientName   = "lean-spec-client"
-	leanRoleName         = "lean"
-	leanHelperRoleName   = "lean-helper"
-	leanDevnet3Label     = "devnet3"
-	leanDevnet4Label     = "devnet4"
-	leanDevnetConfigPath = "simulators/lean/devnet.txt"
+	leanSimulatorName  = "lean"
+	leanSpecClientName = "lean-spec-client"
+	leanRoleName       = "lean"
+	leanHelperRoleName = "lean-helper"
+	leanDevnet3Label   = "devnet3"
+	leanDevnet4Label   = "devnet4"
 )
 
 func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simList []string) []ClientDesignator {
@@ -44,13 +43,32 @@ func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simLis
 	return append(clientList, ClientDesignator{Client: leanSpecClientName})
 }
 
-func prepareLeanClientList(inv Inventory, clientList []ClientDesignator, simList []string) ([]ClientDesignator, error) {
+func NormalizeLeanDevnetLabel(label string) (string, error) {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return leanDevnet3Label, nil
+	}
+
+	switch label {
+	case leanDevnet3Label, leanDevnet4Label:
+		return label, nil
+	default:
+		return "", fmt.Errorf("unsupported Lean devnet %q", label)
+	}
+}
+
+func prepareLeanClientList(
+	inv Inventory,
+	clientList []ClientDesignator,
+	simList []string,
+	devnetLabel string,
+) ([]ClientDesignator, error) {
 	if !containsSimulator(simList, leanSimulatorName) {
 		return clientList, nil
 	}
 
 	clientList = ensureLeanHelperClient(inv, clientList, simList)
-	devnetLabel, err := selectedLeanDevnetLabel(inv)
+	devnetLabel, err := NormalizeLeanDevnetLabel(devnetLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -66,22 +84,6 @@ func prepareLeanClientList(inv Inventory, clientList []ClientDesignator, simList
 		}
 	}
 	return prepared, nil
-}
-
-func selectedLeanDevnetLabel(inv Inventory) (string, error) {
-	configPath := filepath.Join(inv.BaseDir, leanDevnetConfigPath)
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return "", fmt.Errorf("unable to read Lean devnet selection from %s: %w", configPath, err)
-	}
-
-	label := strings.TrimSpace(string(content))
-	switch label {
-	case leanDevnet3Label, leanDevnet4Label:
-		return label, nil
-	default:
-		return "", fmt.Errorf("unsupported Lean devnet selection %q in %s", label, configPath)
-	}
 }
 
 func isLeanSimulationClient(inv Inventory, clientName string) bool {
@@ -139,9 +141,15 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 }
 
 // Build builds client and simulator images.
-func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string, simBuildArgs map[string]string) error {
+func (r *Runner) Build(
+	ctx context.Context,
+	clientList []ClientDesignator,
+	simList []string,
+	simBuildArgs map[string]string,
+	leanDevnetLabel string,
+) error {
 	var err error
-	clientList, err = prepareLeanClientList(r.inv, clientList, simList)
+	clientList, err = prepareLeanClientList(r.inv, clientList, simList, leanDevnetLabel)
 	if err != nil {
 		return err
 	}
@@ -273,7 +281,12 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		clientList := env.ClientList
 		if sim == leanSimulatorName {
 			var err error
-			clientList, err = prepareLeanClientList(r.inv, clientList, []string{sim})
+			clientList, err = prepareLeanClientList(
+				r.inv,
+				clientList,
+				[]string{sim},
+				env.LeanDevnetLabel,
+			)
 			if err != nil {
 				return SimResult{}, err
 			}
@@ -331,6 +344,13 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		},
 		Labels: simLabels,
 		Name:   containerName,
+	}
+	if sim == leanSimulatorName {
+		leanDevnetLabel, err := NormalizeLeanDevnetLabel(env.LeanDevnetLabel)
+		if err != nil {
+			return SimResult{}, err
+		}
+		opts.Env["HIVE_LEAN_DEVNET_LABEL"] = leanDevnetLabel
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
