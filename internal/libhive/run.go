@@ -23,25 +23,11 @@ var (
 
 const (
 	leanSimulatorName  = "lean"
-	leanSpecClientName = "lean-spec-client"
 	leanRoleName       = "lean"
 	leanHelperRoleName = "lean-helper"
 	leanDevnet3Label   = "devnet3"
 	leanDevnet4Label   = "devnet4"
 )
-
-func ensureLeanHelperClient(inv Inventory, clientList []ClientDesignator, simList []string) []ClientDesignator {
-	if !containsSimulator(simList, leanSimulatorName) {
-		return clientList
-	}
-	if _, ok := inv.Clients[leanSpecClientName]; !ok {
-		return clientList
-	}
-	if containsClientDesignator(clientList, leanSpecClientName) {
-		return clientList
-	}
-	return append(clientList, ClientDesignator{Client: leanSpecClientName})
-}
 
 func NormalizeLeanDevnetLabel(label string) (string, error) {
 	label = strings.TrimSpace(label)
@@ -67,7 +53,6 @@ func prepareLeanClientList(
 		return clientList, nil
 	}
 
-	clientList = ensureLeanHelperClient(inv, clientList, simList)
 	devnetLabel, err := NormalizeLeanDevnetLabel(devnetLabel)
 	if err != nil {
 		return nil, err
@@ -87,10 +72,6 @@ func prepareLeanClientList(
 }
 
 func isLeanSimulationClient(inv Inventory, clientName string) bool {
-	if clientName == leanSpecClientName {
-		return true
-	}
-
 	client, ok := inv.Clients[clientName]
 	if !ok {
 		return false
@@ -106,15 +87,6 @@ func isLeanSimulationClient(inv Inventory, clientName string) bool {
 func containsSimulator(simList []string, simulator string) bool {
 	for _, sim := range simList {
 		if sim == simulator {
-			return true
-		}
-	}
-	return false
-}
-
-func containsClientDesignator(clientList []ClientDesignator, clientName string) bool {
-	for _, client := range clientList {
-		if client.Client == clientName || client.Name() == clientName {
 			return true
 		}
 	}
@@ -294,7 +266,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		for _, client := range clientList {
 			found := false
 			for _, def := range r.clientDefs {
-				if def.Name == client.Client {
+				if def.Name == client.Name() {
 					clientDefs = append(clientDefs, def)
 					found = true
 					break

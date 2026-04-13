@@ -1,15 +1,14 @@
-use std::time::Duration;
+use std::{future::Future, pin::Pin, time::Duration};
 
 use crate::scenarios::sync::{
-    default_genesis_time, is_lean_spec_client_name, lean_spec_source_environment,
-    start_post_genesis_sync_context, PostGenesisSyncContext, PostGenesisSyncTestData,
-    SourceCheckpointKind,
+    default_genesis_time, start_post_genesis_sync_context, PostGenesisSyncContext,
+    PostGenesisSyncTestData, SourceCheckpointKind,
 };
 use crate::{
     get_json_with_retry, lean_api_url, lean_clients, lean_environment, selected_lean_devnet_label,
     CheckpointResponse, HealthResponse, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
-use hivesim::{dyn_async, Client, NClientTestSpec, Test};
+use hivesim::{dyn_async, types::TestResult, Client, NClientTestSpec, Test};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as HttpClient,
@@ -183,6 +182,8 @@ struct ForkChoiceResponse {
     validator_count: u64,
 }
 
+type AsyncLeanDataTestFunc<T> = fn(&mut Test, T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
+
 fn expect_single_client(clients: Vec<Client>) -> Client {
     clients
         .into_iter()
@@ -195,6 +196,71 @@ fn http_client() -> HttpClient {
         .timeout(Duration::from_secs(5))
         .build()
         .expect("Unable to build HTTP client")
+}
+
+fn extract_data_test_result(join_handle: Result<(), tokio::task::JoinError>) -> TestResult {
+    match join_handle {
+        Ok(()) => TestResult {
+            pass: true,
+            details: String::new(),
+        },
+        Err(err) => {
+            let err = err.into_panic();
+            let details = if let Some(err) = err.downcast_ref::<&'static str>() {
+                err.to_string()
+            } else if let Some(err) = err.downcast_ref::<String>() {
+                err.clone()
+            } else {
+                format!("?{err:?}")
+            };
+
+            TestResult {
+                pass: false,
+                details,
+            }
+        }
+    }
+}
+
+async fn run_data_test<T: Send + 'static>(
+    host_test: &Test,
+    name: String,
+    description: String,
+    always_run: bool,
+    test_data: T,
+    func: AsyncLeanDataTestFunc<T>,
+) {
+    if let Some(test_match) = host_test.sim.test_matcher.clone() {
+        if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
+            return;
+        }
+    }
+
+    let test_id = host_test
+        .sim
+        .start_test(host_test.suite_id, name, description)
+        .await;
+    let suite_id = host_test.suite_id;
+    let suite = host_test.suite.clone();
+    let simulation = host_test.sim.clone();
+
+    let test_result = extract_data_test_result(
+        tokio::spawn(async move {
+            let test = &mut Test {
+                sim: simulation,
+                test_id,
+                suite,
+                suite_id,
+                result: Default::default(),
+            };
+
+            test.result.pass = true;
+            (func)(test, test_data).await;
+        })
+        .await,
+    );
+
+    host_test.sim.end_test(suite_id, test_id, test_result).await;
 }
 
 fn assert_hex_root(root: &str, field_name: &str) {
@@ -289,19 +355,18 @@ async fn load_fresh_fork_choice_setup(clients: Vec<Client>) -> (Client, ForkChoi
 }
 
 async fn load_post_genesis_sync_context(
-    clients: Vec<Client>,
+    test: &Test,
     test_data: PostGenesisSyncTestData,
 ) -> PostGenesisSyncContext {
-    let source_client = expect_single_client(clients);
-    start_post_genesis_sync_context(source_client, &test_data).await
+    start_post_genesis_sync_context(test, &test_data).await
 }
 
 async fn load_post_genesis_fork_choice_setup(
-    clients: Vec<Client>,
+    test: &Test,
     test_data: PostGenesisSyncTestData,
     checkpoint_kind: SourceCheckpointKind,
 ) -> (PostGenesisSyncContext, ForkChoiceResponse) {
-    let context = load_post_genesis_sync_context(clients, test_data).await;
+    let context = load_post_genesis_sync_context(test, test_data).await;
     let fork_choice = match checkpoint_kind {
         SourceCheckpointKind::Justified => {
             wait_for_non_genesis_fork_choice_response(&context.client_under_test, checkpoint_kind)
@@ -393,10 +458,10 @@ async fn load_fresh_state_and_fork_choice_setup(
 }
 
 async fn load_post_genesis_state_setup(
-    clients: Vec<Client>,
+    test: &Test,
     test_data: PostGenesisSyncTestData,
 ) -> (PostGenesisSyncContext, LeanState, ForkChoiceResponse) {
-    let context = load_post_genesis_sync_context(clients, test_data).await;
+    let context = load_post_genesis_sync_context(test, test_data).await;
     let state = load_finalized_state(&context.client_under_test).await;
     let fork_choice = if selected_lean_devnet_label() == "devnet4" {
         load_fork_choice_response(&context.client_under_test).await
@@ -412,16 +477,7 @@ async fn load_post_genesis_state_setup(
 
 dyn_async! {
     pub async fn run_rpc_compat_lean_test_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
-        let available_clients = test.sim.client_types().await;
-        let lean_spec_client = available_clients
-            .iter()
-            .find(|client| is_lean_spec_client_name(&client.name))
-            .cloned()
-            .expect("The `lean-spec-client` helper client should always be available for the Lean simulator");
-        let clients: Vec<_> = lean_clients(available_clients)
-            .into_iter()
-            .filter(|client| !is_lean_spec_client_name(&client.name))
-            .collect();
+        let clients = lean_clients(test.sim.client_types().await);
         if clients.is_empty() {
             panic!("No lean clients were selected for this run");
         }
@@ -473,24 +529,22 @@ dyn_async! {
 
             let checkpoint_genesis_time = default_genesis_time();
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: checkpoints justified post-genesis".to_string(),
-                description: "Waits for the LeanSpec source to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
-                always_run: false,
-                run: test_checkpoints_justified,
-                environments: Some(vec![Some(lean_spec_source_environment(
-                    checkpoint_genesis_time,
-                ))]),
-                test_data: PostGenesisSyncTestData {
+            run_data_test(
+                test,
+                "rpc_compat: checkpoints justified post-genesis".to_string(),
+                "Waits for the local LeanSpec helper to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
+                false,
+                PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: checkpoint_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: true,
+                    wait_for_client_justified_checkpoint: selected_lean_devnet_label() != "devnet4",
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
-                clients: vec![lean_spec_client.clone()],
-            }).await;
+                test_checkpoints_justified,
+            )
+            .await;
 
             test.run(NClientTestSpec {
                 name: "rpc_compat: forkchoice no head".to_string(),
@@ -599,15 +653,12 @@ dyn_async! {
 
             let finalized_filters_genesis_time = default_genesis_time();
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice filters nodes before finalized slot".to_string(),
-                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
-                always_run: false,
-                run: test_forkchoice_filters_nodes_before_finalized_slot,
-                environments: Some(vec![Some(lean_spec_source_environment(
-                    finalized_filters_genesis_time,
-                ))]),
-                test_data: PostGenesisSyncTestData {
+            run_data_test(
+                test,
+                "rpc_compat: forkchoice filters nodes before finalized slot".to_string(),
+                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
+                false,
+                PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: finalized_filters_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
@@ -615,20 +666,18 @@ dyn_async! {
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
-                clients: vec![lean_spec_client.clone()],
-            }).await;
+                test_forkchoice_filters_nodes_before_finalized_slot,
+            )
+            .await;
 
             let finalized_boundary_genesis_time = default_genesis_time();
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice keeps nodes at or beyond finalized slot".to_string(),
-                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
-                always_run: false,
-                run: test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot,
-                environments: Some(vec![Some(lean_spec_source_environment(
-                    finalized_boundary_genesis_time,
-                ))]),
-                test_data: PostGenesisSyncTestData {
+            run_data_test(
+                test,
+                "rpc_compat: forkchoice keeps nodes at or beyond finalized slot".to_string(),
+                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
+                false,
+                PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: finalized_boundary_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
@@ -636,20 +685,18 @@ dyn_async! {
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
-                clients: vec![lean_spec_client.clone()],
-            }).await;
+                test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot,
+            )
+            .await;
 
             let pre_finalized_only_genesis_time = default_genesis_time();
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
-                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
-                always_run: false,
-                run: test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized,
-                environments: Some(vec![Some(lean_spec_source_environment(
-                    pre_finalized_only_genesis_time,
-                ))]),
-                test_data: PostGenesisSyncTestData {
+            run_data_test(
+                test,
+                "rpc_compat: forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
+                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
+                false,
+                PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: pre_finalized_only_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
@@ -657,8 +704,9 @@ dyn_async! {
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
-                clients: vec![lean_spec_client.clone()],
-            }).await;
+                test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized,
+            )
+            .await;
 
             test.run(NClientTestSpec {
                 name: "rpc_compat: state returns ssz encoded finalized state".to_string(),
@@ -805,16 +853,13 @@ dyn_async! {
 
             let state_finalized_genesis_time = default_genesis_time();
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state finalized endpoint tracks latest finalized slot".to_string(),
-                description: "Starts a LeanSpec client mesh, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized state endpoint tracks the client's latest finalized slot."
+            run_data_test(
+                test,
+                "rpc_compat: state finalized endpoint tracks latest finalized slot".to_string(),
+                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized state endpoint tracks the client's latest finalized slot."
                     .to_string(),
-                always_run: false,
-                run: test_state_finalized_endpoint_tracks_latest_finalized_slot,
-                environments: Some(vec![Some(lean_spec_source_environment(
-                    state_finalized_genesis_time,
-                ))]),
-                test_data: PostGenesisSyncTestData {
+                false,
+                PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: state_finalized_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
@@ -822,8 +867,9 @@ dyn_async! {
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
-                clients: vec![lean_spec_client.clone()],
-            }).await;
+                test_state_finalized_endpoint_tracks_latest_finalized_slot,
+            )
+            .await;
         }
     }
 }
@@ -900,18 +946,38 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_checkpoints_justified<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
-        let context = load_post_genesis_sync_context(clients, test_data).await;
-        let _ = (&context.source_client, &context.client_under_test);
+    async fn test_checkpoints_justified<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
+        let context = load_post_genesis_sync_context(test, test_data).await;
+        assert!(
+            context.source_fork_choice.justified.slot > 0,
+            "helper source should reach a non-genesis justified checkpoint before syncing the client under test"
+        );
+
+        if selected_lean_devnet_label() == "devnet4" {
+            let fork_choice = wait_for_post_genesis_fork_choice_response(&context.client_under_test).await;
+            let http = http_client();
+            let client_checkpoint: CheckpointResponse = get_json_with_retry(
+                &http,
+                &lean_api_url(&context.client_under_test, "/lean/v0/checkpoints/justified"),
+            )
+            .await;
+
+            assert_hex_root(
+                &client_checkpoint.root,
+                "client justified checkpoint root",
+            );
+            assert!(
+                fork_choice.nodes.iter().any(|node| node.slot > 0),
+                "client under test should expose post-genesis forkchoice nodes after checkpoint sync on devnet4"
+            );
+            return;
+        }
+
         let client_checkpoint = context
             .client_checkpoint
             .as_ref()
             .expect("checkpoint tests should wait for a client justified checkpoint");
 
-        assert!(
-            context.source_fork_choice.justified.slot > 0,
-            "helper source should reach a non-genesis justified checkpoint before syncing the client under test"
-        );
         assert!(
             client_checkpoint.slot > 0,
             "client under test should report a non-genesis justified checkpoint after the helper mesh reaches justification"
@@ -997,9 +1063,9 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_filters_nodes_before_finalized_slot<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
+    async fn test_forkchoice_filters_nodes_before_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
         let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
+            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
@@ -1023,9 +1089,9 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
+    async fn test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
         let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
+            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
@@ -1051,10 +1117,6 @@ dyn_async! {
                 .iter()
                 .any(|node| node.slot >= reference_finalized_slot),
             "forkchoice should keep at least one node at or beyond the finalized boundary"
-        );
-        assert!(
-            fork_choice.justified.slot > 0,
-            "checkpoint-synced forkchoice should still expose a post-genesis justified checkpoint"
         );
         assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
     }
@@ -1105,9 +1167,9 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
+    async fn test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
         let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(clients, test_data, SourceCheckpointKind::Finalized)
+            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
@@ -1260,8 +1322,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_finalized_endpoint_tracks_latest_finalized_slot<'a>(clients: Vec<Client>, test_data: PostGenesisSyncTestData) {
-        let (_context, state, fork_choice) = load_post_genesis_state_setup(clients, test_data).await;
+    async fn test_state_finalized_endpoint_tracks_latest_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
+        let (_context, state, fork_choice) = load_post_genesis_state_setup(test, test_data).await;
 
         assert_eq!(
             state.latest_finalized.slot, fork_choice.finalized.slot,

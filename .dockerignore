@@ -6,3 +6,9 @@ hive
 hivechain
 hiveview
 workspace
+target
+**/target
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
