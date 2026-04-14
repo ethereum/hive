@@ -32,6 +32,9 @@ pub type AsyncNClientsTestFunc<T> = fn(
     >,
 >;
 
+type ClientFiles = Option<Vec<Option<HashMap<String, Vec<u8>>>>>;
+type ClientEnvironments = Option<Vec<Option<HashMap<String, String>>>>;
+
 #[async_trait]
 pub trait Testable: DynClone + Send + Sync {
     async fn run_test(&self, simulation: Simulation, suite_id: SuiteID, suite: Suite);
@@ -93,13 +96,24 @@ impl Test {
         client_type: String,
         environment: Option<HashMap<String, String>>,
     ) -> Client {
+        self.start_client_with_files(client_type, environment, None)
+            .await
+    }
+
+    pub async fn start_client_with_files(
+        &self,
+        client_type: String,
+        environment: Option<HashMap<String, String>>,
+        files: Option<HashMap<String, Vec<u8>>>,
+    ) -> Client {
         let (container, ip) = self
             .sim
-            .start_client(
+            .start_client_with_files(
                 self.suite_id,
                 self.test_id,
                 client_type.clone(),
                 environment,
+                files,
             )
             .await;
 
@@ -215,7 +229,10 @@ pub struct NClientTestSpec<T> {
     pub run: AsyncNClientsTestFunc<T>,
     /// For each client, there is a distinct map of Hive Environment Variable names to values.
     /// The environments must be in the same order as the `clients`
-    pub environments: Option<Vec<Option<HashMap<String, String>>>>,
+    pub environments: ClientEnvironments,
+    /// For each client, there is a distinct map of destination file paths to file contents.
+    /// The file maps must be in the same order as the `clients`.
+    pub files: ClientFiles,
     /// test data which can be passed to the test
     pub test_data: T,
     pub clients: Vec<ClientDefinition>,
@@ -242,6 +259,7 @@ impl<T: Clone + Send + Sync + 'static> Testable for NClientTestSpec<T> {
             simulation,
             test_run,
             self.environments.to_owned(),
+            self.files.to_owned(),
             self.test_data.clone(),
             self.clients.to_owned(),
             self.run,
@@ -254,7 +272,8 @@ impl<T: Clone + Send + Sync + 'static> Testable for NClientTestSpec<T> {
 async fn run_n_client_test<T: Send + 'static>(
     host: Simulation,
     test: TestRun,
-    environments: Option<Vec<Option<HashMap<String, String>>>>,
+    environments: ClientEnvironments,
+    files: ClientFiles,
     test_data: T,
     clients: Vec<ClientDefinition>,
     func: AsyncNClientsTestFunc<T>,
@@ -279,8 +298,12 @@ async fn run_n_client_test<T: Send + 'static>(
 
             let mut client_vec: Vec<Client> = Vec::new();
             let env_iter = environments.unwrap_or(vec![None; clients.len()]);
-            for (client, environment) in clients.into_iter().zip(env_iter) {
-                client_vec.push(test.start_client(client.name.to_owned(), environment).await);
+            let file_iter = files.unwrap_or(vec![None; clients.len()]);
+            for ((client, environment), files) in clients.into_iter().zip(env_iter).zip(file_iter) {
+                client_vec.push(
+                    test.start_client_with_files(client.name.to_owned(), environment, files)
+                        .await,
+                );
             }
             (func)(client_vec, test_data).await;
         })
