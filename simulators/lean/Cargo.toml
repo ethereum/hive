@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 hivesim = { git = "https://github.com/ethereum/hive", rev = "4408fc1de3fee3ac23acd25a812c117756af2f39" }
+alloy-primitives = { version = "1.4.1", features = ["serde"] }
 hex = "0.4"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }

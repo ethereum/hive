@@ -8,6 +8,8 @@ use crate::{
     get_json_with_retry, lean_api_url, lean_clients, lean_environment, selected_lean_devnet_label,
     CheckpointResponse, HealthResponse, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
+use alloy_primitives::{FixedBytes, B256};
+use hex::FromHex;
 use hivesim::{dyn_async, types::TestResult, Client, NClientTestSpec, Test};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
@@ -17,17 +19,20 @@ use serde::Deserialize;
 use ssz::Decode as SszDecode;
 use ssz_derive::Decode;
 use ssz_types::{
-    typenum::{U1073741824, U262144, U32, U4096, U52},
-    BitList, FixedVector, VariableList,
+    typenum::{U1073741824, U262144, U4096},
+    BitList, VariableList,
 };
 use tokio::time::sleep;
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
-const ZERO_ROOT_HEX: &str = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
-type RootBytes = FixedVector<u8, U32>;
-type LeanPublicKey = FixedVector<u8, U52>;
+type RootBytes = B256;
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanPublicKey {
+    inner: FixedBytes<52>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode)]
 struct LeanConfig {
@@ -164,9 +169,9 @@ impl From<LeanStateDevnet4> for LeanState {
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ForkChoiceNodeResponse {
-    root: String,
+    root: B256,
     slot: u64,
-    parent_root: String,
+    parent_root: B256,
     proposer_index: u64,
     weight: u64,
 }
@@ -175,10 +180,10 @@ struct ForkChoiceNodeResponse {
 #[derive(Debug, Deserialize)]
 struct ForkChoiceResponse {
     nodes: Vec<ForkChoiceNodeResponse>,
-    head: String,
+    head: B256,
     justified: CheckpointResponse,
     finalized: CheckpointResponse,
-    safe_target: String,
+    safe_target: B256,
     validator_count: u64,
 }
 
@@ -284,6 +289,24 @@ fn assert_hex_root(root: &str, field_name: &str) {
         66,
         "{field_name} should be 32 bytes of hex plus 0x prefix"
     );
+}
+
+fn assert_hex_root_b256(root: &B256, field_name: &str) {
+    let encoded = format!("{:#x}", root);
+    assert_hex_root(&encoded, field_name);
+}
+
+fn parse_b256_hex(value: &str, field_name: &str) -> B256 {
+    let trimmed = value.strip_prefix("0x").unwrap_or(value);
+    let bytes = Vec::<u8>::from_hex(trimmed)
+        .unwrap_or_else(|err| panic!("Unable to decode {field_name} as hex: {err}"));
+    assert_eq!(
+        bytes.len(),
+        32,
+        "{field_name} should be 32 bytes, got {} bytes",
+        bytes.len()
+    );
+    B256::from_slice(&bytes)
 }
 
 async fn load_fork_choice_response(client: &Client) -> ForkChoiceResponse {
@@ -1045,7 +1068,8 @@ dyn_async! {
             "without a non-genesis justification event, the justified slot should remain at genesis"
         );
         assert_eq!(
-            fork_choice.justified.root, fork_choice.head,
+            parse_b256_hex(&fork_choice.justified.root, "justified root"),
+            fork_choice.head,
             "without a non-genesis justification event, the justified root should remain at the genesis head"
         );
         assert_hex_root(&fork_choice.justified.root, "justified root");
@@ -1060,7 +1084,8 @@ dyn_async! {
             "without a non-genesis finalization event, the finalized slot should remain at genesis"
         );
         assert_eq!(
-            fork_choice.finalized.root, fork_choice.head,
+            parse_b256_hex(&fork_choice.finalized.root, "finalized root"),
+            fork_choice.head,
             "without a non-genesis finalization event, the finalized root should remain at the genesis head"
         );
         assert_hex_root(&fork_choice.finalized.root, "finalized root");
@@ -1080,7 +1105,8 @@ dyn_async! {
             "the only forkchoice node should still be the genesis block"
         );
         assert_eq!(
-            fork_choice.nodes[0].parent_root, ZERO_ROOT_HEX,
+            fork_choice.nodes[0].parent_root,
+            B256::ZERO,
             "the genesis forkchoice node should reference the zero parent root"
         );
     }
@@ -1092,7 +1118,7 @@ dyn_async! {
             load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
-        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root_b256(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
         assert!(
             !fork_choice.nodes.is_empty(),
@@ -1118,7 +1144,7 @@ dyn_async! {
             load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
-        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root_b256(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
         assert!(
             !fork_choice.nodes.is_empty(),
@@ -1142,7 +1168,7 @@ dyn_async! {
                 .any(|node| node.slot >= reference_finalized_slot),
             "forkchoice should keep at least one node at or beyond the finalized boundary"
         );
-        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
+        assert_hex_root_b256(&fork_choice.safe_target, "forkchoice safe_target");
     }
 }
 
@@ -1178,14 +1204,14 @@ dyn_async! {
 dyn_async! {
     async fn test_forkchoice_hex_encodes_roots<'a>(clients: Vec<Client>, _: ()) {
         let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
-        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root_b256(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.justified.root, "forkchoice justified root");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
-        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
+        assert_hex_root_b256(&fork_choice.safe_target, "forkchoice safe_target");
 
         for node in &fork_choice.nodes {
-            assert_hex_root(&node.root, "forkchoice node root");
-            assert_hex_root(&node.parent_root, "forkchoice node parent_root");
+            assert_hex_root_b256(&node.root, "forkchoice node root");
+            assert_hex_root_b256(&node.parent_root, "forkchoice node parent_root");
         }
     }
 }
@@ -1196,7 +1222,7 @@ dyn_async! {
             load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
                 .await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
-        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root_b256(&fork_choice.head, "forkchoice head");
         assert!(
             reference_finalized_slot > 0,
             "helper-backed forkchoice setup should sync from a non-genesis finalized boundary"
@@ -1213,7 +1239,7 @@ dyn_async! {
                 || fork_choice
                     .nodes
                     .iter()
-                    .all(|node| node.root != ZERO_ROOT_HEX),
+                    .all(|node| node.root != B256::ZERO),
             "forkchoice should still return well-formed node roots when it exposes post-finalized nodes"
         );
         assert!(
@@ -1221,7 +1247,7 @@ dyn_async! {
                 || !fork_choice.nodes.is_empty(),
             "checkpoint-synced forkchoice should expose either post-genesis justification or a compact post-finalized node set"
         );
-        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
+        assert_hex_root_b256(&fork_choice.safe_target, "forkchoice safe_target");
     }
 }
 
@@ -1235,8 +1261,8 @@ dyn_async! {
         );
 
         let node = &fork_choice.nodes[0];
-        assert_hex_root(&node.root, "forkchoice node root");
-        assert_hex_root(&node.parent_root, "forkchoice node parent_root");
+        assert_hex_root_b256(&node.root, "forkchoice node root");
+        assert_hex_root_b256(&node.parent_root, "forkchoice node parent_root");
         assert_eq!(node.slot, 0, "fresh forkchoice node slot should decode to genesis");
         assert_eq!(
             node.proposer_index, 0,
@@ -1259,15 +1285,16 @@ dyn_async! {
         );
 
         let node = &fork_choice.nodes[0];
-        assert_hex_root(&node.root, "forkchoice node root");
-        assert_hex_root(&node.parent_root, "forkchoice node parent_root");
-        assert_hex_root(&fork_choice.head, "forkchoice head");
+        assert_hex_root_b256(&node.root, "forkchoice node root");
+        assert_hex_root_b256(&node.parent_root, "forkchoice node parent_root");
+        assert_hex_root_b256(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.justified.root, "forkchoice justified root");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
-        assert_hex_root(&fork_choice.safe_target, "forkchoice safe_target");
+        assert_hex_root_b256(&fork_choice.safe_target, "forkchoice safe_target");
         assert_eq!(node.slot, 0, "fresh forkchoice node should be genesis");
         assert_eq!(
-            node.parent_root, ZERO_ROOT_HEX,
+            node.parent_root,
+            B256::ZERO,
             "genesis node should reference the zero parent root"
         );
         assert_eq!(
@@ -1287,7 +1314,8 @@ dyn_async! {
             "fresh forkchoice justified checkpoint should stay at genesis"
         );
         assert_eq!(
-            fork_choice.justified.root, fork_choice.head,
+            parse_b256_hex(&fork_choice.justified.root, "justified root"),
+            fork_choice.head,
             "fresh forkchoice justified root should match the genesis head"
         );
         assert_eq!(
@@ -1295,7 +1323,8 @@ dyn_async! {
             "fresh forkchoice finalized checkpoint should stay at genesis"
         );
         assert_eq!(
-            fork_choice.finalized.root, fork_choice.head,
+            parse_b256_hex(&fork_choice.finalized.root, "finalized root"),
+            fork_choice.head,
             "fresh forkchoice finalized root should match the genesis head"
         );
         assert_eq!(
