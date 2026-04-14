@@ -4,44 +4,49 @@ set -euo pipefail
 
 LANTERN_BIN="${LANTERN_BIN:-$(command -v lantern || command -v lantern_cli)}"
 NODE_ID="${HIVE_NODE_ID:-lantern_0}"
-BOOTNODES="${HIVE_BOOTNODES:-none}"
-KEY_FILE=""
+ASSET_ROOT="/tmp/lantern-runtime"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
 
 cleanup() {
-    if [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
-        rm -f "$KEY_FILE"
+    if [ -d "$ASSET_ROOT" ]; then
+        rm -rf "$ASSET_ROOT"
     fi
 }
 
 trap cleanup EXIT
 
+if [ ! -f "$ASSET_ROOT/config.yaml" ]; then
+    echo "Missing prepared Lean runtime assets at $ASSET_ROOT" >&2
+    exit 1
+fi
+
 FLAGS=(
     --data-dir /data
-    --validator-registry-path /assets/lean/validators.yaml
+    --genesis-config "$ASSET_ROOT/config.yaml"
+    --validator-registry-path "$ASSET_ROOT/validators.yaml"
+    --nodes-path "$ASSET_ROOT/nodes.yaml"
+    --validator-config "$ASSET_ROOT/validator-config.yaml"
     --node-id "$NODE_ID"
+    --node-key-path "$ASSET_ROOT/node.key"
     --listen-address "/ip4/0.0.0.0/udp/9000/quic-v1"
     --http-port 5052
+    --metrics-port 8080
+    --hash-sig-key-dir "$ASSET_ROOT/hash-sig-keys"
     --log-level debug
 )
+
+if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
+    FLAGS+=(--checkpoint-sync-url "$HIVE_CHECKPOINT_SYNC_URL")
+fi
 
 if [ -n "${HIVE_NETWORK:-}" ]; then
     FLAGS+=(--devnet "$HIVE_NETWORK")
 else
-    FLAGS+=(--devnet ephemery) 
+    FLAGS+=(--devnet "$DEVNET_LABEL")
 fi
 
-if [ "$BOOTNODES" != "none" ]; then
-    FLAGS+=(--bootnodes "$BOOTNODES")
-fi
-
-if [ -n "${HIVE_CLIENT_PRIVATE_KEY:-}" ]; then
-    KEY_FILE="$(mktemp /tmp/lantern-node-key.XXXXXX)"
-    printf "%s" "$HIVE_CLIENT_PRIVATE_KEY" > "$KEY_FILE"
-    FLAGS+=(--node-key-path "$KEY_FILE")
-fi
-
-if [ "${HIVE_METRICS_ENABLED:-0}" = "1" ]; then
-    FLAGS+=(--metrics-port 8080)
+if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
+    FLAGS+=(--is-aggregator)
 fi
 
 export RUST_LOG="${RUST_LOG:-info}"

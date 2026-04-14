@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::net::{IpAddr, UdpSocket};
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -28,12 +30,13 @@ const LEAN_GENESIS_DELAY_SECS: u64 = 30;
 const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
 const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
 const LOCAL_HELPER_STARTUP_TIMEOUT_SECS: u64 = 120;
-const LOCAL_HELPER_STARTUP_ATTEMPTS: u64 = 6;
+const LOCAL_HELPER_STARTUP_ATTEMPTS: u64 = 12;
 const CLIENT_UNDER_TEST_STARTUP_ATTEMPTS: u64 = 3;
 const HELPER_METADATA_PORT: u16 = 5053;
 const LOCAL_HELPER_API_PORT: u16 = 5052;
 const LOCAL_HELPER_ENTRYPOINT: &str = "/app/hive/leanspec-client.sh";
 const LOCAL_HELPER_KIND: &str = "lean-spec-local-helper";
+const CLIENT_RUNTIME_ASSET_PREPARER: &str = "/app/hive/prepare_lean_client_assets.py";
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +47,7 @@ struct HelperGenesisValidatorEntry {
 
 #[derive(Debug, Deserialize)]
 struct HelperGenesisMetadata {
+    genesis_time: u64,
     genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
 }
 
@@ -74,6 +78,18 @@ pub(crate) struct PostGenesisSyncContext {
 struct RunningLocalLeanSpecHelper {
     child: Child,
     ip: IpAddr,
+    expected_genesis_time: u64,
+}
+
+struct CheckpointSyncClientStart<'a> {
+    test: &'a Test,
+    helper: &'a mut RunningLocalLeanSpecHelper,
+    source_fork_choice: &'a mut ForkChoiceSnapshot,
+    client_type: String,
+    environment: HashMap<String, String>,
+    genesis_time: u64,
+    checkpoint_kind: SourceCheckpointKind,
+    minimum_slot: u64,
 }
 
 impl RunningLocalLeanSpecHelper {
@@ -89,7 +105,10 @@ impl RunningLocalLeanSpecHelper {
     }
 
     fn checkpoint_sync_url(&self) -> String {
-        format!("http://{}:{}", self.ip, LOCAL_HELPER_API_PORT)
+        format!(
+            "http://{}:{}/lean/v0/states/finalized",
+            self.ip, LOCAL_HELPER_API_PORT
+        )
     }
 
     fn bootnode_multiaddr(&self) -> String {
@@ -178,7 +197,7 @@ pub(crate) async fn start_post_genesis_sync_context(
         None
     };
 
-    let source_fork_choice = match wait_for_checkpoint_slot(
+    let mut source_fork_choice = match wait_for_checkpoint_slot(
         &mut helper,
         test_data.source_checkpoint_kind,
         minimum_source_checkpoint_slot(test_data),
@@ -188,10 +207,21 @@ pub(crate) async fn start_post_genesis_sync_context(
         Ok(source_fork_choice) => source_fork_choice,
         Err(err) => {
             if client_under_test.is_none() {
+                let files = prepare_client_runtime_files(
+                    &test_data.client_under_test.name,
+                    &client_under_test_environment,
+                )
+                .unwrap_or_else(|prep_err| {
+                    panic!(
+                        "Unable to prepare runtime assets for {} after checkpoint wait failure: {prep_err}",
+                        test_data.client_under_test.name
+                    )
+                });
                 let _ = test
-                    .start_client(
+                    .start_client_with_files(
                         test_data.client_under_test.name.clone(),
                         Some(client_under_test_environment.clone()),
+                        Some(files),
                     )
                     .await;
             }
@@ -201,13 +231,32 @@ pub(crate) async fn start_post_genesis_sync_context(
     };
 
     if test_data.use_checkpoint_sync {
-        wait_for_checkpoint_sync_state_ready(&mut helper)
-            .await
-            .unwrap_or_else(|err| panic!("{err}"));
+        ensure_checkpoint_sync_source_ready(
+            &mut helper,
+            &mut source_fork_choice,
+            test_data.genesis_time,
+            test_data.source_checkpoint_kind,
+            minimum_source_checkpoint_slot(test_data),
+        )
+        .await
+        .unwrap_or_else(|err| panic!("{err}"));
     }
 
     let client_under_test = match client_under_test {
         Some(client_under_test) => client_under_test,
+        None if test_data.use_checkpoint_sync => {
+            start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
+                test,
+                helper: &mut helper,
+                source_fork_choice: &mut source_fork_choice,
+                client_type: test_data.client_under_test.name.clone(),
+                environment: client_under_test_environment,
+                genesis_time: test_data.genesis_time,
+                checkpoint_kind: test_data.source_checkpoint_kind,
+                minimum_slot: minimum_source_checkpoint_slot(test_data),
+            })
+            .await
+        }
         None => {
             start_client_under_test_with_retry(
                 test,
@@ -342,6 +391,95 @@ fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
     }
 }
 
+fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
+    for candidate in ["ethlambda", "zeam", "lantern", "ream"] {
+        if client_type.starts_with(candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(format!(
+        "unsupported lean client type for runtime asset preparation: {client_type}"
+    ))
+}
+
+fn client_runtime_asset_root(client_kind: &str) -> String {
+    format!("/tmp/{client_kind}-runtime")
+}
+
+fn local_client_runtime_asset_root(client_kind: &str) -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    env::temp_dir().join(format!("lean-client-assets-{client_kind}-{timestamp}"))
+}
+
+fn collect_client_runtime_files(
+    source_root: &Path,
+    current_dir: &Path,
+    container_root: &str,
+    files: &mut HashMap<String, Vec<u8>>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(current_dir)
+        .map_err(|err| format!("Unable to read prepared asset dir {current_dir:?}: {err}"))?
+    {
+        let entry = entry.map_err(|err| {
+            format!("Unable to inspect entry inside prepared asset dir {current_dir:?}: {err}")
+        })?;
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            collect_client_runtime_files(source_root, &entry_path, container_root, files)?;
+            continue;
+        }
+
+        let relative_path = entry_path.strip_prefix(source_root).map_err(|err| {
+            format!("Unable to derive relative asset path for {entry_path:?}: {err}")
+        })?;
+        let file_contents = fs::read(&entry_path)
+            .map_err(|err| format!("Unable to read prepared asset file {entry_path:?}: {err}"))?;
+        let relative_path = relative_path.to_string_lossy().replace('\\', "/");
+        let container_path = format!("{container_root}/{relative_path}");
+
+        files.insert(container_path, file_contents);
+    }
+    Ok(())
+}
+
+pub(crate) fn prepare_client_runtime_files(
+    client_type: &str,
+    environment: &HashMap<String, String>,
+) -> Result<HashMap<String, Vec<u8>>, String> {
+    let client_kind = lean_client_kind(client_type)?;
+    let local_root = local_client_runtime_asset_root(client_kind);
+    let container_root = client_runtime_asset_root(client_kind);
+
+    let mut command = Command::new("python3");
+    command.arg(CLIENT_RUNTIME_ASSET_PREPARER);
+    command.env("LEAN_CLIENT_KIND", client_kind);
+    command.env("LEAN_RUNTIME_ASSET_ROOT", &local_root);
+    for (key, value) in environment {
+        command.env(key, value);
+    }
+
+    let output = command.output().map_err(|err| {
+        format!("Unable to execute {CLIENT_RUNTIME_ASSET_PREPARER} for {client_type}: {err}")
+    })?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = fs::remove_dir_all(&local_root);
+        return Err(format!(
+            "{CLIENT_RUNTIME_ASSET_PREPARER} failed for {client_type} with status {}.\nstdout:\n{}\nstderr:\n{}",
+            output.status, stdout, stderr
+        ));
+    }
+
+    let mut files = HashMap::new();
+    collect_client_runtime_files(&local_root, &local_root, &container_root, &mut files)?;
+    let _ = fs::remove_dir_all(&local_root);
+    Ok(files)
+}
+
 fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {
     if let Some(error) = payload.downcast_ref::<&'static str>() {
         error.to_string()
@@ -357,16 +495,23 @@ async fn start_client_under_test_with_retry(
     client_type: String,
     environment: HashMap<String, String>,
 ) -> Client {
+    let files = prepare_client_runtime_files(&client_type, &environment)
+        .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
     let mut last_error = None;
 
     for attempt in 1..=CLIENT_UNDER_TEST_STARTUP_ATTEMPTS {
         let test = test.clone();
         let client_type_for_attempt = client_type.clone();
         let environment_for_attempt = environment.clone();
+        let files_for_attempt = files.clone();
 
         match tokio::spawn(async move {
-            test.start_client(client_type_for_attempt, Some(environment_for_attempt))
-                .await
+            test.start_client_with_files(
+                client_type_for_attempt,
+                Some(environment_for_attempt),
+                Some(files_for_attempt),
+            )
+            .await
         })
         .await
         {
@@ -406,6 +551,132 @@ async fn start_client_under_test_with_retry(
             .map(|error| format!(": {error}"))
             .unwrap_or_default()
     );
+}
+
+async fn start_checkpoint_sync_client_under_test_with_retry(
+    params: CheckpointSyncClientStart<'_>,
+) -> Client {
+    let files = prepare_client_runtime_files(&params.client_type, &params.environment)
+        .unwrap_or_else(|err| {
+            panic!(
+                "Unable to prepare runtime assets for {}: {err}",
+                params.client_type
+            )
+        });
+    let mut last_error = None;
+
+    for attempt in 1..=CLIENT_UNDER_TEST_STARTUP_ATTEMPTS {
+        ensure_checkpoint_sync_source_ready(
+            params.helper,
+            params.source_fork_choice,
+            params.genesis_time,
+            params.checkpoint_kind,
+            params.minimum_slot,
+        )
+        .await
+        .unwrap_or_else(|err| {
+            panic!(
+                "Checkpoint-sync source state endpoint was not ready for {} before startup attempt {}: {}",
+                params.client_type, attempt, err
+            )
+        });
+        sleep(Duration::from_secs(1)).await;
+
+        let test = params.test.clone();
+        let client_type_for_attempt = params.client_type.clone();
+        let environment_for_attempt = params.environment.clone();
+        let files_for_attempt = files.clone();
+
+        match tokio::spawn(async move {
+            test.start_client_with_files(
+                client_type_for_attempt,
+                Some(environment_for_attempt),
+                Some(files_for_attempt),
+            )
+            .await
+        })
+        .await
+        {
+            Ok(client) => return client,
+            Err(error) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
+                let message = if error.is_panic() {
+                    panic_payload_to_string(error.into_panic())
+                } else {
+                    error.to_string()
+                };
+                eprintln!(
+                    "Retrying checkpoint-sync client-under-test startup for {} after attempt {} failed: {}",
+                    params.client_type, attempt, message
+                );
+                last_error = Some(message);
+                sleep(Duration::from_secs(1)).await;
+            }
+            Err(error) => {
+                let message = if error.is_panic() {
+                    panic_payload_to_string(error.into_panic())
+                } else {
+                    error.to_string()
+                };
+                panic!(
+                    "Unable to start checkpoint-sync client under test {} after {} attempts: {}",
+                    params.client_type, CLIENT_UNDER_TEST_STARTUP_ATTEMPTS, message
+                );
+            }
+        }
+    }
+
+    panic!(
+        "Unable to start checkpoint-sync client under test {} after {} attempts{}",
+        params.client_type,
+        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
+        last_error
+            .map(|error| format!(": {error}"))
+            .unwrap_or_default()
+    );
+}
+
+async fn ensure_checkpoint_sync_source_ready(
+    helper: &mut RunningLocalLeanSpecHelper,
+    source_fork_choice: &mut ForkChoiceSnapshot,
+    genesis_time: u64,
+    checkpoint_kind: SourceCheckpointKind,
+    minimum_slot: u64,
+) -> Result<(), String> {
+    match wait_for_checkpoint_sync_state_ready(helper).await {
+        Ok(()) => Ok(()),
+        Err(error) if helper_startup_error_is_retryable(&error) => {
+            eprintln!(
+                "Restarting {LOCAL_HELPER_KIND} after checkpoint-sync readiness failure: {error}"
+            );
+            refresh_checkpoint_sync_source(
+                helper,
+                source_fork_choice,
+                genesis_time,
+                checkpoint_kind,
+                minimum_slot,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    }
+}
+
+async fn refresh_checkpoint_sync_source(
+    helper: &mut RunningLocalLeanSpecHelper,
+    source_fork_choice: &mut ForkChoiceSnapshot,
+    genesis_time: u64,
+    checkpoint_kind: SourceCheckpointKind,
+    minimum_slot: u64,
+) -> Result<(), String> {
+    let (mut restarted_helper, _source_genesis_validator_entries) =
+        start_local_lean_spec_helper_with_genesis_metadata(genesis_time).await?;
+    let refreshed_source_fork_choice =
+        wait_for_checkpoint_slot(&mut restarted_helper, checkpoint_kind, minimum_slot).await?;
+    wait_for_checkpoint_sync_state_ready(&mut restarted_helper).await?;
+
+    *helper = restarted_helper;
+    *source_fork_choice = refreshed_source_fork_choice;
+    Ok(())
 }
 
 async fn wait_for_checkpoint_slot(
@@ -576,12 +847,13 @@ fn http_client() -> HttpClient {
         .expect("Unable to build HTTP client")
 }
 
-async fn load_finalized_genesis_validators(
+async fn load_helper_genesis_metadata(
     helper: &mut RunningLocalLeanSpecHelper,
-) -> Result<Vec<HelperGenesisValidatorEntry>, String> {
+) -> Result<HelperGenesisMetadata, String> {
     let http = http_client();
     let url = helper.metadata_url();
     let mut last_error = String::new();
+    let mut last_observed_genesis_time = None;
 
     for _attempt in 0..LOCAL_HELPER_STARTUP_TIMEOUT_SECS {
         helper.ensure_running()?;
@@ -592,7 +864,17 @@ async fn load_finalized_genesis_validators(
                     last_error = format!("received HTTP {status} from {url}");
                 } else {
                     match response.json::<HelperGenesisMetadata>().await {
-                        Ok(metadata) => return Ok(metadata.genesis_validator_entries),
+                        Ok(metadata) => {
+                            last_observed_genesis_time = Some(metadata.genesis_time);
+                            if metadata.genesis_time == helper.expected_genesis_time {
+                                return Ok(metadata);
+                            }
+
+                            last_error = format!(
+                                "observed helper genesis_time {} while waiting for {}",
+                                metadata.genesis_time, helper.expected_genesis_time
+                            );
+                        }
                         Err(err) => {
                             last_error = format!("Unable to decode helper genesis metadata: {err}")
                         }
@@ -608,7 +890,16 @@ async fn load_finalized_genesis_validators(
     }
 
     Err(format!(
-        "Unable to load helper genesis metadata from {url}: {last_error}"
+        "Unable to load helper genesis metadata from {url} for genesis_time {} (last observed genesis_time: {}, last error: {})",
+        helper.expected_genesis_time,
+        last_observed_genesis_time
+            .map(|genesis_time| genesis_time.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        if last_error.is_empty() {
+            "none".to_string()
+        } else {
+            last_error
+        }
     ))
 }
 
@@ -625,9 +916,9 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
 
     for attempt in 1..=LOCAL_HELPER_STARTUP_ATTEMPTS {
         let mut helper = start_local_lean_spec_helper(genesis_time);
-        match load_finalized_genesis_validators(&mut helper).await {
-            Ok(source_genesis_validator_entries) => {
-                return Ok((helper, source_genesis_validator_entries));
+        match load_helper_genesis_metadata(&mut helper).await {
+            Ok(metadata) => {
+                return Ok((helper, metadata.genesis_validator_entries));
             }
             Err(error)
                 if attempt < LOCAL_HELPER_STARTUP_ATTEMPTS
@@ -673,6 +964,7 @@ fn start_local_lean_spec_helper(genesis_time: u64) -> RunningLocalLeanSpecHelper
     RunningLocalLeanSpecHelper {
         child,
         ip: simulator_container_ip(),
+        expected_genesis_time: genesis_time,
     }
 }
 
@@ -701,4 +993,94 @@ fn simulator_container_ip() -> IpAddr {
             panic!("Unable to determine simulator container local socket address: {err}")
         })
         .ip()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, TcpListener};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::thread;
+
+    fn start_metadata_server(
+        genesis_time: Arc<AtomicU64>,
+        stop: Arc<AtomicBool>,
+    ) -> thread::JoinHandle<()> {
+        thread::spawn(move || {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, HELPER_METADATA_PORT))
+                .expect("test metadata server should bind");
+            listener
+                .set_nonblocking(true)
+                .expect("test metadata server should be nonblocking");
+
+            while !stop.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        let mut request_buffer = [0_u8; 1024];
+                        let _ = stream.read(&mut request_buffer);
+
+                        let body = format!(
+                            "{{\"genesis_time\":{},\"genesis_validator_entries\":[{{\"attestation_public_key\":\"0xabc\",\"proposal_public_key\":null}}]}}",
+                            genesis_time.load(Ordering::SeqCst)
+                        );
+                        let response = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        );
+                        stream
+                            .write_all(response.as_bytes())
+                            .expect("test metadata server should write response");
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                    Err(error) => panic!("test metadata server accept failed: {error}"),
+                }
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn load_helper_genesis_metadata_waits_for_expected_genesis_time() {
+        let observed_genesis_time = Arc::new(AtomicU64::new(111));
+        let stop_server = Arc::new(AtomicBool::new(false));
+        let server_thread =
+            start_metadata_server(observed_genesis_time.clone(), stop_server.clone());
+        let mut helper = RunningLocalLeanSpecHelper {
+            child: Command::new("sleep")
+                .arg("30")
+                .spawn()
+                .expect("sleep should spawn for helper test"),
+            ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            expected_genesis_time: 222,
+        };
+
+        let updater = {
+            let observed_genesis_time = observed_genesis_time.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(1100));
+                observed_genesis_time.store(222, Ordering::SeqCst);
+            })
+        };
+
+        let metadata = load_helper_genesis_metadata(&mut helper)
+            .await
+            .expect("metadata should eventually match the expected genesis time");
+
+        assert_eq!(metadata.genesis_time, 222);
+        assert_eq!(metadata.genesis_validator_entries.len(), 1);
+        assert_eq!(
+            metadata.genesis_validator_entries[0].attestation_public_key,
+            "0xabc"
+        );
+
+        stop_server.store(true, Ordering::SeqCst);
+        updater.join().expect("metadata updater should finish");
+        server_thread
+            .join()
+            .expect("test metadata server should shut down cleanly");
+    }
 }

@@ -21,78 +21,6 @@ var (
 	errSimTimeout   = errors.New("simulation timed out")
 )
 
-const (
-	leanSimulatorName  = "lean"
-	leanRoleName       = "lean"
-	leanHelperRoleName = "lean-helper"
-	leanDevnet3Label   = "devnet3"
-	leanDevnet4Label   = "devnet4"
-)
-
-func NormalizeLeanDevnetLabel(label string) (string, error) {
-	label = strings.TrimSpace(label)
-	if label == "" {
-		return leanDevnet3Label, nil
-	}
-
-	switch label {
-	case leanDevnet3Label, leanDevnet4Label:
-		return label, nil
-	default:
-		return "", fmt.Errorf("unsupported Lean devnet %q", label)
-	}
-}
-
-func prepareLeanClientList(
-	inv Inventory,
-	clientList []ClientDesignator,
-	simList []string,
-	devnetLabel string,
-) ([]ClientDesignator, error) {
-	if !containsSimulator(simList, leanSimulatorName) {
-		return clientList, nil
-	}
-
-	devnetLabel, err := NormalizeLeanDevnetLabel(devnetLabel)
-	if err != nil {
-		return nil, err
-	}
-
-	prepared := make([]ClientDesignator, len(clientList))
-	copy(prepared, clientList)
-	for i := range prepared {
-		if !isLeanSimulationClient(inv, prepared[i].Client) {
-			continue
-		}
-		if prepared[i].Nametag == "" {
-			prepared[i].Nametag = devnetLabel
-		}
-	}
-	return prepared, nil
-}
-
-func isLeanSimulationClient(inv Inventory, clientName string) bool {
-	client, ok := inv.Clients[clientName]
-	if !ok {
-		return false
-	}
-	for _, role := range client.Meta.Roles {
-		if role == leanRoleName || role == leanHelperRoleName {
-			return true
-		}
-	}
-	return false
-}
-
-func containsSimulator(simList []string, simulator string) bool {
-	for _, sim := range simList {
-		if sim == simulator {
-			return true
-		}
-	}
-	return false
-}
-
 // Runner executes a simulation runs.
 type Runner struct {
 	inv       Inventory
@@ -113,18 +41,7 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 }
 
 // Build builds client and simulator images.
-func (r *Runner) Build(
-	ctx context.Context,
-	clientList []ClientDesignator,
-	simList []string,
-	simBuildArgs map[string]string,
-	leanDevnetLabel string,
-) error {
-	var err error
-	clientList, err = prepareLeanClientList(r.inv, clientList, simList, leanDevnetLabel)
-	if err != nil {
-		return err
-	}
+func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string, simBuildArgs map[string]string) error {
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
@@ -147,7 +64,6 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 	for _, client := range clientList {
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
-			slog.Error("client build failed", "client", client.Name(), "err", err)
 			continue
 		}
 		anyBuilt = true
@@ -250,23 +166,10 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		// Unspecified, make all clients available.
 		clientDefs = append(clientDefs, r.clientDefs...)
 	} else {
-		clientList := env.ClientList
-		if sim == leanSimulatorName {
-			var err error
-			clientList, err = prepareLeanClientList(
-				r.inv,
-				clientList,
-				[]string{sim},
-				env.LeanDevnetLabel,
-			)
-			if err != nil {
-				return SimResult{}, err
-			}
-		}
-		for _, client := range clientList {
+		for _, client := range env.ClientList {
 			found := false
 			for _, def := range r.clientDefs {
-				if def.Name == client.Name() {
+				if def.Name == client.Client {
 					clientDefs = append(clientDefs, def)
 					found = true
 					break
@@ -316,13 +219,6 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 		},
 		Labels: simLabels,
 		Name:   containerName,
-	}
-	if sim == leanSimulatorName {
-		leanDevnetLabel, err := NormalizeLeanDevnetLabel(env.LeanDevnetLabel)
-		if err != nil {
-			return SimResult{}, err
-		}
-		opts.Env["HIVE_LEAN_DEVNET_LABEL"] = leanDevnetLabel
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {

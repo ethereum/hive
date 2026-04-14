@@ -1,8 +1,8 @@
-use std::{future::Future, pin::Pin, time::Duration};
+use std::{collections::HashMap, future::Future, pin::Pin, time::Duration};
 
 use crate::scenarios::sync::{
-    default_genesis_time, start_post_genesis_sync_context, PostGenesisSyncContext,
-    PostGenesisSyncTestData, SourceCheckpointKind,
+    default_genesis_time, prepare_client_runtime_files, start_post_genesis_sync_context,
+    PostGenesisSyncContext, PostGenesisSyncTestData, SourceCheckpointKind,
 };
 use crate::{
     get_json_with_retry, lean_api_url, lean_clients, lean_environment, selected_lean_devnet_label,
@@ -183,6 +183,9 @@ struct ForkChoiceResponse {
 }
 
 type AsyncLeanDataTestFunc<T> = fn(&mut Test, T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
+type ClientEnvironments = Option<Vec<Option<HashMap<String, String>>>>;
+type ClientFiles = Option<Vec<Option<HashMap<String, Vec<u8>>>>>;
+type ClientRuntimeSetup = (ClientEnvironments, ClientFiles);
 
 fn expect_single_client(clients: Vec<Client>) -> Client {
     clients
@@ -196,6 +199,14 @@ fn http_client() -> HttpClient {
         .timeout(Duration::from_secs(5))
         .build()
         .expect("Unable to build HTTP client")
+}
+
+fn lean_single_client_runtime_setup(client_type: &str) -> ClientRuntimeSetup {
+    let environment = lean_environment();
+    let files = prepare_client_runtime_files(client_type, &environment)
+        .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
+
+    (Some(vec![Some(environment)]), Some(vec![Some(files)]))
 }
 
 fn extract_data_test_result(join_handle: Result<(), tokio::task::JoinError>) -> TestResult {
@@ -483,13 +494,17 @@ dyn_async! {
         }
 
         for client in &clients {
+            let (fresh_client_environments, fresh_client_files) =
+                lean_single_client_runtime_setup(&client.name);
+
             test.run(NClientTestSpec {
                 name: "health healthy".to_string(),
                 description: "rpc_compat: Checks that the health endpoint reports a healthy Lean RPC service."
                     .to_string(),
                 always_run: false,
                 run: test_health_healthy,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -499,7 +514,8 @@ dyn_async! {
                 description: "Checks that the justified checkpoint root is hex encoded.".to_string(),
                 always_run: false,
                 run: test_checkpoints_hex_encodes_root,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -511,7 +527,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_checkpoints_returns_expected_fields,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -522,7 +539,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -538,7 +556,7 @@ dyn_async! {
                     client_under_test: client.clone(),
                     genesis_time: checkpoint_genesis_time,
                     source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: selected_lean_devnet_label() != "devnet4",
+                    wait_for_client_justified_checkpoint: true,
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: false,
                 },
@@ -553,7 +571,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_no_head,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -565,7 +584,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_no_justified,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -577,7 +597,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_no_finalized,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -589,7 +610,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_no_nodes,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -601,7 +623,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_defaults_missing_weight_to_zero,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -613,7 +636,8 @@ dyn_async! {
                         .to_string(),
                 always_run: false,
                 run: test_forkchoice_zero_validator_count_when_head_state_missing,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -624,7 +648,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_forkchoice_hex_encodes_roots,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -635,7 +660,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_forkchoice_includes_expected_node_fields,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -646,7 +672,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_forkchoice,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -714,7 +741,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_returns_ssz_encoded_finalized_state,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -725,7 +753,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_returns_octet_stream_content_type,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -736,7 +765,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_config,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -747,7 +777,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_slot,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -758,7 +789,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_latest_block_header,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -769,7 +801,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_latest_justified,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -780,7 +813,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_latest_finalized,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -791,7 +825,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_historical_block_hashes,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -802,7 +837,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_justified_slots,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -813,7 +849,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_validators,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -824,7 +861,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_justifications_roots,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -835,7 +873,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state_ssz_decodes_justifications_validators,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -846,7 +885,8 @@ dyn_async! {
                     .to_string(),
                 always_run: false,
                 run: test_state,
-                environments: Some(vec![Some(lean_environment())]),
+                environments: fresh_client_environments.clone(),
+                files: fresh_client_files.clone(),
                 test_data: (),
                 clients: vec![client.clone()],
             }).await;
@@ -953,26 +993,6 @@ dyn_async! {
             "helper source should reach a non-genesis justified checkpoint before syncing the client under test"
         );
 
-        if selected_lean_devnet_label() == "devnet4" {
-            let fork_choice = wait_for_post_genesis_fork_choice_response(&context.client_under_test).await;
-            let http = http_client();
-            let client_checkpoint: CheckpointResponse = get_json_with_retry(
-                &http,
-                &lean_api_url(&context.client_under_test, "/lean/v0/checkpoints/justified"),
-            )
-            .await;
-
-            assert_hex_root(
-                &client_checkpoint.root,
-                "client justified checkpoint root",
-            );
-            assert!(
-                fork_choice.nodes.iter().any(|node| node.slot > 0),
-                "client under test should expose post-genesis forkchoice nodes after checkpoint sync on devnet4"
-            );
-            return;
-        }
-
         let client_checkpoint = context
             .client_checkpoint
             .as_ref()
@@ -981,6 +1001,10 @@ dyn_async! {
         assert!(
             client_checkpoint.slot > 0,
             "client under test should report a non-genesis justified checkpoint after the helper mesh reaches justification"
+        );
+        assert_hex_root(
+            &client_checkpoint.root,
+            "client justified checkpoint root",
         );
 
         if client_checkpoint.slot == context.source_fork_choice.justified.slot {

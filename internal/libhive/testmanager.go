@@ -48,10 +48,6 @@ type SimEnv struct {
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
-
-	// LeanDevnetLabel selects which Lean devnet profile to use when running
-	// the lean simulator. It is ignored for other simulators.
-	LeanDevnetLabel string
 }
 
 // SimResult summarizes the results of a simulation run.

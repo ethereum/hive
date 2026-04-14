@@ -3,7 +3,6 @@ ARG tag=v0.0.3
 
 FROM $baseimage:$tag
 
-COPY validators.yaml /assets/lean/validators.yaml
 ADD lantern.sh /lantern.sh
 
 RUN chmod +x /lantern.sh \

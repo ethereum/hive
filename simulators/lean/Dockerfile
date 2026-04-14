@@ -1,15 +1,15 @@
 FROM rust:latest AS rust-builder
 
-RUN USER=root cargo new --bin lean-sim
-WORKDIR /lean-sim
+WORKDIR /workspace
 
 ENV RUST_MIN_STACK=16777216
 
-COPY Cargo.toml ./Cargo.toml
-COPY Cargo.lock ./Cargo.lock
-COPY src ./src
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./hivesim-rs ./hivesim-rs
+COPY ./simulators/lean ./simulators/lean
 
-RUN cargo build --release --locked \
+RUN cargo build -p lean-sim --release --locked \
     && mv target/release/lean-sim /lean-sim-bin \
     && cargo clean \
     && rm -rf /usr/local/cargo/registry /usr/local/cargo/git
@@ -114,8 +114,10 @@ ENV LEAN_ENV=prod \
     LEAN_SPEC_DEVNET3_KEYS_DIR=/app/hive/prod_scheme_devnet3 \
     LEAN_SPEC_DEVNET4_KEYS_DIR=/app/hive/prod_scheme_devnet4
 
-COPY helper/leanspec-client.sh /app/hive/leanspec-client.sh
-COPY helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
+COPY ./simulators/lean/helper/leanspec-client.sh /app/hive/leanspec-client.sh
+COPY ./simulators/lean/helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
+COPY ./simulators/lean/helper/prepare_lean_client_assets.py /app/hive/prepare_lean_client_assets.py
+COPY ./simulators/lean/config/lean-devnets.txt /app/hive/lean-devnets.txt
 
 RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /tmp/leansig \
     && curl -fsSL \

@@ -2,40 +2,56 @@
 
 set -euo pipefail
 
-ZEAM_BIN="${ZEAM_BIN:-/app/zig-out/bin/zeam}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
 NODE_ID="${HIVE_NODE_ID:-zeam_0}"
-BOOTNODES="${HIVE_BOOTNODES:-none}"
-KEY_FILE=""
+ASSET_ROOT="/tmp/zeam-runtime"
+
+case "$DEVNET_LABEL" in
+    devnet3)
+        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet3"
+        ;;
+    devnet4)
+        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet4"
+        ;;
+    *)
+        echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
+        exit 1
+        ;;
+esac
+
+ZEAM_BIN="${ZEAM_BIN:-$DEFAULT_ZEAM_BIN}"
 
 cleanup() {
-    if [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
-        rm -f "$KEY_FILE"
+    if [ -d "$ASSET_ROOT" ]; then
+        rm -rf "$ASSET_ROOT"
     fi
 }
 
 trap cleanup EXIT
 
+if [ ! -f "$ASSET_ROOT/config.yaml" ]; then
+    echo "Missing prepared Lean runtime assets at $ASSET_ROOT" >&2
+    exit 1
+fi
+
 FLAGS=(
     node
-    --custom_genesis /assets/lean
-    --validator_config /assets/lean/validators.yaml
+    --custom_genesis "$ASSET_ROOT"
+    --validator_config "$ASSET_ROOT"
     --data-dir /data
     --node-id "$NODE_ID"
     --api-port 5052
+    --metrics_enable
+    --metrics-port 8080
+    --node-key "$ASSET_ROOT/node.key"
 )
 
-if [ "$BOOTNODES" != "none" ]; then
-    FLAGS+=(--bootnodes "$BOOTNODES")
+if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
+    FLAGS+=(--checkpoint-sync-url "$HIVE_CHECKPOINT_SYNC_URL")
 fi
 
-if [ -n "${HIVE_CLIENT_PRIVATE_KEY:-}" ]; then
-    KEY_FILE="$(mktemp /tmp/zeam-node-key.XXXXXX)"
-    printf "%s" "$HIVE_CLIENT_PRIVATE_KEY" > "$KEY_FILE"
-    FLAGS+=(--node-key "$KEY_FILE")
-fi
-
-if [ "${HIVE_METRICS_ENABLED:-0}" = "1" ]; then
-    FLAGS+=(--metrics_enable)
+if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
+    FLAGS+=(--is-aggregator)
 fi
 
 export RUST_LOG="${RUST_LOG:-info}"
