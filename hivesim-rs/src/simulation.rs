@@ -134,6 +134,20 @@ impl Simulation {
         client_type: String,
         environment: Option<HashMap<String, String>>,
     ) -> (String, IpAddr) {
+        self.start_client_with_files(test_suite, test, client_type, environment, None)
+            .await
+    }
+
+    /// Starts a new node (or other container), uploading files before startup.
+    /// Returns container id and ip.
+    pub async fn start_client_with_files(
+        &self,
+        test_suite: SuiteID,
+        test: TestID,
+        client_type: String,
+        environment: Option<HashMap<String, String>>,
+        files: Option<HashMap<String, Vec<u8>>>,
+    ) -> (String, IpAddr) {
         let url = format!("{}/testsuite/{}/test/{}/node", self.url, test_suite, test);
         let client = reqwest::Client::new();
 
@@ -144,7 +158,15 @@ impl Simulation {
         }
 
         let config = serde_json::to_string(&config).expect("Failed to parse config to serde_json");
-        let form = reqwest::multipart::Form::new().text("config", config);
+        let mut form = reqwest::multipart::Form::new().text("config", config);
+        if let Some(files) = files {
+            for (path, contents) in files {
+                form = form.part(
+                    path,
+                    reqwest::multipart::Part::bytes(contents).file_name("hive-upload"),
+                );
+            }
+        }
 
         let resp = client
             .post(url)
