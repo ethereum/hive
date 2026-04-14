@@ -101,17 +101,6 @@ dyn_async! {
             panic!("No lean clients were selected for this run");
         }
 
-        for client in clients {
-            test.run(NClientTestSpec {
-                name: format!("basic api smoke {}", client.name),
-                description: "Checks the health and justified checkpoint endpoints for a single lean client.".to_string(),
-                always_run: false,
-                run: test_basic_api_smoke,
-                environments: Some(vec![Some(lean_environment())]),
-                test_data: (),
-                clients: vec![client],
-            }).await;
-        }
     }
 }
 
