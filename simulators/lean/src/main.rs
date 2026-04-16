@@ -2,9 +2,10 @@
 
 mod scenarios;
 
-use std::{collections::HashMap, env, fs, time::Duration};
+use std::{collections::HashMap, env, fmt, fs, time::Duration};
 
 use crate::scenarios::rpc_compat::run_rpc_compat_lean_test_suite;
+use alloy_primitives::B256;
 use hivesim::types::ClientDefinition;
 use hivesim::{run_suite, Client, Simulation, Suite, TestSpec};
 use reqwest::Client as HttpClient;
@@ -27,14 +28,26 @@ pub(crate) enum LeanDevnet {
 }
 
 impl LeanDevnet {
-    fn label(self) -> &'static str {
+    const DEFAULT: Self = Self::Devnet3;
+
+    fn as_str(self) -> &'static str {
         match self {
             Self::Devnet3 => "devnet3",
             Self::Devnet4 => "devnet4",
         }
     }
+}
 
-    fn parse(label: &str) -> Result<Self, String> {
+impl fmt::Display for LeanDevnet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<&str> for LeanDevnet {
+    type Error = String;
+
+    fn try_from(label: &str) -> Result<Self, Self::Error> {
         match label.trim() {
             "devnet3" => Ok(Self::Devnet3),
             "devnet4" => Ok(Self::Devnet4),
@@ -57,7 +70,7 @@ struct HealthResponse {
 #[derive(Debug, Deserialize)]
 struct CheckpointResponse {
     slot: u64,
-    root: String,
+    root: B256,
 }
 
 #[tokio::main]
@@ -65,14 +78,13 @@ async fn main() {
     tracing_subscriber::fmt::init();
     let simulation = Simulation::new();
     let devnet = resolve_selected_lean_devnet(&simulation).await;
-    env::set_var(HIVE_LEAN_DEVNET_LABEL, devnet.label());
-    let devnet_label = devnet.label();
+    env::set_var(HIVE_LEAN_DEVNET_LABEL, devnet.as_str());
 
     let mut rpc_compat = Suite {
         name: "rpc-compat".to_string(),
         description: format!(
             "Runs Lean RPC compatibility tests against the selected lean clients using the {} profile.",
-            devnet_label
+            devnet
         ),
         tests: vec![],
     };
@@ -96,17 +108,13 @@ fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
 }
 
 pub(crate) fn selected_lean_devnet() -> LeanDevnet {
-    let label = env::var(HIVE_LEAN_DEVNET_LABEL)
-        .unwrap_or_else(|_| LeanDevnet::Devnet3.label().to_string());
-    LeanDevnet::parse(&label).unwrap_or_else(|err| {
+    let label =
+        env::var(HIVE_LEAN_DEVNET_LABEL).unwrap_or_else(|_| LeanDevnet::DEFAULT.to_string());
+    LeanDevnet::try_from(label.as_str()).unwrap_or_else(|err| {
         panic!(
             "Unsupported Lean devnet selection in environment variable {HIVE_LEAN_DEVNET_LABEL}: {err}"
         )
     })
-}
-
-pub(crate) fn selected_lean_devnet_label() -> &'static str {
-    selected_lean_devnet().label()
 }
 
 fn load_lean_devnet_config() -> LeanDevnetConfig {
@@ -138,7 +146,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
         let value = value.trim();
 
         if key == "default" {
-            default_devnet = Some(LeanDevnet::parse(value).unwrap_or_else(|err| {
+            default_devnet = Some(LeanDevnet::try_from(value).unwrap_or_else(|err| {
                 panic!(
                     "Invalid default lean devnet in {} line {}: {}",
                     LEAN_DEVNET_CONFIG_PATH, line_number, err
@@ -150,7 +158,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
         let supported_devnets = value
             .split(',')
             .map(|label| {
-                LeanDevnet::parse(label).unwrap_or_else(|err| {
+                LeanDevnet::try_from(label).unwrap_or_else(|err| {
                     panic!(
                         "Invalid lean devnet in {} line {} for client {}: {}",
                         LEAN_DEVNET_CONFIG_PATH, line_number, key, err
@@ -184,7 +192,7 @@ fn split_client_devnet_name(client_name: &str) -> (&str, Option<LeanDevnet>) {
     let Some((base_name, suffix)) = client_name.rsplit_once('_') else {
         return (client_name, None);
     };
-    match LeanDevnet::parse(suffix) {
+    match LeanDevnet::try_from(suffix) {
         Ok(devnet) => (base_name, Some(devnet)),
         Err(_) => (client_name, None),
     }
@@ -213,19 +221,16 @@ async fn resolve_selected_lean_devnet(simulation: &Simulation) -> LeanDevnet {
         if !supported_devnets.contains(&devnet) {
             let supported = supported_devnets
                 .iter()
-                .map(|candidate| candidate.label())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
             panic!(
                 "Lean client {} does not support {} according to {} (supported: {})",
-                client.name,
-                devnet.label(),
-                LEAN_DEVNET_CONFIG_PATH,
-                supported,
+                client.name, devnet, LEAN_DEVNET_CONFIG_PATH, supported,
             );
         }
 
-        selected_labels.push(format!("{}={}", client.name, devnet.label()));
+        selected_labels.push(format!("{}={devnet}", client.name));
         match resolved_devnet {
             Some(previous) if previous != devnet => {
                 panic!(
@@ -244,10 +249,10 @@ async fn resolve_selected_lean_devnet(simulation: &Simulation) -> LeanDevnet {
 }
 
 fn lean_environment() -> HashMap<String, String> {
-    let devnet_label = selected_lean_devnet_label();
+    let devnet_label = selected_lean_devnet().to_string();
     HashMap::from([
         (HIVE_CHECK_LIVE_PORT.to_string(), LEAN_HTTP_PORT.to_string()),
-        (HIVE_LEAN_DEVNET_LABEL.to_string(), devnet_label.to_string()),
+        (HIVE_LEAN_DEVNET_LABEL.to_string(), devnet_label),
     ])
 }
 

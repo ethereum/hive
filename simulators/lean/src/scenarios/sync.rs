@@ -30,8 +30,10 @@ const LEAN_GENESIS_DELAY_SECS: u64 = 30;
 const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
 const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
 const LOCAL_HELPER_STARTUP_TIMEOUT_SECS: u64 = 120;
-const LOCAL_HELPER_STARTUP_ATTEMPTS: u64 = 12;
+const LOCAL_HELPER_METADATA_TIMEOUT_SECS: u64 = 60;
+const LOCAL_HELPER_STARTUP_ATTEMPTS: u64 = 3;
 const CLIENT_UNDER_TEST_STARTUP_ATTEMPTS: u64 = 3;
+const CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS: u64 = 30;
 const HELPER_METADATA_PORT: u16 = 5053;
 const LOCAL_HELPER_API_PORT: u16 = 5052;
 const LOCAL_HELPER_ENTRYPOINT: &str = "/app/hive/leanspec-client.sh";
@@ -144,6 +146,19 @@ pub(crate) struct ForkChoiceSnapshot {
     pub finalized: CheckpointResponse,
 }
 
+#[derive(Debug, Deserialize)]
+struct ForkChoiceNodeSlot {
+    slot: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckpointSyncForkChoiceSnapshot {
+    justified: CheckpointResponse,
+    finalized: CheckpointResponse,
+    #[serde(default)]
+    nodes: Vec<ForkChoiceNodeSlot>,
+}
+
 pub(crate) fn default_genesis_time() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -197,16 +212,17 @@ pub(crate) async fn start_post_genesis_sync_context(
         None
     };
 
-    let mut source_fork_choice = match wait_for_checkpoint_slot(
+    let mut source_fork_choice = match wait_for_checkpoint_slot_with_retry(
         &mut helper,
         test_data.source_checkpoint_kind,
         minimum_source_checkpoint_slot(test_data),
+        test_data.genesis_time,
     )
     .await
     {
         Ok(source_fork_choice) => source_fork_choice,
         Err(err) => {
-            if client_under_test.is_none() {
+            if client_under_test.is_none() && !helper_startup_error_is_retryable(&err) {
                 let files = prepare_client_runtime_files(
                     &test_data.client_under_test.name,
                     &client_under_test_environment,
@@ -597,7 +613,24 @@ async fn start_checkpoint_sync_client_under_test_with_retry(
         })
         .await
         {
-            Ok(client) => return client,
+            Ok(client) => match wait_for_checkpoint_sync_client_post_genesis(&client).await {
+                Ok(()) => return client,
+                Err(error) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
+                    eprintln!(
+                        "Retrying checkpoint-sync client-under-test startup for {} after attempt {} never reached a post-genesis forkchoice state: {}",
+                        params.client_type, attempt, error
+                    );
+                    last_error = Some(error);
+                    drop(client);
+                    sleep(Duration::from_secs(1)).await;
+                }
+                Err(error) => {
+                    panic!(
+                        "Unable to start checkpoint-sync client under test {} after {} attempts: {}",
+                        params.client_type, CLIENT_UNDER_TEST_STARTUP_ATTEMPTS, error
+                    );
+                }
+            },
             Err(error) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
                 let message = if error.is_panic() {
                     panic_payload_to_string(error.into_panic())
@@ -670,8 +703,13 @@ async fn refresh_checkpoint_sync_source(
 ) -> Result<(), String> {
     let (mut restarted_helper, _source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(genesis_time).await?;
-    let refreshed_source_fork_choice =
-        wait_for_checkpoint_slot(&mut restarted_helper, checkpoint_kind, minimum_slot).await?;
+    let refreshed_source_fork_choice = wait_for_checkpoint_slot_with_retry(
+        &mut restarted_helper,
+        checkpoint_kind,
+        minimum_slot,
+        genesis_time,
+    )
+    .await?;
     wait_for_checkpoint_sync_state_ready(&mut restarted_helper).await?;
 
     *helper = restarted_helper;
@@ -741,6 +779,45 @@ async fn wait_for_checkpoint_slot(
     ))
 }
 
+async fn wait_for_checkpoint_slot_with_retry(
+    helper: &mut RunningLocalLeanSpecHelper,
+    checkpoint_kind: SourceCheckpointKind,
+    minimum_slot: u64,
+    genesis_time: u64,
+) -> Result<ForkChoiceSnapshot, String> {
+    let checkpoint_name = match checkpoint_kind {
+        SourceCheckpointKind::Justified => "justified",
+        SourceCheckpointKind::Finalized => "finalized",
+    };
+    let mut last_error = None;
+
+    for attempt in 1..=LOCAL_HELPER_STARTUP_ATTEMPTS {
+        match wait_for_checkpoint_slot(helper, checkpoint_kind, minimum_slot).await {
+            Ok(fork_choice) => return Ok(fork_choice),
+            Err(error)
+                if attempt < LOCAL_HELPER_STARTUP_ATTEMPTS
+                    && helper_startup_error_is_retryable(&error) =>
+            {
+                eprintln!(
+                    "Restarting {LOCAL_HELPER_KIND} after {checkpoint_name} checkpoint wait failure on attempt {attempt}: {error}"
+                );
+                let (restarted_helper, _source_genesis_validator_entries) =
+                    start_local_lean_spec_helper_with_genesis_metadata(genesis_time).await?;
+                *helper = restarted_helper;
+                last_error = Some(error);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        format!(
+            "{LOCAL_HELPER_KIND} never reached {checkpoint_name} slot {} after {} attempts",
+            minimum_slot, LOCAL_HELPER_STARTUP_ATTEMPTS
+        )
+    }))
+}
+
 async fn wait_for_non_genesis_justified_checkpoint(
     client: &Client,
 ) -> Result<CheckpointResponse, String> {
@@ -787,6 +864,67 @@ async fn wait_for_non_genesis_justified_checkpoint(
         last_observed_slot
             .map(|slot| slot.to_string())
             .unwrap_or_else(|| "none".to_string()),
+        if last_error.is_empty() {
+            "none".to_string()
+        } else {
+            last_error
+        }
+    ))
+}
+
+async fn wait_for_checkpoint_sync_client_post_genesis(client: &Client) -> Result<(), String> {
+    let http = http_client();
+    let url = lean_api_url(client, "/lean/v0/fork_choice");
+    let mut last_error = String::new();
+    let mut last_observed_state = None;
+
+    for _attempt in 0..CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS {
+        match http.get(&url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {url}");
+                } else {
+                    match response.json::<CheckpointSyncForkChoiceSnapshot>().await {
+                        Ok(fork_choice) => {
+                            let max_node_slot = fork_choice
+                                .nodes
+                                .iter()
+                                .map(|node| node.slot)
+                                .max()
+                                .unwrap_or(0);
+                            last_observed_state = Some(format!(
+                                "justified_slot={}, finalized_slot={}, max_node_slot={}",
+                                fork_choice.justified.slot,
+                                fork_choice.finalized.slot,
+                                max_node_slot
+                            ));
+                            if fork_choice.justified.slot > 0
+                                || fork_choice.finalized.slot > 0
+                                || max_node_slot > 0
+                            {
+                                return Ok(());
+                            }
+                        }
+                        Err(err) => {
+                            last_error =
+                                format!("Unable to decode fork_choice response from {url}: {err}");
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                last_error = format!("error sending request for url ({url}): {err}");
+            }
+        }
+
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    Err(format!(
+        "Client under test {} never exposed a post-genesis checkpoint-sync forkchoice state (last observed state: {}, last error: {})",
+        client.kind,
+        last_observed_state.unwrap_or_else(|| "none".to_string()),
         if last_error.is_empty() {
             "none".to_string()
         } else {
@@ -855,7 +993,7 @@ async fn load_helper_genesis_metadata(
     let mut last_error = String::new();
     let mut last_observed_genesis_time = None;
 
-    for _attempt in 0..LOCAL_HELPER_STARTUP_TIMEOUT_SECS {
+    for _attempt in 0..LOCAL_HELPER_METADATA_TIMEOUT_SECS {
         helper.ensure_running()?;
         match http.get(&url).send().await {
             Ok(response) => {
@@ -907,6 +1045,9 @@ fn helper_startup_error_is_retryable(error: &str) -> bool {
     error.contains("exited before the test completed")
         || error.contains("SIGSEGV")
         || error.contains("signal: 11")
+        || error.contains("SIGABRT")
+        || error.contains("signal: 6")
+        || error.contains("exit status: 134")
 }
 
 async fn start_local_lean_spec_helper_with_genesis_metadata(
@@ -1082,5 +1223,12 @@ mod tests {
         server_thread
             .join()
             .expect("test metadata server should shut down cleanly");
+    }
+
+    #[test]
+    fn helper_startup_error_is_retryable_for_sigabrt() {
+        assert!(helper_startup_error_is_retryable(
+            "lean-spec-local-helper exited before the test completed with status signal: 6 (SIGABRT) (core dumped)"
+        ));
     }
 }

@@ -1,8 +1,7 @@
-FROM ghcr.io/lambdaclass/ethlambda:devnet3 AS devnet3
 FROM ghcr.io/lambdaclass/ethlambda:devnet4 AS devnet4
 FROM ghcr.io/lambdaclass/ethlambda:devnet3
 
-COPY --from=devnet3 /usr/local/bin/ethlambda /usr/local/bin/ethlambda-devnet3
+RUN cp /usr/local/bin/ethlambda /usr/local/bin/ethlambda-devnet3
 COPY --from=devnet4 /usr/local/bin/ethlambda /usr/local/bin/ethlambda-devnet4
 ADD ethlambda.sh /ethlambda.sh
 

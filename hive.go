@@ -15,8 +15,8 @@ import (
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"github.com/lmittmann/tint"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/lmittmann/tint"
 )
 
 type buildArgs map[string]string
