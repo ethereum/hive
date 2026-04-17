@@ -35,7 +35,7 @@ COPY validators.yaml /assets/lean/validators.yaml
 COPY gean.sh /gean.sh
 
 RUN chmod +x /gean.sh \
-    && gean --version 2>&1 | head -1 > /version.txt
+    && (gean --version 2>/dev/null || echo "gean") | head -1 > /version.txt
 
 EXPOSE 5052 9000/udp 8080
 
