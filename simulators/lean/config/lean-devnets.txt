@@ -8,3 +8,4 @@ ethlambda=devnet3,devnet4
 lantern=devnet3
 ream=devnet3,devnet4
 zeam=devnet3,devnet4
+grandine=devnet3,devnet4
