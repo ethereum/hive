@@ -13,8 +13,8 @@ COPY --from=devnet4 /usr/local/bin/gean /usr/local/bin/gean-devnet4
 ADD gean.sh /gean.sh
 
 RUN chmod +x /gean.sh \
-    && /usr/local/bin/gean-devnet3 --version 2>&1 | head -1 > /version-devnet3.txt \
-    && /usr/local/bin/gean-devnet4 --version 2>&1 | head -1 > /version-devnet4.txt \
+    && (/usr/local/bin/gean-devnet3 --version 2>/dev/null || echo "gean-devnet3") | head -1 > /version-devnet3.txt \
+    && (/usr/local/bin/gean-devnet4 --version 2>/dev/null || echo "gean-devnet4") | head -1 > /version-devnet4.txt \
     && printf "gean devnet3: %s\ngean devnet4: %s\n" \
         "$(cat /version-devnet3.txt)" \
         "$(cat /version-devnet4.txt)" > /version.txt
