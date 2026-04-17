@@ -1,5 +1,7 @@
 - client: ethlambda
   nametag: devnet4
+- client: gean
+  nametag: devnet4
 - client: ream
   nametag: devnet4
 - client: zeam
