@@ -1,5 +1,7 @@
 - client: ethlambda
   nametag: devnet3
+- client: gean
+  nametag: devnet3
 - client: lantern
   nametag: devnet3
 - client: ream
