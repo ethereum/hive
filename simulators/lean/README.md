@@ -24,8 +24,9 @@ or:
 `./hive --sim lean --client-file simulators/lean/clients/devnet4.yaml --client ream`
 
 The lean simulator resolves the active devnet from the selected client name
-(`ream_devnet4`, `ethlambda_devnet3`, and so on) and validates it against the
-central support matrix in `simulators/lean/config/lean-devnets.txt`.
+(`ream_devnet4`, `ethlambda_devnet3`, `gean_devnet3`, and so on) and validates
+it against the central support matrix in
+`simulators/lean/config/lean-devnets.txt`.
 
 This gives us a simple onboarding path for new lean clients while leaving a clear place to grow:
 
