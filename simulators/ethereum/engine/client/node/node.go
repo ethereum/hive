@@ -141,6 +141,11 @@ type GethNode struct {
 	accTxInfoMapLock                  sync.Mutex
 	totalReceivedOrAnnouncedNewBlocks *big.Int
 
+	// Tracks the committed state root produced by SetBlock for each inserted block hash.
+	// This lets subsequent SetBlock calls continue from the real committed root even when
+	// the payload header root belongs to an invalid chain.
+	setBlockCommittedStateRoots map[common.Hash]common.Hash
+
 	config GethNodeTestConfiguration
 }
 
@@ -221,6 +226,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 		// Test related configuration
 		totalReceivedOrAnnouncedNewBlocks: big.NewInt(0),
+		setBlockCommittedStateRoots:       make(map[common.Hash]common.Hash),
 		config:                            startConfig,
 	}
 
@@ -362,21 +368,40 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	bc := n.eth.BlockChain()
 	bc.SetBlockValidatorAndProcessorForTesting(new(validator), n.eth.BlockChain().Processor())
 
-	statedb, err := state.New(parentRoot, bc.StateCache())
-	if err != nil {
-		return errors.Wrap(err, "failed to create state db")
+	candidateRoots := []common.Hash{parentRoot}
+	if fallbackRoot, ok := n.setBlockCommittedStateRoots[block.ParentHash()]; ok && fallbackRoot != parentRoot {
+		candidateRoots = append(candidateRoots, fallbackRoot)
 	}
-	var failedProcessing bool
-	result, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
-	if err != nil || result == nil {
-		failedProcessing = true
-	} else {
+
+	var (
+		failedProcessing bool
+		result           *core.ProcessResult
+		root             common.Hash
+		lastErr          error
+	)
+	for _, candidateRoot := range candidateRoots {
+		statedb, err := state.New(candidateRoot, bc.StateCache())
+		if err != nil {
+			lastErr = errors.Wrapf(err, "failed to create state db from parent root %s", candidateRoot)
+			continue
+		}
+		result, err = n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
+		failedProcessing = err != nil || result == nil
+		root, err = statedb.Commit(block.NumberU64(), false, false)
+		if err != nil {
+			lastErr = errors.Wrapf(err, "failed to commit state from parent root %s", candidateRoot)
+			continue
+		}
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	if result != nil {
 		rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), result.Receipts)
 	}
-	root, err := statedb.Commit(block.NumberU64(), false, false)
-	if err != nil {
-		return errors.Wrap(err, "failed to commit state")
-	}
+	n.setBlockCommittedStateRoots[block.Hash()] = root
 
 	// If node is running in path mode, skip explicit gc operation
 	// which is unnecessary in this mode.
