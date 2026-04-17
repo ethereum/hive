@@ -1,0 +1,42 @@
+FROM golang:1.25-bookworm AS builder
+
+ARG github=geanlabs/gean
+ARG tag=master
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# gean links a Rust FFI (xmss/leanMultisig); CGO is required, so do NOT
+# set CGO_ENABLED=0. Rust toolchain pinned to match upstream Dockerfile.
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /src
+
+RUN echo "Cloning: $github - $tag" \
+    && git clone https://github.com/$github gean \
+    && cd gean \
+    && git checkout $tag \
+    && cd xmss/rust && cargo build --release --locked && cd ../.. \
+    && go build -o /out/gean ./cmd/gean
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y bash ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out/gean /usr/bin/gean
+COPY validators.yaml /assets/lean/validators.yaml
+COPY gean.sh /gean.sh
+
+RUN chmod +x /gean.sh \
+    && gean --version 2>&1 | head -1 > /version.txt
+
+EXPOSE 5052 9000/udp 8080
+
+ENTRYPOINT ["/gean.sh"]
