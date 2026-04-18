@@ -21,9 +21,10 @@ use ssz_types::{
     typenum::{U1073741824, U262144, U4096},
     BitList, VariableList,
 };
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
+const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode)]
@@ -217,6 +218,10 @@ fn extract_data_test_result(join_handle: Result<(), tokio::task::JoinError>) -> 
             pass: true,
             details: String::new(),
         },
+        Err(err) if err.is_cancelled() => TestResult {
+            pass: false,
+            details: "test task was cancelled".to_string(),
+        },
         Err(err) => {
             let err = err.into_panic();
             let details = if let Some(err) = err.downcast_ref::<&'static str>() {
@@ -235,11 +240,36 @@ fn extract_data_test_result(join_handle: Result<(), tokio::task::JoinError>) -> 
     }
 }
 
+async fn extract_timed_data_test_result(
+    mut join_handle: tokio::task::JoinHandle<()>,
+    timeout_duration: Duration,
+    client_name: &str,
+) -> TestResult {
+    match timeout(timeout_duration, &mut join_handle).await {
+        Ok(join_result) => extract_data_test_result(join_result),
+        Err(_) => {
+            join_handle.abort();
+            let _ = join_handle.await;
+
+            TestResult {
+                pass: false,
+                details: format!(
+                    "Test for client {} exceeded timeout of {} minutes ({} seconds)",
+                    client_name,
+                    timeout_duration.as_secs() / 60,
+                    timeout_duration.as_secs()
+                ),
+            }
+        }
+    }
+}
+
 async fn run_data_test<T: Send + 'static>(
     host_test: &Test,
     name: String,
     description: String,
     always_run: bool,
+    client_name: String,
     test_data: T,
     func: AsyncLeanDataTestFunc<T>,
 ) {
@@ -257,7 +287,7 @@ async fn run_data_test<T: Send + 'static>(
     let suite = host_test.suite.clone();
     let simulation = host_test.sim.clone();
 
-    let test_result = extract_data_test_result(
+    let test_result = extract_timed_data_test_result(
         tokio::spawn(async move {
             let test = &mut Test {
                 sim: simulation,
@@ -269,9 +299,11 @@ async fn run_data_test<T: Send + 'static>(
 
             test.result.pass = true;
             (func)(test, test_data).await;
-        })
-        .await,
-    );
+        }),
+        POST_GENESIS_TEST_TIMEOUT,
+        &client_name,
+    )
+    .await;
 
     host_test.sim.end_test(suite_id, test_id, test_result).await;
 }
@@ -555,6 +587,7 @@ dyn_async! {
                 "rpc_compat: checkpoints justified post-genesis".to_string(),
                 "Waits for the local LeanSpec helper to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
                 false,
+                client.name.clone(),
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: checkpoint_genesis_time,
@@ -688,6 +721,7 @@ dyn_async! {
                 "rpc_compat: forkchoice filters nodes before finalized slot".to_string(),
                 "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
                 false,
+                client.name.clone(),
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: finalized_filters_genesis_time,
@@ -707,6 +741,7 @@ dyn_async! {
                 "rpc_compat: forkchoice keeps nodes at or beyond finalized slot".to_string(),
                 "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
                 false,
+                client.name.clone(),
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: finalized_boundary_genesis_time,
@@ -726,6 +761,7 @@ dyn_async! {
                 "rpc_compat: forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
                 "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
                 false,
+                client.name.clone(),
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: pre_finalized_only_genesis_time,
@@ -902,6 +938,7 @@ dyn_async! {
                 "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized state endpoint tracks the client's latest finalized slot."
                     .to_string(),
                 false,
+                client.name.clone(),
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: state_finalized_genesis_time,
