@@ -408,7 +408,14 @@ fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
 }
 
 fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
-    for candidate in ["ethlambda", "grandine_lean", "zeam", "lantern", "ream", "gean"] {
+    for candidate in [
+        "ethlambda",
+        "grandine_lean",
+        "zeam",
+        "lantern",
+        "ream",
+        "gean",
+    ] {
         if client_type.starts_with(candidate) {
             return Ok(candidate);
         }
