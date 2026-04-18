@@ -7,6 +7,6 @@ default=devnet3
 ethlambda=devnet3,devnet4
 gean=devnet3,devnet4
 grandine_lean=devnet3,devnet4
-lantern=devnet3
+lantern=devnet3,devnet4
 ream=devnet3,devnet4
 zeam=devnet3,devnet4
