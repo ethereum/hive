@@ -12,7 +12,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-SUPPORTED_CLIENTS = {"ethlambda", "lantern", "ream", "zeam"}
+SUPPORTED_CLIENTS = {"ethlambda", "gean", "lantern", "ream", "zeam"}
 FALLBACK_BOOTNODES = [
     "enr:-IW4QA0pljjdLfxS_EyUxNAxJSoGCwmOVNJauYWsTiYHyWG5Bky-7yCEktSvu_w-PWUrmzbc8vYL_Mx5pgsAix2OfOMBgmlkgnY0gmlwhKwUAAGEcXVpY4IfkIlzZWNwMjU2azGhA6mw8mfwe-3TpjMMSk7GHe3cURhOn9-ufyAqy40wEyui",
 ]
@@ -190,6 +190,8 @@ def render_config(validators: list[dict[str, str]]) -> str:
                     f'    proposal_public_key: "{format_genesis_pubkey(validator["proposal_public"])}"'
                 )
             else:
+                # ethlambda / lantern / zeam / gean-devnet4 all accept the
+                # attestation_pubkey + proposal_pubkey nested shape.
                 lines.append(
                     f'  - attestation_pubkey: "{format_genesis_pubkey(validator["attestation_public"])}"'
                 )
@@ -425,6 +427,59 @@ def write_ream_assignments(
     write_text(asset_root / "hash-sig-keys" / manifest_name, "\n".join(manifest_lines) + "\n")
 
 
+def write_gean_assignments(
+    asset_root: Path,
+    specs: list[dict[str, object]],
+    validators: list[dict[str, str]],
+) -> None:
+    # gean reads annotated_validators.yaml with entries of shape
+    # {index, pubkey_hex, privkey_file} and expects the raw XMSS secret
+    # key bytes under hash-sig-keys/<privkey_file>. On devnet4 we emit two
+    # entries per validator (attestation + proposal) so both keys are
+    # available; gean itself only consumes one pubkey per entry today.
+    lines: list[str] = []
+    for spec in specs:
+        lines.append(f'{spec["name"]}:')
+        for index in spec["indices"]:
+            validator = validators[index]
+            if uses_dual_key_genesis():
+                attestation_file = f"validator_{index}_attester_sk.ssz"
+                proposal_file = f"validator_{index}_proposer_sk.ssz"
+                write_bytes(
+                    asset_root / "hash-sig-keys" / attestation_file,
+                    bytes.fromhex(validator["attestation_secret"]),
+                )
+                write_bytes(
+                    asset_root / "hash-sig-keys" / proposal_file,
+                    bytes.fromhex(validator["proposal_secret"]),
+                )
+                lines.extend(
+                    [
+                        f"  - index: {index}",
+                        f'    pubkey_hex: "{validator["attestation_public"]}"',
+                        f'    privkey_file: "{attestation_file}"',
+                        f"  - index: {index}",
+                        f'    pubkey_hex: "{validator["proposal_public"]}"',
+                        f'    privkey_file: "{proposal_file}"',
+                    ]
+                )
+                continue
+
+            filename = f"validator_{index}_sk.ssz"
+            write_bytes(
+                asset_root / "hash-sig-keys" / filename,
+                bytes.fromhex(validator["attestation_secret"]),
+            )
+            lines.extend(
+                [
+                    f"  - index: {index}",
+                    f'    pubkey_hex: "{validator["attestation_public"]}"',
+                    f'    privkey_file: "{filename}"',
+                ]
+            )
+    write_text(asset_root / "annotated_validators.yaml", "\n".join(lines) + "\n")
+
+
 def write_client_specific_assets(
     asset_root: Path,
     specs: list[dict[str, object]],
@@ -432,6 +487,12 @@ def write_client_specific_assets(
 ) -> None:
     if CLIENT_KIND == "ethlambda":
         write_ethlambda_assignments(asset_root, specs, validators)
+        return
+    if CLIENT_KIND == "gean":
+        # gean.sh verifies /tmp/gean-runtime/validators.yaml exists; write the
+        # shared registry even though gean itself reads annotated_validators.yaml.
+        write_text(asset_root / "validators.yaml", render_validator_registry(specs))
+        write_gean_assignments(asset_root, specs, validators)
         return
     if CLIENT_KIND == "zeam":
         write_zeam_assignments(asset_root, specs, validators)
