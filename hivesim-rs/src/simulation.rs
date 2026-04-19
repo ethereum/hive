@@ -183,6 +183,45 @@ impl Simulation {
         (resp.id, ip)
     }
 
+    /// Registers an existing client container (started under `source_test`) as also
+    /// belonging to `target_test`, without starting a new container. This enables
+    /// client reuse across tests in the same suite while still reporting each
+    /// scenario as its own test case in the hive UI.
+    ///
+    /// Lifecycle: the source test remains the sole owner of the container. Ending
+    /// the target test will NOT stop the container (its registered copy has no
+    /// teardown hook); only ending the source test does. See
+    /// `libhive.TestManager.RegisterNode` / `registerMultiTestNode` on the hive
+    /// server for the full semantics.
+    pub async fn register_multi_test_node(
+        &self,
+        test_suite: SuiteID,
+        source_test: TestID,
+        node_id: &str,
+        target_test: TestID,
+    ) {
+        let url = format!(
+            "{}/testsuite/{}/test/{}/node/{}/register/{}",
+            self.url, test_suite, source_test, node_id, target_test
+        );
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(&url)
+            .send()
+            .await
+            .expect("Failed to send register multi-test node request");
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            panic!(
+                "Failed to register multi-test node (node={}, source_test={}, target_test={}): \
+                 status={} body={}",
+                node_id, source_test, target_test, status, body
+            );
+        }
+    }
+
     /// Returns all client types available to this simulator run. This depends on
     /// both the available client set and the command line filters.
     pub async fn client_types(&self) -> Vec<ClientDefinition> {

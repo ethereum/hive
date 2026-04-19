@@ -8,5 +8,8 @@ pub mod types;
 pub mod utils;
 
 pub use simulation::Simulation;
-pub use testapi::{run_suite, Client, NClientTestSpec, Suite, Test, TestSpec};
+pub use testapi::{
+    run_suite, Client, NClientTestSpec, SharedClientScenario, SharedClientTestSpec, Suite, Test,
+    TestSpec,
+};
 pub use testmatch::TestMatcher;

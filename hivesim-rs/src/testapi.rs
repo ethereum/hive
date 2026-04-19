@@ -32,6 +32,19 @@ pub type AsyncNClientsTestFunc<T> = fn(
     >,
 >;
 
+/// Signature for a scenario inside a `SharedClientTestSpec`. Each scenario gets
+/// a shared, already-started `Client` plus a cloned `test_data` payload.
+pub type AsyncSharedClientTestFunc<T> = fn(
+    Client,
+    T,
+) -> Pin<
+    Box<
+        dyn Future<Output = ()> // future API / pollable
+            + Send // required by non-single-threaded executors
+            + 'static,
+    >,
+>;
+
 type ClientFiles = Option<Vec<Option<HashMap<String, Vec<u8>>>>>;
 type ClientEnvironments = Option<Vec<Option<HashMap<String, String>>>>;
 
@@ -311,6 +324,196 @@ async fn run_n_client_test<T: Send + 'static>(
     );
 
     host.end_test(suite_id, test_id, test_result).await;
+}
+
+/// One scenario inside a [`SharedClientTestSpec`].
+///
+/// Each scenario is surfaced as its own hive test case (pass/fail/details are
+/// recorded per-scenario and shown individually in hiveview), but all scenarios
+/// in the parent spec run against the same client container without
+/// restarting it between scenarios.
+#[derive(Clone)]
+pub struct SharedClientScenario<T> {
+    pub name: String,
+    pub description: String,
+    /// If true, the scenario runs even when the test matcher would otherwise
+    /// filter it out.
+    pub always_run: bool,
+    pub run: AsyncSharedClientTestFunc<T>,
+}
+
+/// Like [`NClientTestSpec`], but starts a single client once and runs a list
+/// of scenarios against it, without restarting the container between
+/// scenarios.
+///
+/// Useful when a suite has many short read-only scenarios whose per-test
+/// container boot dominates wall-clock time (e.g. RPC-compatibility suites
+/// that repeatedly query the same finalized state).
+///
+/// Semantics:
+///
+/// - A container is started once, owned by a "lifecycle owner" test case
+///   created from `name` / `description`. The owner test is always reported
+///   as passing; it exists solely to anchor the container's lifecycle.
+/// - Each entry in `scenarios` is registered as its own hive test case
+///   sharing the owner's container (via
+///   [`Simulation::register_multi_test_node`]). Pass/fail/details are
+///   recorded per-scenario.
+/// - Scenarios run sequentially in the order given. They see each other's
+///   side effects on the client (this is the whole point; scenarios that
+///   rely on a fresh container must keep using [`NClientTestSpec`]).
+/// - `test_data` is cloned once per scenario. Use `Arc`-wrapped payloads to
+///   share heap state cheaply.
+/// - When all scenarios have ended, the owner test ends, which tears down
+///   the container.
+#[derive(Clone)]
+pub struct SharedClientTestSpec<T> {
+    /// Name of the lifecycle-owner test surfaced in hiveview. Pick something
+    /// that makes it clear this is a shared-client group (e.g.
+    /// `"rpc_compat: shared-client SSZ decode suite"`).
+    pub name: String,
+    pub description: String,
+    /// If true, the owner test runs even when the test matcher would
+    /// otherwise filter it out. Per-scenario `always_run` still applies on
+    /// top of this.
+    pub always_run: bool,
+    /// Environment variables for the shared client.
+    pub environment: Option<HashMap<String, String>>,
+    /// Files to upload before starting the shared client.
+    pub files: Option<HashMap<String, Vec<u8>>>,
+    /// Test data cloned once per scenario.
+    pub test_data: T,
+    /// The client to start and share across all scenarios. Only single-client
+    /// sharing is supported today; open an issue if multi-client sharing is
+    /// needed.
+    pub client: ClientDefinition,
+    pub scenarios: Vec<SharedClientScenario<T>>,
+}
+
+#[async_trait]
+impl<T: Clone + Send + Sync + 'static> Testable for SharedClientTestSpec<T> {
+    async fn run_test(&self, simulation: Simulation, suite_id: SuiteID, suite: Suite) {
+        // Apply the owner-level filter first. If the owner doesn't match and
+        // no scenario has an explicit `always_run` override that would match,
+        // skip the whole group before we incur container-start cost.
+        if let Some(test_match) = simulation.test_matcher.clone() {
+            let owner_matches = self.always_run || test_match.match_test(&suite.name, &self.name);
+            if !owner_matches {
+                let any_scenario_matches = self
+                    .scenarios
+                    .iter()
+                    .any(|s| s.always_run || test_match.match_test(&suite.name, &s.name));
+                if !any_scenario_matches {
+                    return;
+                }
+            }
+        }
+
+        run_shared_client_test(
+            simulation,
+            suite_id,
+            suite,
+            self.name.clone(),
+            self.description.clone(),
+            self.client.clone(),
+            self.environment.clone(),
+            self.files.clone(),
+            self.test_data.clone(),
+            self.scenarios.clone(),
+        )
+        .await;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
+    host: Simulation,
+    suite_id: SuiteID,
+    suite: Suite,
+    owner_name: String,
+    owner_desc: String,
+    client_def: ClientDefinition,
+    environment: Option<HashMap<String, String>>,
+    files: Option<HashMap<String, Vec<u8>>>,
+    test_data: T,
+    scenarios: Vec<SharedClientScenario<T>>,
+) {
+    // Start the lifecycle owner test first. Its sole role is to own the
+    // container; we end it last so the container survives every scenario.
+    let owner_test_id = host.start_test(suite_id, owner_name, owner_desc).await;
+
+    let (container_id, ip) = host
+        .start_client_with_files(
+            suite_id,
+            owner_test_id,
+            client_def.name.clone(),
+            environment,
+            files,
+        )
+        .await;
+
+    let mut scenarios_run: usize = 0;
+
+    for scenario in scenarios {
+        if let Some(test_match) = host.test_matcher.clone() {
+            if !scenario.always_run && !test_match.match_test(&suite.name, &scenario.name) {
+                continue;
+            }
+        }
+
+        let scenario_test_id = host
+            .start_test(
+                suite_id,
+                scenario.name.clone(),
+                scenario.description.clone(),
+            )
+            .await;
+
+        // Register the owner's container with the scenario's test id. The
+        // registered copy has no teardown hook (see `registerMultiTestNode`
+        // on the hive server), so ending the scenario leaves the container
+        // running for the next one.
+        host.register_multi_test_node(suite_id, owner_test_id, &container_id, scenario_test_id)
+            .await;
+
+        let scenario_client = Client {
+            kind: client_def.name.clone(),
+            container: container_id.clone(),
+            ip,
+            rpc: HttpClientBuilder::default()
+                .build(format!("http://{}:8545", ip))
+                .expect("Failed to build rpc_client"),
+            test: Test {
+                sim: host.clone(),
+                test_id: scenario_test_id,
+                suite: suite.clone(),
+                suite_id,
+                result: Default::default(),
+            },
+        };
+
+        let data_clone = test_data.clone();
+        let run = scenario.run;
+        let test_result = extract_test_results(
+            tokio::spawn(async move {
+                (run)(scenario_client, data_clone).await;
+            })
+            .await,
+        );
+
+        host.end_test(suite_id, scenario_test_id, test_result).await;
+        scenarios_run += 1;
+    }
+
+    host.end_test(
+        suite_id,
+        owner_test_id,
+        TestResult {
+            pass: true,
+            details: format!("shared-client lifecycle owner ({scenarios_run} scenario(s) ran)"),
+        },
+    )
+    .await;
 }
 
 pub async fn run_suite(host: Simulation, suites: Vec<Suite>) {
