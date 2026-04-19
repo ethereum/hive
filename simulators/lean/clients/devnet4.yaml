@@ -8,3 +8,10 @@
   nametag: devnet4
 - client: zeam
   nametag: devnet4
+  # The zeam image bundles both devnet3 and devnet4 binaries, selected at
+  # runtime by zeam.sh. This profile never touches devnet3, so skip the
+  # ~20-minute devnet3 source build. See clients/zeam/Dockerfile for how
+  # the stub binary is produced and how it fails loudly if someone ever
+  # points HIVE_LEAN_DEVNET_LABEL=devnet3 at a skip-built image.
+  build_args:
+    zeam_skip_devnet3: "true"

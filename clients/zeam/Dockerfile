@@ -1,3 +1,9 @@
+# Global build arg: select which devnet3 builder stage to pull from. Declared
+# before the first FROM so it is visible to the `FROM devnet3-builder-${...}`
+# selector near the bottom of the file. See the block comment above that
+# selector for why the split exists.
+ARG zeam_skip_devnet3=false
+
 FROM denisgolius/zig:0.15.2 AS zig-toolchain
 
 FROM ubuntu:24.04 AS build-base
@@ -28,7 +34,24 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-FROM build-base AS devnet3-builder
+# The devnet3 binary is built from a pinned zeam source revision with the
+# `epoll-v2` patch; the full toolchain bootstrap (apt + rustup + git clone +
+# zig build) adds ~20 minutes to every image build. That cost is only
+# justified when hive actually exercises devnet3 -- simulator profiles
+# targeting only devnet4 pay it for nothing. Split the builder into two
+# stages and let the caller pick at build time via `zeam_skip_devnet3`:
+#
+#   - devnet3-builder-false (default): the real source build, unchanged.
+#   - devnet3-builder-true: a cheap stub that writes a placeholder binary
+#     so the final-stage COPY still resolves. The stub exits non-zero with
+#     a clear message if zeam.sh ever tries to run it at runtime (i.e. a
+#     skip-built image is launched with HIVE_LEAN_DEVNET_LABEL=devnet3),
+#     so misconfiguration surfaces immediately rather than silently.
+#
+# The final `FROM devnet3-builder-${zeam_skip_devnet3} AS devnet3-builder`
+# indirection keeps the downstream COPY untouched regardless of the choice.
+
+FROM build-base AS devnet3-builder-false
 
 ARG zeam_devnet3_revision=1d11cefdcee6b8af81a5ef70c8c7c8dd2f93fb20
 ARG zeam_devnet3_patch_revision=epoll-v2
@@ -127,6 +150,14 @@ PY
 
 RUN GIT_VERSION=$(git rev-parse --short HEAD) \
     && zig build -j1 -Doptimize=ReleaseSafe -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dgit_version="$GIT_VERSION"
+
+FROM ubuntu:24.04 AS devnet3-builder-true
+RUN mkdir -p /src/zig-out/bin \
+    && printf '#!/bin/sh\necho "zeam-devnet3 binary was not built (image built with zeam_skip_devnet3=true); rebuild without that flag to run devnet3 tests" >&2\nexit 64\n' \
+        > /src/zig-out/bin/zeam \
+    && chmod +x /src/zig-out/bin/zeam
+
+FROM devnet3-builder-${zeam_skip_devnet3} AS devnet3-builder
 
 FROM blockblaz/zeam:devnet4 AS devnet4-binary
 
