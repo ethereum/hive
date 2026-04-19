@@ -2,10 +2,25 @@
 
 set -euo pipefail
 
-LANTERN_BIN="${LANTERN_BIN:-$(command -v lantern || command -v lantern_cli)}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
 NODE_ID="${HIVE_NODE_ID:-lantern_0}"
 ASSET_ROOT="/tmp/lantern-runtime"
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+
+case "$DEVNET_LABEL" in
+    devnet3)
+        DEFAULT_LANTERN_BIN="/opt/lantern-devnet3/bin/lantern"
+        export LD_LIBRARY_PATH="/opt/lantern-devnet3/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        ;;
+    devnet4)
+        DEFAULT_LANTERN_BIN="/opt/lantern/bin/lantern"
+        ;;
+    *)
+        echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
+        exit 1
+        ;;
+esac
+
+LANTERN_BIN="${LANTERN_BIN:-$DEFAULT_LANTERN_BIN}"
 
 cleanup() {
     if [ -d "$ASSET_ROOT" ]; then
