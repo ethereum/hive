@@ -353,19 +353,25 @@ pub struct SharedClientScenario<T> {
 /// Semantics:
 ///
 /// - A container is started once, owned by a "lifecycle owner" test case
-///   created from `name` / `description`. The owner test is always reported
-///   as passing; it exists solely to anchor the container's lifecycle.
+///   created from `name` / `description`. The owner's pass/fail is an
+///   aggregate: pass iff at least one scenario ran and every scenario that
+///   ran passed. An owner whose scenarios were all filtered out is reported
+///   as failed to avoid a silent green suite.
 /// - Each entry in `scenarios` is registered as its own hive test case
 ///   sharing the owner's container (via
 ///   [`Simulation::register_multi_test_node`]). Pass/fail/details are
 ///   recorded per-scenario.
-/// - Scenarios run sequentially in the order given. They see each other's
-///   side effects on the client (this is the whole point; scenarios that
-///   rely on a fresh container must keep using [`NClientTestSpec`]).
+/// - Scenarios run sequentially in the order given, but **must be
+///   independent of execution order**: they share one container, so any
+///   mutation performed by one scenario is visible to the next. The safe
+///   mental model is read-only queries against a shared setup. If a
+///   scenario needs a fresh container, use [`NClientTestSpec`] instead.
 /// - `test_data` is cloned once per scenario. Use `Arc`-wrapped payloads to
 ///   share heap state cheaply.
 /// - When all scenarios have ended, the owner test ends, which tears down
-///   the container.
+///   the container. If the scenario loop panics or is cancelled, a best-
+///   effort teardown guard still ends the owner test so the container is
+///   not leaked.
 #[derive(Clone)]
 pub struct SharedClientTestSpec<T> {
     /// Name of the lifecycle-owner test surfaced in hiveview. Pick something
@@ -393,9 +399,15 @@ pub struct SharedClientTestSpec<T> {
 #[async_trait]
 impl<T: Clone + Send + Sync + 'static> Testable for SharedClientTestSpec<T> {
     async fn run_test(&self, simulation: Simulation, suite_id: SuiteID, suite: Suite) {
-        // Apply the owner-level filter first. If the owner doesn't match and
-        // no scenario has an explicit `always_run` override that would match,
-        // skip the whole group before we incur container-start cost.
+        // Outer matcher filter: skip the whole group (and the container
+        // start) if neither the owner nor any scenario would match. This
+        // is load-bearing for performance -- without it we'd boot a
+        // container just to find out every scenario is filtered out.
+        //
+        // The inner matcher filter inside `run_shared_client_test` is the
+        // one that actually skips individual scenarios once the container
+        // is up. The two filters must stay consistent; if you tweak the
+        // matching logic in one site, update the other too.
         if let Some(test_match) = simulation.test_matcher.clone() {
             let owner_matches = self.always_run || test_match.match_test(&suite.name, &self.name);
             if !owner_matches {
@@ -422,6 +434,73 @@ impl<T: Clone + Send + Sync + 'static> Testable for SharedClientTestSpec<T> {
             self.scenarios.clone(),
         )
         .await;
+    }
+}
+
+/// Best-effort teardown guard for a shared-client lifecycle owner.
+///
+/// On normal completion the caller calls `disarm()`, which records the
+/// aggregate scenario result and turns the subsequent `Drop` into a no-op.
+/// If the scenario loop unwinds or is cancelled before `disarm()`, the
+/// `Drop` impl spawns a detached task that ends the owner test with a
+/// failing result. Ending the owner test is what tears the shared
+/// container down on the hive server (see `EndTest` in
+/// `libhive/testmanager.go`), so this prevents a leaked container on the
+/// panic / cancel path.
+struct OwnerGuard {
+    host: Simulation,
+    suite_id: SuiteID,
+    owner_test_id: TestID,
+    disarmed: bool,
+}
+
+impl OwnerGuard {
+    fn new(host: Simulation, suite_id: SuiteID, owner_test_id: TestID) -> Self {
+        Self {
+            host,
+            suite_id,
+            owner_test_id,
+            disarmed: true,
+        }
+    }
+
+    /// Arm the guard for the duration of the scenario loop. Must be paired
+    /// with a call to [`OwnerGuard::disarm`] once the loop finishes
+    /// normally.
+    fn arm(&mut self) {
+        self.disarmed = false;
+    }
+
+    fn disarm(&mut self) {
+        self.disarmed = true;
+    }
+}
+
+impl Drop for OwnerGuard {
+    fn drop(&mut self) {
+        if self.disarmed {
+            return;
+        }
+        let host = self.host.clone();
+        let suite_id = self.suite_id;
+        let owner_test_id = self.owner_test_id;
+        // Best-effort: spawn a detached task to close out the owner test.
+        // If the tokio runtime is already shutting down this may never
+        // run, but in the common panic case it gives the hive server a
+        // chance to stop the shared container.
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                host.end_test(
+                    suite_id,
+                    owner_test_id,
+                    TestResult {
+                        pass: false,
+                        details: "shared-client owner aborted before completion".to_string(),
+                    },
+                )
+                .await;
+            });
+        }
     }
 }
 
@@ -452,11 +531,19 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
         )
         .await;
 
+    let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
+    guard.arm();
+
     let mut scenarios_run: usize = 0;
+    let mut scenarios_passed: usize = 0;
+    let mut scenarios_filtered: usize = 0;
 
     for scenario in scenarios {
+        // Inner matcher filter: individual scenario skip. See the
+        // cross-reference comment in `SharedClientTestSpec::run_test`.
         if let Some(test_match) = host.test_matcher.clone() {
             if !scenario.always_run && !test_match.match_test(&suite.name, &scenario.name) {
+                scenarios_filtered += 1;
                 continue;
             }
         }
@@ -472,48 +559,85 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
         // Register the owner's container with the scenario's test id. The
         // registered copy has no teardown hook (see `registerMultiTestNode`
         // on the hive server), so ending the scenario leaves the container
-        // running for the next one.
-        host.register_multi_test_node(suite_id, owner_test_id, &container_id, scenario_test_id)
-            .await;
-
-        let scenario_client = Client {
-            kind: client_def.name.clone(),
-            container: container_id.clone(),
-            ip,
-            rpc: HttpClientBuilder::default()
-                .build(format!("http://{}:8545", ip))
-                .expect("Failed to build rpc_client"),
-            test: Test {
-                sim: host.clone(),
-                test_id: scenario_test_id,
-                suite: suite.clone(),
+        // running for the next one. A registration failure (transport /
+        // 5xx / timeout) fails just this scenario and keeps the loop and
+        // the shared container alive so the rest of the scenarios still
+        // get a chance to run.
+        if let Err(err) = host
+            .register_multi_test_node(suite_id, owner_test_id, &container_id, scenario_test_id)
+            .await
+        {
+            host.end_test(
                 suite_id,
-                result: Default::default(),
-            },
-        };
+                scenario_test_id,
+                TestResult {
+                    pass: false,
+                    details: format!("shared-client registration failed; skipping scenario: {err}"),
+                },
+            )
+            .await;
+            scenarios_run += 1;
+            continue;
+        }
 
         let data_clone = test_data.clone();
         let run = scenario.run;
+        let host_for_spawn = host.clone();
+        let kind_for_spawn = client_def.name.clone();
+        let container_for_spawn = container_id.clone();
+        let suite_for_spawn = suite.clone();
+        // Build the scenario `Client` inside the spawn so that a panic
+        // from `HttpClientBuilder::build(...).expect(...)` is caught by
+        // `extract_test_results` and surfaces as a scenario failure rather
+        // than unwinding the whole lifecycle.
         let test_result = extract_test_results(
             tokio::spawn(async move {
+                let scenario_client = Client {
+                    kind: kind_for_spawn,
+                    container: container_for_spawn,
+                    ip,
+                    rpc: HttpClientBuilder::default()
+                        .build(format!("http://{}:8545", ip))
+                        .expect("Failed to build rpc_client"),
+                    test: Test {
+                        sim: host_for_spawn,
+                        test_id: scenario_test_id,
+                        suite: suite_for_spawn,
+                        suite_id,
+                        result: Default::default(),
+                    },
+                };
                 (run)(scenario_client, data_clone).await;
             })
             .await,
         );
 
+        if test_result.pass {
+            scenarios_passed += 1;
+        }
         host.end_test(suite_id, scenario_test_id, test_result).await;
         scenarios_run += 1;
     }
 
+    // Owner pass/fail is an aggregate: pass only if every scenario that
+    // ran passed, and at least one scenario actually ran. An owner whose
+    // scenarios were all filtered out or all failed is reported as
+    // failing so hiveview doesn't show a green parent over a red group.
+    let owner_pass = scenarios_run > 0 && scenarios_passed == scenarios_run;
+    let owner_details = format!(
+        "shared-client lifecycle owner: {scenarios_passed}/{scenarios_run} \
+         scenario(s) passed ({scenarios_filtered} filtered)"
+    );
     host.end_test(
         suite_id,
         owner_test_id,
         TestResult {
-            pass: true,
-            details: format!("shared-client lifecycle owner ({scenarios_run} scenario(s) ran)"),
+            pass: owner_pass,
+            details: owner_details,
         },
     )
     .await;
+    guard.disarm();
 }
 
 pub async fn run_suite(host: Simulation, suites: Vec<Suite>) {
