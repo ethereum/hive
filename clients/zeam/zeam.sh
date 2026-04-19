@@ -2,19 +2,16 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
 NODE_ID="${HIVE_NODE_ID:-zeam_0}"
 ASSET_ROOT="/tmp/zeam-runtime"
 
 case "$DEVNET_LABEL" in
-    devnet3)
-        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet3"
-        ;;
     devnet4)
-        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet4"
+        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam"
         ;;
     *)
-        echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
+        echo "Unsupported Lean devnet label for zeam: $DEVNET_LABEL" >&2
         exit 1
         ;;
 esac
