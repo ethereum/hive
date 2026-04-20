@@ -153,12 +153,14 @@ FLAGS="$FLAGS --externalcl"
 ip=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
 FLAGS="$FLAGS --nat=extip:$ip --no-downloader"
 
+# It doesn't make sense to dial out, use only a pre-set bootnode.
+FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+
 if [ "$HIVE_BOOTNODE" = "" ]; then
-    # Isolate discovery from public peers during devp2p tests. An empty
-    # --bootnodes / --discovery.dns overrides the mainnet defaults erigon
-    # would otherwise fall back to. Without this, the routing table fills
-    # with real peers and drowns out the simulator's bystander nodes.
-    FLAGS="$FLAGS --bootnodes= --discovery.dns= --staticpeers="
+    # Erigon's default --chain is mainnet, so also clear DNS and static peer
+    # defaults that would otherwise fill the routing table with real peers
+    # during devp2p tests (drowning out the simulator's bystander nodes).
+    FLAGS="$FLAGS --discovery.dns= --staticpeers="
 fi
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS
