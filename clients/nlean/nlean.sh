@@ -28,7 +28,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-if [ ! -f "$ASSET_ROOT/validator-config.yaml" ]; then
+if [ ! -f "$ASSET_ROOT/annotated_validators.yaml" ]; then
     echo "Missing prepared Lean runtime assets at $ASSET_ROOT" >&2
     exit 1
 fi
@@ -55,7 +55,7 @@ else
 fi
 
 FLAGS=(
-    --validator-config "$ASSET_ROOT/validator-config.yaml"
+    --annotated-validators "$ASSET_ROOT/annotated_validators.yaml"
     --node "$NODE_ID"
     --data-dir /data
     --fork-digest "$FORK_DIGEST"
