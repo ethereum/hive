@@ -416,6 +416,7 @@ fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
         "qlean",
         "ream",
         "gean",
+        "nlean",
     ] {
         if client_type.starts_with(candidate) {
             return Ok(candidate);
