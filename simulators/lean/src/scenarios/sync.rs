@@ -413,6 +413,7 @@ fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
         "grandine_lean",
         "zeam",
         "lantern",
+        "qlean",
         "ream",
         "gean",
     ] {

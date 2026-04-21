@@ -12,7 +12,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-SUPPORTED_CLIENTS = {"ethlambda", "gean", "grandine_lean", "lantern", "ream", "zeam"}
+SUPPORTED_CLIENTS = {"ethlambda", "gean", "grandine_lean", "lantern", "qlean", "ream", "zeam"}
 FALLBACK_BOOTNODES = [
     "enr:-IW4QA0pljjdLfxS_EyUxNAxJSoGCwmOVNJauYWsTiYHyWG5Bky-7yCEktSvu_w-PWUrmzbc8vYL_Mx5pgsAix2OfOMBgmlkgnY0gmlwhKwUAAGEcXVpY4IfkIlzZWNwMjU2azGhA6mw8mfwe-3TpjMMSk7GHe3cURhOn9-ufyAqy40wEyui",
 ]
@@ -191,7 +191,7 @@ def render_config(validators: list[dict[str, str]]) -> str:
                 )
             else:
                 # ethlambda / lantern / zeam / gean-devnet4 /
-                # grandine_lean-devnet4 all accept the
+                # grandine_lean-devnet4 / qlean all accept the
                 # attestation_pubkey + proposal_pubkey nested shape.
                 lines.append(
                     f'  - attestation_pubkey: "{format_genesis_pubkey(validator["attestation_public"])}"'
@@ -368,6 +368,64 @@ def write_lantern_assignments(
                 ]
             )
     write_text(asset_root / "annotated_validators.yaml", "\n".join(lines) + "\n")
+
+
+def write_qlean_lean_assignments(asset_root: Path, validators: list[dict[str, str]]) -> None:
+    keys_directory = asset_root / "hash-sig-keys"
+    keys_directory.mkdir(parents=True, exist_ok=True)
+    
+    is_devnet4 = uses_dual_key_genesis()
+    manifest_filename = "validator-keys-manifest-devnet4.yaml" if is_devnet4 else "validator-keys-manifest.yaml"
+    
+    manifest_lines = [
+        'key_scheme: "SIGTopLevelTargetSumLifetime32Dim64Base8"',
+        'hash_function: "Poseidon2"',
+        'encoding: "TargetSum"',
+        f"num_validators: {len(validators)}",
+        "validators:",
+    ]
+
+    for index, validator in enumerate(validators):
+        manifest_lines.append(f"  - index: {index}")
+        
+        attestation_secret_key_file = f"v{index}_att.sk"
+        attestation_public_key_file = f"v{index}_att.pk"
+        
+        write_bytes(
+            keys_directory / attestation_secret_key_file, 
+            bytes.fromhex(validator["attestation_secret"].removeprefix("0x"))
+        )
+        write_bytes(
+            keys_directory / attestation_public_key_file, 
+            bytes.fromhex(validator["attestation_public"].removeprefix("0x"))
+        )
+        
+        if is_devnet4:
+            proposal_secret_key_file = f"v{index}_prop.sk"
+            proposal_public_key_file = f"v{index}_prop.pk"
+            
+            write_bytes(
+                keys_directory / proposal_secret_key_file, 
+                bytes.fromhex(validator["proposal_secret"].removeprefix("0x"))
+            )
+            write_bytes(
+                keys_directory / proposal_public_key_file, 
+                bytes.fromhex(validator["proposal_public"].removeprefix("0x"))
+            )
+            
+            manifest_lines.extend([
+                f'    attestation_public_key_hex: "{validator["attestation_public"].removeprefix("0x")}"',
+                f'    proposal_public_key_hex: "{validator["proposal_public"].removeprefix("0x")}"',
+                f'    attestation_private_key_file: "{attestation_secret_key_file}"',
+                f'    proposal_private_key_file: "{proposal_secret_key_file}"'
+            ])
+        else:
+            manifest_lines.extend([
+                f'    pubkey_hex: "{validator["attestation_public"].removeprefix("0x")}"',
+                f'    privkey_file: "{attestation_secret_key_file}"'
+            ])
+
+    write_text(keys_directory / manifest_filename, "\n".join(manifest_lines) + "\n")
 
 
 def write_ream_assignments(
@@ -559,6 +617,10 @@ def write_client_specific_assets(
     if CLIENT_KIND == "ream":
         write_text(asset_root / "validators.yaml", render_validator_registry(specs))
         write_ream_assignments(asset_root, validators)
+        return
+    if CLIENT_KIND == "qlean":
+        write_text(asset_root / "validators.yaml", render_validator_registry(specs))
+        write_qlean_lean_assignments(asset_root, validators)
         return
     raise ValueError(f"Unsupported lean runtime asset client kind {CLIENT_KIND!r}")
 
