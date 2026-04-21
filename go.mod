@@ -7,6 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.4
 	github.com/ethereum/hive/hiveproxy v0.0.0-20240610172618-786a798a0cfe
 	github.com/evanw/esbuild v0.18.11
+	github.com/fatih/color v1.18.0
 	github.com/fsouza/go-dockerclient v1.12.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/gorilla/mux v1.8.1
@@ -49,6 +50,8 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
