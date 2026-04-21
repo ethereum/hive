@@ -4,5 +4,5 @@ exclude = ["simulators/portal"]
 default-members = ["simulators/lean"]
 resolver = "2"
 
-[patch."https://github.com/ethereum/hive"]
+[workspace.dependencies]
 hivesim = { path = "hivesim-rs" }
