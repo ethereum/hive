@@ -9,7 +9,10 @@ use crate::{
     CheckpointResponse, HealthResponse, LeanDevnet, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
 use alloy_primitives::{FixedBytes, B256};
-use hivesim::{dyn_async, types::TestResult, Client, NClientTestSpec, Test};
+use hivesim::{
+    dyn_async, types::TestResult, Client, NClientTestSpec, SharedClientScenario,
+    SharedClientTestSpec, Test,
+};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as HttpClient,
@@ -489,18 +492,16 @@ async fn load_finalized_state(client: &Client) -> LeanState {
     decode_finalized_state(&load_finalized_state_bytes(client).await)
 }
 
-async fn load_fresh_state_setup(clients: Vec<Client>) -> (Client, LeanState) {
-    let client = expect_single_client(clients);
-    let state = load_finalized_state(&client).await;
-    (client, state)
+async fn load_fresh_state_setup(client: &Client) -> LeanState {
+    load_finalized_state(client).await
 }
 
 async fn load_fresh_state_and_fork_choice_setup(
-    clients: Vec<Client>,
-) -> (Client, LeanState, ForkChoiceResponse) {
-    let (client, state) = load_fresh_state_setup(clients).await;
-    let fork_choice = load_fork_choice_response(&client).await;
-    (client, state, fork_choice)
+    client: &Client,
+) -> (LeanState, ForkChoiceResponse) {
+    let state = load_fresh_state_setup(client).await;
+    let fork_choice = load_fork_choice_response(client).await;
+    (state, fork_choice)
 }
 
 async fn load_post_genesis_state_setup(
@@ -774,161 +775,138 @@ dyn_async! {
             )
             .await;
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state returns ssz encoded finalized state".to_string(),
-                description: "Loads the finalized state endpoint and checks that it returns decodable SSZ bytes."
-                    .to_string(),
-                always_run: false,
-                run: test_state_returns_ssz_encoded_finalized_state,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
+            // These finalized-state checks are read-only, so they can share one client.
+            let shared_state_environment = lean_environment();
+            let shared_state_files = prepare_client_runtime_files(
+                &client.name,
+                &shared_state_environment,
+            )
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Unable to prepare runtime assets for {}: {err}",
+                    client.name
+                )
+            });
 
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state returns octet-stream content type".to_string(),
-                description: "Loads the finalized state endpoint and checks that it responds with application/octet-stream."
-                    .to_string(),
+            test.run(SharedClientTestSpec {
+                name: "rpc_compat: finalized-state shared-client scenarios".to_string(),
+                description:
+                    "Starts a single client container and runs the finalized-state read-only RPC compatibility scenarios against it, avoiding one container boot per scenario."
+                        .to_string(),
                 always_run: false,
-                run: test_state_returns_octet_stream_content_type,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
+                environment: Some(shared_state_environment),
+                files: Some(shared_state_files),
                 test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes config".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the config field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_config,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes slot".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the slot field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_slot,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes latest block header".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the latest_block_header field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_latest_block_header,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes latest justified".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the latest_justified checkpoint."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_latest_justified,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes latest finalized".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the latest_finalized checkpoint."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_latest_finalized,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes historical block hashes".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the historical_block_hashes field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_historical_block_hashes,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes justified slots".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the justified_slots field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_justified_slots,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes validators".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the validators field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_validators,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes justifications roots".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the justifications_roots field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_justifications_roots,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state ssz decodes justifications validators".to_string(),
-                description: "Loads and SSZ-decodes the finalized state, then checks the justifications_validators field."
-                    .to_string(),
-                always_run: false,
-                run: test_state_ssz_decodes_justifications_validators,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: state decodes".to_string(),
-                description: "Loads the finalized state endpoint for the baseline RPC compatibility case."
-                    .to_string(),
-                always_run: false,
-                run: test_state,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
+                client: client.clone(),
+                scenarios: vec![
+                    SharedClientScenario {
+                        name: "rpc_compat: state returns ssz encoded finalized state".to_string(),
+                        description:
+                            "Loads the finalized state endpoint and checks that it returns decodable SSZ bytes."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_returns_ssz_encoded_finalized_state,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state returns octet-stream content type".to_string(),
+                        description:
+                            "Loads the finalized state endpoint and checks that it responds with application/octet-stream."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_returns_octet_stream_content_type,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes config".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the config field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_config,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes slot".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the slot field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_slot,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes latest block header".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the latest_block_header field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_latest_block_header,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes latest justified".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the latest_justified checkpoint."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_latest_justified,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes latest finalized".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the latest_finalized checkpoint."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_latest_finalized,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes historical block hashes".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the historical_block_hashes field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_historical_block_hashes,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes justified slots".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the justified_slots field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_justified_slots,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes validators".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the validators field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_validators,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes justifications roots".to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the justifications_roots field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_justifications_roots,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state ssz decodes justifications validators"
+                            .to_string(),
+                        description:
+                            "Loads and SSZ-decodes the finalized state, then checks the justifications_validators field."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state_ssz_decodes_justifications_validators,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: state decodes".to_string(),
+                        description:
+                            "Loads the finalized state endpoint for the baseline RPC compatibility case."
+                                .to_string(),
+                        always_run: false,
+                        run: test_state,
+                    },
+                ],
+            })
+            .await;
 
             let state_finalized_genesis_time = default_genesis_time();
 
@@ -1354,8 +1332,7 @@ dyn_async! {
 
 // /lean/v0/states/finalized
 dyn_async! {
-    async fn test_state_returns_ssz_encoded_finalized_state<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_state_returns_ssz_encoded_finalized_state<'a>(client: Client, _: ()) {
         let ssz_bytes = load_finalized_state_bytes(&client).await;
 
         assert!(
@@ -1372,8 +1349,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_returns_octet_stream_content_type<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_state_returns_octet_stream_content_type<'a>(client: Client, _: ()) {
         let response = load_finalized_state_response(&client).await;
         let content_type = response
             .headers()
@@ -1408,8 +1384,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_config<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_config<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             state.config.genesis_time > 0,
@@ -1419,8 +1395,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_slot<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state, fork_choice) = load_fresh_state_and_fork_choice_setup(clients).await;
+    async fn test_state_ssz_decodes_slot<'a>(client: Client, _: ()) {
+        let (state, fork_choice) = load_fresh_state_and_fork_choice_setup(&client).await;
 
         assert_eq!(
             state.slot, fork_choice.finalized.slot,
@@ -1430,8 +1406,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_latest_block_header<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_latest_block_header<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert_eq!(
             state.latest_block_header.slot, state.slot,
@@ -1445,8 +1421,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_latest_justified<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state, fork_choice) = load_fresh_state_and_fork_choice_setup(clients).await;
+    async fn test_state_ssz_decodes_latest_justified<'a>(client: Client, _: ()) {
+        let (state, fork_choice) = load_fresh_state_and_fork_choice_setup(&client).await;
 
         assert_eq!(
             state.latest_justified.slot, fork_choice.justified.slot,
@@ -1460,8 +1436,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_latest_finalized<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state, fork_choice) = load_fresh_state_and_fork_choice_setup(clients).await;
+    async fn test_state_ssz_decodes_latest_finalized<'a>(client: Client, _: ()) {
+        let (state, fork_choice) = load_fresh_state_and_fork_choice_setup(&client).await;
 
         assert_eq!(
             state.latest_finalized.slot, fork_choice.finalized.slot,
@@ -1475,8 +1451,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_historical_block_hashes<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_historical_block_hashes<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             state.historical_block_hashes.len() <= state.slot as usize + 1,
@@ -1486,8 +1462,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_justified_slots<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_justified_slots<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             state.justified_slots.num_set_bits() <= state.justified_slots.len(),
@@ -1497,8 +1473,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_validators<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_validators<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             !state.validators.is_empty(),
@@ -1515,8 +1491,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_justifications_roots<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_justifications_roots<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             state.justifications_roots.len() <= state.historical_block_hashes.len(),
@@ -1526,8 +1502,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state_ssz_decodes_justifications_validators<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state) = load_fresh_state_setup(clients).await;
+    async fn test_state_ssz_decodes_justifications_validators<'a>(client: Client, _: ()) {
+        let state = load_fresh_state_setup(&client).await;
 
         assert!(
             state.justifications_validators.num_set_bits() <= state.justifications_validators.len(),
@@ -1537,8 +1513,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_state<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, state, fork_choice) = load_fresh_state_and_fork_choice_setup(clients).await;
+    async fn test_state<'a>(client: Client, _: ()) {
+        let (state, fork_choice) = load_fresh_state_and_fork_choice_setup(&client).await;
 
         assert!(
             !state.validators.is_empty(),

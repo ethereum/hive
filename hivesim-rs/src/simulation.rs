@@ -4,12 +4,18 @@ use std::collections::HashMap;
 use std::env;
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::time::Duration;
+
+/// Timeout for short simulator control-plane requests.
+const CONTROL_PLANE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Wraps the simulation HTTP API provided by hive.
 #[derive(Clone, Debug)]
 pub struct Simulation {
     pub url: String,
     pub test_matcher: Option<TestMatcher>,
+    /// Shared client for short control-plane requests.
+    http_client: reqwest::Client,
 }
 
 impl Default for Simulation {
@@ -55,7 +61,30 @@ impl Simulation {
             panic!("HIVE_SIMULATOR environment variable is empty")
         }
 
-        Self { url, test_matcher }
+        let http_client = reqwest::Client::builder()
+            .timeout(CONTROL_PLANE_TIMEOUT)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
+        Self {
+            url,
+            test_matcher,
+            http_client,
+        }
+    }
+
+    /// Builds a [`Simulation`] for tests against a custom API URL.
+    #[doc(hidden)]
+    pub fn with_url(url: String) -> Self {
+        let http_client = reqwest::Client::builder()
+            .timeout(CONTROL_PLANE_TIMEOUT)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        Self {
+            url,
+            test_matcher: None,
+            http_client,
+        }
     }
 
     pub async fn start_suite(
@@ -183,6 +212,37 @@ impl Simulation {
         (resp.id, ip)
     }
 
+    /// Registers an existing container with another test without starting a new one.
+    pub async fn register_multi_test_node(
+        &self,
+        test_suite: SuiteID,
+        source_test: TestID,
+        node_id: &str,
+        target_test: TestID,
+    ) -> Result<(), String> {
+        let url = format!(
+            "{}/testsuite/{}/test/{}/node/{}/register/{}",
+            self.url, test_suite, source_test, node_id, target_test
+        );
+        let resp = self.http_client.post(&url).send().await.map_err(|err| {
+            format!(
+                "register_multi_test_node transport error (node={node_id}, \
+                 source_test={source_test}, target_test={target_test}): {err}"
+            )
+        })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!(
+                "register_multi_test_node rejected (node={node_id}, \
+                 source_test={source_test}, target_test={target_test}): \
+                 status={status} body={body}"
+            ));
+        }
+        Ok(())
+    }
+
     /// Returns all client types available to this simulator run. This depends on
     /// both the available client set and the command line filters.
     pub async fn client_types(&self) -> Vec<ClientDefinition> {
@@ -196,5 +256,79 @@ impl Simulation {
             .json::<Vec<ClientDefinition>>()
             .await
             .expect("Failed to convert client types response to json")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener as TokioTcpListener;
+
+    /// Minimal one-request HTTP test server.
+    async fn spawn_mock(
+        response: &'static str,
+    ) -> (String, Arc<AtomicUsize>, tokio::task::JoinHandle<()>) {
+        let std_listener = TcpListener::bind("127.0.0.1:0").expect("bind mock");
+        std_listener.set_nonblocking(true).expect("nonblocking");
+        let addr = std_listener.local_addr().expect("addr");
+        let listener = TokioTcpListener::from_std(std_listener).expect("tokio listener");
+        let hits = Arc::new(AtomicUsize::new(0));
+        let hits_clone = hits.clone();
+        let handle = tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = match listener.accept().await {
+                    Ok(v) => v,
+                    Err(_) => break,
+                };
+                hits_clone.fetch_add(1, Ordering::SeqCst);
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let _ = socket.write_all(response.as_bytes()).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+        (format!("http://{}", addr), hits, handle)
+    }
+
+    #[tokio::test]
+    async fn register_multi_test_node_happy_path() {
+        let (url, hits, handle) =
+            spawn_mock("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK").await;
+        let sim = Simulation::with_url(url);
+        let result = sim.register_multi_test_node(1, 2, "node-abc", 3).await;
+        handle.abort();
+        assert!(result.is_ok(), "expected Ok, got {result:?}");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn register_multi_test_node_returns_err_on_non_2xx() {
+        let (url, _, handle) = spawn_mock(
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 11\r\n\
+             Connection: close\r\n\r\nserver boom",
+        )
+        .await;
+        let sim = Simulation::with_url(url);
+        let result = sim.register_multi_test_node(1, 2, "node-abc", 3).await;
+        handle.abort();
+        let err = result.expect_err("expected Err on 500");
+        assert!(err.contains("status=500"), "unexpected err: {err}");
+        assert!(err.contains("server boom"), "unexpected err: {err}");
+    }
+
+    #[tokio::test]
+    async fn register_multi_test_node_returns_err_on_transport_failure() {
+        let addr = {
+            let l = TcpListener::bind("127.0.0.1:0").expect("bind");
+            l.local_addr().expect("addr")
+        };
+        let sim = Simulation::with_url(format!("http://{addr}"));
+        let result = sim.register_multi_test_node(1, 2, "node-abc", 3).await;
+        let err = result.expect_err("expected Err on closed port");
+        assert!(err.contains("transport error"), "unexpected err: {err}");
     }
 }
