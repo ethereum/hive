@@ -775,12 +775,7 @@ dyn_async! {
             )
             .await;
 
-            // Finalized-state read-only scenarios share one client container
-            // instead of restarting zeam/etc. per scenario. Each scenario
-            // queries a side-effect-free read endpoint
-            // (`/lean/v0/states/finalized` and `/lean/v0/fork_choice`), so
-            // scenario ordering does not change any observable result. See
-            // hivesim::SharedClientTestSpec for the lifecycle semantics.
+            // These finalized-state checks are read-only, so they can share one client.
             let shared_state_environment = lean_environment();
             let shared_state_files = prepare_client_runtime_files(
                 &client.name,

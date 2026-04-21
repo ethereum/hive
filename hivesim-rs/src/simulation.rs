@@ -6,11 +6,7 @@ use std::net::IpAddr;
 use std::str::FromStr;
 use std::time::Duration;
 
-/// Default HTTP timeout for short control-plane requests against the hive
-/// simulation API (e.g. [`Simulation::register_multi_test_node`]). All of
-/// these requests are localhost POSTs against the hive process, so a short
-/// timeout is safe and stops a stuck server from hanging a scenario loop
-/// indefinitely.
+/// Timeout for short simulator control-plane requests.
 const CONTROL_PLANE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Wraps the simulation HTTP API provided by hive.
@@ -18,12 +14,7 @@ const CONTROL_PLANE_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct Simulation {
     pub url: String,
     pub test_matcher: Option<TestMatcher>,
-    /// Long-lived client used by new control-plane methods (e.g.
-    /// [`Simulation::register_multi_test_node`]). Configured with a bounded
-    /// timeout so a hung hive server cannot stall a scenario loop. The
-    /// pre-existing methods on this struct intentionally still use
-    /// `reqwest::Client::new()` per call; unifying them is out of scope for
-    /// the change that introduced this field.
+    /// Shared client for short control-plane requests.
     http_client: reqwest::Client,
 }
 
@@ -82,10 +73,7 @@ impl Simulation {
         }
     }
 
-    /// Builds a [`Simulation`] pointing at the given hive API URL. Primarily
-    /// useful for tests that want to exercise the control-plane methods
-    /// against a mock HTTP server without touching the `HIVE_SIMULATOR`
-    /// environment variable.
+    /// Builds a [`Simulation`] for tests against a custom API URL.
     #[doc(hidden)]
     pub fn with_url(url: String) -> Self {
         let http_client = reqwest::Client::builder()
@@ -224,21 +212,7 @@ impl Simulation {
         (resp.id, ip)
     }
 
-    /// Registers an existing client container (started under `source_test`) as also
-    /// belonging to `target_test`, without starting a new container. This enables
-    /// client reuse across tests in the same suite while still reporting each
-    /// scenario as its own test case in the hive UI.
-    ///
-    /// Lifecycle: the source test remains the sole owner of the container. Ending
-    /// the target test will NOT stop the container (its registered copy has
-    /// `wait == nil` server-side); only ending the source test does. See
-    /// `libhive.TestManager.RegisterNode` / `registerMultiTestNode` on the hive
-    /// server (`internal/libhive/api.go::registerMultiTestNode` explicitly
-    /// constructs the copy without a `wait` function) for the full semantics.
-    ///
-    /// Returns `Err` on transport errors, timeouts, or non-2xx responses so the
-    /// caller can recover gracefully (e.g. fail just the affected scenario and
-    /// keep the shared container and the rest of the scenario loop alive).
+    /// Registers an existing container with another test without starting a new one.
     pub async fn register_multi_test_node(
         &self,
         test_suite: SuiteID,
@@ -294,10 +268,7 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener as TokioTcpListener;
 
-    /// Minimal test HTTP server: reads one request, responds with the
-    /// supplied status line and body, counts hits. Intentionally avoids any
-    /// HTTP framework so hivesim-rs doesn't grow a dev-dependency for one
-    /// test.
+    /// Minimal one-request HTTP test server.
     async fn spawn_mock(
         response: &'static str,
     ) -> (String, Arc<AtomicUsize>, tokio::task::JoinHandle<()>) {
@@ -351,7 +322,6 @@ mod tests {
 
     #[tokio::test]
     async fn register_multi_test_node_returns_err_on_transport_failure() {
-        // Bind and immediately drop the listener so the port is closed.
         let addr = {
             let l = TcpListener::bind("127.0.0.1:0").expect("bind");
             l.local_addr().expect("addr")
