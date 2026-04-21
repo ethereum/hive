@@ -12,7 +12,16 @@ import time
 import urllib.request
 from pathlib import Path
 
-SUPPORTED_CLIENTS = {"ethlambda", "gean", "grandine_lean", "lantern", "qlean", "ream", "zeam"}
+SUPPORTED_CLIENTS = {
+    "ethlambda",
+    "gean",
+    "grandine_lean",
+    "lantern",
+    "nlean",
+    "qlean",
+    "ream",
+    "zeam",
+}
 FALLBACK_BOOTNODES = [
     "enr:-IW4QA0pljjdLfxS_EyUxNAxJSoGCwmOVNJauYWsTiYHyWG5Bky-7yCEktSvu_w-PWUrmzbc8vYL_Mx5pgsAix2OfOMBgmlkgnY0gmlwhKwUAAGEcXVpY4IfkIlzZWNwMjU2azGhA6mw8mfwe-3TpjMMSk7GHe3cURhOn9-ufyAqy40wEyui",
 ]
@@ -587,6 +596,56 @@ def write_gean_assignments(
     write_text(asset_root / "annotated_validators.yaml", "\n".join(lines) + "\n")
 
 
+def write_nlean_assignments(
+    asset_root: Path,
+    specs: list[dict[str, object]],
+    validators: list[dict[str, str]],
+) -> None:
+    # nlean consumes the shared annotated_validators.yaml (via
+    # --annotated-validators) and reads each privkey_file out of
+    # --hash-sig-key-dir. Use the same (attestation, proposal) entry-pair
+    # layout as ethlambda / gean / grandine_lean — nlean resolves the role
+    # from the `_attester` / `_proposer` substring in the filename.
+    #
+    # nlean also needs a per-node libp2p key file for --node-key; write one
+    # alongside each spec so any node in the registry can be launched.
+    if not uses_dual_key_genesis():
+        raise ValueError(
+            "nlean hive integration currently requires devnet4 dual-key genesis; "
+            f"got DEVNET_LABEL={DEVNET_LABEL!r}"
+        )
+
+    lines: list[str] = []
+    for spec in specs:
+        key_hex = trim_hex(spec["private_key"])  # type: ignore[arg-type]
+        write_text(asset_root / f"{spec['name']}.key", key_hex + "\n")
+
+        lines.append(f'{spec["name"]}:')
+        for index in spec["indices"]:
+            validator = validators[index]
+            attester_sk = f"validator_{index}_attester_sk.ssz"
+            proposer_sk = f"validator_{index}_proposer_sk.ssz"
+            write_bytes(
+                asset_root / "hash-sig-keys" / attester_sk,
+                bytes.fromhex(validator["attestation_secret"]),
+            )
+            write_bytes(
+                asset_root / "hash-sig-keys" / proposer_sk,
+                bytes.fromhex(validator["proposal_secret"]),
+            )
+            lines.extend(
+                [
+                    f"  - index: {index}",
+                    f'    pubkey_hex: "{validator["attestation_public"]}"',
+                    f'    privkey_file: "{attester_sk}"',
+                    f"  - index: {index}",
+                    f'    pubkey_hex: "{validator["proposal_public"]}"',
+                    f'    privkey_file: "{proposer_sk}"',
+                ]
+            )
+    write_text(asset_root / "annotated_validators.yaml", "\n".join(lines) + "\n")
+
+
 def write_client_specific_assets(
     asset_root: Path,
     specs: list[dict[str, object]],
@@ -617,6 +676,11 @@ def write_client_specific_assets(
     if CLIENT_KIND == "ream":
         write_text(asset_root / "validators.yaml", render_validator_registry(specs))
         write_ream_assignments(asset_root, validators)
+        return
+    if CLIENT_KIND == "nlean":
+        # nlean consumes annotated_validators.yaml plus per-node libp2p keys
+        # written under <name>.key that --node-key can point at.
+        write_nlean_assignments(asset_root, specs, validators)
         return
     if CLIENT_KIND == "qlean":
         write_text(asset_root / "validators.yaml", render_validator_registry(specs))
