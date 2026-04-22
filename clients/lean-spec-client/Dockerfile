@@ -1,24 +1,33 @@
-FROM python:3.12-slim AS builder-devnet3
+FROM python:3.12-slim-bookworm AS lean-spec-base
 
 ARG github=leanEthereum/leanSpec
-ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
+ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
     build-essential \
+    ca-certificates \
+    curl \
     git \
-    pkg-config \
     libssl-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly \
-    && rustup default nightly
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal --default-toolchain ${RUST_NIGHTLY_TOOLCHAIN} \
+    && rustup default ${RUST_NIGHTLY_TOOLCHAIN}
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+FROM lean-spec-base AS builder-devnet3
+
+ARG github=leanEthereum/leanSpec
+ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
 
 WORKDIR /app/devnet3
 
@@ -27,27 +36,10 @@ RUN git clone https://github.com/$github . \
 
 RUN uv sync --frozen
 
-FROM python:3.12-slim AS builder-devnet4
+FROM lean-spec-base AS builder-devnet4
 
 ARG github=leanEthereum/leanSpec
 ARG devnet4_tag=ad9a3226
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    build-essential \
-    git \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly \
-    && rustup default nightly
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app/devnet4
 
@@ -56,14 +48,18 @@ RUN git clone https://github.com/$github . \
 
 RUN uv sync --frozen
 
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
 ARG devnet4_tag=ad9a3226
 ARG devnet3_keys_tag=leanSpec-ad9a3226
 ARG devnet4_keys_tag=leanSpec-ad9a3226
+ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
+    ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -122,9 +118,10 @@ RUN ls -l /app/hive/prod_scheme_devnet4 \
 RUN rm -rf /tmp/leansig \
     && chown -R leanspec:leanspec /app/hive \
     && chmod +x /app/hive/leanspec-client.sh \
-    && printf "lean-spec-client devnet3: %s\nlean-spec-client devnet4: %s\n" \
+    && printf "lean-spec-client devnet3: %s\nlean-spec-client devnet4: %s\nrust toolchain: %s\n" \
         "$devnet3_tag" \
-        "$devnet4_tag" > /version.txt
+        "$devnet4_tag" \
+        "$RUST_NIGHTLY_TOOLCHAIN" > /version.txt
 
 USER leanspec
 

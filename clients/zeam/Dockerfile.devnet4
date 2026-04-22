@@ -1,0 +1,16 @@
+FROM blockblaz/zeam:devnet4 AS devnet4-binary
+
+FROM ubuntu:24.04
+
+COPY --from=devnet4-binary /app/zig-out/bin/zeam /usr/local/bin/zeam-devnet4
+
+ADD zeam.sh /zeam.sh
+
+RUN chmod +x /zeam.sh \
+    && (/usr/local/bin/zeam-devnet4 --version || echo "zeam-devnet4") | head -1 > /version-devnet4.txt \
+    && printf "zeam devnet4: %s\n" \
+        "$(cat /version-devnet4.txt)" > /version.txt
+
+EXPOSE 5052 9000/udp 8080
+
+ENTRYPOINT ["/zeam.sh"]

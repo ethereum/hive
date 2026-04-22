@@ -5,6 +5,27 @@ set -euo pipefail
 DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
 NODE_ID="${HIVE_NODE_ID:-ethlambda_0}"
 ASSET_ROOT="/tmp/ethlambda-runtime"
+LOCAL_IP_PLACEHOLDER="__HIVE_LOCAL_IP__"
+
+detect_local_ip() {
+    hostname -i 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -v '^127\.' | head -n 1
+}
+
+materialize_runtime_local_ip() {
+    local runtime_ip
+
+    if [ ! -f "$ASSET_ROOT/validator-config.yaml" ]; then
+        return
+    fi
+
+    runtime_ip="$(detect_local_ip)"
+    if [ -z "$runtime_ip" ]; then
+        echo "Unable to resolve local container IP for $NODE_ID" >&2
+        exit 1
+    fi
+
+    sed -i "s/${LOCAL_IP_PLACEHOLDER}/${runtime_ip}/g" "$ASSET_ROOT/validator-config.yaml"
+}
 
 case "$DEVNET_LABEL" in
     devnet3)
@@ -33,6 +54,8 @@ if [ ! -f "$ASSET_ROOT/config.yaml" ]; then
     echo "Missing prepared Lean runtime assets at $ASSET_ROOT" >&2
     exit 1
 fi
+
+materialize_runtime_local_ip
 
 FLAGS=(
     --custom-network-config-dir "$ASSET_ROOT"

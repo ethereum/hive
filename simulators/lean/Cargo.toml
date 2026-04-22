@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 hivesim.workspace = true
 alloy-primitives = { version = "1.4.1", features = ["serde"] }
-hex = "0.4"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 ssz = { package = "ethereum_ssz", version = "0.10" }

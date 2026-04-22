@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shutil
-import socket
 import sys
 import time
 import urllib.request
@@ -39,6 +38,7 @@ ZEAM_TEST_KEYS_BASE_URL = (
 ZEAM_TEST_KEYS_CACHE = Path(os.environ.get("ZEAM_TEST_KEYS_CACHE", "/tmp/zeam-test-keys/hash-sig-keys"))
 GENESIS_TIME = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", str(int(time.time()) + 30)))
 BOOTNODE_ENV = os.environ.get("HIVE_BOOTNODES", "")
+LOCAL_IP_PLACEHOLDER = "__HIVE_LOCAL_IP__"
 
 
 def validate_client_kind() -> None:
@@ -62,14 +62,15 @@ def deterministic_private_key(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
 
 
-def detect_local_ip() -> str:
-    try:
-        address = socket.gethostbyname(socket.gethostname())
-        if address and address != "127.0.0.1":
-            return address
-    except OSError:
-        pass
-    return "127.0.0.1"
+def observer_only() -> bool:
+    return os.environ.get("HIVE_LEAN_CLIENT_RUNTIME_ROLE", "").strip().lower() == "observer"
+
+
+def parse_runtime_validator_indices() -> list[int] | None:
+    raw_indices = os.environ.get("HIVE_LEAN_VALIDATOR_INDICES", "").strip()
+    if not raw_indices:
+        return None
+    return [int(value) for value in raw_indices.split(",") if value.strip()]
 
 
 def load_source_validator(index: int) -> dict[str, str]:
@@ -122,15 +123,24 @@ def node_specs(count: int) -> list[dict[str, object]]:
     current_key = trim_hex(
         os.environ.get("HIVE_CLIENT_PRIVATE_KEY", deterministic_private_key(f"{CLIENT_KIND}:{NODE_ID}:node"))
     )
+    requested_indices = parse_runtime_validator_indices()
+    current_indices = [] if observer_only() else (requested_indices or [0])
     specs = [
         {
             "name": NODE_ID,
-            "indices": [0],
+            "indices": current_indices,
             "private_key": current_key,
-            "ip": detect_local_ip(),
+            # The simulator prepares runtime assets before Hive creates the
+            # client container, so it cannot know the client's eventual Docker
+            # IP yet. The client entrypoints replace this placeholder at launch
+            # time from inside the live container.
+            "ip": LOCAL_IP_PLACEHOLDER,
         }
     ]
-    for index in range(1, count):
+    owned_indices = set(current_indices)
+    for index in range(count):
+        if index in owned_indices:
+            continue
         specs.append(
             {
                 "name": f"{CLIENT_KIND}_dummy_{index}",
@@ -144,13 +154,11 @@ def node_specs(count: int) -> list[dict[str, object]]:
 
 def bootnodes() -> list[str]:
     values = [value.strip() for value in BOOTNODE_ENV.split(",") if value.strip()]
-    enrs = [value for value in values if value.startswith("enr:")]
-    if values and not enrs:
-        print(
-            "Ignoring unsupported non-ENR HIVE_BOOTNODES values while preparing lean runtime assets",
-            file=sys.stderr,
-        )
-    return enrs or FALLBACK_BOOTNODES
+    # Lean runtimes consume bootnodes either from the raw HIVE_BOOTNODES env
+    # or from nodes.yaml, and those endpoints can be ENRs or libp2p multiaddrs
+    # depending on the client/runtime under test. Preserve the exact values the
+    # simulator passes in so helper-mesh tests exercise the real source.
+    return values or FALLBACK_BOOTNODES
 
 
 def write_text(path: Path, contents: str) -> None:
@@ -242,10 +250,21 @@ def render_validator_config(specs: list[dict[str, object]]) -> str:
 def render_validator_registry(specs: list[dict[str, object]]) -> str:
     lines: list[str] = []
     for spec in specs:
+        indices = spec["indices"]
+        if not indices:
+            lines.append(f'{spec["name"]}: []')
+            continue
         lines.append(f'{spec["name"]}:')
-        for index in spec["indices"]:
+        for index in indices:
             lines.append(f"  - {index}")
     return "\n".join(lines) + "\n"
+
+
+def append_assignment_header(lines: list[str], spec: dict[str, object]) -> None:
+    if spec["indices"]:
+        lines.append(f'{spec["name"]}:')
+    else:
+        lines.append(f'{spec["name"]}: []')
 
 
 def ensure_zeam_test_key(index: int, kind: str) -> Path:
@@ -272,7 +291,7 @@ def write_ethlambda_assignments(
 ) -> None:
     lines: list[str] = []
     for spec in specs:
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             validator = validators[index]
             if uses_dual_key_genesis():
@@ -320,7 +339,7 @@ def write_zeam_assignments(
 ) -> None:
     lines: list[str] = []
     for spec in specs:
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             # Zeam expects XMSS keypairs serialized in SSZ files. Use pre-generated
             # zeam test keys and map them into attester filenames so the runtime
@@ -353,7 +372,7 @@ def write_lantern_assignments(
 ) -> None:
     lines: list[str] = []
     for spec in specs:
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             validator = validators[index]
             attestation_file = f"validator_{index}_attester_key_sk.ssz"
@@ -502,7 +521,7 @@ def write_grandine_lean_assignments(
 ) -> None:
     lines: list[str] = []
     for spec in specs:
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             validator = validators[index]
             if uses_dual_key_genesis():
@@ -555,7 +574,7 @@ def write_gean_assignments(
     # available; gean itself only consumes one pubkey per entry today.
     lines: list[str] = []
     for spec in specs:
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             validator = validators[index]
             if uses_dual_key_genesis():
