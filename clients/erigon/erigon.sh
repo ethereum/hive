@@ -151,6 +151,14 @@ fi
 FLAGS="$FLAGS --externalcl"
 
 # Launch the main client.
-FLAGS="$FLAGS --nat=none --no-downloader"
+# Use the container's eth0 IP as the external address so the self-node advertised
+# in discv5 is routable from the simulator (which is on the same Docker network).
+# Without this, the p2p server falls back to 127.0.0.1, and the discv5 FINDNODE
+# handler drops the self-node via CheckRelayAddr (loopback from non-loopback).
+ip=$(ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+FLAGS="$FLAGS --nat=extip:$ip --no-downloader"
+
+# It doesn't make sense to dial out, use only a pre-set bootnode.
+FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS
