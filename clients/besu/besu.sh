@@ -148,6 +148,8 @@ FLAGS="$FLAGS --sync-mode=$syncmode"
 
 # Enable Snap Server.
 FLAGS="$FLAGS --snapsync-server-enabled"
+# Enable discv5.
+FLAGS="$FLAGS --Xv5-discovery-enabled"
 
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
