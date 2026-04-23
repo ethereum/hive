@@ -55,7 +55,7 @@ else
 fi
 
 FLAGS=(
-    --annotated-validators "$ASSET_ROOT/annotated_validators.yaml"
+    --custom-network-config-dir "$ASSET_ROOT"
     --node "$NODE_ID"
     --data-dir /data
     --fork-digest "$FORK_DIGEST"
@@ -63,7 +63,6 @@ FLAGS=(
     --socket-port 9000
     --metrics-address 0.0.0.0
     --metrics-port 8080
-    --hash-sig-key-dir "$ASSET_ROOT/hash-sig-keys"
     --api-port 5052
 )
 
