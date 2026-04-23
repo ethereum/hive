@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     git \
+    iproute2 \
     jq && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
