@@ -155,6 +155,37 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	return nil
 }
 
+// isAddress reports whether s is a hex-encoded Ethereum address.
+func isAddress(s string) bool {
+	if len(s) != 42 || !strings.HasPrefix(s, "0x") {
+		return false
+	}
+	for _, c := range s[2:] {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+// lookupKey returns the value for key in obj. For address keys the lookup is
+// case-insensitive so that checksummed and lowercase addresses are treated as equal.
+func lookupKey(obj gjson.Result, key string) gjson.Result {
+	if !isAddress(key) {
+		return obj.Get(key)
+	}
+	lower := strings.ToLower(key)
+	var result gjson.Result
+	obj.ForEach(func(k, v gjson.Result) bool {
+		if strings.ToLower(k.String()) == lower {
+			result = v
+			return false
+		}
+		return true
+	})
+	return result
+}
+
 // checkJSONStructure checks whether the `actual` value matches the type structure
 // of the `expected` value.
 func checkJSONStructure(expected, actual gjson.Result, path string) []string {
@@ -181,7 +212,7 @@ func checkJSONStructure(expected, actual gjson.Result, path string) []string {
 	// Check all expected keys exist with correct types
 	expected.ForEach(func(key, value gjson.Result) bool {
 		keyPath := buildPath(key.String())
-		actualValue := actual.Get(key.String())
+		actualValue := lookupKey(actual, key.String())
 
 		if !actualValue.Exists() {
 			errors = append(errors, fmt.Sprintf("%s: missing key", keyPath))
@@ -203,7 +234,7 @@ func checkJSONStructure(expected, actual gjson.Result, path string) []string {
 	// Check for unexpected keys
 	if actual.IsObject() {
 		actual.ForEach(func(key, value gjson.Result) bool {
-			if !expected.Get(key.String()).Exists() {
+			if !lookupKey(expected, key.String()).Exists() {
 				errors = append(errors, fmt.Sprintf("%s: unexpected key in response", buildPath(key.String())))
 			}
 			return true
