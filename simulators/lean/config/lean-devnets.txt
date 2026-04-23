@@ -8,6 +8,7 @@ ethlambda=devnet3,devnet4
 gean=devnet3,devnet4
 grandine_lean=devnet3,devnet4
 lantern=devnet3,devnet4
+nlean=devnet4
 qlean=devnet3,devnet4
 ream=devnet3,devnet4
 zeam=devnet4
