@@ -2,7 +2,6 @@ use crate::scenarios::helper::{
     default_genesis_time, fork_choice_head_slot, load_fork_choice_response, run_data_test,
     start_post_genesis_sync_context, ClientUnderTestRole, ForkChoiceResponse,
     HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
-    SourceCheckpointKind,
 };
 use crate::{lean_clients, selected_lean_devnet, LeanDevnet};
 use hivesim::{dyn_async, Client, Test};
@@ -12,34 +11,13 @@ use tokio::time::{sleep, timeout, Instant};
 const HEAD_SYNC_TIMEOUT_SECS: u64 = 300;
 const CHECKPOINT_SYNC_FRESH_START_TIMEOUT_SECS: u64 = 480;
 const SYNC_HELPER_PEER_COUNT: usize = 3;
-const SYNC_HELPER_VALIDATORS_WITH_CLIENT_RESERVED: &str = "1,2";
-
-fn helper_fork_digest_profile_for_client(client_type: &str) -> HelperGossipForkDigestProfile {
-    if selected_lean_devnet() == LeanDevnet::Devnet4 {
-        return HelperGossipForkDigestProfile::SelectedDevnet;
-    }
-
-    if client_type.starts_with("lantern") {
-        return HelperGossipForkDigestProfile::SelectedDevnet;
-    }
-
-    HelperGossipForkDigestProfile::LegacyDevnet0
-}
 
 fn client_role_for_sync(client_type: &str) -> ClientUnderTestRole {
-    if client_type.starts_with("lantern") || client_type.starts_with("zeam") {
+    if client_type.starts_with("zeam") {
         return ClientUnderTestRole::Validator;
     }
 
     ClientUnderTestRole::Observer
-}
-
-fn source_helper_validator_indices_for_client(client_type: &str) -> Option<String> {
-    if client_type.starts_with("lantern") || client_type.starts_with("zeam") {
-        return Some(SYNC_HELPER_VALIDATORS_WITH_CLIENT_RESERVED.to_string());
-    }
-
-    None
 }
 
 struct HeadSyncObservation {
@@ -133,6 +111,11 @@ dyn_async! {
         for client in &clients {
             let checkpoint_sync_genesis_time = default_genesis_time();
             let client_role = client_role_for_sync(&client.name);
+            let helper_fork_digest_profile = if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                HelperGossipForkDigestProfile::SelectedDevnet
+            } else {
+                HelperGossipForkDigestProfile::LegacyDevnet0
+            };
 
             run_data_test(
                 test,
@@ -142,18 +125,13 @@ dyn_async! {
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: checkpoint_sync_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: true,
                     client_role,
-                    source_helper_validator_indices: source_helper_validator_indices_for_client(
-                        &client.name,
-                    ),
+                    source_helper_validator_indices: None,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_client(
-                        &client.name,
-                    ),
+                    helper_fork_digest_profile,
                 },
                 test_checkpoint_sync_fresh_start,
             )
@@ -206,21 +184,5 @@ dyn_async! {
                 client_name, CHECKPOINT_SYNC_FRESH_START_TIMEOUT_SECS
             )
         });
-    }
-}
-
-dyn_async! {
-    async fn test_sync_network_finalized_passed_local_head<'a>() {
-        //client is started and made to run alongside leanspec client from genesis, then paused in some manner to simulate bad network conditions etc, then
-        //unpaused once the network finalized slot has passed the clients local head slot to see if the client properly starts resyncing until it catches back up to network head
-    }
-}
-
-dyn_async! {
-    async fn test_sync_bad_outlier<'a>() {
-        //client is started and made to run alongside leanspec client from genesis, then paused in some manner to simulate bad network conditions etc, then
-        //unpaused once the network finalized slot has passed the clients local head slot to see if the client properly starts resyncing until it catches back up to network head
-        //The difference is that there also exists two other clients/helper that is connected to the client being tested that are either behind the network head or way ahead of the network head,
-        //this effect can be achieved artificially using mock clients if needed
     }
 }

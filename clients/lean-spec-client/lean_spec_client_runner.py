@@ -71,6 +71,10 @@ VALIDATOR_MANIFEST_PATH: Final = (
 HELPER_IDENTITY_PRIVATE_KEY_HEX: Final = (
     "1111111111111111111111111111111111111111111111111111111111111111"
 )
+SECP256K1_ORDER: Final = int(
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+    16,
+)
 HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: Final = (
     "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY"
 )
@@ -497,6 +501,9 @@ def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
         ec.ECDSA(Prehashed(hashes.SHA256())),
     )
     signature_r, signature_s = decode_dss_signature(der_signature)
+    # Emit canonical low-s ENR signatures so stricter peers accept helper bootnodes.
+    if signature_s > SECP256K1_ORDER // 2:
+        signature_s = SECP256K1_ORDER - signature_s
     signature = signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
     return ENR(signature=signature, seq=1, pairs=pairs).to_string()
 

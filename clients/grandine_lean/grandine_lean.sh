@@ -26,10 +26,6 @@ esac
 
 LEAN_BIN="${LEAN_BIN:-$DEFAULT_LEAN_BIN}"
 
-if [ "$DEVNET_LABEL" = "devnet4" ]; then
-    export HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY="${HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY:-1}"
-fi
-
 if [ "$DEVNET_LABEL" = "devnet3" ]; then
     export HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY="${HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY:-1}"
     export HIVE_LEAN_GRANDINE_REQUIRE_KEYS="${HIVE_LEAN_GRANDINE_REQUIRE_KEYS:-1}"
@@ -168,8 +164,8 @@ if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
         checkpoint_deadline=$((SECONDS + checkpoint_wait_secs))
         while ! (exec 3<>"/dev/tcp/${checkpoint_host}/${checkpoint_port}") >/dev/null 2>&1; do
             if [ "$SECONDS" -ge "$checkpoint_deadline" ]; then
-                echo "Checkpoint source ${checkpoint_host}:${checkpoint_port} did not become reachable within ${checkpoint_wait_secs}s" >&2
-                exit 1
+                echo "Checkpoint source ${checkpoint_host}:${checkpoint_port} did not become reachable within ${checkpoint_wait_secs}s; continuing to launch grandine for direct client diagnostics" >&2
+                break
             fi
             sleep 1
         done

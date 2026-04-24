@@ -34,6 +34,7 @@ from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.enr import ENR, keys as enr_keys
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
+from lean_spec.subspecs.networking.service.events import GossipBlockEvent
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
@@ -73,6 +74,10 @@ VALIDATOR_MANIFEST_PATH: Final = (
 HELPER_IDENTITY_PRIVATE_KEY_HEX: Final = (
     "1111111111111111111111111111111111111111111111111111111111111111"
 )
+SECP256K1_ORDER: Final = int(
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+    16,
+)
 HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: Final = (
     "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY"
 )
@@ -94,6 +99,11 @@ logger = logging.getLogger("lean_spec_client_runner")
 _QUIC_STREAM_CLOSE_PATCHED = False
 _SSZ_FAST_DESERIALIZATION_PATCHED = False
 _SNAPPY_COMPRESS_PATCHED = False
+_REQRESP_BLOCK_CACHE_PATCHED = False
+_NETWORK_SERVICE_GOSSIP_PATCHED = False
+_BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
+_BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
+_SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
 
 
 def setup_logging() -> None:
@@ -318,6 +328,76 @@ def patch_snappy_compress() -> None:
     snappy_compress_module.compress = compress_with_fallback
     networking_service_module.compress = compress_with_fallback
     _SNAPPY_COMPRESS_PATCHED = True
+
+
+def patch_reqresp_block_cache() -> None:
+    global _REQRESP_BLOCK_CACHE_PATCHED
+
+    if _REQRESP_BLOCK_CACHE_PATCHED:
+        return
+
+    reqresp_client_module = importlib.import_module(
+        "lean_spec.subspecs.networking.client.reqresp_client"
+    )
+    reqresp_client_cls = reqresp_client_module.ReqRespClient
+    original_request_blocks_by_root = reqresp_client_cls.request_blocks_by_root
+
+    async def request_blocks_by_root_with_cache(
+        self: object,
+        peer_id: object,
+        roots: list[Bytes32],
+    ) -> list[object]:
+        signed_blocks = await original_request_blocks_by_root(self, peer_id, roots)
+        block_cache = _BLOCK_CACHE_BY_REQRESP_CLIENT.get(id(self))
+        if block_cache is not None:
+            for signed_block in signed_blocks:
+                cache_signed_block(block_cache, signed_block)
+        return signed_blocks
+
+    reqresp_client_cls.request_blocks_by_root = request_blocks_by_root_with_cache
+    _REQRESP_BLOCK_CACHE_PATCHED = True
+
+
+def patch_network_service_gossip_processing() -> None:
+    global _NETWORK_SERVICE_GOSSIP_PATCHED
+
+    if _NETWORK_SERVICE_GOSSIP_PATCHED:
+        return
+
+    networking_service_module = importlib.import_module(
+        "lean_spec.subspecs.networking.service.service"
+    )
+    network_service_cls = networking_service_module.NetworkService
+    original_handle_event = network_service_cls._handle_event
+
+    async def handle_event_with_helper_backfill(self: object, event: object) -> None:
+        if isinstance(event, GossipBlockEvent):
+            block_cache = _BLOCK_CACHE_BY_SYNC_SERVICE.get(id(self.sync_service))
+            if block_cache is not None:
+                cache_signed_block(block_cache, event.block)
+
+        await original_handle_event(self, event)
+
+        if not isinstance(event, GossipBlockEvent):
+            return
+
+        event_context = _SYNC_EVENT_CONTEXT.get(id(self.sync_service))
+        if event_context is None:
+            return
+
+        event_source, node = event_context
+        processed_count = await self.sync_service.process_pending_blocks()
+        if processed_count > 0:
+            logger.info(
+                "Processed %d cached backfill blocks after slot=%s gossip",
+                processed_count,
+                extract_inner_block(event.block).slot,
+            )
+
+        refresh_status(event_source, node)
+
+    network_service_cls._handle_event = handle_event_with_helper_backfill
+    _NETWORK_SERVICE_GOSSIP_PATCHED = True
 
 
 def parse_bootnodes() -> list[str]:
@@ -566,6 +646,10 @@ def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
         ec.ECDSA(Prehashed(hashes.SHA256())),
     )
     signature_r, signature_s = decode_dss_signature(der_signature)
+    # Zeam rejects non-canonical high-s ENR signatures during startup.
+    # Normalize helper ECDSA signatures so every client sees a canonical ENR.
+    if signature_s > SECP256K1_ORDER // 2:
+        signature_s = SECP256K1_ORDER - signature_s
     signature = signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
     return ENR(signature=signature, seq=1, pairs=pairs).to_string()
 
@@ -724,6 +808,15 @@ def extract_inner_block(signed_block: object) -> object:
     )
 
 
+def cache_signed_block(
+    block_cache: dict[Bytes32, object],
+    signed_block: object,
+) -> Bytes32:
+    block_root = hash_tree_root(extract_inner_block(signed_block))
+    block_cache[block_root] = signed_block
+    return block_root
+
+
 async def keep_status_current(
     event_source: LiveNetworkEventSource,
     node: Node,
@@ -782,6 +875,8 @@ async def run() -> None:
     patch_quic_stream_close()
     patch_fast_ssz_deserialization()
     patch_snappy_compress()
+    patch_reqresp_block_cache()
+    patch_network_service_gossip_processing()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -840,12 +935,15 @@ async def run() -> None:
     refresh_status(event_source, node)
 
     published_blocks: dict[Bytes32, object] = {}
+    _BLOCK_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks
+    _SYNC_EVENT_CONTEXT[id(node.sync_service)] = (event_source, node)
+    _BLOCK_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = published_blocks
+
     if node.validator_service is not None:
         original_on_block = node.validator_service.on_block
 
         async def cache_and_publish_block(signed_block: object) -> None:
-            block_root = hash_tree_root(extract_inner_block(signed_block))
-            published_blocks[block_root] = signed_block
+            cache_signed_block(published_blocks, signed_block)
             await original_on_block(signed_block)
             refresh_status(event_source, node)
 
@@ -895,6 +993,9 @@ async def run() -> None:
         status_task.cancel()
         with suppress(asyncio.CancelledError):
             await status_task
+        _BLOCK_CACHE_BY_SYNC_SERVICE.pop(id(node.sync_service), None)
+        _SYNC_EVENT_CONTEXT.pop(id(node.sync_service), None)
+        _BLOCK_CACHE_BY_REQRESP_CLIENT.pop(id(event_source.reqresp_client), None)
 
 
 def main() -> None:

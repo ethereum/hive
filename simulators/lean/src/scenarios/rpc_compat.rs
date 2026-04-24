@@ -4,14 +4,16 @@ use crate::scenarios::helper::{
     load_response_with_retry, prepare_client_runtime_files, run_data_test_with_timeout,
     start_post_genesis_sync_context, ClientUnderTestRole, ForkChoiceResponse,
     HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
-    SourceCheckpointKind,
+    TimedDataTestSpec,
 };
 use crate::{
     get_json_with_retry, lean_api_url, lean_clients, lean_environment, selected_lean_devnet,
     CheckpointResponse, HealthResponse, LeanDevnet, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
 use alloy_primitives::{FixedBytes, B256};
-use hivesim::{dyn_async, Client, NClientTestSpec, SharedClientScenario, SharedClientTestSpec, Test};
+use hivesim::{
+    dyn_async, Client, NClientTestSpec, SharedClientScenario, SharedClientTestSpec, Test,
+};
 use reqwest::header::CONTENT_TYPE;
 use ssz::Decode as SszDecode;
 use ssz_derive::Decode;
@@ -177,51 +179,37 @@ fn assert_hex_root(root: &B256, field_name: &str) {
     );
 }
 
-async fn wait_for_non_genesis_fork_choice_response(
-    client: &Client,
-    checkpoint_kind: SourceCheckpointKind,
-) -> ForkChoiceResponse {
+async fn wait_for_non_genesis_fork_choice_response(client: &Client) -> ForkChoiceResponse {
     let mut stalled_post_genesis_attempts = 0;
 
     for _attempt in 0..FORK_CHOICE_TIMEOUT_SECS {
         let fork_choice = load_fork_choice_response(client).await;
-        let checkpoint_slot = match checkpoint_kind {
-            SourceCheckpointKind::Justified => fork_choice.justified.slot,
-            SourceCheckpointKind::Finalized => fork_choice.finalized.slot,
-        };
-        if checkpoint_slot > 0 {
+        if fork_choice.finalized.slot > 0 {
             return fork_choice;
         }
 
-        if matches!(checkpoint_kind, SourceCheckpointKind::Finalized) {
-            let has_post_genesis_progress = fork_choice.justified.slot > 0
-                || fork_choice.nodes.iter().any(|node| node.slot > 0);
+        let has_post_genesis_progress =
+            fork_choice.justified.slot > 0 || fork_choice.nodes.iter().any(|node| node.slot > 0);
 
-            if has_post_genesis_progress {
-                stalled_post_genesis_attempts += 1;
-                if stalled_post_genesis_attempts >= 30 {
-                    panic!(
-                        "Client {} advanced post-genesis but never reported a non-genesis finalized forkchoice checkpoint (justified slot: {}, max node slot: {})",
-                        client.kind,
-                        fork_choice.justified.slot,
-                        fork_choice.nodes.iter().map(|node| node.slot).max().unwrap_or(0)
-                    );
-                }
-            } else {
-                stalled_post_genesis_attempts = 0;
+        if has_post_genesis_progress {
+            stalled_post_genesis_attempts += 1;
+            if stalled_post_genesis_attempts >= 30 {
+                panic!(
+                    "Client {} advanced post-genesis but never reported a non-genesis finalized forkchoice checkpoint (justified slot: {}, max node slot: {})",
+                    client.kind,
+                    fork_choice.justified.slot,
+                    fork_choice.nodes.iter().map(|node| node.slot).max().unwrap_or(0)
+                );
             }
+        } else {
+            stalled_post_genesis_attempts = 0;
         }
 
         sleep(std::time::Duration::from_secs(1)).await;
     }
 
-    let checkpoint_name = match checkpoint_kind {
-        SourceCheckpointKind::Justified => "justified",
-        SourceCheckpointKind::Finalized => "finalized",
-    };
-
     panic!(
-        "Client {} never reached a non-genesis {checkpoint_name} forkchoice checkpoint",
+        "Client {} never reached a non-genesis finalized forkchoice checkpoint",
         client.kind
     );
 }
@@ -254,18 +242,9 @@ async fn load_fresh_fork_choice_setup(clients: Vec<Client>) -> (Client, ForkChoi
 async fn load_post_genesis_fork_choice_setup(
     test: &Test,
     test_data: PostGenesisSyncTestData,
-    checkpoint_kind: SourceCheckpointKind,
 ) -> (PostGenesisSyncContext, ForkChoiceResponse) {
     let context = start_post_genesis_sync_context(test, &test_data).await;
-    let fork_choice = match checkpoint_kind {
-        SourceCheckpointKind::Justified => {
-            wait_for_non_genesis_fork_choice_response(&context.client_under_test, checkpoint_kind)
-                .await
-        }
-        SourceCheckpointKind::Finalized => {
-            wait_for_post_genesis_fork_choice_response(&context.client_under_test).await
-        }
-    };
+    let fork_choice = wait_for_post_genesis_fork_choice_response(&context.client_under_test).await;
     (context, fork_choice)
 }
 
@@ -319,11 +298,7 @@ async fn load_post_genesis_state_setup(
     let fork_choice = if selected_lean_devnet() == LeanDevnet::Devnet4 {
         load_fork_choice_response(&context.client_under_test).await
     } else {
-        wait_for_non_genesis_fork_choice_response(
-            &context.client_under_test,
-            SourceCheckpointKind::Finalized,
-        )
-        .await
+        wait_for_non_genesis_fork_choice_response(&context.client_under_test).await
     };
     (context, state, fork_choice)
 }
@@ -429,22 +404,23 @@ dyn_async! {
 
             run_data_test_with_timeout(
                 test,
-                "rpc_compat: checkpoints justified post-genesis".to_string(),
-                "Waits for the local LeanSpec helper to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
-                false,
-                client.name.clone(),
-                POST_GENESIS_TEST_TIMEOUT,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: checkpoint_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: true,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: false,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
-                    helper_peer_count: 1,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                TimedDataTestSpec {
+                    name: "rpc_compat: checkpoints justified post-genesis".to_string(),
+                    description: "Waits for the local LeanSpec helper to finalize, checkpoint-syncs the client under test from that source, and checks that the client under test reaches a non-genesis justified checkpoint.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: checkpoint_genesis_time,
+                        wait_for_client_justified_checkpoint: true,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
                 },
                 test_checkpoints_justified,
             )
@@ -568,22 +544,23 @@ dyn_async! {
 
             run_data_test_with_timeout(
                 test,
-                "rpc_compat: forkchoice filters nodes before finalized slot".to_string(),
-                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
-                false,
-                client.name.clone(),
-                POST_GENESIS_TEST_TIMEOUT,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: finalized_filters_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: false,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
-                    helper_peer_count: 1,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                TimedDataTestSpec {
+                    name: "rpc_compat: forkchoice filters nodes before finalized slot".to_string(),
+                    description: "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice with a non-genesis finalized slot.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: finalized_filters_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
                 },
                 test_forkchoice_filters_nodes_before_finalized_slot,
             )
@@ -593,22 +570,23 @@ dyn_async! {
 
             run_data_test_with_timeout(
                 test,
-                "rpc_compat: forkchoice keeps nodes at or beyond finalized slot".to_string(),
-                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
-                false,
-                client.name.clone(),
-                POST_GENESIS_TEST_TIMEOUT,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: finalized_boundary_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: false,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
-                    helper_peer_count: 1,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                TimedDataTestSpec {
+                    name: "rpc_compat: forkchoice keeps nodes at or beyond finalized slot".to_string(),
+                    description: "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the visible forkchoice nodes stay at or beyond the finalized boundary.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: finalized_boundary_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
                 },
                 test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot,
             )
@@ -618,22 +596,23 @@ dyn_async! {
 
             run_data_test_with_timeout(
                 test,
-                "rpc_compat: forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
-                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
-                false,
-                client.name.clone(),
-                POST_GENESIS_TEST_TIMEOUT,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: pre_finalized_only_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: false,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
-                    helper_peer_count: 1,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                TimedDataTestSpec {
+                    name: "rpc_compat: forkchoice returns empty nodes when all blocks are pre-finalized".to_string(),
+                    description: "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and loads forkchoice at the finalized boundary.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: pre_finalized_only_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
                 },
                 test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized,
             )
@@ -648,7 +627,6 @@ dyn_async! {
                         lean_single_client_runtime_setup_with_live_helper(
                             &client.name,
                             default_genesis_time(),
-                            SourceCheckpointKind::Finalized,
                             10,
                             helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
                             ClientUnderTestRole::Observer,
@@ -802,23 +780,24 @@ dyn_async! {
 
             run_data_test_with_timeout(
                 test,
-                "rpc_compat: state finalized endpoint tracks latest finalized slot".to_string(),
-                "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized state endpoint tracks the client's latest finalized slot."
-                    .to_string(),
-                false,
-                client.name.clone(),
-                POST_GENESIS_TEST_TIMEOUT,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: state_finalized_genesis_time,
-                    source_checkpoint_kind: SourceCheckpointKind::Finalized,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: false,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
-                    helper_peer_count: 1,
-                    helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                TimedDataTestSpec {
+                    name: "rpc_compat: state finalized endpoint tracks latest finalized slot".to_string(),
+                    description: "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized state endpoint tracks the client's latest finalized slot."
+                        .to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: state_finalized_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
                 },
                 test_state_finalized_endpoint_tracks_latest_finalized_slot,
             )
@@ -1001,9 +980,7 @@ dyn_async! {
 
 dyn_async! {
     async fn test_forkchoice_filters_nodes_before_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
-        let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
-                .await;
+        let (context, fork_choice) = load_post_genesis_fork_choice_setup(test, test_data).await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
@@ -1027,9 +1004,7 @@ dyn_async! {
 
 dyn_async! {
     async fn test_forkchoice_keeps_nodes_at_or_beyond_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
-        let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
-                .await;
+        let (context, fork_choice) = load_post_genesis_fork_choice_setup(test, test_data).await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
@@ -1105,9 +1080,7 @@ dyn_async! {
 
 dyn_async! {
     async fn test_forkchoice_returns_empty_nodes_when_all_blocks_are_pre_finalized<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
-        let (context, fork_choice) =
-            load_post_genesis_fork_choice_setup(test, test_data, SourceCheckpointKind::Finalized)
-                .await;
+        let (context, fork_choice) = load_post_genesis_fork_choice_setup(test, test_data).await;
         let reference_finalized_slot = context.source_fork_choice.finalized.slot;
         assert_hex_root(&fork_choice.head, "forkchoice head");
         assert!(

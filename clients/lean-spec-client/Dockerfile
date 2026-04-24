@@ -32,29 +32,35 @@ ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
 WORKDIR /app/devnet3
 
 RUN git clone https://github.com/$github . \
-    && git checkout $devnet3_tag
+    && git checkout $devnet3_tag \
+    && git rev-parse HEAD > /app/devnet3/.git-commit
 
 RUN uv sync --frozen
 
 FROM lean-spec-base AS builder-devnet4
 
 ARG github=leanEthereum/leanSpec
-ARG devnet4_tag=ad9a3226
+ARG devnet4_tag=main
+ENV LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL=https://api.github.com/repos/${github}/commits/${devnet4_tag}
 
 WORKDIR /app/devnet4
 
+ADD ${LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL} /tmp/devnet4-commit.json
+
 RUN git clone https://github.com/$github . \
-    && git checkout $devnet4_tag
+    && git checkout $devnet4_tag \
+    && git rev-parse HEAD > /app/devnet4/.git-commit
 
 RUN uv sync --frozen
 
 FROM python:3.12-slim-bookworm
 
 ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
-ARG devnet4_tag=ad9a3226
+ARG devnet4_tag=main
 ARG devnet3_keys_tag=leanSpec-ad9a3226
-ARG devnet4_keys_tag=leanSpec-ad9a3226
+ARG devnet4_keys_tag=latest
 ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
+ENV LEAN_SPEC_DEVNET4_KEYS_METADATA_URL=https://api.github.com/repos/leanEthereum/leansig-test-keys/releases/tags/${devnet4_keys_tag}
 
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
     && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
@@ -74,6 +80,7 @@ COPY --from=builder-devnet3 /app/devnet3/pyproject.toml /app/devnet3/pyproject.t
 COPY --from=builder-devnet3 /app/devnet3/uv.lock /app/devnet3/uv.lock
 COPY --from=builder-devnet3 /app/devnet3/LICENSE /app/devnet3/LICENSE
 COPY --from=builder-devnet3 /app/devnet3/README.md /app/devnet3/README.md
+COPY --from=builder-devnet3 /app/devnet3/.git-commit /app/devnet3/.git-commit
 
 COPY --from=builder-devnet4 /app/devnet4/.venv /app/devnet4/.venv
 COPY --from=builder-devnet4 /app/devnet4/src /app/devnet4/src
@@ -82,6 +89,7 @@ COPY --from=builder-devnet4 /app/devnet4/pyproject.toml /app/devnet4/pyproject.t
 COPY --from=builder-devnet4 /app/devnet4/uv.lock /app/devnet4/uv.lock
 COPY --from=builder-devnet4 /app/devnet4/LICENSE /app/devnet4/LICENSE
 COPY --from=builder-devnet4 /app/devnet4/README.md /app/devnet4/README.md
+COPY --from=builder-devnet4 /app/devnet4/.git-commit /app/devnet4/.git-commit
 
 ENV LEAN_ENV=prod \
     LEAN_SPEC_DEVNET3_ROOT=/app/devnet3 \
@@ -91,6 +99,8 @@ USER root
 
 COPY leanspec-client.sh /app/hive/leanspec-client.sh
 COPY lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
+
+ADD ${LEAN_SPEC_DEVNET4_KEYS_METADATA_URL} /tmp/devnet4-keys-release.json
 
 RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /tmp/leansig \
     && curl -fsSL \
@@ -115,12 +125,14 @@ RUN ls -l /app/hive/prod_scheme_devnet4 \
     && test -f /app/hive/prod_scheme_devnet4/0.json \
     && test -f /app/hive/prod_scheme_devnet4/1.json \
     && test -f /app/hive/prod_scheme_devnet4/2.json
-RUN rm -rf /tmp/leansig \
+RUN DEVNET3_COMMIT="$(cat /app/devnet3/.git-commit)" \
+    && DEVNET4_COMMIT="$(cat /app/devnet4/.git-commit)" \
+    && rm -rf /tmp/leansig /tmp/devnet4-keys-release.json \
     && chown -R leanspec:leanspec /app/hive \
     && chmod +x /app/hive/leanspec-client.sh \
     && printf "lean-spec-client devnet3: %s\nlean-spec-client devnet4: %s\nrust toolchain: %s\n" \
-        "$devnet3_tag" \
-        "$devnet4_tag" \
+        "$DEVNET3_COMMIT" \
+        "$DEVNET4_COMMIT" \
         "$RUST_NIGHTLY_TOOLCHAIN" > /version.txt
 
 USER leanspec

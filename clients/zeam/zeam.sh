@@ -29,7 +29,11 @@ materialize_runtime_local_ip() {
 
 case "$DEVNET_LABEL" in
     devnet4)
-        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam"
+        if [ -x /usr/local/bin/zeam ]; then
+            DEFAULT_ZEAM_BIN="/usr/local/bin/zeam"
+        else
+            DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet4"
+        fi
         ;;
     *)
         echo "Unsupported Lean devnet label for zeam: $DEVNET_LABEL" >&2
@@ -67,14 +71,7 @@ FLAGS=(
 )
 
 if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
-    CHECKPOINT_SYNC_URL="$HIVE_CHECKPOINT_SYNC_URL"
-    CHECKPOINT_SYNC_SUFFIX="/lean/v0/states/finalized"
-
-    if [[ "$CHECKPOINT_SYNC_URL" == *"$CHECKPOINT_SYNC_SUFFIX" ]]; then
-        CHECKPOINT_SYNC_URL="${CHECKPOINT_SYNC_URL%"$CHECKPOINT_SYNC_SUFFIX"}"
-    fi
-
-    FLAGS+=(--checkpoint-sync-url "$CHECKPOINT_SYNC_URL")
+    FLAGS+=(--checkpoint-sync-url "$HIVE_CHECKPOINT_SYNC_URL")
 fi
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then

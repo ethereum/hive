@@ -8,7 +8,6 @@ import os
 import shutil
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 SUPPORTED_CLIENTS = {
@@ -32,10 +31,6 @@ ASSET_ROOT = Path(os.environ.get("LEAN_RUNTIME_ASSET_ROOT", f"/tmp/{CLIENT_KIND}
 SOURCE_KEYS_DIR = Path(
     "/app/hive/prod_scheme_devnet4" if DEVNET_LABEL == "devnet4" else "/app/hive/prod_scheme_devnet3"
 )
-ZEAM_TEST_KEYS_BASE_URL = (
-    "https://raw.githubusercontent.com/blockblaz/zeam-test-keys/main/hash-sig-keys"
-)
-ZEAM_TEST_KEYS_CACHE = Path(os.environ.get("ZEAM_TEST_KEYS_CACHE", "/tmp/zeam-test-keys/hash-sig-keys"))
 GENESIS_TIME = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", str(int(time.time()) + 30)))
 BOOTNODE_ENV = os.environ.get("HIVE_BOOTNODES", "")
 LOCAL_IP_PLACEHOLDER = "__HIVE_LOCAL_IP__"
@@ -137,6 +132,14 @@ def node_specs(count: int) -> list[dict[str, object]]:
             "ip": LOCAL_IP_PLACEHOLDER,
         }
     ]
+
+    if observer_only():
+        # Observer-mode clients should not receive dummy validator assignments.
+        # Some runtimes, including Ethlambda, still load those extra keys and
+        # start proposing locally, which forks the sync test away from the
+        # helper mesh.
+        return specs
+
     owned_indices = set(current_indices)
     for index in range(count):
         if index in owned_indices:
@@ -267,23 +270,6 @@ def append_assignment_header(lines: list[str], spec: dict[str, object]) -> None:
         lines.append(f'{spec["name"]}: []')
 
 
-def ensure_zeam_test_key(index: int, kind: str) -> Path:
-    if kind not in {"sk", "pk"}:
-        raise ValueError(f"Unsupported zeam key kind {kind!r}")
-    filename = f"validator_{index}_{kind}.ssz"
-    path = ZEAM_TEST_KEYS_CACHE / filename
-    if path.exists():
-        return path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    url = f"{ZEAM_TEST_KEYS_BASE_URL}/{filename}"
-    try:
-        with urllib.request.urlopen(url, timeout=30) as response, path.open("wb") as out:
-            shutil.copyfileobj(response, out)
-    except Exception as exc:  # pragma: no cover - network errors
-        raise RuntimeError(f"Unable to download zeam test key {filename} from {url}: {exc}") from exc
-    return path
-
-
 def write_ethlambda_assignments(
     asset_root: Path,
     specs: list[dict[str, object]],
@@ -341,24 +327,57 @@ def write_zeam_assignments(
     for spec in specs:
         append_assignment_header(lines, spec)
         for index in spec["indices"]:
-            # Zeam expects XMSS keypairs serialized in SSZ files. Use pre-generated
-            # zeam test keys and map them into attester filenames so the runtime
-            # accepts the assignment format.
-            attester_base = f"validator_{index}_attester"
-            sk_filename = f"{attester_base}_sk.ssz"
-            pk_filename = f"{attester_base}_pk.ssz"
-            shutil.copyfile(
-                ensure_zeam_test_key(index, "sk"),
+            validator = validators[index]
+            if uses_dual_key_genesis():
+                attester_base = f"validator_{index}_attester"
+                proposer_base = f"validator_{index}_proposer"
+                attester_sk_filename = f"{attester_base}_sk.ssz"
+                attester_pk_filename = f"{attester_base}_pk.ssz"
+                proposer_sk_filename = f"{proposer_base}_sk.ssz"
+                proposer_pk_filename = f"{proposer_base}_pk.ssz"
+                write_bytes(
+                    asset_root / "hash-sig-keys" / attester_sk_filename,
+                    bytes.fromhex(validator["attestation_secret"]),
+                )
+                write_bytes(
+                    asset_root / "hash-sig-keys" / attester_pk_filename,
+                    bytes.fromhex(validator["attestation_public"]),
+                )
+                write_bytes(
+                    asset_root / "hash-sig-keys" / proposer_sk_filename,
+                    bytes.fromhex(validator["proposal_secret"]),
+                )
+                write_bytes(
+                    asset_root / "hash-sig-keys" / proposer_pk_filename,
+                    bytes.fromhex(validator["proposal_public"]),
+                )
+                lines.extend(
+                    [
+                        f"  - index: {index}",
+                        f'    pubkey_hex: "{validator["attestation_public"]}"',
+                        f'    privkey_file: "{attester_sk_filename}"',
+                        f"  - index: {index}",
+                        f'    pubkey_hex: "{validator["proposal_public"]}"',
+                        f'    privkey_file: "{proposer_sk_filename}"',
+                    ]
+                )
+                continue
+
+            base = f"validator_{index}_attester"
+            sk_filename = f"{base}_sk.ssz"
+            pk_filename = f"{base}_pk.ssz"
+            write_bytes(
                 asset_root / "hash-sig-keys" / sk_filename,
+                bytes.fromhex(validator["attestation_secret"]),
             )
-            shutil.copyfile(
-                ensure_zeam_test_key(index, "pk"),
+            write_bytes(
                 asset_root / "hash-sig-keys" / pk_filename,
+                bytes.fromhex(validator["attestation_public"]),
             )
             lines.extend(
                 [
                     f"  - index: {index}",
-                    f'    pubkey_hex: "{validators[index]["attestation_public"]}"',
+                    f'    pubkey_hex: "{validator["attestation_public"]}"',
                     f'    privkey_file: "{sk_filename}"',
                 ]
             )
