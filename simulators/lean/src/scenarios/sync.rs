@@ -12,14 +12,6 @@ const HEAD_SYNC_TIMEOUT_SECS: u64 = 300;
 const CHECKPOINT_SYNC_FRESH_START_TIMEOUT_SECS: u64 = 480;
 const SYNC_HELPER_PEER_COUNT: usize = 3;
 
-fn client_role_for_sync(client_type: &str) -> ClientUnderTestRole {
-    if client_type.starts_with("zeam") {
-        return ClientUnderTestRole::Validator;
-    }
-
-    ClientUnderTestRole::Observer
-}
-
 struct HeadSyncObservation {
     source_before_head: String,
     source_before_head_slot: u64,
@@ -110,7 +102,6 @@ dyn_async! {
 
         for client in &clients {
             let checkpoint_sync_genesis_time = default_genesis_time();
-            let client_role = client_role_for_sync(&client.name);
             let helper_fork_digest_profile = if selected_lean_devnet() == LeanDevnet::Devnet4 {
                 HelperGossipForkDigestProfile::SelectedDevnet
             } else {
@@ -128,7 +119,7 @@ dyn_async! {
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: true,
-                    client_role,
+                    client_role: ClientUnderTestRole::Validator,
                     source_helper_validator_indices: None,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
                     helper_fork_digest_profile,
