@@ -166,6 +166,11 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-secret /jwtsecret"
 fi
 
+# Enable discv5 if requested by the test suite.
+if [ "$HIVE_DISCV5" != "" ]; then
+    FLAGS="$FLAGS --Xv5-discovery-enabled"
+fi
+
 # Disable parallel transaction processing
 if [ "$HIVE_PARALLEL_TX_PROCESSING_DISABLED" = "true" ]; then
     FLAGS="$FLAGS --bonsai-parallel-tx-processing-enabled=false"

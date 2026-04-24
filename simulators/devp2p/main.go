@@ -52,6 +52,7 @@ func main() {
 					"HIVE_FORK_SPURIOUS":  "0",
 					"HIVE_FORK_BYZANTIUM": "0",
 					"HIVE_LOGLEVEL":       "5",
+					"HIVE_DISCV5":         "1",
 				},
 				AlwaysRun: true,
 				Run: func(t *hivesim.T, c *hivesim.Client) {
