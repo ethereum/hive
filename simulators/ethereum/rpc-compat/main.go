@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/nsf/jsondiff"
+	openrpc "github.com/open-rpc/meta-schema"
+	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -34,6 +37,12 @@ func main() {
 		panic(err)
 	}
 
+	// Load method result schemas from the OpenRPC spec.
+	schemas, err := loadMethodSchemas("openrpc.json")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load OpenRPC spec: %v", err))
+	}
+
 	// Run the test suite.
 	suite := hivesim.Suite{
 		Name: "rpc-compat",
@@ -50,7 +59,7 @@ conformance with the execution API specification.`[1:],
 		Files:       files,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
 			sendForkchoiceUpdated(t, c)
-			runAllTests(t, c, c.Type)
+			runAllTests(t, c, c.Type, schemas)
 		},
 		AlwaysRun: true,
 	})
@@ -58,7 +67,7 @@ conformance with the execution API specification.`[1:],
 	hivesim.MustRunSuite(sim, suite)
 }
 
-func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
+func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string, schemas map[string]openrpc.JSONSchemaObject) {
 	_, testPattern := t.Sim.TestPattern()
 	re := regexp.MustCompile(testPattern)
 	tests := loadTests(t, "tests", re)
@@ -68,7 +77,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 			Name:        fmt.Sprintf("%s (%s)", test.name, clientName),
 			Description: test.comment,
 			Run: func(t *hivesim.T) {
-				if err := runTest(t, c, &test); err != nil {
+				if err := runTest(t, c, &test, schemas); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -76,17 +85,19 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	}
 }
 
-func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
+func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest, schemas map[string]openrpc.JSONSchemaObject) error {
 	var (
-		client    = &http.Client{Timeout: 5 * time.Second}
-		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
-		err       error
-		respBytes []byte
+		client     = &http.Client{Timeout: 5 * time.Second}
+		url        = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
+		err        error
+		respBytes  []byte
+		lastMethod string
 	)
 
 	for _, msg := range test.messages {
 		if msg.send {
-			// Send request.
+			// Send request, track the method name for schema lookup.
+			lastMethod = gjson.Get(msg.data, "method").String()
 			t.Log(">> ", msg.data)
 			respBytes, err = postHttp(client, url, strings.NewReader(msg.data))
 			if err != nil {
@@ -104,15 +115,17 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, ensure the response type matches the expected type.
+			// For speconly tests, validate the response result against the OpenRPC schema.
 			hasError := gjson.Get(resp, "error").Exists()
 			if !hasError && test.speconly {
-				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
-				if len(errors) > 0 {
-					for _, err := range errors {
-						t.Log(err)
-					}
-					return fmt.Errorf("response type does not match expected")
+				schema, ok := schemas[lastMethod]
+				if !ok {
+					return fmt.Errorf("no schema found for method %s", lastMethod)
+				}
+				result := json.RawMessage(gjson.Get(resp, "result").Raw)
+				if err := validateResult(schema, result, lastMethod); err != nil {
+					t.Log(err)
+					return fmt.Errorf("response does not match schema for %s: %v", lastMethod, err)
 				}
 				respBytes = nil
 				continue
@@ -155,93 +168,52 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	return nil
 }
 
-// isAddress reports whether s is a hex-encoded Ethereum address.
-func isAddress(s string) bool {
-	if len(s) != 42 || !strings.HasPrefix(s, "0x") {
-		return false
+// loadMethodSchemas reads the dereferenced OpenRPC spec and returns a map of
+// method name to its result JSON schema.
+func loadMethodSchemas(path string) (map[string]openrpc.JSONSchemaObject, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
-	for _, c := range s[2:] {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
+	var doc openrpc.OpenrpcDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	schemas := make(map[string]openrpc.JSONSchemaObject)
+	for _, method := range *doc.Methods {
+		if method.MethodObject == nil {
+			continue
 		}
+		m := method.MethodObject
+		if m.Result == nil || m.Result.ContentDescriptorObject == nil {
+			continue
+		}
+		cd := m.Result.ContentDescriptorObject
+		if cd.Schema == nil || cd.Schema.JSONSchemaObject == nil {
+			continue
+		}
+		schemas[string(*m.Name)] = *cd.Schema.JSONSchemaObject
 	}
-	return true
+	return schemas, nil
 }
 
-// lookupKey returns the value for key in obj. For address keys the lookup is
-// case-insensitive so that checksummed and lowercase addresses are treated as equal.
-func lookupKey(obj gjson.Result, key string) gjson.Result {
-	if !isAddress(key) {
-		return obj.Get(key)
+// validateResult validates the result value against the method's result schema.
+func validateResult(schema openrpc.JSONSchemaObject, result json.RawMessage, method string) error {
+	draft := openrpc.Schema("https://json-schema.org/draft/2019-09/schema")
+	schema.Schema = &draft
+	b, err := json.Marshal(schema)
+	if err != nil {
+		return fmt.Errorf("unable to marshal schema: %v", err)
 	}
-	lower := strings.ToLower(key)
-	var result gjson.Result
-	obj.ForEach(func(k, v gjson.Result) bool {
-		if strings.ToLower(k.String()) == lower {
-			result = v
-			return false
-		}
-		return true
-	})
-	return result
-}
-
-// checkJSONStructure checks whether the `actual` value matches the type structure
-// of the `expected` value.
-func checkJSONStructure(expected, actual gjson.Result, path string) []string {
-	var errors []string
-
-	buildPath := func(key string) string {
-		if path != "." {
-			return path + "." + key
-		}
-		return "." + key
+	s, err := jsonschema.CompileString(method+".result", string(b))
+	if err != nil {
+		return err
 	}
-
-	if expected.Type != gjson.JSON {
-		return errors
+	var x interface{}
+	if err := json.Unmarshal(result, &x); err != nil {
+		return err
 	}
-
-	if expected.IsArray() {
-		if !actual.IsArray() {
-			errors = append(errors, fmt.Sprintf("%s: expected array but got %s", path, actual.Type))
-		}
-		return errors
-	}
-
-	// Check all expected keys exist with correct types
-	expected.ForEach(func(key, value gjson.Result) bool {
-		keyPath := buildPath(key.String())
-		actualValue := lookupKey(actual, key.String())
-
-		if !actualValue.Exists() {
-			errors = append(errors, fmt.Sprintf("%s: missing key", keyPath))
-			return true
-		}
-
-		if value.Type != actualValue.Type && !(value.Type == gjson.JSON && actualValue.Type == gjson.JSON) {
-			errors = append(errors, fmt.Sprintf("%s: type mismatch (expected %s, got %s)",
-				keyPath, value.Type, actualValue.Type))
-			return true
-		}
-
-		if value.IsObject() || value.IsArray() {
-			errors = append(errors, checkJSONStructure(value, actualValue, keyPath)...)
-		}
-		return true
-	})
-
-	// Check for unexpected keys
-	if actual.IsObject() {
-		actual.ForEach(func(key, value gjson.Result) bool {
-			if !lookupKey(expected, key.String()).Exists() {
-				errors = append(errors, fmt.Sprintf("%s: unexpected key in response", buildPath(key.String())))
-			}
-			return true
-		})
-	}
-
-	return errors
+	return s.Validate(x)
 }
 
 func numbersEqual(a, b json.Number) bool {
