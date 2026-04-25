@@ -29,11 +29,7 @@ materialize_runtime_local_ip() {
 
 case "$DEVNET_LABEL" in
     devnet4)
-        if [ -x /usr/local/bin/zeam ]; then
-            DEFAULT_ZEAM_BIN="/usr/local/bin/zeam"
-        else
-            DEFAULT_ZEAM_BIN="/usr/local/bin/zeam-devnet4"
-        fi
+        DEFAULT_ZEAM_BIN="/usr/local/bin/zeam"
         ;;
     *)
         echo "Unsupported Lean devnet label for zeam: $DEVNET_LABEL" >&2

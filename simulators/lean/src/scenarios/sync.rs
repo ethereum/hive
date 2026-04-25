@@ -1,9 +1,10 @@
 use crate::scenarios::helper::{
-    default_genesis_time, fork_choice_head_slot, load_fork_choice_response, run_data_test,
-    start_post_genesis_sync_context, ClientUnderTestRole, ForkChoiceResponse,
-    HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
+    default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
+    run_data_test, selected_lean_devnet, start_post_genesis_sync_context, ClientUnderTestRole,
+    ForkChoiceResponse, HelperGossipForkDigestProfile, LeanDevnet, PostGenesisSyncContext,
+    PostGenesisSyncTestData,
 };
-use crate::{lean_clients, selected_lean_devnet, LeanDevnet};
+use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
 use std::time::Duration;
 use tokio::time::{sleep, timeout, Instant};
@@ -13,15 +14,15 @@ const CHECKPOINT_SYNC_FRESH_START_TIMEOUT_SECS: u64 = 480;
 const SYNC_HELPER_PEER_COUNT: usize = 3;
 
 struct HeadSyncObservation {
-    source_before_head: String,
+    source_before_head: B256,
     source_before_head_slot: u64,
     source_before_justified_slot: u64,
     source_before_finalized_slot: u64,
-    client_head: String,
+    client_head: B256,
     client_head_slot: u64,
     client_justified_slot: u64,
     client_finalized_slot: u64,
-    source_after_head: String,
+    source_after_head: B256,
     source_after_head_slot: u64,
     source_after_justified_slot: u64,
     source_after_finalized_slot: u64,
@@ -33,15 +34,15 @@ fn capture_head_sync_observation(
     source_after: &ForkChoiceResponse,
 ) -> HeadSyncObservation {
     HeadSyncObservation {
-        source_before_head: format!("{:#x}", source_before.head),
+        source_before_head: source_before.head,
         source_before_head_slot: fork_choice_head_slot(source_before),
         source_before_justified_slot: source_before.justified.slot,
         source_before_finalized_slot: source_before.finalized.slot,
-        client_head: format!("{:#x}", client.head),
+        client_head: client.head,
         client_head_slot: fork_choice_head_slot(client),
         client_justified_slot: client.justified.slot,
         client_finalized_slot: client.finalized.slot,
-        source_after_head: format!("{:#x}", source_after.head),
+        source_after_head: source_after.head,
         source_after_head_slot: fork_choice_head_slot(source_after),
         source_after_justified_slot: source_after.justified.slot,
         source_after_finalized_slot: source_after.finalized.slot,
@@ -76,7 +77,7 @@ async fn wait_for_client_to_reach_source_head(
     let observation = last_observation
         .expect("sync head wait should record at least one helper/client forkchoice observation");
     panic!(
-        "Client under test never matched the local LeanSpec helper head within {} seconds (helper-before head: {} at slot {} [justified={}, finalized={}], client head: {} at slot {} [justified={}, finalized={}], helper-after head: {} at slot {} [justified={}, finalized={}])",
+        "Client under test never matched the local LeanSpec helper head within {} seconds (helper-before head: {:#x} at slot {} [justified={}, finalized={}], client head: {:#x} at slot {} [justified={}, finalized={}], helper-after head: {:#x} at slot {} [justified={}, finalized={}])",
         HEAD_SYNC_TIMEOUT_SECS,
         observation.source_before_head,
         observation.source_before_head_slot,

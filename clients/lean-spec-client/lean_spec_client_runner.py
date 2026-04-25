@@ -480,6 +480,20 @@ def encode_enr_port(port: int) -> bytes:
     return port.to_bytes(byte_length, "big")
 
 
+def build_canonical_secp256k1_signature(
+    identity_key: IdentityKeypair,
+    digest: bytes,
+) -> bytes:
+    der_signature = identity_key.private_key.sign(
+        digest,
+        ec.ECDSA(Prehashed(hashes.SHA256())),
+    )
+    signature_r, signature_s = decode_dss_signature(der_signature)
+    if signature_s > SECP256K1_ORDER // 2:
+        signature_s = SECP256K1_ORDER - signature_s
+    return signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
+
+
 def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
     advertise_ip = os.environ.get(HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE)
     if not advertise_ip:
@@ -496,15 +510,8 @@ def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
     }
     unsigned_enr = ENR(signature=b"\x00" * 64, seq=1, pairs=pairs)
     digest = keccak.new(digest_bits=256, data=unsigned_enr._content_rlp()).digest()
-    der_signature = identity_key.private_key.sign(
-        digest,
-        ec.ECDSA(Prehashed(hashes.SHA256())),
-    )
-    signature_r, signature_s = decode_dss_signature(der_signature)
-    # Emit canonical low-s ENR signatures so stricter peers accept helper bootnodes.
-    if signature_s > SECP256K1_ORDER // 2:
-        signature_s = SECP256K1_ORDER - signature_s
-    signature = signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
+    # Normalize helper ECDSA signatures so every client sees a canonical ENR.
+    signature = build_canonical_secp256k1_signature(identity_key, digest)
     return ENR(signature=signature, seq=1, pairs=pairs).to_string()
 
 
@@ -651,6 +658,15 @@ def extract_inner_block(signed_block: object) -> object:
     )
 
 
+def cache_signed_block(
+    block_cache: dict[Bytes32, object],
+    signed_block: object,
+) -> Bytes32:
+    block_root = hash_tree_root(extract_inner_block(signed_block))
+    block_cache[block_root] = signed_block
+    return block_root
+
+
 async def keep_status_current(
     event_source: LiveNetworkEventSource,
     node: Node,
@@ -764,8 +780,7 @@ async def run() -> None:
         original_on_block = node.validator_service.on_block
 
         async def cache_and_publish_block(signed_block: object) -> None:
-            block_root = hash_tree_root(extract_inner_block(signed_block))
-            published_blocks[block_root] = signed_block
+            cache_signed_block(published_blocks, signed_block)
             await original_on_block(signed_block)
             refresh_status(event_source, node)
 
