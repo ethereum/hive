@@ -187,9 +187,10 @@ type ClientInfo struct {
 	// to the client pool at end-of-test. Empty for unpooled (legacy) containers.
 	poolKey string
 
-	// resetPort is captured at start-time so disposeClient can build a
-	// PoolEntry without re-parsing HIVE_CHECK_LIVE_PORT. Same value as the
-	// cold path's options.CheckLive (default 8545).
+	// resetPort is the JSON-RPC port the pool's debug_setHead reset RPC
+	// targets. Defaults to 8545; overridable per-suite via HIVE_RESET_PORT.
+	// Distinct from options.CheckLive, which a simulator may set to a
+	// different (e.g. JWT-protected engine) port for liveness purposes.
 	resetPort uint16
 }
 

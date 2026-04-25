@@ -344,6 +344,22 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		options.CheckLive = uint16(v)
 	}
 
+	// Reset port for the pool's debug_setHead RPC. Defaults to the standard
+	// JSON-RPC port (8545) — distinct from CheckLive, which a simulator may
+	// set to e.g. the JWT-protected engine API port (8551). debug_setHead
+	// lives on the public RPC port; pointing at the engine port returns
+	// "403: missing token" and every Release fails.
+	resetPort := uint16(8545)
+	if portStr := env["HIVE_RESET_PORT"]; portStr != "" {
+		v, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			slog.Error("API: could not parse reset port", "error", err)
+			serveError(w, err, http.StatusBadRequest)
+			return
+		}
+		resetPort = uint16(v)
+	}
+
 	// Start it (or, on pool reuse, synthesise a ContainerInfo from the
 	// pool entry — the daemon is already up).
 	var info *ContainerInfo
@@ -374,7 +390,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogOffsets:     &TestLogOffsets{Begin: logBegin},
 			wait:           info.Wait,
 			poolKey:        poolKey,
-			resetPort:      options.CheckLive,
+			resetPort:      resetPort,
 		}
 
 		// Add client version to the test suite.
