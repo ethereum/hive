@@ -49,18 +49,30 @@ func (b *recordingBackend) ContainerIP(string, string) (net.IP, error) { return 
 func (b *recordingBackend) ConnectContainer(string, string) error      { return nil }
 func (b *recordingBackend) DisconnectContainer(string, string) error   { return nil }
 
+// resetCall captures one invocation of the reset stub.
+type resetCall struct {
+	ip   string
+	port uint16
+}
+
 // poolWithStubReset returns a pool whose reset function records calls
 // instead of doing HTTP, so unit tests don't need a live RPC endpoint.
-func poolWithStubReset(t *testing.T, maxPerKey int, resetErr error) (*ClientPool, *recordingBackend, *[]string) {
+func poolWithStubReset(t *testing.T, maxIdle int, resetErr error) (*ClientPool, *recordingBackend, *[]resetCall) {
 	t.Helper()
 	be := &recordingBackend{}
-	p := NewClientPool(be, maxPerKey)
-	var resetIPs []string
-	p.reset = func(ip string) error {
-		resetIPs = append(resetIPs, ip)
+	p := NewClientPool(be, maxIdle)
+	var calls []resetCall
+	p.reset = func(ip string, port uint16) error {
+		calls = append(calls, resetCall{ip: ip, port: port})
 		return resetErr
 	}
-	return p, be, &resetIPs
+	return p, be, &calls
+}
+
+// testEntry builds a PoolEntry with the boilerplate non-zero fields filled
+// in so tests don't have to repeat ResetPort: 8545 everywhere.
+func testEntry(id, ip string) PoolEntry {
+	return PoolEntry{ID: id, IP: ip, ResetPort: 8545}
 }
 
 // waitForEvictions blocks until all async DeleteContainer goroutines
@@ -79,22 +91,22 @@ func TestPoolDisabled(t *testing.T) {
 	if got := p.Acquire("k"); got != nil {
 		t.Fatalf("disabled pool should return nil on Acquire, got %+v", got)
 	}
-	if p.Release(PoolEntry{ID: "c", IP: "1.2.3.4"}, "k") {
+	if p.Release(testEntry("c", "1.2.3.4"), "k") {
 		t.Fatal("disabled pool should not retain on Release")
 	}
 }
 
 func TestPoolAcquireReleaseLIFO(t *testing.T) {
 	// Pool fits all 3 entries; verify Acquire returns LIFO within bucket.
-	p, _, resetIPs := poolWithStubReset(t, 4, nil)
+	p, _, calls := poolWithStubReset(t, 4, nil)
 
 	if got := p.Acquire("k"); got != nil {
 		t.Fatalf("empty bucket should return nil, got %+v", got)
 	}
 
-	e1 := PoolEntry{ID: "c1", IP: "10.0.0.1"}
-	e2 := PoolEntry{ID: "c2", IP: "10.0.0.2"}
-	e3 := PoolEntry{ID: "c3", IP: "10.0.0.3"}
+	e1 := testEntry("c1", "10.0.0.1")
+	e2 := testEntry("c2", "10.0.0.2")
+	e3 := testEntry("c3", "10.0.0.3")
 	for _, e := range []PoolEntry{e1, e2, e3} {
 		if !p.Release(e, "k") {
 			t.Fatalf("Release of %s should succeed under cap", e.ID)
@@ -114,8 +126,8 @@ func TestPoolAcquireReleaseLIFO(t *testing.T) {
 		t.Fatalf("Acquire on drained bucket should return nil, got %+v", got)
 	}
 
-	if len(*resetIPs) != 3 {
-		t.Fatalf("expected 3 reset calls, got %v", *resetIPs)
+	if len(*calls) != 3 {
+		t.Fatalf("expected 3 reset calls, got %v", *calls)
 	}
 }
 
@@ -127,10 +139,10 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 2, nil)
 
 	// Park 2 entries to fill the global cap.
-	if !p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1"}, "k1") {
+	if !p.Release(testEntry("c1", "10.0.0.1"), "k1") {
 		t.Fatal("first release must succeed")
 	}
-	if !p.Release(PoolEntry{ID: "c2", IP: "10.0.0.2"}, "k2") {
+	if !p.Release(testEntry("c2", "10.0.0.2"), "k2") {
 		t.Fatal("second release must succeed under cap")
 	}
 	if got := len(be.deletes); got != 0 {
@@ -138,7 +150,7 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 	}
 
 	// Park a 3rd: evicts c1 (oldest in LRU) to make room.
-	if !p.Release(PoolEntry{ID: "c3", IP: "10.0.0.3"}, "k3") {
+	if !p.Release(testEntry("c3", "10.0.0.3"), "k3") {
 		t.Fatal("Release should succeed by evicting oldest")
 	}
 	waitForEvictions(p)
@@ -165,8 +177,8 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 func TestPoolAcquireRefreshesLRU(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 2, nil)
 
-	p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1"}, "k1")
-	p.Release(PoolEntry{ID: "c2", IP: "10.0.0.2"}, "k2")
+	p.Release(testEntry("c1", "10.0.0.1"), "k1")
+	p.Release(testEntry("c2", "10.0.0.2"), "k2")
 
 	// Acquire and re-Release c1 — that pushes it to the back of the LRU.
 	got := p.Acquire("k1")
@@ -178,7 +190,7 @@ func TestPoolAcquireRefreshesLRU(t *testing.T) {
 	}
 
 	// Park c3: evict the *new* oldest, which is now c2 (not c1).
-	p.Release(PoolEntry{ID: "c3", IP: "10.0.0.3"}, "k3")
+	p.Release(testEntry("c3", "10.0.0.3"), "k3")
 	waitForEvictions(p)
 	if got := be.deletes; len(got) != 1 || got[0] != "c2" {
 		t.Fatalf("expected c2 to be evicted (older after c1 was refreshed), got %v", got)
@@ -187,7 +199,7 @@ func TestPoolAcquireRefreshesLRU(t *testing.T) {
 
 func TestPoolReleaseFailsOnResetError(t *testing.T) {
 	p, _, _ := poolWithStubReset(t, 4, errStubResetFailed)
-	if p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1"}, "k") {
+	if p.Release(testEntry("c1", "10.0.0.1"), "k") {
 		t.Fatal("Release should fail when reset returns an error")
 	}
 	if got := p.Acquire("k"); got != nil {
@@ -195,12 +207,65 @@ func TestPoolReleaseFailsOnResetError(t *testing.T) {
 	}
 }
 
+// TestPoolReleaseRequiresResetPort guards the contract that callers must
+// populate ResetPort. A zero port would otherwise produce a malformed
+// reset URL and silently 0-port-fail at runtime.
+func TestPoolReleaseRequiresResetPort(t *testing.T) {
+	p, _, calls := poolWithStubReset(t, 4, nil)
+	if p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1" /* ResetPort omitted */}, "k") {
+		t.Fatal("Release with ResetPort=0 should be rejected")
+	}
+	if len(*calls) != 0 {
+		t.Fatalf("reset stub should not have been called, got %v", *calls)
+	}
+}
+
+// TestPoolReleasePassesResetPort verifies the cold-path-supplied port
+// reaches the reset RPC, so HIVE_CHECK_LIVE_PORT overrides take effect.
+func TestPoolReleasePassesResetPort(t *testing.T) {
+	p, _, calls := poolWithStubReset(t, 4, nil)
+	entry := PoolEntry{ID: "c1", IP: "10.0.0.1", ResetPort: 9999}
+	if !p.Release(entry, "k") {
+		t.Fatal("Release should succeed")
+	}
+	if len(*calls) != 1 || (*calls)[0].port != 9999 || (*calls)[0].ip != "10.0.0.1" {
+		t.Fatalf("reset called with wrong args: %+v", *calls)
+	}
+}
+
+// TestPoolPreservesLogFile verifies that the LogFile populated at Release
+// time round-trips through Acquire unchanged. api.startClient relies on
+// this to direct subsequent tests' offsets at the same file the docker
+// attach goroutine actually writes to.
+func TestPoolPreservesLogFile(t *testing.T) {
+	p, _, _ := poolWithStubReset(t, 4, nil)
+	entry := PoolEntry{
+		ID:        "c1",
+		IP:        "10.0.0.1",
+		LogFile:   "geth/client-deadbeef-full-id.log",
+		ResetPort: 8545,
+	}
+	if !p.Release(entry, "k") {
+		t.Fatal("Release should succeed")
+	}
+	got := p.Acquire("k")
+	if got == nil {
+		t.Fatal("Acquire should return the parked entry")
+	}
+	if got.LogFile != entry.LogFile {
+		t.Fatalf("LogFile not preserved across pool: got %q, want %q", got.LogFile, entry.LogFile)
+	}
+	if got.ResetPort != entry.ResetPort {
+		t.Fatalf("ResetPort not preserved: got %d, want %d", got.ResetPort, entry.ResetPort)
+	}
+}
+
 func TestPoolDrain(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 4, nil)
 
-	p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1"}, "k1")
-	p.Release(PoolEntry{ID: "c2", IP: "10.0.0.2"}, "k2")
-	p.Release(PoolEntry{ID: "c3", IP: "10.0.0.3"}, "k1")
+	p.Release(testEntry("c1", "10.0.0.1"), "k1")
+	p.Release(testEntry("c2", "10.0.0.2"), "k2")
+	p.Release(testEntry("c3", "10.0.0.3"), "k1")
 
 	p.Drain(context.Background())
 
@@ -211,7 +276,7 @@ func TestPoolDrain(t *testing.T) {
 	if got := p.Acquire("k1"); got != nil {
 		t.Fatalf("Acquire after Drain should return nil, got %+v", got)
 	}
-	if p.Release(PoolEntry{ID: "c4", IP: "10.0.0.4"}, "k1") {
+	if p.Release(testEntry("c4", "10.0.0.4"), "k1") {
 		t.Fatal("Release after Drain should fail")
 	}
 }
@@ -229,11 +294,11 @@ func TestComputePoolKeyDeterministic(t *testing.T) {
 	files1 := buildMultipartFiles(t, map[string]string{"/genesis.json": `{"alloc":{}}`})
 	files2 := buildMultipartFiles(t, map[string]string{"/genesis.json": `{"alloc":{}}`})
 
-	k1, err := ComputePoolKey("img:tag", env1, files1)
+	k1, err := ComputePoolKey("img:tag", env1, files1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	k2, err := ComputePoolKey("img:tag", env2, files2)
+	k2, err := ComputePoolKey("img:tag", env2, files2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +310,7 @@ func TestComputePoolKeyDeterministic(t *testing.T) {
 	otherFiles := buildMultipartFiles(t, map[string]string{
 		"/genesis.json": `{"alloc":{"0x00":{"balance":"0x1"}}}`,
 	})
-	k3, err := ComputePoolKey("img:tag", env1, otherFiles)
+	k3, err := ComputePoolKey("img:tag", env1, otherFiles, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +319,7 @@ func TestComputePoolKeyDeterministic(t *testing.T) {
 	}
 
 	// Different image -> different key.
-	k4, err := ComputePoolKey("img:other", env1, buildMultipartFiles(t, map[string]string{"/genesis.json": `{"alloc":{}}`}))
+	k4, err := ComputePoolKey("img:other", env1, buildMultipartFiles(t, map[string]string{"/genesis.json": `{"alloc":{}}`}), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,8 +328,51 @@ func TestComputePoolKeyDeterministic(t *testing.T) {
 	}
 }
 
+// TestComputePoolKeyNetworks verifies that the network set participates in
+// the key. Two tests with identical image/env/files but different requested
+// networks are NOT interchangeable: the warm path skips ConnectContainer,
+// so reusing across network sets would silently leave the container off
+// the network the new test asked for.
+func TestComputePoolKeyNetworks(t *testing.T) {
+	env := map[string]string{"HIVE_CHAIN_ID": "1"}
+	files := buildMultipartFiles(t, map[string]string{"/genesis.json": `{}`})
+
+	files2 := buildMultipartFiles(t, map[string]string{"/genesis.json": `{}`})
+	files3 := buildMultipartFiles(t, map[string]string{"/genesis.json": `{}`})
+	files4 := buildMultipartFiles(t, map[string]string{"/genesis.json": `{}`})
+
+	noNet, err := ComputePoolKey("img", env, files, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withNetA, err := ComputePoolKey("img", env, files2, []string{"netA"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	withNetB, err := ComputePoolKey("img", env, files3, []string{"netB"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noNet == withNetA || withNetA == withNetB {
+		t.Fatalf("network set must affect key: noNet=%s netA=%s netB=%s", noNet, withNetA, withNetB)
+	}
+
+	// Order-independence within the network set.
+	ab1, err := ComputePoolKey("img", env, files4, []string{"netA", "netB"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ab2, err := ComputePoolKey("img", env, buildMultipartFiles(t, map[string]string{"/genesis.json": `{}`}), []string{"netB", "netA"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ab1 != ab2 {
+		t.Fatalf("network order should not affect key: %q vs %q", ab1, ab2)
+	}
+}
+
 func TestComputePoolKeyEmpty(t *testing.T) {
-	k, err := ComputePoolKey("img", nil, nil)
+	k, err := ComputePoolKey("img", nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

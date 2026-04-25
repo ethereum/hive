@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,27 +23,41 @@ import (
 // LabelHivePoolKey marks pool-managed containers in their docker labels.
 const LabelHivePoolKey = "hive.pool.key"
 
-// poolResetPort is the JSON-RPC port hive talks to for the inter-test
-// reset RPC. It matches the standard HIVE_CHECK_LIVE_PORT default.
-const poolResetPort = 8545
-
 // poolResetTimeout caps each debug_setHead call. The unwind itself is
 // sub-millisecond inside Erigon; this is a generous safety net for HTTP.
 const poolResetTimeout = 5 * time.Second
 
 // PoolEntry is a single parked container.
+//
+// LogFile carries the JSON-relative log path that was set when the container
+// was first created. The docker attach goroutine wrote the stream to that
+// file once at first start; subsequent reuses must reuse the same path so
+// per-test LogOffsets refer to the file that actually receives output.
+//
+// ResetPort is the JSON-RPC port the reset RPC targets — the same value the
+// cold path puts in options.CheckLive (HIVE_CHECK_LIVE_PORT, default 8545).
 type PoolEntry struct {
-	ID  string
-	IP  string
-	key string // bucket key, set by Release
+	ID        string
+	IP        string
+	LogFile   string
+	ResetPort uint16
+	key       string // bucket key, set by Release
 }
 
 // ClientPool retains running client containers across tests. After a
 // test ends, hive sends the client a JSON-RPC `debug_setHead(0)` to
 // revert chain state to genesis and parks the entry under its
-// (image, env, files) key. The next matching test reuses the
-// already-running daemon — no docker create/start, no client init,
-// no daemon boot.
+// (image, env, files, networks) key. The next matching test reuses
+// the already-running daemon — no docker create/start, no client
+// init, no daemon boot.
+//
+// Suitability: `debug_setHead(0)` rewinds the canonical chain head only.
+// It does NOT clear txpool entries, RPC subscriptions/filters, miner
+// state, peer lists, or in-memory caches. Pooling is therefore safe for
+// near-stateless workloads (e.g. EEST consume-engine, where each test
+// is a single newPayload from genesis) and unsafe for tests that mutate
+// any of the above. Workloads that don't fit should keep
+// --client.pool.size=0.
 //
 // Entries are stored in a single global LRU list rather than per-key
 // buckets: with pool.size bounded (~24 in practice) the linear scan
@@ -56,7 +71,7 @@ type ClientPool struct {
 	maxIdle int
 	// reset performs the inter-test chain reset. Production uses
 	// defaultReset (HTTP debug_setHead); tests inject a stub.
-	reset func(ip string) error
+	reset func(ip string, port uint16) error
 
 	mu     sync.Mutex
 	list   *list.List // *PoolEntry, oldest at front
@@ -89,9 +104,12 @@ func (p *ClientPool) Enabled() bool {
 
 // ComputePoolKey hashes the inputs that determine "this container is
 // interchangeable with another for the next test": the image name, the
-// sanitized HIVE_* environment, and the contents of every file passed
-// in (notably /genesis.json).
-func ComputePoolKey(image string, env map[string]string, files map[string]*multipart.FileHeader) (string, error) {
+// sanitized HIVE_* environment, the contents of every file passed in
+// (notably /genesis.json), and the set of docker networks the container
+// is initially connected to. Two tests with different network sets are
+// not interchangeable — the cold path connects networks at startClient
+// time and the warm path skips that step, so they must hash differently.
+func ComputePoolKey(image string, env map[string]string, files map[string]*multipart.FileHeader, networks []string) (string, error) {
 	h := sha256.New()
 	io.WriteString(h, image)
 	io.WriteString(h, "\x00")
@@ -103,6 +121,14 @@ func ComputePoolKey(image string, env map[string]string, files map[string]*multi
 	sort.Strings(keys)
 	for _, k := range keys {
 		fmt.Fprintf(h, "%s=%s\x00", k, env[k])
+	}
+
+	// Networks are tagged with a "net=" prefix so they can't collide with
+	// HIVE_*-prefixed env entries above. Sorted for iteration-order independence.
+	netNames := append([]string(nil), networks...)
+	sort.Strings(netNames)
+	for _, n := range netNames {
+		fmt.Fprintf(h, "net=%s\x00", n)
 	}
 
 	paths := make([]string, 0, len(files))
@@ -156,10 +182,10 @@ func (p *ClientPool) Acquire(key string) *PoolEntry {
 // evicted (DeleteContainer in a background goroutine). On reset failure
 // returns false; caller is expected to delete the container.
 func (p *ClientPool) Release(entry PoolEntry, key string) bool {
-	if !p.Enabled() || entry.ID == "" || entry.IP == "" || key == "" {
+	if !p.Enabled() || entry.ID == "" || entry.IP == "" || key == "" || entry.ResetPort == 0 {
 		return false
 	}
-	if err := p.reset(entry.IP); err != nil {
+	if err := p.reset(entry.IP, entry.ResetPort); err != nil {
 		slog.Warn("pool: reset failed, not retaining",
 			"container", shortID(entry.ID), "ip", entry.IP, "err", err)
 		p.mu.Lock()
@@ -182,12 +208,20 @@ func (p *ClientPool) Release(entry PoolEntry, key string) bool {
 		p.evicted++
 	}
 	p.list.PushBack(&entry)
+	// Add to the WaitGroup *while still holding p.mu*: Drain takes the
+	// same lock to flip closed=true and read the list, so any Add visible
+	// to a future Release was either accounted for in this critical
+	// section or short-circuited by the closed check above. Without the
+	// lock here, an Add after Drain unlocks but before Drain.Wait could
+	// spawn a goroutine the WaitGroup never observes.
+	if victimID != "" {
+		p.deleting.Add(1)
+	}
 	p.mu.Unlock()
 
 	// DeleteContainer can take 50–200 ms; run it off the test-end hot
 	// path. Drain waits on the WaitGroup at shutdown.
 	if victimID != "" {
-		p.deleting.Add(1)
 		go func() {
 			defer p.deleting.Done()
 			if err := p.backend.DeleteContainer(victimID); err != nil {
@@ -198,16 +232,19 @@ func (p *ClientPool) Release(entry PoolEntry, key string) bool {
 	return true
 }
 
-// defaultReset POSTs debug_setHead(0x0) to ip:8545. Erigon already
+// defaultReset POSTs debug_setHead(0x0) to ip:port. Erigon already
 // exposes this on --http.api=...,debug — the test harness uses
 // --http.api=admin,debug,trace,eth,net,txpool,web3,testing — so no
 // client-side changes are needed for Erigon. Other clients (geth,
 // reth, nethermind, besu) all support debug_setHead.
-func (p *ClientPool) defaultReset(ip string) error {
+//
+// The port is the same one the cold path uses for CheckLive
+// (HIVE_CHECK_LIVE_PORT, default 8545); we don't assume 8545 unconditionally.
+func (p *ClientPool) defaultReset(ip string, port uint16) error {
 	ctx, cancel := context.WithTimeout(context.Background(), poolResetTimeout)
 	defer cancel()
 
-	url := fmt.Sprintf("http://%s/", net.JoinHostPort(ip, fmt.Sprintf("%d", poolResetPort)))
+	url := fmt.Sprintf("http://%s/", net.JoinHostPort(ip, strconv.FormatUint(uint64(port), 10)))
 	body := strings.NewReader(`{"jsonrpc":"2.0","method":"debug_setHead","params":["0x0"],"id":1}`)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {

@@ -248,11 +248,13 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Compute pool key from the inputs that define a "fresh state" for this
-	// client run. Empty string means pooling is disabled.
+	// client run. Empty string means pooling is disabled. Networks are part
+	// of the key because the warm path skips ConnectContainer — two tests
+	// requesting different network sets must not share a container.
 	pool := api.tm.ClientPool()
 	var poolKey string
 	if pool.Enabled() {
-		k, err := ComputePoolKey(clientDef.Image, env, files)
+		k, err := ComputePoolKey(clientDef.Image, env, files, networks)
 		if err != nil {
 			slog.Warn("API: pool key computation failed; falling back to fresh container",
 				"client", clientDef.Name, "err", err)
@@ -302,13 +304,24 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set the log file. We need the container ID for this,
-	// so it can only be set after creating the container.
-	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
+	// Set the log file path. On the cold path the path is derived from the
+	// (full) container ID so each container gets its own file. On pool reuse
+	// we MUST keep using the original path: the docker attach goroutine was
+	// wired up at first start-time and continues to write there. Recomputing
+	// from the (short) reused ID would point per-test offsets at an empty
+	// file while the real output piles up at the original path.
+	var logPath, logFilePath string
+	if fromPool {
+		logPath = poolEntry.LogFile
+		logFilePath = filepath.Join(api.env.LogDir, filepath.FromSlash(logPath))
+	} else {
+		logPath, logFilePath = api.clientLogFilePaths(clientDef.Name, containerID)
+	}
 	options.LogFile = logFilePath
 
 	// Connect to the networks if requested. For pool reuse the container
-	// is already on its networks from the original creation, so skip.
+	// is already on its networks from the original creation (and networks
+	// are part of the pool key, so the set matches), so skip.
 	if !fromPool {
 		for _, network := range networks {
 			if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
@@ -336,7 +349,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	var info *ContainerInfo
 	if fromPool {
 		info = &ContainerInfo{
-			ID:      containerID[:8],
+			ID:      containerID,
 			IP:      poolEntry.IP,
 			LogFile: logFilePath,
 			// No-op wait: the daemon stays up across tests; the container is
@@ -361,6 +374,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogOffsets:     &TestLogOffsets{Begin: logBegin},
 			wait:           info.Wait,
 			poolKey:        poolKey,
+			resetPort:      options.CheckLive,
 		}
 
 		// Add client version to the test suite.

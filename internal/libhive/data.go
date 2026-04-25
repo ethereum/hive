@@ -186,6 +186,11 @@ type ClientInfo struct {
 	// poolKey, when non-empty, marks this container as a candidate for return
 	// to the client pool at end-of-test. Empty for unpooled (legacy) containers.
 	poolKey string
+
+	// resetPort is captured at start-time so disposeClient can build a
+	// PoolEntry without re-parsing HIVE_CHECK_LIVE_PORT. Same value as the
+	// cold path's options.CheckLive (default 8545).
+	resetPort uint16
 }
 
 // HiveInstance contains information about hive itself.

@@ -92,11 +92,16 @@ Otherwise, it looks for files in the $HOME directory:
 
 		clientPoolSize = flag.Int("client.pool.size", 0, "Max `number` of running client containers retained globally between tests.\n"+
 			"When set, hive keeps client daemons running across tests in a pool keyed by\n"+
-			"(image, sanitized HIVE_* env, files), and resets chain state between tests via\n"+
-			"a JSON-RPC `debug_setHead(0)` call rather than restarting the container. This\n"+
-			"saves the docker create + tar upload + erigon init + daemon boot cost on every\n"+
-			"pool hit. The cap is global (LRU across all buckets), not per-bucket. Default 0\n"+
-			"disables pooling — every test gets a fresh container as before.")
+			"(image, sanitized HIVE_* env, files, networks), and resets chain state between\n"+
+			"tests via a JSON-RPC debug_setHead(0) call rather than restarting the container.\n"+
+			"This saves the docker create + tar upload + client init + daemon boot cost on\n"+
+			"every pool hit. The cap is global (LRU across all buckets), not per-bucket.\n"+
+			"Caveat: debug_setHead(0) only rewinds the canonical chain head. It does NOT\n"+
+			"clear txpool entries, RPC subscriptions/filters, miner state, peer lists, or\n"+
+			"in-memory caches. The pool is therefore safe for near-stateless workloads (e.g.\n"+
+			"EEST consume-engine, single-newPayload-from-genesis) and unsafe for tests that\n"+
+			"mutate any of those. Workloads that don't fit should keep this at 0.\n"+
+			"Default 0 disables pooling — every test gets a fresh container as before.")
 	)
 
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.

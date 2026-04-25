@@ -616,7 +616,12 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 // The wait callback is always cleared so Terminate doesn't try again.
 func (manager *TestManager) disposeClient(c *ClientInfo) {
 	if c.poolKey != "" {
-		entry := PoolEntry{ID: c.ID, IP: c.IP}
+		entry := PoolEntry{
+			ID:        c.ID,
+			IP:        c.IP,
+			LogFile:   c.LogFile,
+			ResetPort: c.resetPort,
+		}
 		if manager.clientPool.Release(entry, c.poolKey) {
 			// Warm-daemon path: container keeps running. Don't call wait()
 			// — that would block indefinitely. The original attach goroutine
@@ -688,7 +693,12 @@ func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 	// path when applicable; otherwise force-remove.
 	if nodeInfo.wait != nil {
 		if nodeInfo.poolKey != "" {
-			entry := PoolEntry{ID: nodeInfo.ID, IP: nodeInfo.IP}
+			entry := PoolEntry{
+				ID:        nodeInfo.ID,
+				IP:        nodeInfo.IP,
+				LogFile:   nodeInfo.LogFile,
+				ResetPort: nodeInfo.resetPort,
+			}
 			if manager.clientPool.Release(entry, nodeInfo.poolKey) {
 				nodeInfo.wait = nil
 				return nil
