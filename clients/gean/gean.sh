@@ -16,6 +16,29 @@ ASSET_ROOT="/tmp/gean-runtime"
 KEY_FILE=""
 NETWORK_CONFIG="${HIVE_LEAN_NETWORK_CONFIG:-$ASSET_ROOT/config.yaml}"
 VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/validators.yaml}"
+LOCAL_IP_PLACEHOLDER="__HIVE_LOCAL_IP__"
+
+detect_local_ip() {
+    hostname -i 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -v '^127\.' | head -n 1
+}
+
+materialize_runtime_local_ip() {
+    local config_dir="$1"
+    local runtime_ip
+    local validator_config="$config_dir/validator-config.yaml"
+
+    if [ ! -f "$validator_config" ]; then
+        return
+    fi
+
+    runtime_ip="$(detect_local_ip)"
+    if [ -z "$runtime_ip" ]; then
+        echo "Unable to resolve local container IP for $NODE_ID" >&2
+        exit 1
+    fi
+
+    sed -i "s/${LOCAL_IP_PLACEHOLDER}/${runtime_ip}/g" "$validator_config"
+}
 
 case "$DEVNET_LABEL" in
     devnet3)
@@ -52,6 +75,7 @@ fi
 
 # gean reads its inputs from a directory, not individual file paths.
 CONFIG_DIR="$(dirname "$NETWORK_CONFIG")"
+materialize_runtime_local_ip "$CONFIG_DIR"
 
 # HIVE_BOOTNODES is informational here — gean loads bootnodes from
 # "$CONFIG_DIR/nodes.yaml", which the lean simulator is expected to write.

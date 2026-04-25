@@ -5,6 +5,7 @@ ARG devnet4_tag=devnet-4
 
 FROM $devnet3_baseimage:$devnet3_tag AS devnet3
 FROM $devnet4_baseimage:$devnet4_tag AS devnet4
+
 FROM $devnet3_baseimage:$devnet3_tag
 
 COPY validators.yaml /assets/lean/validators.yaml
