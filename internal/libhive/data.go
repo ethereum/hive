@@ -182,6 +182,10 @@ type ClientInfo struct {
 	LogOffsets *TestLogOffsets `json:"logOffsets,omitempty"`
 
 	wait func()
+
+	// poolKey, when non-empty, marks this container as a candidate for return
+	// to the client pool at end-of-test. Empty for unpooled (legacy) containers.
+	poolKey string
 }
 
 // HiveInstance contains information about hive itself.

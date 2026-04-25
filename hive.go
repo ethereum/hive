@@ -15,8 +15,8 @@ import (
 
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"github.com/lmittmann/tint"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/lmittmann/tint"
 )
 
 type buildArgs map[string]string
@@ -89,6 +89,14 @@ Otherwise, it looks for files in the $HOME directory:
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
+
+		clientPoolSize = flag.Int("client.pool.size", 0, "Max `number` of running client containers retained globally between tests.\n"+
+			"When set, hive keeps client daemons running across tests in a pool keyed by\n"+
+			"(image, sanitized HIVE_* env, files), and resets chain state between tests via\n"+
+			"a JSON-RPC `debug_setHead(0)` call rather than restarting the container. This\n"+
+			"saves the docker create + tar upload + erigon init + daemon boot cost on every\n"+
+			"pool hit. The cap is global (LRU across all buckets), not per-bucket. Default 0\n"+
+			"disables pooling — every test gets a fresh container as before.")
 	)
 
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
@@ -209,6 +217,7 @@ Otherwise, it looks for files in the $HOME directory:
 		SimRandomSeed:      *simRandomSeed,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
+		ClientPoolSize:     *clientPoolSize,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 

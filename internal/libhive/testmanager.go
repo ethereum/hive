@@ -1,6 +1,7 @@
 package libhive
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,11 @@ type SimEnv struct {
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
+
+	// ClientPoolSize controls the maximum number of stopped client
+	// containers retained per (image, env, genesis) bucket. Zero or
+	// negative disables pooling. See pool.go.
+	ClientPoolSize int
 }
 
 // SimResult summarizes the results of a simulation run.
@@ -71,6 +77,7 @@ type HiveInfo struct {
 type TestManager struct {
 	config     SimEnv
 	backend    ContainerBackend
+	clientPool *ClientPool
 	clientDefs []*ClientDefinition
 	hiveInfo   HiveInfo
 
@@ -130,6 +137,7 @@ func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefiniti
 		clientDefs:        clients,
 		config:            config,
 		backend:           b,
+		clientPool:        NewClientPool(b, config.ClientPoolSize),
 		hiveInfo:          hiveInfo,
 		hiveInstanceID:    GenerateHiveInstanceID(),
 		hiveVersion:       hiveInfo.Commit,
@@ -163,6 +171,12 @@ func (manager *TestManager) Results() map[TestSuiteID]*TestSuite {
 // API returns the simulation API handler.
 func (manager *TestManager) API() http.Handler {
 	return newSimulationAPI(manager.backend, manager.config, manager, manager.hiveInfo)
+}
+
+// ClientPool exposes the manager's pool. It is always non-nil; callers
+// should check Enabled() to decide whether to use it.
+func (manager *TestManager) ClientPool() *ClientPool {
+	return manager.clientPool
 }
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so
@@ -205,8 +219,6 @@ func (manager *TestManager) Terminate() error {
 		Details: "Test was terminated by host",
 	}
 	manager.testSuiteMutex.Lock()
-	defer manager.testSuiteMutex.Unlock()
-
 	for suiteID, suite := range manager.runningTestSuites {
 		for testID := range suite.TestCases {
 			if _, running := manager.IsTestRunning(testID); running {
@@ -214,6 +226,7 @@ func (manager *TestManager) Terminate() error {
 				// any resources (e.g. docker containers).
 				err := manager.EndTest(suiteID, testID, terminationSummary)
 				if err != nil {
+					manager.testSuiteMutex.Unlock()
 					return err
 				}
 			}
@@ -221,7 +234,11 @@ func (manager *TestManager) Terminate() error {
 		// ensure the db is updated with results
 		manager.doEndSuite(suiteID)
 	}
+	manager.testSuiteMutex.Unlock()
 
+	// Drain any pooled containers — they were intentionally retained
+	// across tests but should not outlive the test manager.
+	manager.clientPool.Drain(context.Background())
 	return nil
 }
 
@@ -578,18 +595,39 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		}
 	}
 
-	// Stop running clients.
+	// Stop running clients. disposeClient routes to the pool when
+	// applicable; otherwise force-removes the container.
 	for _, v := range testCase.ClientInfo {
 		if v.wait != nil {
-			manager.backend.DeleteContainer(v.ID)
-			v.wait()
-			v.wait = nil
+			manager.disposeClient(v)
 		}
 	}
 
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
 	return nil
+}
+
+// disposeClient releases or deletes a client container at the end of a test.
+// If the container has a poolKey set and the pool's reset RPC succeeds, the
+// daemon stays up and the container is parked for the next matching test.
+// Otherwise we delete it and call its wait() to clean up the attach goroutine.
+//
+// The wait callback is always cleared so Terminate doesn't try again.
+func (manager *TestManager) disposeClient(c *ClientInfo) {
+	if c.poolKey != "" {
+		entry := PoolEntry{ID: c.ID, IP: c.IP}
+		if manager.clientPool.Release(entry, c.poolKey) {
+			// Warm-daemon path: container keeps running. Don't call wait()
+			// — that would block indefinitely. The original attach goroutine
+			// stays parked until pool Drain calls DeleteContainer at shutdown.
+			c.wait = nil
+			return
+		}
+	}
+	manager.backend.DeleteContainer(c.ID)
+	c.wait()
+	c.wait = nil
 }
 
 func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
@@ -646,8 +684,16 @@ func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 	if !ok {
 		return ErrNoSuchNode
 	}
-	// Stop the container.
+	// Stop the container — let the pool's reset RPC handle the warm-daemon
+	// path when applicable; otherwise force-remove.
 	if nodeInfo.wait != nil {
+		if nodeInfo.poolKey != "" {
+			entry := PoolEntry{ID: nodeInfo.ID, IP: nodeInfo.IP}
+			if manager.clientPool.Release(entry, nodeInfo.poolKey) {
+				nodeInfo.wait = nil
+				return nil
+			}
+		}
 		if err := manager.backend.DeleteContainer(nodeInfo.ID); err != nil {
 			return fmt.Errorf("unable to stop client: %v", err)
 		}
