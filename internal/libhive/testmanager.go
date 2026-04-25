@@ -621,8 +621,9 @@ func (manager *TestManager) disposeClient(c *ClientInfo) {
 			IP:        c.IP,
 			LogFile:   c.LogFile,
 			ResetPort: c.resetPort,
+			Key:       c.poolKey,
 		}
-		if manager.clientPool.Release(entry, c.poolKey) {
+		if manager.clientPool.Release(entry) {
 			// Warm-daemon path: container keeps running. Don't call wait()
 			// — that would block indefinitely. The original attach goroutine
 			// stays parked until pool Drain calls DeleteContainer at shutdown.
@@ -698,8 +699,9 @@ func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 				IP:        nodeInfo.IP,
 				LogFile:   nodeInfo.LogFile,
 				ResetPort: nodeInfo.resetPort,
+				Key:       nodeInfo.poolKey,
 			}
-			if manager.clientPool.Release(entry, nodeInfo.poolKey) {
+			if manager.clientPool.Release(entry) {
 				nodeInfo.wait = nil
 				return nil
 			}

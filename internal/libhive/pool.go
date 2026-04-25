@@ -27,6 +27,11 @@ const LabelHivePoolKey = "hive.pool.key"
 // sub-millisecond inside Erigon; this is a generous safety net for HTTP.
 const poolResetTimeout = 5 * time.Second
 
+// poolProbeTimeout caps the TCP liveness probe Acquire runs against a
+// parked entry before handing it back. The daemon's listen socket is
+// either up or it isn't — this isn't waiting on app logic.
+const poolProbeTimeout = 500 * time.Millisecond
+
 // PoolEntry is a single parked container.
 //
 // LogFile carries the JSON-relative log path that was set when the container
@@ -36,12 +41,15 @@ const poolResetTimeout = 5 * time.Second
 //
 // ResetPort is the JSON-RPC port the reset RPC targets — the same value the
 // cold path puts in options.CheckLive (HIVE_CHECK_LIVE_PORT, default 8545).
+//
+// Key is the bucket the entry is filed under (sha256 of image/env/files/
+// networks); callers must populate it before calling Release.
 type PoolEntry struct {
 	ID        string
 	IP        string
 	LogFile   string
 	ResetPort uint16
-	key       string // bucket key, set by Release
+	Key       string
 }
 
 // ClientPool retains running client containers across tests. After a
@@ -72,17 +80,21 @@ type ClientPool struct {
 	// reset performs the inter-test chain reset. Production uses
 	// defaultReset (HTTP debug_setHead); tests inject a stub.
 	reset func(ip string, port uint16) error
+	// probe is the cheap liveness check Acquire runs before handing an
+	// entry back; defaultProbe does a short TCP dial. Tests inject a stub.
+	probe func(ip string, port uint16) error
 
 	mu     sync.Mutex
 	list   *list.List // *PoolEntry, oldest at front
 	closed bool
 
 	// deleting tracks async DeleteContainer goroutines spawned by
-	// eviction; Drain waits on it so shutdown sees all cleanup through.
+	// eviction or stale-probe rejection; Drain waits on it so shutdown
+	// sees all cleanup through.
 	deleting sync.WaitGroup
 
 	// Counters for the end-of-run summary log line.
-	hits, misses, evicted, resetFailed uint64
+	hits, misses, evicted, resetFailed, staleRejected uint64
 }
 
 // NewClientPool returns a pool that holds at most maxIdle entries
@@ -94,6 +106,7 @@ func NewClientPool(backend ContainerBackend, maxIdle int) *ClientPool {
 		list:    list.New(),
 	}
 	p.reset = p.defaultReset
+	p.probe = defaultProbe
 	return p
 }
 
@@ -152,37 +165,86 @@ func ComputePoolKey(image string, env map[string]string, files map[string]*multi
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// Acquire returns a parked entry whose key matches, or nil if none.
-// On a hit the daemon is already running with chain state reset to
-// genesis (done at Release), so the caller can use ID/IP directly.
+// Acquire returns a parked entry whose key matches and whose daemon
+// answers a TCP probe, or nil if neither is true. On a hit the daemon
+// is already running with chain state reset to genesis (done at
+// Release) so the caller can use ID/IP directly.
+//
+// If a candidate fails the probe (daemon died between Release and now),
+// the entry is dropped from the pool, its container scheduled for async
+// DeleteContainer, and we look for the next candidate in the same
+// bucket. Without this check Acquire would silently hand out dead
+// containers and the caller would learn only when subsequent RPCs time
+// out — the cold-path CheckLive wait that catches this is skipped on
+// pool reuse.
 func (p *ClientPool) Acquire(key string) *PoolEntry {
 	if !p.Enabled() {
 		return nil
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed {
-		return nil
-	}
-	// Scan from the back (newest) so we return hot entries first.
-	for e := p.list.Back(); e != nil; e = e.Prev() {
-		entry := e.Value.(*PoolEntry)
-		if entry.key == key {
-			p.list.Remove(e)
+	for {
+		p.mu.Lock()
+		if p.closed {
+			p.mu.Unlock()
+			return nil
+		}
+		// Scan from the back (newest) so we return hot entries first.
+		var found *list.Element
+		for e := p.list.Back(); e != nil; e = e.Prev() {
+			if e.Value.(*PoolEntry).Key == key {
+				found = e
+				break
+			}
+		}
+		if found == nil {
+			p.misses++
+			p.mu.Unlock()
+			return nil
+		}
+		entry := found.Value.(*PoolEntry)
+		p.list.Remove(found)
+		p.mu.Unlock()
+
+		// Probe outside the lock: TCP dial may take up to poolProbeTimeout
+		// in the failure case, and we don't want to block other
+		// Acquire/Release calls behind it.
+		if err := p.probe(entry.IP, entry.ResetPort); err == nil {
+			p.mu.Lock()
 			p.hits++
+			p.mu.Unlock()
 			return entry
+		} else {
+			slog.Warn("pool: stale entry rejected, deleting",
+				"container", shortID(entry.ID), "ip", entry.IP, "err", err)
+			p.mu.Lock()
+			p.staleRejected++
+			// Add(1) under the lock for the same reason as Release: keeps
+			// Drain.Wait from racing past a not-yet-spawned goroutine.
+			if !p.closed {
+				p.deleting.Add(1)
+			}
+			closed := p.closed
+			p.mu.Unlock()
+
+			if !closed {
+				go func(id string) {
+					defer p.deleting.Done()
+					if err := p.backend.DeleteContainer(id); err != nil {
+						slog.Warn("pool: stale delete failed", "container", shortID(id), "err", err)
+					}
+				}(entry.ID)
+			}
+			// Loop: another entry in this bucket might still be alive.
 		}
 	}
-	p.misses++
-	return nil
 }
 
 // Release sends debug_setHead(0) to revert the daemon to genesis, then
-// parks the entry. If the global cap is exceeded the oldest entry is
-// evicted (DeleteContainer in a background goroutine). On reset failure
-// returns false; caller is expected to delete the container.
-func (p *ClientPool) Release(entry PoolEntry, key string) bool {
-	if !p.Enabled() || entry.ID == "" || entry.IP == "" || key == "" || entry.ResetPort == 0 {
+// parks the entry under entry.Key. If the global cap is exceeded the
+// oldest entry is evicted (DeleteContainer in a background goroutine).
+// On reset failure returns false; caller is expected to delete the
+// container.
+func (p *ClientPool) Release(entry PoolEntry) bool {
+	if !p.Enabled() || entry.ID == "" || entry.IP == "" || entry.Key == "" || entry.ResetPort == 0 {
 		return false
 	}
 	if err := p.reset(entry.IP, entry.ResetPort); err != nil {
@@ -194,7 +256,6 @@ func (p *ClientPool) Release(entry PoolEntry, key string) bool {
 		return false
 	}
 
-	entry.key = key
 	var victimID string
 	p.mu.Lock()
 	if p.closed {
@@ -278,6 +339,21 @@ func (p *ClientPool) defaultReset(ip string, port uint16) error {
 	return nil
 }
 
+// defaultProbe does a TCP dial against the daemon's listen socket so
+// Acquire can reject entries whose daemons died between Release and now.
+// We don't issue an RPC — the dial succeeding is sufficient evidence the
+// daemon is up; the next reset RPC at end-of-test will exercise the
+// JSON-RPC path.
+func defaultProbe(ip string, port uint16) error {
+	addr := net.JoinHostPort(ip, strconv.FormatUint(uint64(port), 10))
+	conn, err := net.DialTimeout("tcp", addr, poolProbeTimeout)
+	if err != nil {
+		return err
+	}
+	conn.Close()
+	return nil
+}
+
 // Drain removes every parked container at hive shutdown.
 func (p *ClientPool) Drain(ctx context.Context) {
 	if !p.Enabled() {
@@ -285,7 +361,7 @@ func (p *ClientPool) Drain(ctx context.Context) {
 	}
 	p.mu.Lock()
 	p.closed = true
-	hits, misses, evicted, resetFailed := p.hits, p.misses, p.evicted, p.resetFailed
+	hits, misses, evicted, resetFailed, staleRejected := p.hits, p.misses, p.evicted, p.resetFailed, p.staleRejected
 	victims := make([]string, 0, p.list.Len())
 	for e := p.list.Front(); e != nil; e = e.Next() {
 		victims = append(victims, e.Value.(*PoolEntry).ID)
@@ -300,7 +376,8 @@ func (p *ClientPool) Drain(ctx context.Context) {
 	slog.Info("pool: summary",
 		"hits", hits, "misses", misses,
 		"hit_rate_pct", fmt.Sprintf("%.1f", hitRate),
-		"evicted", evicted, "reset_failed", resetFailed)
+		"evicted", evicted, "reset_failed", resetFailed,
+		"stale_rejected", staleRejected)
 
 	for _, id := range victims {
 		if err := p.backend.DeleteContainer(id); err != nil {

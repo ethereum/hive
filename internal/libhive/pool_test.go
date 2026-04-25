@@ -57,6 +57,8 @@ type resetCall struct {
 
 // poolWithStubReset returns a pool whose reset function records calls
 // instead of doing HTTP, so unit tests don't need a live RPC endpoint.
+// The probe stub always returns nil (entry is alive); tests that want
+// staleness override p.probe directly.
 func poolWithStubReset(t *testing.T, maxIdle int, resetErr error) (*ClientPool, *recordingBackend, *[]resetCall) {
 	t.Helper()
 	be := &recordingBackend{}
@@ -66,13 +68,14 @@ func poolWithStubReset(t *testing.T, maxIdle int, resetErr error) (*ClientPool, 
 		calls = append(calls, resetCall{ip: ip, port: port})
 		return resetErr
 	}
+	p.probe = func(ip string, port uint16) error { return nil }
 	return p, be, &calls
 }
 
 // testEntry builds a PoolEntry with the boilerplate non-zero fields filled
-// in so tests don't have to repeat ResetPort: 8545 everywhere.
-func testEntry(id, ip string) PoolEntry {
-	return PoolEntry{ID: id, IP: ip, ResetPort: 8545}
+// in (ResetPort + Key) so tests don't repeat them everywhere.
+func testEntry(id, ip, key string) PoolEntry {
+	return PoolEntry{ID: id, IP: ip, ResetPort: 8545, Key: key}
 }
 
 // waitForEvictions blocks until all async DeleteContainer goroutines
@@ -91,7 +94,7 @@ func TestPoolDisabled(t *testing.T) {
 	if got := p.Acquire("k"); got != nil {
 		t.Fatalf("disabled pool should return nil on Acquire, got %+v", got)
 	}
-	if p.Release(testEntry("c", "1.2.3.4"), "k") {
+	if p.Release(testEntry("c", "1.2.3.4", "k")) {
 		t.Fatal("disabled pool should not retain on Release")
 	}
 }
@@ -104,11 +107,12 @@ func TestPoolAcquireReleaseLIFO(t *testing.T) {
 		t.Fatalf("empty bucket should return nil, got %+v", got)
 	}
 
-	e1 := testEntry("c1", "10.0.0.1")
-	e2 := testEntry("c2", "10.0.0.2")
-	e3 := testEntry("c3", "10.0.0.3")
-	for _, e := range []PoolEntry{e1, e2, e3} {
-		if !p.Release(e, "k") {
+	for _, e := range []PoolEntry{
+		testEntry("c1", "10.0.0.1", "k"),
+		testEntry("c2", "10.0.0.2", "k"),
+		testEntry("c3", "10.0.0.3", "k"),
+	} {
+		if !p.Release(e) {
 			t.Fatalf("Release of %s should succeed under cap", e.ID)
 		}
 	}
@@ -139,10 +143,10 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 2, nil)
 
 	// Park 2 entries to fill the global cap.
-	if !p.Release(testEntry("c1", "10.0.0.1"), "k1") {
+	if !p.Release(testEntry("c1", "10.0.0.1", "k1")) {
 		t.Fatal("first release must succeed")
 	}
-	if !p.Release(testEntry("c2", "10.0.0.2"), "k2") {
+	if !p.Release(testEntry("c2", "10.0.0.2", "k2")) {
 		t.Fatal("second release must succeed under cap")
 	}
 	if got := len(be.deletes); got != 0 {
@@ -150,7 +154,7 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 	}
 
 	// Park a 3rd: evicts c1 (oldest in LRU) to make room.
-	if !p.Release(testEntry("c3", "10.0.0.3"), "k3") {
+	if !p.Release(testEntry("c3", "10.0.0.3", "k3")) {
 		t.Fatal("Release should succeed by evicting oldest")
 	}
 	waitForEvictions(p)
@@ -177,20 +181,20 @@ func TestPoolGlobalCapEvictsOldest(t *testing.T) {
 func TestPoolAcquireRefreshesLRU(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 2, nil)
 
-	p.Release(testEntry("c1", "10.0.0.1"), "k1")
-	p.Release(testEntry("c2", "10.0.0.2"), "k2")
+	p.Release(testEntry("c1", "10.0.0.1", "k1"))
+	p.Release(testEntry("c2", "10.0.0.2", "k2"))
 
 	// Acquire and re-Release c1 — that pushes it to the back of the LRU.
 	got := p.Acquire("k1")
 	if got == nil || got.ID != "c1" {
 		t.Fatalf("Acquire k1 should return c1, got %+v", got)
 	}
-	if !p.Release(*got, "k1") {
+	if !p.Release(*got) {
 		t.Fatal("Re-release of c1 should succeed")
 	}
 
 	// Park c3: evict the *new* oldest, which is now c2 (not c1).
-	p.Release(testEntry("c3", "10.0.0.3"), "k3")
+	p.Release(testEntry("c3", "10.0.0.3", "k3"))
 	waitForEvictions(p)
 	if got := be.deletes; len(got) != 1 || got[0] != "c2" {
 		t.Fatalf("expected c2 to be evicted (older after c1 was refreshed), got %v", got)
@@ -199,7 +203,7 @@ func TestPoolAcquireRefreshesLRU(t *testing.T) {
 
 func TestPoolReleaseFailsOnResetError(t *testing.T) {
 	p, _, _ := poolWithStubReset(t, 4, errStubResetFailed)
-	if p.Release(testEntry("c1", "10.0.0.1"), "k") {
+	if p.Release(testEntry("c1", "10.0.0.1", "k")) {
 		t.Fatal("Release should fail when reset returns an error")
 	}
 	if got := p.Acquire("k"); got != nil {
@@ -212,7 +216,7 @@ func TestPoolReleaseFailsOnResetError(t *testing.T) {
 // reset URL and silently 0-port-fail at runtime.
 func TestPoolReleaseRequiresResetPort(t *testing.T) {
 	p, _, calls := poolWithStubReset(t, 4, nil)
-	if p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1" /* ResetPort omitted */}, "k") {
+	if p.Release(PoolEntry{ID: "c1", IP: "10.0.0.1", Key: "k" /* ResetPort omitted */}) {
 		t.Fatal("Release with ResetPort=0 should be rejected")
 	}
 	if len(*calls) != 0 {
@@ -224,8 +228,8 @@ func TestPoolReleaseRequiresResetPort(t *testing.T) {
 // reaches the reset RPC, so HIVE_CHECK_LIVE_PORT overrides take effect.
 func TestPoolReleasePassesResetPort(t *testing.T) {
 	p, _, calls := poolWithStubReset(t, 4, nil)
-	entry := PoolEntry{ID: "c1", IP: "10.0.0.1", ResetPort: 9999}
-	if !p.Release(entry, "k") {
+	entry := PoolEntry{ID: "c1", IP: "10.0.0.1", ResetPort: 9999, Key: "k"}
+	if !p.Release(entry) {
 		t.Fatal("Release should succeed")
 	}
 	if len(*calls) != 1 || (*calls)[0].port != 9999 || (*calls)[0].ip != "10.0.0.1" {
@@ -244,8 +248,9 @@ func TestPoolPreservesLogFile(t *testing.T) {
 		IP:        "10.0.0.1",
 		LogFile:   "geth/client-deadbeef-full-id.log",
 		ResetPort: 8545,
+		Key:       "k",
 	}
-	if !p.Release(entry, "k") {
+	if !p.Release(entry) {
 		t.Fatal("Release should succeed")
 	}
 	got := p.Acquire("k")
@@ -260,12 +265,70 @@ func TestPoolPreservesLogFile(t *testing.T) {
 	}
 }
 
+// TestPoolAcquireRejectsStaleEntry verifies that when the daemon's TCP
+// probe fails (daemon died after Release), Acquire drops that entry,
+// schedules its container for async DeleteContainer, and walks back to
+// find the next live candidate in the same bucket. The cold-path
+// CheckLive wait is skipped on pool reuse, so this is the only thing
+// stopping a dead container from reaching the test.
+func TestPoolAcquireRejectsStaleEntry(t *testing.T) {
+	p, be, _ := poolWithStubReset(t, 4, nil)
+
+	// c1-dead is at IP .1, c2-alive at IP .2. Both share key "k".
+	dead := map[string]bool{"10.0.0.1": true}
+	p.probe = func(ip string, port uint16) error {
+		if dead[ip] {
+			return errStubResetFailed
+		}
+		return nil
+	}
+
+	// Release c2 first (becomes oldest), then c1 (becomes newest). Acquire
+	// scans newest-first, so it must trip on dead c1 before reaching c2.
+	if !p.Release(testEntry("c2", "10.0.0.2", "k")) {
+		t.Fatal("Release c2 should succeed")
+	}
+	if !p.Release(testEntry("c1", "10.0.0.1", "k")) {
+		t.Fatal("Release c1 should succeed")
+	}
+
+	got := p.Acquire("k")
+	if got == nil || got.ID != "c2" {
+		t.Fatalf("Acquire should walk past dead c1 to live c2, got %+v", got)
+	}
+	waitForEvictions(p)
+	if len(be.deletes) != 1 || be.deletes[0] != "c1" {
+		t.Fatalf("dead c1 should have been scheduled for delete, got %v", be.deletes)
+	}
+	if p.staleRejected != 1 {
+		t.Fatalf("staleRejected should be 1, got %d", p.staleRejected)
+	}
+}
+
+// TestPoolAcquireAllStaleReturnsNil verifies the loop terminates and
+// returns a miss when every candidate fails the probe.
+func TestPoolAcquireAllStaleReturnsNil(t *testing.T) {
+	p, be, _ := poolWithStubReset(t, 4, nil)
+	p.probe = func(string, uint16) error { return errStubResetFailed }
+
+	p.Release(testEntry("c1", "10.0.0.1", "k"))
+	p.Release(testEntry("c2", "10.0.0.2", "k"))
+
+	if got := p.Acquire("k"); got != nil {
+		t.Fatalf("all entries stale: Acquire should return nil, got %+v", got)
+	}
+	waitForEvictions(p)
+	if len(be.deletes) != 2 {
+		t.Fatalf("both stale entries should be scheduled for delete, got %v", be.deletes)
+	}
+}
+
 func TestPoolDrain(t *testing.T) {
 	p, be, _ := poolWithStubReset(t, 4, nil)
 
-	p.Release(testEntry("c1", "10.0.0.1"), "k1")
-	p.Release(testEntry("c2", "10.0.0.2"), "k2")
-	p.Release(testEntry("c3", "10.0.0.3"), "k1")
+	p.Release(testEntry("c1", "10.0.0.1", "k1"))
+	p.Release(testEntry("c2", "10.0.0.2", "k2"))
+	p.Release(testEntry("c3", "10.0.0.3", "k1"))
 
 	p.Drain(context.Background())
 
@@ -276,7 +339,7 @@ func TestPoolDrain(t *testing.T) {
 	if got := p.Acquire("k1"); got != nil {
 		t.Fatalf("Acquire after Drain should return nil, got %+v", got)
 	}
-	if p.Release(testEntry("c4", "10.0.0.4"), "k1") {
+	if p.Release(testEntry("c4", "10.0.0.4", "k1")) {
 		t.Fatal("Release after Drain should fail")
 	}
 }
