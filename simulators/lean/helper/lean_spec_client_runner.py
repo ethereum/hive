@@ -36,6 +36,7 @@ from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import GossipBlockEvent
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+from lean_spec.subspecs.networking.transport.identity.keypair import Secp256k1PublicKey
 from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
     QuicStream,
@@ -43,6 +44,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
+from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
@@ -95,6 +97,23 @@ LEGACY_PUBLIC_FIELD: Final = "public"
 LEGACY_SECRET_FIELD: Final = "secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
+
+
+def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypair:
+    private_key_bytes = Bytes32(bytes.fromhex(private_key_hex))
+
+    if hasattr(IdentityKeypair, "from_bytes"):
+        return IdentityKeypair.from_bytes(private_key_bytes)
+
+    private_key_value = int.from_bytes(private_key_bytes, "big")
+    if not 0 < private_key_value < SECP256K1_ORDER:
+        raise ValueError("helper identity private key is outside the secp256k1 scalar range")
+
+    private_key = ec.derive_private_key(private_key_value, ec.SECP256K1())
+    return IdentityKeypair(
+        private_key=private_key,
+        public_key=Secp256k1PublicKey(_key=private_key.public_key()),
+    )
 
 _QUIC_STREAM_CLOSE_PATCHED = False
 _SSZ_FAST_DESERIALIZATION_PATCHED = False
@@ -715,31 +734,34 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
         # LeanSpec's ValidatorRegistry.from_yaml path intermittently segfaults
         # while decoding the bundled secret-key files. Decode the already
         # available JSON payloads directly instead for assigned validators.
-        #
-        # Devnet4's latest SecretKey decoding can also raise during this fast
-        # path, so fall back to the manifest loader rather than abort helper
-        # startup outright.
         try:
+            registry = ValidatorRegistry()
             if uses_latest_leanspec_format():
-                validator_keys = {
-                    ValidatorIndex(index): (
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
-                        ),
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[PROPOSAL_SECRET_FIELD])
-                        ),
+                for index in validator_indices:
+                    validator = load_validator(index)
+                    registry.add(
+                        ValidatorEntry(
+                            index=ValidatorIndex(index),
+                            attestation_secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+                            ),
+                            proposal_secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[PROPOSAL_SECRET_FIELD])
+                            ),
+                        )
                     )
-                    for index in validator_indices
-                }
             else:
-                validator_keys = {
-                    ValidatorIndex(index): SecretKey.decode_bytes(
-                        bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
+                for index in validator_indices:
+                    validator = load_validator(index)
+                    registry.add(
+                        ValidatorEntry(
+                            index=ValidatorIndex(index),
+                            secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+                            ),
+                        )
                     )
-                    for index in validator_indices
-                }
-            return ValidatorRegistry.from_secret_keys(validator_keys)
+            return registry
         except Exception as err:
             logger.warning(
                 "Falling back to ValidatorRegistry.from_yaml for %s after direct key decode failed: %s",
@@ -892,9 +914,7 @@ async def run() -> None:
         HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
         HELPER_IDENTITY_PRIVATE_KEY_HEX,
     )
-    identity_key = IdentityKeypair.from_bytes(
-        Bytes32(bytes.fromhex(identity_private_key_hex))
-    )
+    identity_key = identity_keypair_from_private_key_hex(identity_private_key_hex)
     metadata = helper_genesis_metadata()
     validator_registry = load_validator_registry(node_id)
     bootnodes = parse_bootnodes()

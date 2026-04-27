@@ -1,7 +1,7 @@
 ARG devnet3_baseimage=ghcr.io/reamlabs/ream
 ARG devnet3_tag=latest-devnet3
 ARG devnet4_baseimage=ghcr.io/reamlabs/ream
-ARG devnet4_tag=latest-devnet4
+ARG devnet4_tag=latest
 
 FROM $devnet4_baseimage:$devnet4_tag AS devnet4
 FROM $devnet3_baseimage:$devnet3_tag

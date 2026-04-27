@@ -10,10 +10,12 @@ if [[ "$DEVNET_LABEL" == "devnet4" ]]; then
     SOURCE_DIR="/opt/qlean-d4" 
     QLEAN_BIN_NAME="qlean-devnet4" 
     MANIFEST_NAME="validator-keys-manifest-devnet4.yaml" 
+    QLEAN_USES_GENESIS_DIR=1
 else 
     SOURCE_DIR="/opt/qlean-d3" 
     QLEAN_BIN_NAME="qlean-devnet3" 
     MANIFEST_NAME="validator-keys-manifest.yaml" 
+    QLEAN_USES_GENESIS_DIR=0
 fi 
 
 rm -rf "$WORKSPACE" "$REAL_MODS" 
@@ -44,20 +46,32 @@ until [[ -f "$ASSET_ROOT/config.yaml" ]]; do sleep 0.5; done
 
 find "$ASSET_ROOT" -type f \( -name "*.yaml" -o -name "*.json" \) -exec sed -i 's/: 0x/: /g; s/\"0x/\"/g' {} + || true 
 
+NODE_KEY="$(cat "$ASSET_ROOT/node.key")"
+
 FLAGS=( 
     --modules-dir "$WORKSPACE/internal_modules" 
-    --genesis "$ASSET_ROOT/config.yaml" 
-    --validator-registry-path "$ASSET_ROOT/validators.yaml" 
-    --validator-keys-manifest "$ASSET_ROOT/hash-sig-keys/$MANIFEST_NAME" 
-    --xmss-pk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.pk" 
-    --xmss-sk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.sk" 
     --data-dir "/data" 
     --node-id "$CLEAN_NODE_ID" 
-    --node-key "$ASSET_ROOT/node.key" 
+    --node-key "$NODE_KEY"
     --listen-addr "/ip4/0.0.0.0/udp/9000/quic-v1" 
     --api-host "0.0.0.0" 
     --api-port 5052 
 ) 
+
+if [[ "$QLEAN_USES_GENESIS_DIR" == "1" ]]; then
+    FLAGS+=(
+        --genesis-dir "$ASSET_ROOT"
+        --bootnodes "$ASSET_ROOT/nodes.yaml"
+    )
+else
+    FLAGS+=(
+        --genesis "$ASSET_ROOT/config.yaml"
+        --validator-registry-path "$ASSET_ROOT/validators.yaml"
+        --validator-keys-manifest "$ASSET_ROOT/hash-sig-keys/$MANIFEST_NAME"
+        --xmss-pk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.pk"
+        --xmss-sk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.sk"
+    )
+fi
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
