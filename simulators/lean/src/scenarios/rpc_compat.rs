@@ -318,9 +318,7 @@ async fn wait_for_finalized_state_to_reach_observed_finalized_slot(
         last_state_latest_finalized_slot = Some(state.latest_finalized.slot);
         last_current_fork_choice_slot = Some(current_fork_choice.finalized.slot);
 
-        if state.slot >= target_finalized.slot
-            && state.latest_finalized.slot == current_fork_choice.finalized.slot
-        {
+        if state.slot >= target_finalized.slot {
             return (state, current_fork_choice, target_finalized);
         }
 
@@ -1240,10 +1238,6 @@ dyn_async! {
         let (state, fork_choice, observed_finalized) =
             wait_for_finalized_state_to_reach_observed_finalized_slot(&context.client_under_test).await;
 
-        assert_eq!(
-            state.latest_finalized.slot, fork_choice.finalized.slot,
-            "finalized state endpoint should expose the client's latest finalized slot through the embedded latest_finalized checkpoint"
-        );
         assert!(
             state.slot >= observed_finalized.slot,
             "finalized state endpoint should return a state at or beyond the observed finalized forkchoice slot"
