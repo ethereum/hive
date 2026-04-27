@@ -23,7 +23,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
-const FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS: u64 = 30;
+const FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS: u64 = 60;
 const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
@@ -301,31 +301,39 @@ async fn load_post_genesis_state_setup(
     (context, state, fork_choice)
 }
 
-async fn wait_for_finalized_state_to_catch_fork_choice(
+async fn wait_for_finalized_state_to_reach_observed_finalized_slot(
     client: &Client,
-) -> (LeanState, ForkChoiceResponse) {
+) -> (LeanState, ForkChoiceResponse, CheckpointResponse) {
+    let target_fork_choice = wait_for_non_genesis_fork_choice_response(client).await;
+    let target_finalized = target_fork_choice.finalized;
     let mut last_state_slot = None;
-    let mut last_fork_choice_slot = None;
+    let mut last_state_latest_finalized_slot = None;
+    let mut last_current_fork_choice_slot = None;
 
     for _attempt in 0..FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS {
-        let fork_choice = load_fork_choice_response(client).await;
         let state = load_finalized_state(client).await;
+        let current_fork_choice = load_fork_choice_response(client).await;
 
-        last_state_slot = Some(state.latest_finalized.slot);
-        last_fork_choice_slot = Some(fork_choice.finalized.slot);
+        last_state_slot = Some(state.slot);
+        last_state_latest_finalized_slot = Some(state.latest_finalized.slot);
+        last_current_fork_choice_slot = Some(current_fork_choice.finalized.slot);
 
-        if state.latest_finalized.slot >= fork_choice.finalized.slot {
-            return (state, fork_choice);
+        if state.slot >= target_finalized.slot
+            && state.latest_finalized.slot == current_fork_choice.finalized.slot
+        {
+            return (state, current_fork_choice, target_finalized);
         }
 
         sleep(std::time::Duration::from_secs(1)).await;
     }
 
     panic!(
-        "finalized state endpoint never caught up to forkchoice within {} seconds (latest state finalized slot: {}, latest forkchoice finalized slot: {})",
+        "finalized state endpoint never reached the observed finalized forkchoice slot within {} seconds (target forkchoice finalized slot: {}, latest state slot: {}, latest state embedded finalized slot: {}, latest current forkchoice finalized slot: {})",
         FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS,
+        target_finalized.slot,
         last_state_slot.unwrap_or(0),
-        last_fork_choice_slot.unwrap_or(0),
+        last_state_latest_finalized_slot.unwrap_or(0),
+        last_current_fork_choice_slot.unwrap_or(0),
     );
 }
 
@@ -1229,12 +1237,16 @@ dyn_async! {
 dyn_async! {
     async fn test_state_finalized_endpoint_tracks_latest_finalized_slot<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
         let (context, _state, _fork_choice) = load_post_genesis_state_setup(test, test_data).await;
-        let (state, fork_choice) =
-            wait_for_finalized_state_to_catch_fork_choice(&context.client_under_test).await;
+        let (state, fork_choice, observed_finalized) =
+            wait_for_finalized_state_to_reach_observed_finalized_slot(&context.client_under_test).await;
 
         assert_eq!(
             state.latest_finalized.slot, fork_choice.finalized.slot,
             "finalized state endpoint should expose the client's latest finalized slot through the embedded latest_finalized checkpoint"
+        );
+        assert!(
+            state.slot >= observed_finalized.slot,
+            "finalized state endpoint should return a state at or beyond the observed finalized forkchoice slot"
         );
         assert!(
             state.slot >= state.latest_finalized.slot,
@@ -1243,6 +1255,10 @@ dyn_async! {
         assert!(
             state.latest_block_header.slot >= state.latest_finalized.slot,
             "the finalized state's latest_block_header should stay at or ahead of the embedded latest_finalized checkpoint"
+        );
+        assert!(
+            fork_choice.finalized.slot >= observed_finalized.slot,
+            "forkchoice finalized checkpoint should not regress while waiting for finalized state"
         );
     }
 }

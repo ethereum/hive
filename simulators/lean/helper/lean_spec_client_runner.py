@@ -36,6 +36,7 @@ from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import GossipBlockEvent
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+from lean_spec.subspecs.networking.transport.identity.keypair import Secp256k1PublicKey
 from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
     QuicStream,
@@ -43,6 +44,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
+from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
@@ -86,6 +88,8 @@ HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_GOSSIP
 HELPER_P2P_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_P2P_PORT"
 HELPER_API_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_API_PORT"
 HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_METADATA_PORT"
+HELPER_REQRESP_BLOCK_ENCODING_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_REQRESP_BLOCK_ENCODING"
+REAM_DEVNET4_REQRESP_BLOCK_ENCODING: Final = "ream-devnet4"
 VALIDATOR_COUNT: Final = 3
 ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
@@ -96,11 +100,29 @@ LEGACY_SECRET_FIELD: Final = "secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
 
+
+def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypair:
+    private_key_bytes = Bytes32(bytes.fromhex(private_key_hex))
+
+    if hasattr(IdentityKeypair, "from_bytes"):
+        return IdentityKeypair.from_bytes(private_key_bytes)
+
+    private_key_value = int.from_bytes(private_key_bytes, "big")
+    if not 0 < private_key_value < SECP256K1_ORDER:
+        raise ValueError("helper identity private key is outside the secp256k1 scalar range")
+
+    private_key = ec.derive_private_key(private_key_value, ec.SECP256K1())
+    return IdentityKeypair(
+        private_key=private_key,
+        public_key=Secp256k1PublicKey(_key=private_key.public_key()),
+    )
+
 _QUIC_STREAM_CLOSE_PATCHED = False
 _SSZ_FAST_DESERIALIZATION_PATCHED = False
 _SNAPPY_COMPRESS_PATCHED = False
 _REQRESP_BLOCK_CACHE_PATCHED = False
 _NETWORK_SERVICE_GOSSIP_PATCHED = False
+_REAM_DEVNET4_REQRESP_ENCODING_PATCHED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
@@ -356,6 +378,75 @@ def patch_reqresp_block_cache() -> None:
 
     reqresp_client_cls.request_blocks_by_root = request_blocks_by_root_with_cache
     _REQRESP_BLOCK_CACHE_PATCHED = True
+
+
+def patch_ream_devnet4_reqresp_block_encoding() -> None:
+    global _REAM_DEVNET4_REQRESP_ENCODING_PATCHED
+
+    if _REAM_DEVNET4_REQRESP_ENCODING_PATCHED:
+        return
+
+    if (
+        os.environ.get(HELPER_REQRESP_BLOCK_ENCODING_ENVIRONMENT_VARIABLE)
+        != REAM_DEVNET4_REQRESP_BLOCK_ENCODING
+    ):
+        return
+
+    aggregation_module = importlib.import_module("lean_spec.subspecs.xmss.aggregation")
+    aggregated_signature_proof_cls = aggregation_module.AggregatedSignatureProof
+    original_deserialize = aggregated_signature_proof_cls.deserialize
+
+    def serialize_with_bytecode_point_none(self: object, stream: io.BytesIO) -> int:
+        participants = getattr(self, "participants")
+        proof_data = getattr(self, "proof_data")
+        variable_data = [
+            participants.encode_bytes(),
+            proof_data.encode_bytes(),
+            b"\x00",
+        ]
+
+        offset = len(variable_data) * OFFSET_BYTE_LENGTH
+        for data in variable_data:
+            Uint32(offset).serialize(stream)
+            offset += len(data)
+
+        for data in variable_data:
+            stream.write(data)
+
+        return offset
+
+    @classmethod
+    def deserialize_with_optional_bytecode_point(
+        cls: type[Container],
+        stream: io.BytesIO,
+        scope: int,
+    ) -> object:
+        data = stream.read(scope)
+        try:
+            return original_deserialize(io.BytesIO(data), scope)
+        except Exception:
+            if scope < 3 * OFFSET_BYTE_LENGTH:
+                raise
+
+        offsets = [
+            int(Uint32.decode_bytes(data[i : i + OFFSET_BYTE_LENGTH]))
+            for i in range(0, 3 * OFFSET_BYTE_LENGTH, OFFSET_BYTE_LENGTH)
+        ]
+        offsets.append(scope)
+        _validate_offsets(offsets, scope, cls.__name__)
+
+        participants_type = cls._get_ssz_field_type(cls.model_fields["participants"].annotation)
+        proof_data_type = cls._get_ssz_field_type(cls.model_fields["proof_data"].annotation)
+
+        return cls(
+            participants=participants_type.decode_bytes(data[offsets[0] : offsets[1]]),
+            proof_data=proof_data_type.decode_bytes(data[offsets[1] : offsets[2]]),
+        )
+
+    aggregated_signature_proof_cls.serialize = serialize_with_bytecode_point_none
+    aggregated_signature_proof_cls.deserialize = deserialize_with_optional_bytecode_point
+    logger.info("Enabled Ream devnet4-compatible req/resp block proof encoding")
+    _REAM_DEVNET4_REQRESP_ENCODING_PATCHED = True
 
 
 def patch_network_service_gossip_processing() -> None:
@@ -715,31 +806,34 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
         # LeanSpec's ValidatorRegistry.from_yaml path intermittently segfaults
         # while decoding the bundled secret-key files. Decode the already
         # available JSON payloads directly instead for assigned validators.
-        #
-        # Devnet4's latest SecretKey decoding can also raise during this fast
-        # path, so fall back to the manifest loader rather than abort helper
-        # startup outright.
         try:
+            registry = ValidatorRegistry()
             if uses_latest_leanspec_format():
-                validator_keys = {
-                    ValidatorIndex(index): (
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
-                        ),
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[PROPOSAL_SECRET_FIELD])
-                        ),
+                for index in validator_indices:
+                    validator = load_validator(index)
+                    registry.add(
+                        ValidatorEntry(
+                            index=ValidatorIndex(index),
+                            attestation_secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+                            ),
+                            proposal_secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[PROPOSAL_SECRET_FIELD])
+                            ),
+                        )
                     )
-                    for index in validator_indices
-                }
             else:
-                validator_keys = {
-                    ValidatorIndex(index): SecretKey.decode_bytes(
-                        bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
+                for index in validator_indices:
+                    validator = load_validator(index)
+                    registry.add(
+                        ValidatorEntry(
+                            index=ValidatorIndex(index),
+                            secret_key=SecretKey.decode_bytes(
+                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+                            ),
+                        )
                     )
-                    for index in validator_indices
-                }
-            return ValidatorRegistry.from_secret_keys(validator_keys)
+            return registry
         except Exception as err:
             logger.warning(
                 "Falling back to ValidatorRegistry.from_yaml for %s after direct key decode failed: %s",
@@ -882,6 +976,7 @@ async def run() -> None:
     patch_fast_ssz_deserialization()
     patch_snappy_compress()
     patch_reqresp_block_cache()
+    patch_ream_devnet4_reqresp_block_encoding()
     patch_network_service_gossip_processing()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
@@ -892,9 +987,7 @@ async def run() -> None:
         HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
         HELPER_IDENTITY_PRIVATE_KEY_HEX,
     )
-    identity_key = IdentityKeypair.from_bytes(
-        Bytes32(bytes.fromhex(identity_private_key_hex))
-    )
+    identity_key = identity_keypair_from_private_key_hex(identity_private_key_hex)
     metadata = helper_genesis_metadata()
     validator_registry = load_validator_registry(node_id)
     bootnodes = parse_bootnodes()
