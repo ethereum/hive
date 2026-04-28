@@ -41,8 +41,8 @@ const LEAN_HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_HELPER_M
 const LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str =
     "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
-const LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_CLIENT_RUNTIME_ROLE";
-const LEAN_CLIENT_RUNTIME_ROLE_OBSERVER: &str = "observer";
+pub(crate) const LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_CLIENT_RUNTIME_ROLE";
+pub(crate) const LEAN_CLIENT_RUNTIME_ROLE_OBSERVER: &str = "observer";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
 const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
 const LEAN_SPEC_SOURCE_PEER_ID: &str = "16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3";
@@ -2172,7 +2172,7 @@ fn start_local_lean_spec_helper(
     }
 }
 
-fn simulator_container_ip() -> IpAddr {
+pub(crate) fn simulator_container_ip() -> IpAddr {
     let simulator_url = env::var("HIVE_SIMULATOR")
         .expect("HIVE_SIMULATOR environment variable should be set inside the simulator");
     let url = Url::parse(&simulator_url).unwrap_or_else(|err| {
