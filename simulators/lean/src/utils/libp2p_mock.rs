@@ -7,20 +7,26 @@ use async_trait::async_trait;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use futures::prelude::*;
 use libp2p::{
-    Multiaddr, PeerId, StreamProtocol, Swarm,
-    gossipsub::{Behaviour as GossipsubBehaviour, Config as GossipsubConfig, Event as GossipsubEvent, IdentTopic, MessageAuthenticity},
+    gossipsub::{
+        Behaviour as GossipsubBehaviour, Config as GossipsubConfig, Event as GossipsubEvent,
+        IdentTopic, MessageAuthenticity,
+    },
     request_response::{
         self, Behaviour as RequestResponseBehaviour, Codec, Event as ReqRespEvent,
         Message as ReqRespMessage, OutboundRequestId, ProtocolSupport, ResponseChannel,
     },
     swarm::{NetworkBehaviour, SwarmEvent},
+    Multiaddr, PeerId, StreamProtocol, Swarm,
 };
 use libp2p_identity::secp256k1::SecretKey;
 use sha2::{Digest, Sha256};
 use snap::{read::FrameDecoder, write::FrameEncoder};
 use ssz::Encode;
 use ssz_derive::{Decode as SszDecodeDerive, Encode as SszEncodeDerive};
-use ssz_types::{BitList, VariableList, typenum::{U1024, U4096, U1048576}};
+use ssz_types::{
+    typenum::{U1024, U1048576, U4096},
+    BitList, VariableList,
+};
 use tokio::time::timeout;
 
 // Protocol strings for lean reqresp
@@ -33,11 +39,15 @@ pub fn lean_block_topic(fork_digest: &str) -> IdentTopic {
 }
 
 pub fn lean_attestation_topic(fork_digest: &str, subnet_id: u64) -> IdentTopic {
-    IdentTopic::new(format!("/leanconsensus/{fork_digest}/attestation_{subnet_id}/ssz_snappy"))
+    IdentTopic::new(format!(
+        "/leanconsensus/{fork_digest}/attestation_{subnet_id}/ssz_snappy"
+    ))
 }
 
 pub fn lean_aggregation_topic(fork_digest: &str) -> IdentTopic {
-    IdentTopic::new(format!("/leanconsensus/{fork_digest}/aggregated_attestation/ssz_snappy"))
+    IdentTopic::new(format!(
+        "/leanconsensus/{fork_digest}/aggregated_attestation/ssz_snappy"
+    ))
 }
 
 // Response codes
@@ -200,7 +210,12 @@ pub struct LeanSignedBlock {
 
 impl LeanSignedBlock {
     /// Build a minimal valid-SSZ signed block for the given slot with the specified parent.
-    pub fn build_minimal(slot: u64, proposer_index: u64, parent_root: B256, state_root: B256) -> Self {
+    pub fn build_minimal(
+        slot: u64,
+        proposer_index: u64,
+        parent_root: B256,
+        state_root: B256,
+    ) -> Self {
         Self {
             block: LeanBlock {
                 slot,
@@ -292,12 +307,10 @@ pub fn replace_multiaddr_ip(addr: &Multiaddr, ip: std::net::IpAddr) -> Multiaddr
     let mut new_addr = Multiaddr::empty();
     for proto in addr.iter() {
         match proto {
-            libp2p::multiaddr::Protocol::Ip4(_) | libp2p::multiaddr::Protocol::Ip6(_) => {
-                match ip {
-                    std::net::IpAddr::V4(v4) => new_addr.push(libp2p::multiaddr::Protocol::Ip4(v4)),
-                    std::net::IpAddr::V6(v6) => new_addr.push(libp2p::multiaddr::Protocol::Ip6(v6)),
-                }
-            }
+            libp2p::multiaddr::Protocol::Ip4(_) | libp2p::multiaddr::Protocol::Ip6(_) => match ip {
+                std::net::IpAddr::V4(v4) => new_addr.push(libp2p::multiaddr::Protocol::Ip4(v4)),
+                std::net::IpAddr::V6(v6) => new_addr.push(libp2p::multiaddr::Protocol::Ip6(v6)),
+            },
             other => new_addr.push(other),
         }
     }
@@ -312,8 +325,7 @@ fn encode_varint_usize(value: usize) -> Vec<u8> {
 }
 
 fn decode_varint_usize(buf: &[u8]) -> io::Result<(usize, &[u8])> {
-    unsigned_varint::decode::usize(buf)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    unsigned_varint::decode::usize(buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 /// Encode SSZ bytes + snappy compression for a request payload.
@@ -466,8 +478,10 @@ pub struct MockBehaviour {
 
 pub struct MockNode {
     pub swarm: Swarm<MockBehaviour>,
-    pending_requests:
-        HashMap<OutboundRequestId, tokio::sync::oneshot::Sender<Result<Vec<(u8, Vec<u8>)>, String>>>,
+    pending_requests: HashMap<
+        OutboundRequestId,
+        tokio::sync::oneshot::Sender<Result<Vec<(u8, Vec<u8>)>, String>>,
+    >,
     gossip_messages: Vec<(PeerId, IdentTopic, Vec<u8>)>,
     secret_key_bytes: Option<[u8; 32]>,
 }
@@ -501,11 +515,7 @@ impl MockNode {
                 )
                 .with_agent_version("mock-node/0.1.0".to_string());
                 MockBehaviour {
-                    reqresp: RequestResponseBehaviour::with_codec(
-                        LeanReqRespCodec,
-                        protocols,
-                        cfg,
-                    ),
+                    reqresp: RequestResponseBehaviour::with_codec(LeanReqRespCodec, protocols, cfg),
                     gossipsub,
                     identify: libp2p::identify::Behaviour::new(identify_config),
                     ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
@@ -543,7 +553,10 @@ impl MockNode {
 
     pub fn new() -> Result<Self, String> {
         Self::with_protocols(vec![
-            (StreamProtocol::new(LEAN_STATUS_PROTOCOL), ProtocolSupport::Full),
+            (
+                StreamProtocol::new(LEAN_STATUS_PROTOCOL),
+                ProtocolSupport::Full,
+            ),
             (
                 StreamProtocol::new(LEAN_BLOCKS_BY_ROOT_PROTOCOL),
                 ProtocolSupport::Full,
@@ -602,39 +615,35 @@ impl MockNode {
             }
 
             match timeout(remaining, self.swarm.select_next_some()).await {
-                Ok(event) => {
-                    match event {
-                        SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
-                            ReqRespEvent::Message {
-                                peer: _,
-                                message:
-                                    ReqRespMessage::Response {
-                                        request_id: rid,
-                                        response,
-                                    },
-                                ..
-                            },
-                        )) => {
-                            if rid == request_id {
-                                self.pending_requests.remove(&request_id);
-                                return Ok(response);
-                            }
-                        }
-                        SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
-                            ReqRespEvent::OutboundFailure {
+                Ok(event) => match event {
+                    SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(ReqRespEvent::Message {
+                        peer: _,
+                        message:
+                            ReqRespMessage::Response {
                                 request_id: rid,
-                                error,
-                                ..
+                                response,
                             },
-                        )) => {
-                            if rid == request_id {
-                                self.pending_requests.remove(&request_id);
-                                return Err(format!("Outbound failure: {error:?}"));
-                            }
+                        ..
+                    })) => {
+                        if rid == request_id {
+                            self.pending_requests.remove(&request_id);
+                            return Ok(response);
                         }
-                        _ => {}
                     }
-                }
+                    SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
+                        ReqRespEvent::OutboundFailure {
+                            request_id: rid,
+                            error,
+                            ..
+                        },
+                    )) => {
+                        if rid == request_id {
+                            self.pending_requests.remove(&request_id);
+                            return Err(format!("Outbound failure: {error:?}"));
+                        }
+                    }
+                    _ => {}
+                },
                 Err(_) => {
                     self.pending_requests.remove(&request_id);
                     return Err("Request timeout".to_string());
@@ -646,8 +655,12 @@ impl MockNode {
     /// Wait for an incoming request and return it along with the response channel.
     pub async fn wait_for_request(
         &mut self,
-    ) -> Option<(PeerId, request_response::InboundRequestId, Vec<u8>, ResponseChannel<Vec<(u8, Vec<u8>)>>)>
-    {
+    ) -> Option<(
+        PeerId,
+        request_response::InboundRequestId,
+        Vec<u8>,
+        ResponseChannel<Vec<(u8, Vec<u8>)>>,
+    )> {
         loop {
             match self.swarm.next().await {
                 Some(SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
@@ -713,18 +726,16 @@ impl MockNode {
                 break;
             }
             match tokio::time::timeout(remaining, self.swarm.select_next_some()).await {
-                Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
-                    ReqRespEvent::Message {
-                        peer: _,
-                        message:
-                            ReqRespMessage::Request {
-                                request_id: _,
-                                request,
-                                channel,
-                            },
-                        ..
-                    },
-                ))) => {
+                Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(ReqRespEvent::Message {
+                    peer: _,
+                    message:
+                        ReqRespMessage::Request {
+                            request_id: _,
+                            request,
+                            channel,
+                        },
+                    ..
+                }))) => {
                     // Try to decode as Status and echo it back.
                     if let Ok(decompressed) = decode_request(&request) {
                         if let Ok(status) = Status::from_ssz_bytes(&decompressed) {
@@ -743,10 +754,8 @@ impl MockNode {
                             continue;
                         }
                     }
-                    let _ = self.send_response(
-                        channel,
-                        vec![(RESPONSE_CODE_RESOURCE_UNAVAILABLE, vec![])],
-                    );
+                    let _ = self
+                        .send_response(channel, vec![(RESPONSE_CODE_RESOURCE_UNAVAILABLE, vec![])]);
                 }
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
                     GossipsubEvent::Message {
@@ -757,7 +766,8 @@ impl MockNode {
                 ))) => {
                     let topic_str = message.topic.into_string();
                     let topic = IdentTopic::new(topic_str);
-                    self.gossip_messages.push((propagation_source, topic, message.data));
+                    self.gossip_messages
+                        .push((propagation_source, topic, message.data));
                 }
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(_))) => {}
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Identify(_))) => {}
@@ -779,11 +789,16 @@ impl MockNode {
             match timeout(remaining, self.swarm.select_next_some()).await {
                 Ok(SwarmEvent::NewListenAddr { address, .. }) => return Some(address),
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
-                    GossipsubEvent::Message { propagation_source, message, .. },
+                    GossipsubEvent::Message {
+                        propagation_source,
+                        message,
+                        ..
+                    },
                 ))) => {
                     let topic_str = message.topic.into_string();
                     let topic = IdentTopic::new(topic_str);
-                    self.gossip_messages.push((propagation_source, topic, message.data));
+                    self.gossip_messages
+                        .push((propagation_source, topic, message.data));
                     continue;
                 }
                 Ok(_) => continue,
@@ -802,7 +817,11 @@ impl MockNode {
         loop {
             match self.swarm.next().await {
                 Some(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
-                    GossipsubEvent::Message { propagation_source, message, .. },
+                    GossipsubEvent::Message {
+                        propagation_source,
+                        message,
+                        ..
+                    },
                 ))) => {
                     let topic_str = message.topic.into_string();
                     let topic = IdentTopic::new(topic_str);

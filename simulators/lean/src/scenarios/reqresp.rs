@@ -1,9 +1,9 @@
 use crate::scenarios::helper::{
-    default_genesis_time, expect_single_client, fork_choice_head_slot, http_client, lean_api_url,
-    lean_clients, lean_single_client_runtime_setup, load_fork_choice_response,
+    default_genesis_time, fork_choice_head_slot, http_client, lean_api_url,
+    lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
     prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
-    simulator_container_ip, start_post_genesis_sync_context, lean_environment,
-    ClientUnderTestRole, HelperGossipForkDigestProfile, LeanDevnet, PostGenesisSyncTestData,
+    simulator_container_ip, start_post_genesis_sync_context, ClientUnderTestRole,
+    HelperGossipForkDigestProfile, LeanDevnet, PostGenesisSyncTestData,
     LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE, LEAN_CLIENT_RUNTIME_ROLE_OBSERVER,
 };
 use crate::utils::libp2p_mock::{
@@ -39,7 +39,10 @@ async fn wait_for_client_blocks(client: &Client) {
         }
         sleep(Duration::from_secs(1)).await;
     }
-    panic!("client did not produce blocks within {} seconds", REQRESP_SYNC_TIMEOUT_SECS);
+    panic!(
+        "client did not produce blocks within {} seconds",
+        REQRESP_SYNC_TIMEOUT_SECS
+    );
 }
 
 // Suite: reqresp
@@ -54,7 +57,7 @@ dyn_async! {
         }
 
         for client in &clients {
-            let (fresh_client_environments, fresh_client_files) = lean_single_client_runtime_setup(
+            let (_fresh_client_environments, _fresh_client_files) = lean_single_client_runtime_setup(
                 &client.name);
 
 
@@ -616,7 +619,7 @@ dyn_async! {
         );
 
         assert!(
-            client_fork_choice.nodes.len() >= 1,
+            !client_fork_choice.nodes.is_empty(),
             "client should have at least genesis node after status exchange"
         );
     }
@@ -659,7 +662,7 @@ dyn_async! {
         let mut mock = MockNode::new_status_only().expect("failed to create mock node");
         let listen_addr = mock.get_listen_address().await
             .expect("mock node should bind to an address");
-        let mock_peer_id = mock.local_peer_id();
+        let _mock_peer_id = mock.local_peer_id();
         let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
         let (ip, port) = extract_ip_port(&external_addr)
             .expect("mock listen address should have IP and port");
@@ -719,7 +722,7 @@ dyn_async! {
         let mut mock = MockNode::new_status_only().expect("failed to create mock node");
         let listen_addr = mock.get_listen_address().await
             .expect("mock node should bind to an address");
-        let mock_peer_id = mock.local_peer_id();
+        let _mock_peer_id = mock.local_peer_id();
         let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
         let (ip, port) = extract_ip_port(&external_addr)
             .expect("mock listen address should have IP and port");
@@ -785,18 +788,15 @@ dyn_async! {
         let request = encode_request_raw(&garbage);
         let result = mock.send_request(peer_id, request).await;
 
-        match result {
-            Ok(chunks) => {
-                assert!(
-                    chunks.is_empty() || chunks[0].0 != RESPONSE_CODE_SUCCESS,
-                    "client should reject malformed SSZ status"
-                );
-            }
-            Err(_) => {}
+        if let Ok(chunks) = result {
+            assert!(
+                chunks.is_empty() || chunks[0].0 != RESPONSE_CODE_SUCCESS,
+                "client should reject malformed SSZ status"
+            );
         }
 
         let response = http_client()
-            .get(&lean_api_url(&client, "/lean/v0/fork_choice"))
+            .get(lean_api_url(client, "/lean/v0/fork_choice"))
             .send()
             .await
             .expect("client should still respond to HTTP after malformed status");
@@ -821,7 +821,7 @@ dyn_async! {
         let head_root = fork_choice.head;
 
         let response = http_client()
-            .get(&lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
+            .get(lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
             .send()
             .await
             .expect("state endpoint should respond");
@@ -884,7 +884,7 @@ dyn_async! {
         );
 
         let response = http_client()
-            .get(&lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
+            .get(lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
             .send()
             .await
             .expect("state endpoint should respond");
@@ -913,7 +913,7 @@ dyn_async! {
         );
 
         let response = http_client()
-            .get(&lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
+            .get(lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
             .send()
             .await
             .expect("state endpoint should respond");
@@ -935,7 +935,7 @@ dyn_async! {
         dial_client(&mut mock, client).await.expect("failed to dial client");
         let peer_id = compute_client_peer_id(&client.kind);
 
-        let mut roots = vec![known_root; MAX_REQUEST_BLOCKS];
+        let roots = vec![known_root; MAX_REQUEST_BLOCKS];
         let request = encode_request(&BlocksByRootV1Request::new(roots));
         let result = mock.send_request(peer_id, request).await;
 
@@ -961,19 +961,15 @@ dyn_async! {
         dial_client(&mut mock, client).await.expect("failed to dial client");
         let peer_id = compute_client_peer_id(&client.kind);
 
-        let mut roots = vec![known_root; MAX_REQUEST_BLOCKS + 1];
+        let roots = vec![known_root; MAX_REQUEST_BLOCKS + 1];
         let request = encode_request(&BlocksByRootV1Request::new(roots));
         let result = mock.send_request(peer_id, request).await;
 
-        match result {
-            Ok(chunks) => {
-                assert!(
-                    chunks.is_empty() || chunks[0].0 == RESPONSE_CODE_INVALID_REQUEST,
-                    "client should reject request exceeding max block count"
-                );
-            }
-            Err(_) => {
-            }
+        if let Ok(chunks) = result {
+            assert!(
+                chunks.is_empty() || chunks[0].0 == RESPONSE_CODE_INVALID_REQUEST,
+                "client should reject request exceeding max block count"
+            );
         }
     }
 }
@@ -1020,18 +1016,15 @@ dyn_async! {
         let request = encode_request_raw(&garbage);
         let result = mock.send_request(peer_id, request).await;
 
-        match result {
-            Ok(chunks) => {
-                assert!(
-                    chunks.is_empty() || chunks[0].0 != RESPONSE_CODE_SUCCESS,
-                    "client should reject malformed BlocksByRoot request"
-                );
-            }
-            Err(_) => {}
+        if let Ok(chunks) = result {
+            assert!(
+                chunks.is_empty() || chunks[0].0 != RESPONSE_CODE_SUCCESS,
+                "client should reject malformed BlocksByRoot request"
+            );
         }
 
         let response = http_client()
-            .get(&lean_api_url(client, "/lean/v0/fork_choice"))
+            .get(lean_api_url(client, "/lean/v0/fork_choice"))
             .send()
             .await
             .expect("client should still respond to HTTP after malformed request");
@@ -1157,12 +1150,10 @@ dyn_async! {
         );
 
         let response = http_client()
-            .get(&lean_api_url(client, "/lean/v0/fork_choice"))
+            .get(lean_api_url(client, "/lean/v0/fork_choice"))
             .send()
             .await
             .expect("client should still respond to HTTP after concurrent requests");
         assert_eq!(response.status(), 200, "client should remain healthy");
     }
 }
-
-

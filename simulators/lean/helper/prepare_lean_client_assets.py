@@ -230,9 +230,6 @@ def render_config(validators: list[dict[str, str]]) -> str:
 
 def render_nodes_yaml() -> str:
     if CLIENT_KIND == "zeam" and BOOTNODE_ENV.strip().lower() == "none":
-        # Zeam d629e3e requires nodes.yaml to contain at least one ENR even for
-        # an otherwise standalone genesis node. A valid unreachable fallback ENR
-        # lets the node start without introducing another live bootnode.
         return "".join(f"- {entry}\n" for entry in FALLBACK_BOOTNODES)
 
     if CLIENT_KIND == "lantern":
