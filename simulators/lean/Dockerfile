@@ -148,6 +148,66 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /tmp/le
         "$DEVNET4_COMMIT" \
         "$RUST_NIGHTLY_TOOLCHAIN" > /version.txt
 
+# Fix missing IdentityKeypair.from_bytes in lean_spec
+RUN <<'EOF'
+python3 -c '
+import sys
+
+filepath = "/app/devnet4/src/lean_spec/subspecs/networking/transport/identity/keypair.py"
+with open(filepath, "r") as f:
+    content = f.read()
+
+old_method = """    @classmethod
+    def generate(cls) -> IdentityKeypair:
+        \"\"\"
+        Generate a new random secp256k1 keypair.
+
+        Returns:
+            A fresh identity keypair.
+        \"\"\"
+        private_key = ec.generate_private_key(ec.SECP256K1())
+        public_key = Secp256k1PublicKey(_key=private_key.public_key())
+        return cls(private_key=private_key, public_key=public_key)"""
+
+new_method = """    @classmethod
+    def generate(cls) -> IdentityKeypair:
+        \"\"\"
+        Generate a new random secp256k1 keypair.
+
+        Returns:
+            A fresh identity keypair.
+        \"\"\"
+        private_key = ec.generate_private_key(ec.SECP256K1())
+        public_key = Secp256k1PublicKey(_key=private_key.public_key())
+        return cls(private_key=private_key, public_key=public_key)
+
+    @classmethod
+    def from_bytes(cls, private_key_bytes: bytes) -> IdentityKeypair:
+        \"\"\"
+        Create an identity keypair from raw private key bytes.
+
+        Args:
+            private_key_bytes: 32-byte secp256k1 private key.
+
+        Returns:
+            Identity keypair derived from the private key.
+        \"\"\"
+        private_value = int.from_bytes(private_key_bytes, "big")
+        private_key = ec.derive_private_key(private_value, ec.SECP256K1())
+        public_key = Secp256k1PublicKey(_key=private_key.public_key())
+        return cls(private_key=private_key, public_key=public_key)"""
+
+if old_method in content:
+    content = content.replace(old_method, new_method)
+    with open(filepath, "w") as f:
+        f.write(content)
+    print("Fixed IdentityKeypair.from_bytes")
+else:
+    print("Could not find method to patch")
+    sys.exit(1)
+'
+EOF
+
 EXPOSE 5052 5053 9001/udp
 
 ENTRYPOINT ["/usr/bin/lean-sim"]
