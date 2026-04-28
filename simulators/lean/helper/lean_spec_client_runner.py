@@ -89,8 +89,6 @@ HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_GOSSIP
 HELPER_P2P_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_P2P_PORT"
 HELPER_API_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_API_PORT"
 HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_METADATA_PORT"
-HELPER_REQRESP_BLOCK_ENCODING_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_REQRESP_BLOCK_ENCODING"
-REAM_DEVNET4_REQRESP_BLOCK_ENCODING: Final = "ream-devnet4"
 VALIDATOR_COUNT: Final = 3
 ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
@@ -123,7 +121,6 @@ _SSZ_FAST_DESERIALIZATION_PATCHED = False
 _SNAPPY_COMPRESS_PATCHED = False
 _REQRESP_BLOCK_CACHE_PATCHED = False
 _NETWORK_SERVICE_GOSSIP_PATCHED = False
-_REAM_DEVNET4_REQRESP_ENCODING_PATCHED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
@@ -379,75 +376,6 @@ def patch_reqresp_block_cache() -> None:
 
     reqresp_client_cls.request_blocks_by_root = request_blocks_by_root_with_cache
     _REQRESP_BLOCK_CACHE_PATCHED = True
-
-
-def patch_ream_devnet4_reqresp_block_encoding() -> None:
-    global _REAM_DEVNET4_REQRESP_ENCODING_PATCHED
-
-    if _REAM_DEVNET4_REQRESP_ENCODING_PATCHED:
-        return
-
-    if (
-        os.environ.get(HELPER_REQRESP_BLOCK_ENCODING_ENVIRONMENT_VARIABLE)
-        != REAM_DEVNET4_REQRESP_BLOCK_ENCODING
-    ):
-        return
-
-    aggregation_module = importlib.import_module("lean_spec.subspecs.xmss.aggregation")
-    aggregated_signature_proof_cls = aggregation_module.AggregatedSignatureProof
-    original_deserialize = aggregated_signature_proof_cls.deserialize
-
-    def serialize_with_bytecode_point_none(self: object, stream: io.BytesIO) -> int:
-        participants = getattr(self, "participants")
-        proof_data = getattr(self, "proof_data")
-        variable_data = [
-            participants.encode_bytes(),
-            proof_data.encode_bytes(),
-            b"\x00",
-        ]
-
-        offset = len(variable_data) * OFFSET_BYTE_LENGTH
-        for data in variable_data:
-            Uint32(offset).serialize(stream)
-            offset += len(data)
-
-        for data in variable_data:
-            stream.write(data)
-
-        return offset
-
-    @classmethod
-    def deserialize_with_optional_bytecode_point(
-        cls: type[Container],
-        stream: io.BytesIO,
-        scope: int,
-    ) -> object:
-        data = stream.read(scope)
-        try:
-            return original_deserialize(io.BytesIO(data), scope)
-        except Exception:
-            if scope < 3 * OFFSET_BYTE_LENGTH:
-                raise
-
-        offsets = [
-            int(Uint32.decode_bytes(data[i : i + OFFSET_BYTE_LENGTH]))
-            for i in range(0, 3 * OFFSET_BYTE_LENGTH, OFFSET_BYTE_LENGTH)
-        ]
-        offsets.append(scope)
-        _validate_offsets(offsets, scope, cls.__name__)
-
-        participants_type = cls._get_ssz_field_type(cls.model_fields["participants"].annotation)
-        proof_data_type = cls._get_ssz_field_type(cls.model_fields["proof_data"].annotation)
-
-        return cls(
-            participants=participants_type.decode_bytes(data[offsets[0] : offsets[1]]),
-            proof_data=proof_data_type.decode_bytes(data[offsets[1] : offsets[2]]),
-        )
-
-    aggregated_signature_proof_cls.serialize = serialize_with_bytecode_point_none
-    aggregated_signature_proof_cls.deserialize = deserialize_with_optional_bytecode_point
-    logger.info("Enabled Ream devnet4-compatible req/resp block proof encoding")
-    _REAM_DEVNET4_REQRESP_ENCODING_PATCHED = True
 
 
 def patch_network_service_gossip_processing() -> None:
@@ -977,7 +905,6 @@ async def run() -> None:
     patch_fast_ssz_deserialization()
     patch_snappy_compress()
     patch_reqresp_block_cache()
-    patch_ream_devnet4_reqresp_block_encoding()
     patch_network_service_gossip_processing()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
