@@ -55,7 +55,7 @@ func main() {
 				},
 				AlwaysRun: true,
 				Run: func(t *hivesim.T, c *hivesim.Client) {
-					runDiscv5Test(t, c, (*hivesim.Client).EnodeURL)
+					runDiscv5Test(t, c, getEth1ENR)
 				},
 			},
 			hivesim.ClientTestSpec{
@@ -334,6 +334,23 @@ func getPortalENR(c *hivesim.Client) (string, error) {
 	}
 	if nodeInfoResult.ENR == "" {
 		return "", fmt.Errorf("missing 'enr' in discv5_nodeInfo response")
+	}
+	return nodeInfoResult.ENR, nil
+}
+
+// getEth1ENR returns the client's signed ENR via admin_nodeInfo. The discv5
+// endpoint must be read from the ENR rather than the enode URL, because the
+// enode URL only describes the discv4/RLPx endpoint and some clients (e.g.
+// reth) bind discv5 to a different UDP port.
+func getEth1ENR(c *hivesim.Client) (string, error) {
+	var nodeInfoResult struct {
+		ENR string `json:"enr"`
+	}
+	if err := c.RPC().Call(&nodeInfoResult, "admin_nodeInfo"); err != nil {
+		return "", err
+	}
+	if nodeInfoResult.ENR == "" {
+		return "", fmt.Errorf("missing 'enr' in admin_nodeInfo response")
 	}
 	return nodeInfoResult.ENR, nil
 }
