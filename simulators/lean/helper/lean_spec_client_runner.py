@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -1024,7 +1025,29 @@ async def run() -> None:
         _BLOCK_CACHE_BY_REQRESP_CLIENT.pop(id(event_source.reqresp_client), None)
 
 
+async def print_bootnode_metadata() -> None:
+    identity_private_key_hex = os.environ.get(
+        HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+        HELPER_IDENTITY_PRIVATE_KEY_HEX,
+    )
+    identity_key = identity_keypair_from_private_key_hex(identity_private_key_hex)
+    peer_id = str(identity_key.to_peer_id())
+    print(
+        json.dumps(
+            {
+                "peer_id": peer_id,
+                "enr": build_helper_bootnode_enr(identity_key),
+                "multiaddr": build_helper_bootnode_multiaddr(peer_id),
+            }
+        )
+    )
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "--bootnode-metadata":
+        asyncio.run(print_bootnode_metadata())
+        return
+
     try:
         asyncio.run(run())
     except KeyboardInterrupt:

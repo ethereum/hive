@@ -1,12 +1,11 @@
 use crate::scenarios::helper::{
-    expect_single_client, lean_clients, lean_environment,
-    lean_single_client_runtime_setup, load_fork_choice_response, prepare_client_runtime_files,
-    selected_lean_devnet, simulator_container_ip,
-    LeanDevnet,
+    expect_single_client, lean_clients, lean_environment, lean_single_client_runtime_setup,
+    load_fork_choice_response, prepare_client_runtime_files, selected_lean_devnet,
+    simulator_container_ip, LeanDevnet,
 };
 use crate::utils::libp2p_mock::{
-    decode_request, encode_gossip_data, extract_ip_port,
-    lean_block_topic, replace_multiaddr_ip, LeanSignedBlock, MockNode, Status, RESPONSE_CODE_SUCCESS,
+    decode_request, encode_gossip_data, extract_ip_port, lean_block_topic, replace_multiaddr_ip,
+    LeanSignedBlock, MockNode, Status, RESPONSE_CODE_SUCCESS,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
@@ -75,7 +74,7 @@ dyn_async! {
         let mut mock = MockNode::new().expect("failed to create mock node");
         let listen_addr = mock.get_listen_address().await
             .expect("mock node should bind to an address");
-        let mock_peer_id = mock.local_peer_id();
+        let _mock_peer_id = mock.local_peer_id();
         let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
         let (ip, port) = extract_ip_port(&external_addr)
             .expect("mock listen address should have IP and port");

@@ -2,12 +2,17 @@
 
 This simulator contains the initial Rust-based Hive coverage for lean clients.
 
-Today it runs an RPC compatibility suite that:
+Today it runs RPC compatibility, sync, and client interop suites. The RPC
+compatibility coverage:
 
 - launches each selected `lean` client,
 - checks the shared Lean HTTP endpoints on fresh nodes, and
 - uses the `lean-spec-client` helper to drive post-genesis
   justification/finalization cases for the shared RPC endpoints.
+
+The `client-interop` suite runs every selected client against every other
+selected client in both three-node 2:1 topologies, using one shared genesis per
+run and asserting that all three nodes finalize past genesis at the same slot.
 
 The helper-backed post-genesis cases are part of the default suite. The
 LeanSpec helper image generates and caches a small fixed set of validator keys

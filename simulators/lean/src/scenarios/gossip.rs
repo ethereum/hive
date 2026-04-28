@@ -7,10 +7,10 @@ use crate::utils::libp2p_mock::{
     decode_request, encode_gossip_data, extract_ip_port, lean_block_topic, replace_multiaddr_ip,
     LeanSignedBlock, MockBehaviourEvent, MockNode, Status, RESPONSE_CODE_SUCCESS,
 };
-use libp2p::swarm::SwarmEvent;
 use alloy_primitives::B256;
 use futures::prelude::*;
 use hivesim::{dyn_async, Client, Test};
+use libp2p::swarm::SwarmEvent;
 use ssz::Encode;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -100,54 +100,60 @@ fn fork_digest_for_devnet() -> &'static str {
 
 /// Start a mock node as the client's only bootnode, handle the initial Status handshake,
 /// and return the mock, the running client, and the block topic.
-async fn setup_mock_bootnode(
-    clients: Vec<Client>,
-) -> (MockNode, Client, String) {
+async fn setup_mock_bootnode(clients: Vec<Client>) -> (MockNode, Client, String) {
     let client = expect_single_client(clients);
     let client_type = client.kind.clone();
     let test = client.test.clone();
 
     let mut mock = MockNode::new().expect("failed to create mock node");
-    let listen_addr = mock.get_listen_address().await
+    let listen_addr = mock
+        .get_listen_address()
+        .await
         .expect("mock node should bind to an address");
-    let mock_peer_id = mock.local_peer_id();
+    let _mock_peer_id = mock.local_peer_id();
     let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
-    let (ip, port) = extract_ip_port(&external_addr)
-        .expect("mock listen address should have IP and port");
-    let mock_enr = mock.enr_string(
-        match ip {
-            std::net::IpAddr::V4(v4) => v4,
-            _ => panic!("expected IPv4"),
-        },
-        port,
-    ).expect("should generate ENR for mock node");
+    let (ip, port) =
+        extract_ip_port(&external_addr).expect("mock listen address should have IP and port");
+    let mock_enr = mock
+        .enr_string(
+            match ip {
+                std::net::IpAddr::V4(v4) => v4,
+                _ => panic!("expected IPv4"),
+            },
+            port,
+        )
+        .expect("should generate ENR for mock node");
 
     let fork_digest = fork_digest_for_devnet();
     let block_topic = lean_block_topic(fork_digest);
-    mock.subscribe(&block_topic).expect("mock should subscribe to block topic");
+    mock.subscribe(&block_topic)
+        .expect("mock should subscribe to block topic");
 
     let mut environment = lean_environment();
     environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
     let files = prepare_client_runtime_files(&client_type, &environment)
         .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
-    let client = test.start_client_with_files(client_type, Some(environment), Some(files)).await;
-
+    let client = test
+        .start_client_with_files(client_type, Some(environment), Some(files))
+        .await;
 
     let (_peer, _req_id, request, channel) = tokio::time::timeout(
         Duration::from_secs(GOSSIPSUB_TIMEOUT_SECS),
-        mock.wait_for_request()
-    ).await
-        .expect("client should connect and send a request")
-        .expect("mock should receive a request");
+        mock.wait_for_request(),
+    )
+    .await
+    .expect("client should connect and send a request")
+    .expect("mock should receive a request");
 
-    let decompressed = decode_request(&request)
-        .expect("should be able to decode request");
+    let decompressed = decode_request(&request).expect("should be able to decode request");
     let client_status = Status::from_ssz_bytes(&decompressed)
         .expect("first request should be a valid Status message");
 
-    mock.send_response(channel, vec![
-        (RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())
-    ]).expect("should send valid status response");
+    mock.send_response(
+        channel,
+        vec![(RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())],
+    )
+    .expect("should send valid status response");
 
     (mock, client, fork_digest.to_string())
 }
@@ -232,7 +238,7 @@ dyn_async! {
 
         let fork_choice = load_fork_choice_response(&client).await;
         assert!(
-            fork_choice.nodes.len() >= 1,
+            !fork_choice.nodes.is_empty(),
             "client should remain healthy after receiving malformed gossip"
         );
     }
@@ -278,7 +284,7 @@ dyn_async! {
         // but may fail state-transition validation). The important thing is that the client
         // did not crash and remains responsive.
         assert!(
-            fork_choice.nodes.len() >= 1,
+            !fork_choice.nodes.is_empty(),
             "client should remain healthy after receiving orphan and parent blocks"
         );
     }
@@ -313,4 +319,3 @@ dyn_async! {
         );
     }
 }
-
