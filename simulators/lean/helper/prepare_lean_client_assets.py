@@ -156,6 +156,9 @@ def node_specs(count: int) -> list[dict[str, object]]:
 
 
 def bootnodes() -> list[str]:
+    if BOOTNODE_ENV.strip().lower() == "none":
+        return []
+
     values = [value.strip() for value in BOOTNODE_ENV.split(",") if value.strip()]
     # Lean runtimes consume bootnodes either from the raw HIVE_BOOTNODES env
     # or from nodes.yaml, and those endpoints can be ENRs or libp2p multiaddrs
@@ -226,6 +229,12 @@ def render_config(validators: list[dict[str, str]]) -> str:
 
 
 def render_nodes_yaml() -> str:
+    if CLIENT_KIND == "zeam" and BOOTNODE_ENV.strip().lower() == "none":
+        # Zeam d629e3e requires nodes.yaml to contain at least one ENR even for
+        # an otherwise standalone genesis node. A valid unreachable fallback ENR
+        # lets the node start without introducing another live bootnode.
+        return "".join(f"- {entry}\n" for entry in FALLBACK_BOOTNODES)
+
     if CLIENT_KIND == "lantern":
         return "".join(f"- {entry}\n" for entry in bootnodes())
     return "".join(f'- "{entry}"\n' for entry in bootnodes())

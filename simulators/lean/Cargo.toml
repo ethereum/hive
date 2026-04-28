@@ -17,6 +17,7 @@ libp2p-identity = { version = "0.2.12", features = ["secp256k1"] }
 rand = "0.8"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 sha2 = "0.10"
 snap = "1"
 ssz = { package = "ethereum_ssz", version = "0.10" }

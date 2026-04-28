@@ -65,6 +65,7 @@ const CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS: u64 = 30;
 const MESH_HELPER_READY_TIMEOUT_SECS: u64 = 120;
 const LIVE_HELPER_FORK_CHOICE_RETRY_ATTEMPTS: u64 = 10;
 const LOCAL_HELPER_ENTRYPOINT: &str = "/app/hive/leanspec-client.sh";
+const LEAN_SPEC_CLIENT_RUNNER: &str = "/app/hive/lean_spec_client_runner.py";
 const LOCAL_HELPER_KIND: &str = "lean-spec-local-helper";
 const CLIENT_RUNTIME_ASSET_PREPARER: &str = "/app/hive/prepare_lean_client_assets.py";
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
@@ -138,6 +139,12 @@ struct HelperGenesisMetadata {
     bootnode_multiaddr: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub(crate) struct LeanBootnodeMetadata {
+    pub(crate) enr: String,
+    pub(crate) multiaddr: String,
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum ClientUnderTestRole {
     Validator,
@@ -200,6 +207,17 @@ pub(crate) fn set_selected_lean_devnet(devnet: LeanDevnet) {
     env::set_var(HIVE_LEAN_DEVNET_LABEL, devnet.as_str());
 }
 
+fn lean_spec_app_root() -> PathBuf {
+    let (environment_variable, default_path) = match selected_lean_devnet() {
+        LeanDevnet::Devnet3 => ("LEAN_SPEC_DEVNET3_ROOT", "/app/devnet3"),
+        LeanDevnet::Devnet4 => ("LEAN_SPEC_DEVNET4_ROOT", "/app/devnet4"),
+    };
+
+    env::var(environment_variable)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(default_path))
+}
+
 pub(crate) async fn resolve_selected_lean_devnet(simulation: &Simulation) -> LeanDevnet {
     let config = load_lean_devnet_config();
     let clients = lean_clients(simulation.client_types().await);
@@ -258,6 +276,93 @@ pub(crate) fn lean_environment() -> HashMap<String, String> {
 
 pub(crate) fn lean_api_url(client: &Client, path: &str) -> String {
     format!("http://{}:{}{}", client.ip, LEAN_HTTP_PORT, path)
+}
+
+pub(crate) fn lean_bootnodes_for_client(
+    client_kind: &str,
+    bootnodes: &[LeanBootnodeMetadata],
+) -> String {
+    if bootnodes.is_empty() {
+        return "none".to_string();
+    }
+
+    let use_enr = client_kind == "ethlambda" || client_kind == "zeam";
+    bootnodes
+        .iter()
+        .map(|bootnode| {
+            if use_enr {
+                bootnode.enr.as_str()
+            } else {
+                bootnode.multiaddr.as_str()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+pub(crate) fn bootnode_metadata_for_client(
+    private_key: &str,
+    ip: IpAddr,
+    p2p_port: u16,
+) -> LeanBootnodeMetadata {
+    let app_root = lean_spec_app_root();
+    let python = app_root.join(".venv/bin/python");
+    let venv_bin = app_root.join(".venv/bin");
+    let path = match env::var("PATH") {
+        Ok(existing_path) => format!("{}:{existing_path}", venv_bin.display()),
+        Err(_) => venv_bin.display().to_string(),
+    };
+
+    let output = Command::new(&python)
+        .arg(LEAN_SPEC_CLIENT_RUNNER)
+        .arg("--bootnode-metadata")
+        .current_dir(&app_root)
+        .env("VIRTUAL_ENV", app_root.join(".venv"))
+        .env("PATH", path)
+        .env(
+            LEAN_HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE,
+            ip.to_string(),
+        )
+        .env(
+            LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+            private_key,
+        )
+        .env(
+            LEAN_HELPER_P2P_PORT_ENVIRONMENT_VARIABLE,
+            p2p_port.to_string(),
+        )
+        .output()
+        .unwrap_or_else(|err| {
+            panic!(
+                "Unable to derive lean bootnode metadata with {}: {err}",
+                python.display()
+            )
+        });
+
+    if !output.status.success() {
+        panic!(
+            "Unable to derive lean bootnode metadata: command exited with status {}.\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let metadata_line = stdout
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or_else(|| {
+            panic!(
+                "Lean bootnode metadata command produced no JSON output. stderr:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+        });
+
+    serde_json::from_str(metadata_line).unwrap_or_else(|err| {
+        panic!("Unable to decode lean bootnode metadata `{metadata_line}`: {err}")
+    })
 }
 
 pub(crate) async fn get_json_with_retry<T: DeserializeOwned>(http: &HttpClient, url: &str) -> T {
@@ -905,11 +1010,14 @@ pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
 }
 
 pub(crate) fn default_genesis_time() -> u64 {
+    current_unix_time() + LEAN_GENESIS_DELAY_SECS
+}
+
+pub(crate) fn current_unix_time() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("System time is before UNIX_EPOCH")
         .as_secs()
-        + LEAN_GENESIS_DELAY_SECS
 }
 
 fn adjusted_genesis_time_for_helper_mesh(
@@ -1281,7 +1389,7 @@ fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
     }
 }
 
-fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
+pub(crate) fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
     for candidate in [
         "ethlambda",
         "grandine_lean",
@@ -1387,7 +1495,7 @@ pub(crate) fn prepare_client_runtime_files(
     Ok(files)
 }
 
-fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {
+pub(crate) fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {
     if let Some(error) = payload.downcast_ref::<&'static str>() {
         error.to_string()
     } else if let Some(error) = payload.downcast_ref::<String>() {

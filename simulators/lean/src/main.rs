@@ -3,6 +3,7 @@
 mod scenarios;
 mod utils;
 
+use crate::scenarios::client_interop::run_client_interop_lean_test_suite;
 use crate::scenarios::gossip::run_gossip_lean_test_suite;
 use crate::scenarios::helper::{resolve_selected_lean_devnet, set_selected_lean_devnet};
 use crate::scenarios::reqresp::run_reqresp_lean_test_suite;
@@ -49,6 +50,25 @@ async fn main() {
         description: "This test launches the client and collects its logs.".to_string(),
         always_run: true,
         run: run_sync_lean_test_suite,
+        client: None,
+    });
+
+    let mut client_interop = Suite {
+        name: "client-interop".to_string(),
+        description: format!(
+            "Runs three-node Lean client interoperability tests across every selected client pair using the {} profile.",
+            devnet
+        ),
+        tests: vec![],
+    };
+
+    client_interop.add(TestSpec {
+        name: "client-interop: matrix".to_string(),
+        description:
+            "Runs every selected Lean client against every other selected Lean client in both 2:1 topologies."
+                .to_string(),
+        always_run: true,
+        run: run_client_interop_lean_test_suite,
         client: None,
     });
 
@@ -103,11 +123,16 @@ async fn main() {
         client: None,
     });
 
-    run_suite(simulation, vec![
-        rpc_compat,
-        sync,
-        validation,
-        gossip,
-        reqresp,
-    ]).await;
+    run_suite(
+        simulation,
+        vec![
+            rpc_compat,
+            sync,
+            client_interop,
+            validation,
+            gossip,
+            reqresp,
+        ],
+    )
+    .await;
 }

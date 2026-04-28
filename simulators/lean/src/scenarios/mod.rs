@@ -1,3 +1,4 @@
+pub mod client_interop;
 pub(crate) mod gossip;
 pub(crate) mod helper;
 pub(crate) mod reqresp;
