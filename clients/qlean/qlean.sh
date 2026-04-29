@@ -3,36 +3,21 @@ set -euo pipefail
 
 DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}" 
 ASSET_ROOT="/tmp/qlean-runtime" 
-WORKSPACE="/opt/qlean" 
-REAL_MODS="/opt/qlean_internal_storage" 
 
-if [[ "$DEVNET_LABEL" == "devnet4" ]]; then 
-    SOURCE_DIR="/opt/qlean-d4" 
-    QLEAN_BIN_NAME="qlean-devnet4" 
-    MANIFEST_NAME="validator-keys-manifest-devnet4.yaml" 
-    QLEAN_USES_GENESIS_DIR=1
-else 
-    SOURCE_DIR="/opt/qlean-d3" 
-    QLEAN_BIN_NAME="qlean-devnet3" 
-    MANIFEST_NAME="validator-keys-manifest.yaml" 
-    QLEAN_USES_GENESIS_DIR=0
-fi 
+case "$DEVNET_LABEL" in
+    devnet3)
+        DEFAULT_QLEAN_BIN="/usr/local/bin/qlean-devnet3"
+        ;;
+    devnet4)
+        DEFAULT_QLEAN_BIN="/usr/local/bin/qlean-devnet4"
+        ;;
+    *)
+        echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
+        exit 1
+        ;;
+esac
 
-rm -rf "$WORKSPACE" "$REAL_MODS" 
-mkdir -p "$WORKSPACE/bin" "$WORKSPACE/lib" "$WORKSPACE/modules" "$REAL_MODS" 
-
-cp "$SOURCE_DIR/bin/$QLEAN_BIN_NAME" "$WORKSPACE/bin/" 
-cp "$SOURCE_DIR"/lib/*.so* "$WORKSPACE/lib/" 2>/dev/null || true 
-
-mkdir -p "$WORKSPACE/internal_modules" 
-
-find "$SOURCE_DIR/modules" -maxdepth 1 -type f -name "*_module.so" -exec cp {} "$REAL_MODS/" \; 
-
-for mod in "$REAL_MODS"/*_module.so; do 
-    ln -s "$mod" "$WORKSPACE/internal_modules/$(basename "$mod")" 
-done 
-
-QLEAN_BIN="$WORKSPACE/bin/$QLEAN_BIN_NAME" 
+QLEAN_BIN="${QLEAN_BIN:-$DEFAULT_QLEAN_BIN}"
 
 V_IDX="${HIVE_VALIDATOR_INDEX:-0}" 
 RAW_ID="${HIVE_NODE_ID:-${HIVE_CLIENT_ID:-qlean_$V_IDX}}" 
@@ -49,7 +34,7 @@ find "$ASSET_ROOT" -type f \( -name "*.yaml" -o -name "*.json" \) -exec sed -i '
 NODE_KEY="$(cat "$ASSET_ROOT/node.key")"
 
 FLAGS=( 
-    --modules-dir "$WORKSPACE/internal_modules" 
+    --genesis-dir "$ASSET_ROOT"
     --data-dir "/data" 
     --node-id "$CLEAN_NODE_ID" 
     --node-key "$NODE_KEY"
@@ -57,21 +42,6 @@ FLAGS=(
     --api-host "0.0.0.0" 
     --api-port 5052 
 ) 
-
-if [[ "$QLEAN_USES_GENESIS_DIR" == "1" ]]; then
-    FLAGS+=(
-        --genesis-dir "$ASSET_ROOT"
-        --bootnodes "$ASSET_ROOT/nodes.yaml"
-    )
-else
-    FLAGS+=(
-        --genesis "$ASSET_ROOT/config.yaml"
-        --validator-registry-path "$ASSET_ROOT/validators.yaml"
-        --validator-keys-manifest "$ASSET_ROOT/hash-sig-keys/$MANIFEST_NAME"
-        --xmss-pk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.pk"
-        --xmss-sk "$ASSET_ROOT/hash-sig-keys/v${V_IDX}_att.sk"
-    )
-fi
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
