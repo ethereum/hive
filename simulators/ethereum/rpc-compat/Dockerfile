@@ -5,7 +5,7 @@ ENV GOPROXY=${GOPROXY}
 ARG branch=main
 ENV GIT_REF=${branch}
 
-RUN apk add --update git ca-certificates gcc musl-dev linux-headers
+RUN apk add --update git ca-certificates gcc musl-dev linux-headers make
 
 # Clone the tests repo.
 # Allow the user to specify a branch or commit to checkout
@@ -14,6 +14,9 @@ RUN git init /execution-apis && \
     git remote add origin https://github.com/ethereum/execution-apis.git && \
     git fetch --depth 1 origin $GIT_REF && \
     git checkout FETCH_HEAD;
+
+# Build the spec using the execution-apis Makefile.
+RUN cd /execution-apis && make build
 
 # To run local tests, copy the directory into the same as the simulator and
 # uncomment the line below
@@ -30,5 +33,6 @@ ADD . /source
 WORKDIR /source
 COPY --from=builder /source/rpc-compat .
 COPY --from=builder /execution-apis/tests ./tests
+COPY --from=builder /execution-apis/openrpc.json ./openrpc.json
 
 ENTRYPOINT ["./rpc-compat"]
