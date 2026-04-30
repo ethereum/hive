@@ -174,6 +174,29 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	}
 	info.IP = container.NetworkSettings.IPAddress
 	info.MAC = container.NetworkSettings.MacAddress
+	// On some Docker setups (e.g. Docker Desktop for macOS), the top-level
+	// NetworkSettings.IPAddress field may be empty even though the container
+	// has an IP on the bridge network. Fall back to checking the per-network
+	// endpoint settings.
+	if info.IP == "" {
+		for name, network := range container.NetworkSettings.Networks {
+			if network.IPAddress != "" {
+				logger.Debug("using IP from network endpoint (top-level IPAddress was empty)", "network", name, "ip", network.IPAddress)
+				info.IP = network.IPAddress
+				if info.MAC == "" {
+					info.MAC = network.MacAddress
+				}
+				break
+			}
+		}
+	}
+	if info.IP == "" {
+		waiter.Close()
+		b.DeleteContainer(containerID)
+		info.Wait()
+		info.Wait = nil
+		return info, fmt.Errorf("container has no IP address (check Docker network settings)")
+	}
 
 	// Set up the port check if requested.
 	hasStarted := make(chan struct{})
