@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::scenarios::util::{
+use crate::utils::util::{
     bootnode_enr_for_client, client_uses_enr_bootnodes, default_genesis_time,
     fork_choice_head_slot, http_client, lean_api_url, lean_environment, panic_payload_to_string,
     prepare_client_runtime_files, selected_lean_devnet, simulator_container_ip, CheckpointResponse,

@@ -1,16 +1,16 @@
-use crate::scenarios::helper::{
+use crate::utils::helper::{
     start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncTestData,
-};
-use crate::scenarios::util::{
-    default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
-    lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
-    prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
-    simulator_container_ip, ClientUnderTestRole, LeanDevnet, TimedDataTestSpec,
 };
 use crate::utils::libp2p_mock::{
     client_multiaddr, compute_client_peer_id, decode_request, encode_request, encode_request_raw,
     extract_ip_port, replace_multiaddr_ip, BlocksByRootV1Request, Checkpoint, MockNode, Status,
     MAX_REQUEST_BLOCKS, RESPONSE_CODE_INVALID_REQUEST, RESPONSE_CODE_SUCCESS,
+};
+use crate::utils::util::{
+    default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
+    lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
+    prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
+    simulator_container_ip, ClientUnderTestRole, LeanDevnet, TimedDataTestSpec,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};

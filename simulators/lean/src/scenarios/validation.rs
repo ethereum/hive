@@ -1,11 +1,11 @@
-use crate::scenarios::util::{
-    expect_single_client, lean_clients, lean_environment, lean_single_client_runtime_setup,
-    load_fork_choice_response, prepare_client_runtime_files, selected_lean_devnet,
-    simulator_container_ip, LeanDevnet,
-};
 use crate::utils::libp2p_mock::{
     decode_request, encode_gossip_data, extract_ip_port, lean_block_topic, replace_multiaddr_ip,
     LeanSignedBlock, MockNode, Status, RESPONSE_CODE_SUCCESS,
+};
+use crate::utils::util::{
+    expect_single_client, lean_clients, lean_environment, lean_single_client_runtime_setup,
+    load_fork_choice_response, prepare_client_runtime_files, selected_lean_devnet,
+    simulator_container_ip, LeanDevnet,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};

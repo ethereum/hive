@@ -1,8 +1,8 @@
-use crate::scenarios::helper::{
+use crate::utils::helper::{
     start_checkpoint_sync_client_context, start_checkpoint_sync_helper_mesh,
     HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
 };
-use crate::scenarios::util::{
+use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
     run_data_test, selected_lean_devnet, ClientUnderTestRole, ForkChoiceResponse, LeanDevnet,
 };

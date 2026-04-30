@@ -26,8 +26,6 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 import yaml
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
-from lean_spec.subspecs.containers import Checkpoint
-from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.genesis.config import GenesisConfig
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -46,6 +44,13 @@ from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZSerializationError, SSZValueError
 from lean_spec.types.uint import Uint32
+from lean_spec_runtime import (
+    Checkpoint,
+    SubnetId,
+    ValidatorIndex,
+    build_node_config,
+    configure_event_source_network,
+)
 
 GOSSIP_FORK_DIGEST: Final = "devnet0"
 LISTEN_ADDR: Final = "/ip4/0.0.0.0/udp/9001/quic-v1"
@@ -752,20 +757,18 @@ async def run() -> None:
     )
     connection_manager = await QuicConnectionManager.create(identity_key)
     event_source = await LiveNetworkEventSource.create(connection_manager=connection_manager)
-    event_source.set_fork_digest(GOSSIP_FORK_DIGEST)
+    configure_event_source_network(event_source, GOSSIP_FORK_DIGEST)
     subscribe_gossip_topics(event_source, validator_registry, is_aggregator)
     logger.info("Helper peer_id=%s", connection_manager.peer_id)
 
     node = Node.from_genesis(
-        NodeConfig(
-            genesis_time=genesis.genesis_time,
-            validators=genesis.to_validators(),
+        build_node_config(
+            node_config_type=NodeConfig,
+            genesis=genesis,
             event_source=event_source,
-            network=event_source.reqresp_client,
-            api_config=None,
             validator_registry=validator_registry,
-            fork_digest=GOSSIP_FORK_DIGEST,
             is_aggregator=is_aggregator,
+            fork_digest=GOSSIP_FORK_DIGEST,
         )
     )
     api_server = ApiServer(

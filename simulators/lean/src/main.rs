@@ -8,8 +8,8 @@ use crate::scenarios::gossip::run_gossip_lean_test_suite;
 use crate::scenarios::reqresp::run_reqresp_lean_test_suite;
 use crate::scenarios::rpc_compat::run_rpc_compat_lean_test_suite;
 use crate::scenarios::sync::run_sync_lean_test_suite;
-use crate::scenarios::util::{resolve_selected_lean_devnet, set_selected_lean_devnet};
 use crate::scenarios::validation::run_validation_lean_test_suite;
+use crate::utils::util::{resolve_selected_lean_devnet, set_selected_lean_devnet};
 use hivesim::{run_suite, Simulation, Suite, TestSpec};
 
 #[tokio::main]

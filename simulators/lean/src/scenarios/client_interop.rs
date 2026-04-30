@@ -1,4 +1,4 @@
-use crate::scenarios::util::{
+use crate::utils::util::{
     bootnode_metadata_for_client, current_unix_time, default_genesis_time, http_client,
     lean_api_url, lean_bootnodes_for_client, lean_client_kind, lean_clients, lean_environment,
     panic_payload_to_string, prepare_client_runtime_files, run_data_test_with_timeout,

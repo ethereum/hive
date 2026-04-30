@@ -115,6 +115,7 @@ ENV LEAN_ENV=prod \
 
 COPY ./simulators/lean/helper/leanspec-client.sh /app/hive/leanspec-client.sh
 COPY ./simulators/lean/helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
+COPY ./clients/lean-spec-client/lean_spec_runtime.py /app/hive/lean_spec_runtime.py
 COPY ./simulators/lean/helper/prepare_lean_client_assets.py /app/hive/prepare_lean_client_assets.py
 COPY ./simulators/lean/config/lean-devnets.txt /app/hive/lean-devnets.txt
 
