@@ -7,7 +7,7 @@ ARG fork=Osaka
 ENV FORK=${fork}
 
 ## Clone and install EELS
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git cmake g++ libclang-dev
 
 # Clone repo and use the default branch if none specified
 RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
@@ -17,8 +17,8 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
         git checkout FETCH_HEAD; \
     fi
 
-WORKDIR /execution-specs/packages/testing
-RUN uv sync
+WORKDIR /execution-specs/
+RUN uv sync --all-extras
 
 ## Define `consume engine` entry point using the local fixtures
 ENTRYPOINT uv run execute hive --fork=$FORK -v -m blob_transaction_test
