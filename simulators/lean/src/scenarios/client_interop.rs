@@ -1,4 +1,4 @@
-use crate::scenarios::helper::{
+use crate::scenarios::util::{
     bootnode_metadata_for_client, current_unix_time, default_genesis_time, http_client,
     lean_api_url, lean_bootnodes_for_client, lean_client_kind, lean_clients, lean_environment,
     panic_payload_to_string, prepare_client_runtime_files, run_data_test_with_timeout,
@@ -23,7 +23,7 @@ const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
 const CLIENT_INTEROP_NODE_COUNT: usize = 3;
 const CLIENT_INTEROP_P2P_PORT: u16 = 9000;
 const FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS: u64 = 3 * 60;
-const CLIENT_STARTUP_ATTEMPTS: u64 = 2;
+const CLIENT_STARTUP_ATTEMPTS: u64 = 3;
 const CLIENT_STARTUP_TIMEOUT_SECS: u64 = 120;
 const OUTER_TEST_TIMEOUT_GRACE_SECS: u64 = 750;
 const FINALIZATION_POLL_INTERVAL_SECS: u64 = 1;
@@ -61,12 +61,7 @@ struct FinalizationObservation {
 dyn_async! {
     pub async fn run_client_interop_lean_test_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
         let clients = lean_clients(test.sim.client_types().await);
-        if clients.len() < 2 {
-            panic!(
-                "client-interop requires at least two selected lean clients, got {}",
-                clients.len()
-            );
-        }
+        assert!(clients.len() > 1, "client-interop requires at least two selected lean clients, got {}", clients.len());
 
         for left_index in 0..clients.len() {
             for right_index in (left_index + 1)..clients.len() {

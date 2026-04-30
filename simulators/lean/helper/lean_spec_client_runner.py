@@ -659,7 +659,11 @@ def build_canonical_secp256k1_signature(
     return signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
 
 
-def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
+def build_helper_bootnode_enr(
+    identity_key: IdentityKeypair,
+    *,
+    include_udp: bool = True,
+) -> str:
     advertise_ip = os.environ.get(HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE)
     if not advertise_ip:
         raise ValueError(
@@ -670,9 +674,11 @@ def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
         enr_keys.ID: b"v4",
         enr_keys.SECP256K1: identity_key.public_key.to_bytes(),
         enr_keys.IP: ipaddress.ip_address(advertise_ip).packed,
-        enr_keys.UDP: encode_enr_port(helper_p2p_port()),
-        enr_keys.QUIC: encode_enr_port(helper_p2p_port()),
     }
+    if include_udp:
+        pairs[enr_keys.UDP] = encode_enr_port(helper_p2p_port())
+    pairs[enr_keys.QUIC] = encode_enr_port(helper_p2p_port())
+
     unsigned_enr = ENR(signature=b"\x00" * 64, seq=1, pairs=pairs)
     digest = keccak.new(digest_bits=256, data=unsigned_enr._content_rlp()).digest()
     # Normalize helper ECDSA signatures so every client sees a canonical ENR.
@@ -934,6 +940,10 @@ async def run() -> None:
     )
     connection_manager = await QuicConnectionManager.create(identity_key)
     metadata["bootnode_enr"] = build_helper_bootnode_enr(identity_key)
+    metadata["bootnode_qlean_enr"] = build_helper_bootnode_enr(
+        identity_key,
+        include_udp=False,
+    )
     metadata["bootnode_multiaddr"] = build_helper_bootnode_multiaddr(
         str(connection_manager.peer_id)
     )
@@ -1037,6 +1047,10 @@ async def print_bootnode_metadata() -> None:
             {
                 "peer_id": peer_id,
                 "enr": build_helper_bootnode_enr(identity_key),
+                "qlean_enr": build_helper_bootnode_enr(
+                    identity_key,
+                    include_udp=False,
+                ),
                 "multiaddr": build_helper_bootnode_multiaddr(peer_id),
             }
         )

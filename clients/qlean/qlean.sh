@@ -3,6 +3,31 @@ set -euo pipefail
 
 DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}" 
 ASSET_ROOT="/tmp/qlean-runtime" 
+LOCAL_IP_PLACEHOLDER="__HIVE_LOCAL_IP__"
+
+detect_local_ip() {
+    hostname -i 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -v '^127\.' | head -n 1
+}
+
+materialize_runtime_local_ip() {
+    local runtime_ip
+
+    if [ ! -f "$ASSET_ROOT/validator-config.yaml" ]; then
+        return
+    fi
+
+    if ! grep -q "$LOCAL_IP_PLACEHOLDER" "$ASSET_ROOT/validator-config.yaml"; then
+        return
+    fi
+
+    runtime_ip="$(detect_local_ip || true)"
+    if [ -z "$runtime_ip" ]; then
+        echo "Unable to resolve local container IP for $CLEAN_NODE_ID" >&2
+        exit 1
+    fi
+
+    sed -i "s/${LOCAL_IP_PLACEHOLDER}/${runtime_ip}/g" "$ASSET_ROOT/validator-config.yaml"
+}
 
 case "$DEVNET_LABEL" in
     devnet3)
@@ -30,6 +55,7 @@ done
 until [[ -f "$ASSET_ROOT/config.yaml" ]]; do sleep 0.5; done 
 
 find "$ASSET_ROOT" -type f \( -name "*.yaml" -o -name "*.json" \) -exec sed -i 's/: 0x/: /g; s/\"0x/\"/g' {} + || true 
+materialize_runtime_local_ip
 
 NODE_KEY="$(cat "$ASSET_ROOT/node.key")"
 

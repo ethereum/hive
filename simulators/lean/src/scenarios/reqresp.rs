@@ -1,10 +1,11 @@
 use crate::scenarios::helper::{
-    default_genesis_time, fork_choice_head_slot, http_client, lean_api_url,
-    lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
+    start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncTestData,
+};
+use crate::scenarios::util::{
+    default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
+    lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
     prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
-    simulator_container_ip, start_post_genesis_sync_context, ClientUnderTestRole,
-    HelperGossipForkDigestProfile, LeanDevnet, PostGenesisSyncTestData,
-    LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE, LEAN_CLIENT_RUNTIME_ROLE_OBSERVER,
+    simulator_container_ip, ClientUnderTestRole, LeanDevnet, TimedDataTestSpec,
 };
 use crate::utils::libp2p_mock::{
     client_multiaddr, compute_client_peer_id, decode_request, encode_request, encode_request_raw,
@@ -64,7 +65,7 @@ dyn_async! {
             let status_happy_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/happy_path".to_string(),
                     description: "Two compatible lean nodes exchange Status and assert finalized/head checkpoints match.".to_string(),
                     always_run: false,
@@ -93,7 +94,7 @@ dyn_async! {
             let status_genesis_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/genesis_only".to_string(),
                     description: "Two fresh nodes at genesis exchange Status; assert zero/genesis finalized and head are accepted.".to_string(),
                     always_run: false,
@@ -122,7 +123,7 @@ dyn_async! {
             let status_advanced_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/advanced_head".to_string(),
                     description: "Source node advances several slots, sink connects later and marks it as useful for sync.".to_string(),
                     always_run: false,
@@ -151,7 +152,7 @@ dyn_async! {
             let status_bad_root_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/incompatible_finalized_root".to_string(),
                     description: "Peer reports same finalized slot but different finalized root. Client should reject/disconnect.".to_string(),
                     always_run: false,
@@ -180,7 +181,7 @@ dyn_async! {
             let status_bad_fork_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/incompatible_fork_or_network".to_string(),
                     description: "Peer uses wrong fork digest/network config. Client should not treat it as a valid sync peer.".to_string(),
                     always_run: false,
@@ -209,7 +210,7 @@ dyn_async! {
             let status_malformed_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/status/malformed_ssz".to_string(),
                     description: "Send invalid SSZ/snappy status bytes. Client must reject without crashing.".to_string(),
                     always_run: false,
@@ -238,7 +239,7 @@ dyn_async! {
             let blocks_single_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/single_known_block".to_string(),
                     description: "Request one known block root from source. Assert exact block is returned.".to_string(),
                     always_run: false,
@@ -267,7 +268,7 @@ dyn_async! {
             let blocks_multiple_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/multiple_known_blocks".to_string(),
                     description: "Request several known roots in one request. Assert all returned blocks match.".to_string(),
                     always_run: false,
@@ -296,7 +297,7 @@ dyn_async! {
             let blocks_unknown_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/unknown_root".to_string(),
                     description: "Request a root the peer does not have. Assert empty response or missing block behavior is spec-compliant.".to_string(),
                     always_run: false,
@@ -325,7 +326,7 @@ dyn_async! {
             let blocks_mixed_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/mixed_known_unknown".to_string(),
                     description: "Request known and unknown roots together. Assert known blocks are returned and unknown roots do not fail the whole request.".to_string(),
                     always_run: false,
@@ -354,7 +355,7 @@ dyn_async! {
             let blocks_max_limit_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/max_request_limit".to_string(),
                     description: "Request exactly MAX_REQUEST_BLOCKS roots. Assert accepted.".to_string(),
                     always_run: false,
@@ -383,7 +384,7 @@ dyn_async! {
             let blocks_too_many_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/too_many_roots".to_string(),
                     description: "Request more than MAX_REQUEST_BLOCKS. Assert rejected, stream reset, or error response.".to_string(),
                     always_run: false,
@@ -412,7 +413,7 @@ dyn_async! {
             let blocks_duplicate_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/duplicate_roots".to_string(),
                     description: "Request the same root multiple times. Assert deterministic behavior.".to_string(),
                     always_run: false,
@@ -441,7 +442,7 @@ dyn_async! {
             let blocks_malformed_req_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/blocks_by_root/malformed_request".to_string(),
                     description: "Send invalid SSZ/snappy request bytes. Client rejects without crash.".to_string(),
                     always_run: false,
@@ -470,7 +471,7 @@ dyn_async! {
             let backfill_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/sync/missing_parent_backfill".to_string(),
                     description: "Sink receives child via gossip before parent, then fetches missing parent via BlocksByRoot.".to_string(),
                     always_run: false,
@@ -499,7 +500,7 @@ dyn_async! {
             let catchup_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/sync/catch_up_from_status".to_string(),
                     description: "Sink starts behind, reads peer Status, requests missing blocks, and catches up within slot delta.".to_string(),
                     always_run: false,
@@ -528,7 +529,7 @@ dyn_async! {
             let concurrency_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
                 test,
-                crate::scenarios::helper::TimedDataTestSpec {
+                TimedDataTestSpec {
                     name: "reqresp/concurrency/per_peer_request_limit".to_string(),
                     description: "Issue concurrent block requests to one peer. Assert client respects the max in-flight request limit.".to_string(),
                     always_run: false,
@@ -676,10 +677,7 @@ dyn_async! {
 
         let mut environment = lean_environment();
         environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
-        environment.insert(
-            LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE.to_string(),
-            LEAN_CLIENT_RUNTIME_ROLE_OBSERVER.to_string(),
-        );
+        ClientUnderTestRole::Observer.apply_to_environment(&mut environment);
         let files = prepare_client_runtime_files(
             &client_type, &environment)
             .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
@@ -736,10 +734,7 @@ dyn_async! {
 
         let mut environment = lean_environment();
         environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
-        environment.insert(
-            LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE.to_string(),
-            LEAN_CLIENT_RUNTIME_ROLE_OBSERVER.to_string(),
-        );
+        ClientUnderTestRole::Observer.apply_to_environment(&mut environment);
         let files = prepare_client_runtime_files(
             &client_type, &environment)
             .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));

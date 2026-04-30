@@ -1,4 +1,4 @@
-use crate::scenarios::helper::{
+use crate::scenarios::util::{
     expect_single_client, lean_clients, lean_environment, lean_single_client_runtime_setup,
     load_fork_choice_response, prepare_client_runtime_files, selected_lean_devnet,
     simulator_container_ip, LeanDevnet,

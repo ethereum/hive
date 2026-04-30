@@ -1,12 +1,13 @@
 use crate::scenarios::helper::{
+    lean_single_client_runtime_setup_with_live_helper, start_post_genesis_sync_context,
+    HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
+};
+use crate::scenarios::util::{
     default_genesis_time, expect_single_client, get_json_with_retry, http_client, lean_api_url,
-    lean_clients, lean_environment, lean_single_client_runtime_setup,
-    lean_single_client_runtime_setup_with_live_helper, load_fork_choice_response,
+    lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
     load_response_with_retry, prepare_client_runtime_files, run_data_test_with_timeout,
-    selected_lean_devnet, start_post_genesis_sync_context, CheckpointResponse, ClientUnderTestRole,
-    ForkChoiceResponse, HealthResponse, HelperGossipForkDigestProfile, LeanDevnet,
-    PostGenesisSyncContext, PostGenesisSyncTestData, TimedDataTestSpec, HEALTHY_STATUS,
-    LEAN_RPC_SERVICE,
+    selected_lean_devnet, CheckpointResponse, ClientUnderTestRole, ForkChoiceResponse,
+    HealthResponse, LeanDevnet, TimedDataTestSpec, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
 use alloy_primitives::{FixedBytes, B256};
 use hivesim::{
