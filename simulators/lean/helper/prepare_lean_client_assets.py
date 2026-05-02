@@ -61,6 +61,11 @@ def observer_only() -> bool:
     return os.environ.get("HIVE_LEAN_CLIENT_RUNTIME_ROLE", "").strip().lower() == "observer"
 
 
+def observer_needs_validator_assignment() -> bool:
+    # These clients can't currently boot with an empty local validator assignment, should be a standardized behavior
+    return CLIENT_KIND in {"lantern", "nlean", "qlean", "zeam"}
+
+
 def parse_runtime_validator_indices() -> list[int] | None:
     raw_indices = os.environ.get("HIVE_LEAN_VALIDATOR_INDICES", "").strip()
     if not raw_indices:
@@ -119,7 +124,12 @@ def node_specs(count: int) -> list[dict[str, object]]:
         os.environ.get("HIVE_CLIENT_PRIVATE_KEY", deterministic_private_key(f"{CLIENT_KIND}:{NODE_ID}:node"))
     )
     requested_indices = parse_runtime_validator_indices()
-    current_indices = [] if observer_only() else (requested_indices or [0])
+    if observer_only():
+        current_indices = []
+        if observer_needs_validator_assignment():
+            current_indices = requested_indices or [0]
+    else:
+        current_indices = requested_indices or [0]
     specs = [
         {
             "name": NODE_ID,
@@ -133,7 +143,7 @@ def node_specs(count: int) -> list[dict[str, object]]:
         }
     ]
 
-    if observer_only():
+    if observer_only() and not observer_needs_validator_assignment():
         # Observer-mode clients should not receive dummy validator assignments.
         # Some runtimes, including Ethlambda, still load those extra keys and
         # start proposing locally, which forks the sync test away from the
@@ -229,12 +239,16 @@ def render_config(validators: list[dict[str, str]]) -> str:
 
 
 def render_nodes_yaml() -> str:
+    entries = bootnodes()
+    if CLIENT_KIND == "qlean" and not entries:
+        return "[]\n"
+
     if CLIENT_KIND == "zeam" and BOOTNODE_ENV.strip().lower() == "none":
         return "".join(f"- {entry}\n" for entry in FALLBACK_BOOTNODES)
 
     if CLIENT_KIND == "lantern":
-        return "".join(f"- {entry}\n" for entry in bootnodes())
-    return "".join(f'- "{entry}"\n' for entry in bootnodes())
+        return "".join(f"- {entry}\n" for entry in entries)
+    return "".join(f'- "{entry}"\n' for entry in entries)
 
 
 def render_validator_config(specs: list[dict[str, object]]) -> str:
@@ -710,7 +724,7 @@ def write_nlean_assignments(
         key_hex = trim_hex(spec["private_key"])  # type: ignore[arg-type]
         write_text(asset_root / f"{spec['name']}.key", key_hex + "\n")
 
-        lines.append(f'{spec["name"]}:')
+        append_assignment_header(lines, spec)
         for index in spec["indices"]:
             validator = validators[index]
             attester_sk = f"validator_{index}_attester_sk.ssz"

@@ -2,27 +2,27 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::fmt;
 use std::fs;
-use std::future::Future;
-use std::net::{IpAddr, UdpSocket};
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
+use std::net::IpAddr;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use alloy_primitives::B256;
+use crate::utils::util::{
+    bootnode_enr_for_client, client_uses_enr_bootnodes, default_genesis_time,
+    fork_choice_head_slot, http_client, lean_api_url, lean_environment, panic_payload_to_string,
+    prepare_client_runtime_files, selected_lean_devnet, simulator_container_ip, CheckpointResponse,
+    ClientUnderTestRole, ForkChoiceResponse, ForkChoiceSnapshot, LeanDevnet,
+    DEVNET4_HELPER_GOSSIP_FORK_DIGEST, LEAN_HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE,
+    LEAN_HELPER_API_PORT_ENVIRONMENT_VARIABLE, LEAN_HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE,
+    LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+    LEAN_HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE, LEAN_HELPER_P2P_PORT_ENVIRONMENT_VARIABLE,
+};
 use hivesim::types::ClientDefinition;
-use hivesim::{types::TestResult, Client, Simulation, Test};
-use reqwest::{header::ACCEPT, Client as HttpClient, Url};
-use serde::{de::DeserializeOwned, Deserialize};
+use hivesim::{Client, Test};
+use serde::Deserialize;
 use tokio::time::{sleep, timeout};
 
-const HIVE_CHECK_LIVE_PORT: &str = "HIVE_CHECK_LIVE_PORT";
-const HIVE_LEAN_DEVNET_LABEL: &str = "HIVE_LEAN_DEVNET_LABEL";
-const LEAN_HTTP_PORT: u16 = 5052;
-const LEAN_DEVNET_CONFIG_PATH: &str = "/app/hive/lean-devnets.txt";
-const LEAN_ROLE: &str = "lean";
 const CHECKPOINT_SYNC_URL_ENVIRONMENT_VARIABLE: &str = "HIVE_CHECKPOINT_SYNC_URL";
 const BOOTNODES_ENVIRONMENT_VARIABLE: &str = "HIVE_BOOTNODES";
 const LEAN_GENESIS_VALIDATORS_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_VALIDATORS";
@@ -32,27 +32,14 @@ const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
-const LEAN_HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_HELPER_ADVERTISE_IP";
-const LEAN_HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE: &str =
-    "HIVE_LEAN_HELPER_GOSSIP_FORK_DIGEST";
-const LEAN_HELPER_P2P_PORT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_HELPER_P2P_PORT";
-const LEAN_HELPER_API_PORT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_HELPER_API_PORT";
-const LEAN_HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_HELPER_METADATA_PORT";
-const LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str =
-    "HIVE_LEAN_HELPER_IDENTITY_PRIVATE_KEY";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
-pub(crate) const LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE: &str =
-    "HIVE_LEAN_CLIENT_RUNTIME_ROLE";
-pub(crate) const LEAN_CLIENT_RUNTIME_ROLE_OBSERVER: &str = "observer";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
 const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
 const LEAN_SPEC_SOURCE_PEER_ID: &str = "16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3";
 const DEFAULT_HELPER_GOSSIP_FORK_DIGEST: &str = "devnet0";
-const DEVNET4_HELPER_GOSSIP_FORK_DIGEST: &str = "12345678";
 const DEFAULT_HELPER_P2P_PORT: u16 = 9001;
 const DEFAULT_HELPER_API_PORT: u16 = 5052;
 const DEFAULT_HELPER_METADATA_PORT: u16 = 5053;
-const LEAN_GENESIS_DELAY_SECS: u64 = 30;
 const MESH_HELPER_GENESIS_BUFFER_PER_PEER_SECS: u64 = 10;
 const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
 const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
@@ -66,65 +53,8 @@ const CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS: u64 = 30;
 const MESH_HELPER_READY_TIMEOUT_SECS: u64 = 120;
 const LIVE_HELPER_FORK_CHOICE_RETRY_ATTEMPTS: u64 = 10;
 const LOCAL_HELPER_ENTRYPOINT: &str = "/app/hive/leanspec-client.sh";
-const LEAN_SPEC_CLIENT_RUNNER: &str = "/app/hive/lean_spec_client_runner.py";
 const LOCAL_HELPER_KIND: &str = "lean-spec-local-helper";
-const CLIENT_RUNTIME_ASSET_PREPARER: &str = "/app/hive/prepare_lean_client_assets.py";
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
-pub(crate) const HEALTHY_STATUS: &str = "healthy";
-pub(crate) const LEAN_RPC_SERVICE: &str = "lean-rpc-api";
-
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum LeanDevnet {
-    Devnet3,
-    Devnet4,
-}
-
-impl LeanDevnet {
-    const DEFAULT: Self = Self::Devnet3;
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Devnet3 => "devnet3",
-            Self::Devnet4 => "devnet4",
-        }
-    }
-}
-
-impl fmt::Display for LeanDevnet {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-impl TryFrom<&str> for LeanDevnet {
-    type Error = String;
-
-    fn try_from(label: &str) -> Result<Self, Self::Error> {
-        match label.trim() {
-            "devnet3" => Ok(Self::Devnet3),
-            "devnet4" => Ok(Self::Devnet4),
-            other => Err(format!("unsupported lean devnet label {other:?}")),
-        }
-    }
-}
-
-struct LeanDevnetConfig {
-    default_devnet: LeanDevnet,
-    client_support: HashMap<String, Vec<LeanDevnet>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct HealthResponse {
-    pub(crate) status: String,
-    pub(crate) service: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct CheckpointResponse {
-    pub(crate) slot: u64,
-    pub(crate) root: B256,
-}
 
 #[derive(Debug, Deserialize)]
 struct HelperGenesisValidatorEntry {
@@ -136,20 +66,10 @@ struct HelperGenesisValidatorEntry {
 struct HelperGenesisMetadata {
     genesis_time: u64,
     genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
+    #[serde(default)]
+    bootnode_qlean_enr: Option<String>,
     bootnode_enr: Option<String>,
     bootnode_multiaddr: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct LeanBootnodeMetadata {
-    pub(crate) enr: String,
-    pub(crate) multiaddr: String,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum ClientUnderTestRole {
-    Validator,
-    Observer,
 }
 
 #[derive(Clone, Copy)]
@@ -178,300 +98,25 @@ pub(crate) struct PostGenesisSyncContext {
     pub client_checkpoint: Option<CheckpointResponse>,
 }
 
+pub(crate) struct CheckpointSyncHelperMesh {
+    helpers: RunningLocalLeanSpecHelperGroup,
+    source_fork_choice: ForkChoiceSnapshot,
+    source_genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
+    source_helper_config: LocalLeanSpecHelperConfig,
+    genesis_time: u64,
+}
+
 impl PostGenesisSyncContext {
+    pub(crate) async fn try_load_live_helper_fork_choice(
+        &mut self,
+    ) -> Result<ForkChoiceResponse, String> {
+        self._helpers.load_live_fork_choice().await
+    }
+
     pub(crate) async fn load_live_helper_fork_choice(&mut self) -> ForkChoiceResponse {
-        self._helpers
-            .load_live_fork_choice()
+        self.try_load_live_helper_fork_choice()
             .await
             .unwrap_or_else(|err| panic!("{err}"))
-    }
-}
-
-pub(crate) fn lean_clients(clients: Vec<ClientDefinition>) -> Vec<ClientDefinition> {
-    clients
-        .into_iter()
-        .filter(|client| client.meta.roles.iter().any(|role| role == LEAN_ROLE))
-        .collect()
-}
-
-pub(crate) fn selected_lean_devnet() -> LeanDevnet {
-    let label =
-        env::var(HIVE_LEAN_DEVNET_LABEL).unwrap_or_else(|_| LeanDevnet::DEFAULT.to_string());
-    LeanDevnet::try_from(label.as_str()).unwrap_or_else(|err| {
-        panic!(
-            "Unsupported Lean devnet selection in environment variable {HIVE_LEAN_DEVNET_LABEL}: {err}"
-        )
-    })
-}
-
-pub(crate) fn set_selected_lean_devnet(devnet: LeanDevnet) {
-    env::set_var(HIVE_LEAN_DEVNET_LABEL, devnet.as_str());
-}
-
-fn lean_spec_app_root() -> PathBuf {
-    let (environment_variable, default_path) = match selected_lean_devnet() {
-        LeanDevnet::Devnet3 => ("LEAN_SPEC_DEVNET3_ROOT", "/app/devnet3"),
-        LeanDevnet::Devnet4 => ("LEAN_SPEC_DEVNET4_ROOT", "/app/devnet4"),
-    };
-
-    env::var(environment_variable)
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(default_path))
-}
-
-pub(crate) async fn resolve_selected_lean_devnet(simulation: &Simulation) -> LeanDevnet {
-    let config = load_lean_devnet_config();
-    let clients = lean_clients(simulation.client_types().await);
-    if clients.is_empty() {
-        return config.default_devnet;
-    }
-
-    let mut resolved_devnet = None;
-    let mut selected_labels = Vec::new();
-
-    for client in clients {
-        let (base_name, explicit_devnet) = split_client_devnet_name(&client.name);
-        let devnet = explicit_devnet.unwrap_or(config.default_devnet);
-        let supported_devnets = config.client_support.get(base_name).unwrap_or_else(|| {
-            panic!(
-                "Lean client {} is missing from {}",
-                base_name, LEAN_DEVNET_CONFIG_PATH
-            )
-        });
-
-        if !supported_devnets.contains(&devnet) {
-            let supported = supported_devnets
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            panic!(
-                "Lean client {} does not support {} according to {} (supported: {})",
-                client.name, devnet, LEAN_DEVNET_CONFIG_PATH, supported,
-            );
-        }
-
-        selected_labels.push(format!("{}={devnet}", client.name));
-        match resolved_devnet {
-            Some(previous) if previous != devnet => {
-                panic!(
-                    "Mixed lean devnets selected in one run: {}",
-                    selected_labels.join(", ")
-                );
-            }
-            Some(_) => {}
-            None => resolved_devnet = Some(devnet),
-        }
-    }
-
-    resolved_devnet.unwrap_or(config.default_devnet)
-}
-
-pub(crate) fn lean_environment() -> HashMap<String, String> {
-    let devnet_label = selected_lean_devnet().to_string();
-    HashMap::from([
-        (HIVE_CHECK_LIVE_PORT.to_string(), LEAN_HTTP_PORT.to_string()),
-        (HIVE_LEAN_DEVNET_LABEL.to_string(), devnet_label),
-    ])
-}
-
-pub(crate) fn lean_api_url(client: &Client, path: &str) -> String {
-    format!("http://{}:{}{}", client.ip, LEAN_HTTP_PORT, path)
-}
-
-pub(crate) fn lean_bootnodes_for_client(
-    client_kind: &str,
-    bootnodes: &[LeanBootnodeMetadata],
-) -> String {
-    if bootnodes.is_empty() {
-        return "none".to_string();
-    }
-
-    let use_enr = client_kind == "ethlambda" || client_kind == "zeam";
-    bootnodes
-        .iter()
-        .map(|bootnode| {
-            if use_enr {
-                bootnode.enr.as_str()
-            } else {
-                bootnode.multiaddr.as_str()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
-pub(crate) fn bootnode_metadata_for_client(
-    private_key: &str,
-    ip: IpAddr,
-    p2p_port: u16,
-) -> LeanBootnodeMetadata {
-    let app_root = lean_spec_app_root();
-    let python = app_root.join(".venv/bin/python");
-    let venv_bin = app_root.join(".venv/bin");
-    let path = match env::var("PATH") {
-        Ok(existing_path) => format!("{}:{existing_path}", venv_bin.display()),
-        Err(_) => venv_bin.display().to_string(),
-    };
-
-    let output = Command::new(&python)
-        .arg(LEAN_SPEC_CLIENT_RUNNER)
-        .arg("--bootnode-metadata")
-        .current_dir(&app_root)
-        .env("VIRTUAL_ENV", app_root.join(".venv"))
-        .env("PATH", path)
-        .env(
-            LEAN_HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE,
-            ip.to_string(),
-        )
-        .env(
-            LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE,
-            private_key,
-        )
-        .env(
-            LEAN_HELPER_P2P_PORT_ENVIRONMENT_VARIABLE,
-            p2p_port.to_string(),
-        )
-        .output()
-        .unwrap_or_else(|err| {
-            panic!(
-                "Unable to derive lean bootnode metadata with {}: {err}",
-                python.display()
-            )
-        });
-
-    if !output.status.success() {
-        panic!(
-            "Unable to derive lean bootnode metadata: command exited with status {}.\nstdout:\n{}\nstderr:\n{}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let metadata_line = stdout
-        .lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or_else(|| {
-            panic!(
-                "Lean bootnode metadata command produced no JSON output. stderr:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            )
-        });
-
-    serde_json::from_str(metadata_line).unwrap_or_else(|err| {
-        panic!("Unable to decode lean bootnode metadata `{metadata_line}`: {err}")
-    })
-}
-
-pub(crate) async fn get_json_with_retry<T: DeserializeOwned>(http: &HttpClient, url: &str) -> T {
-    let mut last_error = String::new();
-
-    for attempt in 1..=30 {
-        match http.get(url).send().await {
-            Ok(response) => {
-                let status = response.status();
-                if !status.is_success() {
-                    last_error = format!("received HTTP {status} from {url}");
-                } else {
-                    return response.json::<T>().await.unwrap_or_else(|err| {
-                        panic!("Unable to decode response from {url}: {err}")
-                    });
-                }
-            }
-            Err(err) => {
-                last_error = err.to_string();
-            }
-        }
-
-        if attempt < 30 {
-            sleep(Duration::from_secs(1)).await;
-        }
-    }
-
-    panic!("Request to {url} did not succeed after retries: {last_error}");
-}
-
-fn load_lean_devnet_config() -> LeanDevnetConfig {
-    let contents = fs::read_to_string(LEAN_DEVNET_CONFIG_PATH).unwrap_or_else(|err| {
-        panic!("Unable to read lean devnet config {LEAN_DEVNET_CONFIG_PATH}: {err}")
-    });
-
-    let mut default_devnet = None;
-    let mut client_support = HashMap::new();
-
-    for (index, raw_line) in contents.lines().enumerate() {
-        let line_number = index + 1;
-        let line = raw_line
-            .split('#')
-            .next()
-            .expect("split always yields at least one segment")
-            .trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        let (key, value) = line.split_once('=').unwrap_or_else(|| {
-            panic!(
-                "Invalid lean devnet config line {} in {}: expected key=value, got {:?}",
-                line_number, LEAN_DEVNET_CONFIG_PATH, raw_line
-            )
-        });
-        let key = key.trim();
-        let value = value.trim();
-
-        if key == "default" {
-            default_devnet = Some(LeanDevnet::try_from(value).unwrap_or_else(|err| {
-                panic!(
-                    "Invalid default lean devnet in {} line {}: {}",
-                    LEAN_DEVNET_CONFIG_PATH, line_number, err
-                )
-            }));
-            continue;
-        }
-
-        let supported_devnets = value
-            .split(',')
-            .map(|label| {
-                LeanDevnet::try_from(label).unwrap_or_else(|err| {
-                    panic!(
-                        "Invalid lean devnet in {} line {} for client {}: {}",
-                        LEAN_DEVNET_CONFIG_PATH, line_number, key, err
-                    )
-                })
-            })
-            .collect::<Vec<_>>();
-
-        if supported_devnets.is_empty() {
-            panic!(
-                "Lean devnet config {} line {} defines client {} without any supported devnets",
-                LEAN_DEVNET_CONFIG_PATH, line_number, key
-            );
-        }
-
-        client_support.insert(key.to_string(), supported_devnets);
-    }
-
-    LeanDevnetConfig {
-        default_devnet: default_devnet.unwrap_or_else(|| {
-            panic!(
-                "Lean devnet config {} must define a default=<devnet> entry",
-                LEAN_DEVNET_CONFIG_PATH
-            )
-        }),
-        client_support,
-    }
-}
-
-fn split_client_devnet_name(client_name: &str) -> (&str, Option<LeanDevnet>) {
-    let Some((base_name, suffix)) = client_name.rsplit_once('_') else {
-        return (client_name, None);
-    };
-    match LeanDevnet::try_from(suffix) {
-        Ok(devnet) => (base_name, Some(devnet)),
-        Err(_) => (client_name, None),
     }
 }
 
@@ -484,6 +129,7 @@ struct RunningLocalLeanSpecHelper {
     p2p_port: u16,
     api_port: u16,
     metadata_port: u16,
+    bootnode_qlean_enr: Option<String>,
     bootnode_enr: Option<String>,
     bootnode_multiaddr: Option<String>,
 }
@@ -648,11 +294,16 @@ impl RunningLocalLeanSpecHelper {
     }
 
     fn bootnode_for_client(&self, client_type: &str) -> String {
-        if client_type.starts_with("ethlambda") || client_type.starts_with("zeam") {
-            return self
-                .bootnode_enr
-                .clone()
-                .unwrap_or_else(|| self.bootnode_multiaddr());
+        if client_uses_enr_bootnodes(client_type) {
+            if let Some(enr) = bootnode_enr_for_client(
+                client_type,
+                self.bootnode_enr.as_deref(),
+                self.bootnode_qlean_enr.as_deref(),
+            ) {
+                return enr.to_string();
+            }
+
+            return self.bootnode_multiaddr();
         }
 
         self.bootnode_multiaddr()
@@ -703,62 +354,6 @@ impl Drop for RunningLocalLeanSpecHelper {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct ForkChoiceSnapshot {
-    pub justified: CheckpointResponse,
-    pub finalized: CheckpointResponse,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct ForkChoiceNodeResponse {
-    pub root: B256,
-    pub slot: u64,
-    pub parent_root: B256,
-    pub proposer_index: u64,
-    pub weight: u64,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct ForkChoiceResponse {
-    #[serde(default)]
-    pub nodes: Vec<ForkChoiceNodeResponse>,
-    pub head: B256,
-    pub justified: CheckpointResponse,
-    pub finalized: CheckpointResponse,
-    #[serde(default)]
-    pub safe_target: B256,
-    #[serde(default)]
-    pub validator_count: u64,
-}
-
-pub(crate) fn fork_choice_head_slot(fork_choice: &ForkChoiceResponse) -> u64 {
-    fork_choice
-        .nodes
-        .iter()
-        .find(|node| node.root == fork_choice.head)
-        .map(|node| node.slot)
-        .unwrap_or_else(|| {
-            let max_node_slot = fork_choice
-                .nodes
-                .iter()
-                .map(|node| node.slot)
-                .max()
-                .unwrap_or(0);
-            if max_node_slot > 0 {
-                return max_node_slot;
-            }
-
-            if fork_choice.head == fork_choice.justified.root {
-                return fork_choice.justified.slot;
-            }
-            if fork_choice.head == fork_choice.finalized.root {
-                return fork_choice.finalized.slot;
-            }
-
-            fork_choice.justified.slot.max(fork_choice.finalized.slot)
-        })
-}
-
 fn is_better_fork_choice(candidate: &ForkChoiceResponse, current: &ForkChoiceResponse) -> bool {
     let candidate_key = (
         fork_choice_head_slot(candidate),
@@ -785,41 +380,6 @@ struct CheckpointSyncForkChoiceSnapshot {
     finalized: CheckpointResponse,
     #[serde(default)]
     nodes: Vec<ForkChoiceNodeSlot>,
-}
-
-pub(crate) type AsyncLeanDataTestFunc<T> =
-    fn(&mut Test, T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
-pub(crate) type ClientEnvironments = Option<Vec<Option<HashMap<String, String>>>>;
-pub(crate) type ClientFiles = Option<Vec<Option<HashMap<String, Vec<u8>>>>>;
-pub(crate) type ClientRuntimeSetup = (ClientEnvironments, ClientFiles);
-
-pub(crate) struct TimedDataTestSpec<T> {
-    pub name: String,
-    pub description: String,
-    pub always_run: bool,
-    pub client_name: String,
-    pub timeout_duration: Duration,
-    pub test_data: T,
-}
-
-pub(crate) async fn load_fork_choice_response(client: &Client) -> ForkChoiceResponse {
-    let http = http_client();
-    get_json_with_retry(&http, &lean_api_url(client, "/lean/v0/fork_choice")).await
-}
-
-pub(crate) fn expect_single_client(clients: Vec<Client>) -> Client {
-    clients
-        .into_iter()
-        .next()
-        .expect("NClientTestSpec should start exactly one client")
-}
-
-pub(crate) fn lean_single_client_runtime_setup(client_type: &str) -> ClientRuntimeSetup {
-    let environment = lean_environment();
-    let files = prepare_client_runtime_files(client_type, &environment)
-        .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
-
-    (Some(vec![Some(environment)]), Some(vec![Some(files)]))
 }
 
 pub(crate) struct LiveHelperSingleClientRuntimeSetup {
@@ -880,147 +440,6 @@ pub(crate) async fn lean_single_client_runtime_setup_with_live_helper(
     }
 }
 
-fn extract_data_test_result(join_handle: Result<(), tokio::task::JoinError>) -> TestResult {
-    match join_handle {
-        Ok(()) => TestResult {
-            pass: true,
-            details: String::new(),
-        },
-        Err(err) => TestResult {
-            pass: false,
-            details: panic_payload_to_string(err.into_panic()),
-        },
-    }
-}
-
-fn annotate_failed_client(mut test_result: TestResult, client_name: &str) -> TestResult {
-    if test_result.pass {
-        return test_result;
-    }
-
-    if test_result.details.is_empty() {
-        test_result.details = format!("client {client_name} failed without an error message");
-    } else if !test_result.details.contains(client_name) {
-        test_result.details = format!("client {client_name}: {}", test_result.details);
-    }
-
-    test_result
-}
-
-pub(crate) async fn run_data_test<T: Send + 'static>(
-    host_test: &Test,
-    name: String,
-    description: String,
-    always_run: bool,
-    test_data: T,
-    func: AsyncLeanDataTestFunc<T>,
-) {
-    if let Some(test_match) = host_test.sim.test_matcher.clone() {
-        if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
-            return;
-        }
-    }
-
-    let test_id = host_test
-        .sim
-        .start_test(host_test.suite_id, name, description)
-        .await;
-    let suite_id = host_test.suite_id;
-    let suite = host_test.suite.clone();
-    let simulation = host_test.sim.clone();
-
-    let test_result = extract_data_test_result(
-        tokio::spawn(async move {
-            let test = &mut Test {
-                sim: simulation,
-                test_id,
-                suite,
-                suite_id,
-                result: Default::default(),
-            };
-
-            test.result.pass = true;
-            (func)(test, test_data).await;
-        })
-        .await,
-    );
-
-    host_test.sim.end_test(suite_id, test_id, test_result).await;
-}
-
-pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
-    host_test: &Test,
-    spec: TimedDataTestSpec<T>,
-    func: AsyncLeanDataTestFunc<T>,
-) {
-    let TimedDataTestSpec {
-        name,
-        description,
-        always_run,
-        client_name,
-        timeout_duration,
-        test_data,
-    } = spec;
-
-    if let Some(test_match) = host_test.sim.test_matcher.clone() {
-        if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
-            return;
-        }
-    }
-
-    let test_id = host_test
-        .sim
-        .start_test(host_test.suite_id, name, description)
-        .await;
-    let suite_id = host_test.suite_id;
-    let suite = host_test.suite.clone();
-    let simulation = host_test.sim.clone();
-
-    let mut join_handle = tokio::spawn(async move {
-        let test = &mut Test {
-            sim: simulation,
-            test_id,
-            suite,
-            suite_id,
-            result: Default::default(),
-        };
-
-        test.result.pass = true;
-        (func)(test, test_data).await;
-    });
-
-    let test_result = match timeout(timeout_duration, &mut join_handle).await {
-        Ok(join_result) => {
-            annotate_failed_client(extract_data_test_result(join_result), &client_name)
-        }
-        Err(_) => {
-            join_handle.abort();
-            join_handle.await.ok();
-            TestResult {
-                pass: false,
-                details: format!(
-                    "client {}: test exceeded timeout of {} seconds",
-                    client_name,
-                    timeout_duration.as_secs()
-                ),
-            }
-        }
-    };
-
-    host_test.sim.end_test(suite_id, test_id, test_result).await;
-}
-
-pub(crate) fn default_genesis_time() -> u64 {
-    current_unix_time() + LEAN_GENESIS_DELAY_SECS
-}
-
-pub(crate) fn current_unix_time() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("System time is before UNIX_EPOCH")
-        .as_secs()
-}
-
 fn adjusted_genesis_time_for_helper_mesh(
     requested_genesis_time: u64,
     helper_peer_count: usize,
@@ -1046,6 +465,149 @@ fn helper_gossip_fork_digest(profile: HelperGossipForkDigestProfile) -> String {
             LeanDevnet::Devnet3 => LeanDevnet::Devnet3.to_string(),
             LeanDevnet::Devnet4 => DEVNET4_HELPER_GOSSIP_FORK_DIGEST.to_string(),
         },
+    }
+}
+
+pub(crate) async fn start_checkpoint_sync_helper_mesh(
+    test_data: &PostGenesisSyncTestData,
+) -> CheckpointSyncHelperMesh {
+    assert!(
+        test_data.use_checkpoint_sync,
+        "checkpoint-sync helper mesh setup requires checkpoint sync test data"
+    );
+
+    let helper_peer_count = test_data.helper_peer_count.max(1);
+    let genesis_time = adjusted_genesis_time_for_helper_mesh(
+        test_data.genesis_time,
+        helper_peer_count,
+        test_data.connect_client_to_lean_spec_mesh,
+    );
+    let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
+    let source_helper_config = LocalLeanSpecHelperConfig::source(
+        genesis_time,
+        helper_fork_digest.clone(),
+        test_data.source_helper_validator_indices.clone(),
+    );
+    let (source_helper, source_genesis_validator_entries) =
+        start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
+                )
+            });
+    let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
+        start_mesh_helpers(
+            &source_helper,
+            genesis_time,
+            helper_peer_count - 1,
+            helper_fork_digest.clone(),
+        )
+        .await
+        .unwrap_or_else(|err| panic!("{err}"))
+    } else {
+        Vec::new()
+    };
+    let mut helpers = RunningLocalLeanSpecHelperGroup {
+        source: source_helper,
+        mesh_peers,
+    };
+
+    let (mut source_fork_choice, mut source_helper_restarted) =
+        match wait_for_checkpoint_slot_with_retry(
+            &mut helpers.source,
+            minimum_source_checkpoint_slot(test_data),
+            &source_helper_config,
+        )
+        .await
+        {
+            Ok(source_fork_choice) => source_fork_choice,
+            Err(err) => panic!("{err}"),
+        };
+
+    source_helper_restarted |= ensure_checkpoint_sync_source_ready(
+        &mut helpers.source,
+        &mut source_fork_choice,
+        &source_helper_config,
+        minimum_source_checkpoint_slot(test_data),
+    )
+    .await
+    .unwrap_or_else(|err| panic!("{err}"));
+
+    if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
+        if source_helper_restarted {
+            helpers.mesh_peers = start_mesh_helpers(
+                &helpers.source,
+                genesis_time,
+                helper_peer_count - 1,
+                helper_fork_digest.clone(),
+            )
+            .await
+            .unwrap_or_else(|err| panic!("{err}"));
+        }
+
+        if let Err(err) =
+            wait_for_any_mesh_helper_to_reach_post_genesis(&mut helpers.mesh_peers).await
+        {
+            eprintln!("Continuing checkpoint-sync test despite auxiliary helper lag: {err}");
+        }
+    }
+
+    CheckpointSyncHelperMesh {
+        helpers,
+        source_fork_choice,
+        source_genesis_validator_entries,
+        source_helper_config,
+        genesis_time,
+    }
+}
+
+pub(crate) async fn start_checkpoint_sync_client_context(
+    test: &Test,
+    test_data: &PostGenesisSyncTestData,
+    mut helper_mesh: CheckpointSyncHelperMesh,
+) -> PostGenesisSyncContext {
+    assert!(
+        test_data.use_checkpoint_sync,
+        "checkpoint-sync client startup requires checkpoint sync test data"
+    );
+
+    let checkpoint_sync_client_environment = client_under_test_environment(
+        &helper_mesh.helpers,
+        &test_data.client_under_test.name,
+        helper_mesh.genesis_time,
+        &helper_mesh.source_genesis_validator_entries,
+        test_data.use_checkpoint_sync,
+        test_data.connect_client_to_lean_spec_mesh,
+        test_data.client_role,
+    );
+    let client_under_test =
+        start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
+            test,
+            helper: &mut helper_mesh.helpers.source,
+            source_fork_choice: &mut helper_mesh.source_fork_choice,
+            helper_config: helper_mesh.source_helper_config.clone(),
+            client_type: test_data.client_under_test.name.clone(),
+            environment: checkpoint_sync_client_environment,
+            minimum_slot: minimum_source_checkpoint_slot(test_data),
+        })
+        .await;
+
+    let client_checkpoint = if test_data.wait_for_client_justified_checkpoint {
+        Some(
+            wait_for_non_genesis_justified_checkpoint(&client_under_test)
+                .await
+                .unwrap_or_else(|err| panic!("{err}")),
+        )
+    } else {
+        None
+    };
+
+    PostGenesisSyncContext {
+        _helpers: helper_mesh.helpers,
+        client_under_test,
+        source_fork_choice: helper_mesh.source_fork_choice,
+        client_checkpoint,
     }
 }
 
@@ -1372,12 +934,7 @@ fn client_under_test_environment(
         );
     }
 
-    if matches!(client_role, ClientUnderTestRole::Observer) {
-        environment.insert(
-            LEAN_CLIENT_RUNTIME_ROLE_ENVIRONMENT_VARIABLE.to_string(),
-            LEAN_CLIENT_RUNTIME_ROLE_OBSERVER.to_string(),
-        );
-    }
+    client_role.apply_to_environment(&mut environment);
 
     environment
 }
@@ -1390,120 +947,12 @@ fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
     }
 }
 
-pub(crate) fn lean_client_kind(client_type: &str) -> Result<&'static str, String> {
-    for candidate in [
-        "ethlambda",
-        "grandine_lean",
-        "zeam",
-        "lantern",
-        "qlean",
-        "ream",
-        "gean",
-        "nlean",
-    ] {
-        if client_type.starts_with(candidate) {
-            return Ok(candidate);
-        }
-    }
-    Err(format!(
-        "unsupported lean client type for runtime asset preparation: {client_type}"
-    ))
-}
-
-fn client_runtime_asset_root(client_kind: &str) -> String {
-    format!("/tmp/{client_kind}-runtime")
-}
-
-fn local_client_runtime_asset_root(client_kind: &str) -> PathBuf {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    env::temp_dir().join(format!("lean-client-assets-{client_kind}-{timestamp}"))
-}
-
 fn local_helper_runtime_asset_root(node_id: &str) -> PathBuf {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
     env::temp_dir().join(format!("lean-spec-helper-{node_id}-{timestamp}"))
-}
-
-fn collect_client_runtime_files(
-    source_root: &Path,
-    current_dir: &Path,
-    container_root: &str,
-    files: &mut HashMap<String, Vec<u8>>,
-) -> Result<(), String> {
-    for entry in fs::read_dir(current_dir)
-        .map_err(|err| format!("Unable to read prepared asset dir {current_dir:?}: {err}"))?
-    {
-        let entry = entry.map_err(|err| {
-            format!("Unable to inspect entry inside prepared asset dir {current_dir:?}: {err}")
-        })?;
-        let entry_path = entry.path();
-        if entry_path.is_dir() {
-            collect_client_runtime_files(source_root, &entry_path, container_root, files)?;
-            continue;
-        }
-
-        let relative_path = entry_path.strip_prefix(source_root).map_err(|err| {
-            format!("Unable to derive relative asset path for {entry_path:?}: {err}")
-        })?;
-        let file_contents = fs::read(&entry_path)
-            .map_err(|err| format!("Unable to read prepared asset file {entry_path:?}: {err}"))?;
-        let relative_path = relative_path.to_string_lossy().replace('\\', "/");
-        let container_path = format!("{container_root}/{relative_path}");
-
-        files.insert(container_path, file_contents);
-    }
-    Ok(())
-}
-
-pub(crate) fn prepare_client_runtime_files(
-    client_type: &str,
-    environment: &HashMap<String, String>,
-) -> Result<HashMap<String, Vec<u8>>, String> {
-    let client_kind = lean_client_kind(client_type)?;
-    let local_root = local_client_runtime_asset_root(client_kind);
-    let container_root = client_runtime_asset_root(client_kind);
-
-    let mut command = Command::new("python3");
-    command.arg(CLIENT_RUNTIME_ASSET_PREPARER);
-    command.env("LEAN_CLIENT_KIND", client_kind);
-    command.env("LEAN_RUNTIME_ASSET_ROOT", &local_root);
-    for (key, value) in environment {
-        command.env(key, value);
-    }
-
-    let output = command.output().map_err(|err| {
-        format!("Unable to execute {CLIENT_RUNTIME_ASSET_PREPARER} for {client_type}: {err}")
-    })?;
-    if !output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        fs::remove_dir_all(&local_root).ok();
-        return Err(format!(
-            "{CLIENT_RUNTIME_ASSET_PREPARER} failed for {client_type} with status {}.\nstdout:\n{}\nstderr:\n{}",
-            output.status, stdout, stderr
-        ));
-    }
-
-    let mut files = HashMap::new();
-    collect_client_runtime_files(&local_root, &local_root, &container_root, &mut files)?;
-    fs::remove_dir_all(&local_root).ok();
-    Ok(files)
-}
-
-pub(crate) fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {
-    if let Some(error) = payload.downcast_ref::<&'static str>() {
-        error.to_string()
-    } else if let Some(error) = payload.downcast_ref::<String>() {
-        error.clone()
-    } else {
-        format!("unknown panic payload: {payload:?}")
-    }
 }
 
 async fn start_client_under_test_attempt(
@@ -2070,48 +1519,6 @@ async fn wait_for_helper_to_reach_post_genesis_once(
     Ok(fork_choice.justified.slot > 0 || fork_choice.finalized.slot > 0 || max_node_slot > 0)
 }
 
-pub(crate) fn http_client() -> HttpClient {
-    HttpClient::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("Unable to build HTTP client")
-}
-
-pub(crate) async fn load_response_with_retry(
-    client: &Client,
-    path: &str,
-    accept_content_type: Option<&str>,
-) -> reqwest::Response {
-    let http = http_client();
-    let url = lean_api_url(client, path);
-    let mut last_error = String::new();
-
-    for _attempt in 0..10 {
-        let mut request = http.get(&url);
-        if let Some(accept_content_type) = accept_content_type {
-            request = request.header(ACCEPT, accept_content_type);
-        }
-
-        match request.send().await {
-            Ok(response) => {
-                let status = response.status();
-                if status.is_success() {
-                    return response;
-                }
-
-                last_error = format!("received HTTP {status} from {url}");
-            }
-            Err(err) => {
-                last_error = format!("error sending request for url ({url}): {err}");
-            }
-        }
-
-        sleep(Duration::from_secs(1)).await;
-    }
-
-    panic!("Request to {url} did not succeed after retries: {last_error}");
-}
-
 async fn load_helper_genesis_metadata(
     helper: &mut RunningLocalLeanSpecHelper,
 ) -> Result<HelperGenesisMetadata, String> {
@@ -2189,6 +1596,7 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
         let mut helper = start_local_lean_spec_helper(helper_config);
         match load_helper_genesis_metadata(&mut helper).await {
             Ok(metadata) => {
+                helper.bootnode_qlean_enr = metadata.bootnode_qlean_enr.clone();
                 helper.bootnode_enr = metadata.bootnode_enr.clone();
                 helper.bootnode_multiaddr = metadata.bootnode_multiaddr.clone();
                 return Ok((helper, metadata.genesis_validator_entries));
@@ -2276,36 +1684,10 @@ fn start_local_lean_spec_helper(
         p2p_port: helper_config.p2p_port,
         api_port: helper_config.api_port,
         metadata_port: helper_config.metadata_port,
+        bootnode_qlean_enr: None,
         bootnode_enr: None,
         bootnode_multiaddr: None,
     }
-}
-
-pub(crate) fn simulator_container_ip() -> IpAddr {
-    let simulator_url = env::var("HIVE_SIMULATOR")
-        .expect("HIVE_SIMULATOR environment variable should be set inside the simulator");
-    let url = Url::parse(&simulator_url).unwrap_or_else(|err| {
-        panic!("Unable to parse HIVE_SIMULATOR URL `{simulator_url}`: {err}")
-    });
-    let host = url
-        .host_str()
-        .unwrap_or_else(|| panic!("HIVE_SIMULATOR URL `{simulator_url}` does not include a host"));
-    let port = url.port_or_known_default().unwrap_or(80);
-    let socket = UdpSocket::bind("0.0.0.0:0").unwrap_or_else(|err| {
-        panic!("Unable to bind UDP socket to determine simulator container IP: {err}")
-    });
-    socket.connect((host, port)).unwrap_or_else(|err| {
-        panic!(
-            "Unable to connect UDP socket to HIVE_SIMULATOR host {}:{} to determine simulator container IP: {err}",
-            host, port
-        )
-    });
-    socket
-        .local_addr()
-        .unwrap_or_else(|err| {
-            panic!("Unable to determine simulator container local socket address: {err}")
-        })
-        .ip()
 }
 
 #[cfg(test)]
@@ -2383,6 +1765,7 @@ mod tests {
             p2p_port: DEFAULT_HELPER_P2P_PORT,
             api_port: DEFAULT_HELPER_API_PORT,
             metadata_port: DEFAULT_HELPER_METADATA_PORT,
+            bootnode_qlean_enr: None,
             bootnode_enr: None,
             bootnode_multiaddr: None,
         };

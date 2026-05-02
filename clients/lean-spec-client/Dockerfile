@@ -99,6 +99,7 @@ USER root
 
 COPY leanspec-client.sh /app/hive/leanspec-client.sh
 COPY lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
+COPY lean_spec_runtime.py /app/hive/lean_spec_runtime.py
 
 ADD ${LEAN_SPEC_DEVNET4_KEYS_METADATA_URL} /tmp/devnet4-keys-release.json
 

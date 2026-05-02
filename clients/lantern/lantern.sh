@@ -31,9 +31,11 @@ case "$DEVNET_LABEL" in
     devnet3)
         DEFAULT_LANTERN_BIN="/opt/lantern-devnet3/bin/lantern"
         export LD_LIBRARY_PATH="/opt/lantern-devnet3/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        DEFAULT_GOSSIP_TOPIC="devnet0"
         ;;
     devnet4)
         DEFAULT_LANTERN_BIN="/opt/lantern/bin/lantern"
+        DEFAULT_GOSSIP_TOPIC="12345678"
         ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
@@ -42,6 +44,7 @@ case "$DEVNET_LABEL" in
 esac
 
 LANTERN_BIN="${LANTERN_BIN:-$DEFAULT_LANTERN_BIN}"
+GOSSIP_TOPIC="${HIVE_LEAN_FORK_DIGEST:-$DEFAULT_GOSSIP_TOPIC}"
 
 cleanup() {
     if [ -d "$ASSET_ROOT" ]; then
@@ -77,11 +80,7 @@ if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
     FLAGS+=(--checkpoint-sync-url "$HIVE_CHECKPOINT_SYNC_URL")
 fi
 
-if [ -n "${HIVE_NETWORK:-}" ]; then
-    FLAGS+=(--devnet "$HIVE_NETWORK")
-else
-    FLAGS+=(--devnet "$DEVNET_LABEL")
-fi
+FLAGS+=(--devnet "$GOSSIP_TOPIC")
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)

@@ -27,8 +27,6 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 import yaml
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
-from lean_spec.subspecs.containers import Checkpoint
-from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.genesis.config import GenesisConfig
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -53,6 +51,13 @@ from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZSerializationError, SSZValueError
 from lean_spec.types.uint import Uint32
+from lean_spec_runtime import (
+    Checkpoint,
+    SubnetId,
+    ValidatorIndex,
+    build_node_config,
+    configure_event_source_network,
+)
 
 DEFAULT_GOSSIP_FORK_DIGEST: Final = "devnet0"
 DEFAULT_LISTEN_PORT: Final = 9001
@@ -659,7 +664,11 @@ def build_canonical_secp256k1_signature(
     return signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
 
 
-def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
+def build_helper_bootnode_enr(
+    identity_key: IdentityKeypair,
+    *,
+    include_udp: bool = True,
+) -> str:
     advertise_ip = os.environ.get(HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE)
     if not advertise_ip:
         raise ValueError(
@@ -670,9 +679,11 @@ def build_helper_bootnode_enr(identity_key: IdentityKeypair) -> str:
         enr_keys.ID: b"v4",
         enr_keys.SECP256K1: identity_key.public_key.to_bytes(),
         enr_keys.IP: ipaddress.ip_address(advertise_ip).packed,
-        enr_keys.UDP: encode_enr_port(helper_p2p_port()),
-        enr_keys.QUIC: encode_enr_port(helper_p2p_port()),
     }
+    if include_udp:
+        pairs[enr_keys.UDP] = encode_enr_port(helper_p2p_port())
+    pairs[enr_keys.QUIC] = encode_enr_port(helper_p2p_port())
+
     unsigned_enr = ENR(signature=b"\x00" * 64, seq=1, pairs=pairs)
     digest = keccak.new(digest_bits=256, data=unsigned_enr._content_rlp()).digest()
     # Normalize helper ECDSA signatures so every client sees a canonical ENR.
@@ -934,24 +945,26 @@ async def run() -> None:
     )
     connection_manager = await QuicConnectionManager.create(identity_key)
     metadata["bootnode_enr"] = build_helper_bootnode_enr(identity_key)
+    metadata["bootnode_qlean_enr"] = build_helper_bootnode_enr(
+        identity_key,
+        include_udp=False,
+    )
     metadata["bootnode_multiaddr"] = build_helper_bootnode_multiaddr(
         str(connection_manager.peer_id)
     )
     event_source = await LiveNetworkEventSource.create(connection_manager=connection_manager)
-    event_source.set_fork_digest(helper_gossip_fork_digest())
+    configure_event_source_network(event_source, helper_gossip_fork_digest())
     subscribe_gossip_topics(event_source, validator_registry, is_aggregator)
     logger.info("Helper peer_id=%s", connection_manager.peer_id)
 
     node = Node.from_genesis(
-        NodeConfig(
-            genesis_time=genesis.genesis_time,
-            validators=genesis.to_validators(),
+        build_node_config(
+            node_config_type=NodeConfig,
+            genesis=genesis,
             event_source=event_source,
-            network=event_source.reqresp_client,
-            api_config=None,
             validator_registry=validator_registry,
-            fork_digest=helper_gossip_fork_digest(),
             is_aggregator=is_aggregator,
+            fork_digest=helper_gossip_fork_digest(),
         )
     )
     api_server = ApiServer(
@@ -1037,6 +1050,10 @@ async def print_bootnode_metadata() -> None:
             {
                 "peer_id": peer_id,
                 "enr": build_helper_bootnode_enr(identity_key),
+                "qlean_enr": build_helper_bootnode_enr(
+                    identity_key,
+                    include_udp=False,
+                ),
                 "multiaddr": build_helper_bootnode_multiaddr(peer_id),
             }
         )
