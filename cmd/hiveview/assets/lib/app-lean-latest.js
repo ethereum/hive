@@ -6,6 +6,11 @@ import { formatDuration } from './utils.js';
 
 const listingURL = 'listing.jsonl?limit=1000';
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
+const leanLatestState = {
+    entries: [],
+    devnets: [],
+    selectedDevnet: '',
+};
 
 $(document).ready(function () {
     common.updateHeader();
@@ -18,19 +23,40 @@ async function loadLeanLatest() {
 
     try {
         const listingText = await loadText(listingURL);
-        const entries = latestSuiteEntries(parseListing(listingText));
+        const entries = prepareEntries(parseListing(listingText));
         if (entries.length === 0) {
             renderEmptyState('No lean suite runs found.');
             return;
         }
 
-        const matrices = await Promise.all(entries.map(loadSuiteMatrices));
-        renderLeanLatest(matrices.flat().filter(Boolean));
+        leanLatestState.entries = entries;
+        leanLatestState.devnets = collectDevnets(entries);
+        const selectedDevnet = selectedDevnetFromURL(leanLatestState.devnets) || defaultDevnet(leanLatestState.devnets);
+        await renderSelectedDevnet(selectedDevnet, false);
     } catch (err) {
         showError(`Unable to load lean latest results: ${err.message || err}`);
     } finally {
         $('#loading-container').removeClass('show');
     }
+}
+
+async function renderSelectedDevnet(devnet, updateURL) {
+    leanLatestState.selectedDevnet = devnet || '';
+    if (updateURL) {
+        updateDevnetURL(leanLatestState.selectedDevnet);
+    }
+    renderDevnetControls(leanLatestState.devnets, leanLatestState.selectedDevnet);
+
+    const entries = entriesForDevnet(leanLatestState.entries, leanLatestState.selectedDevnet);
+    const latestEntries = latestSuiteEntries(entries);
+    if (latestEntries.length === 0) {
+        const suffix = leanLatestState.selectedDevnet ? ` for ${leanLatestState.selectedDevnet}` : '';
+        renderEmptyState(`No lean suite runs found${suffix}.`);
+        return;
+    }
+
+    const matrices = await Promise.all(latestEntries.map(loadSuiteMatrices));
+    renderLeanLatest(matrices.flat().filter(Boolean), leanLatestState.selectedDevnet);
 }
 
 async function loadSuiteMatrices(entry) {
@@ -70,6 +96,94 @@ function parseListing(data) {
         }
         return entries;
     }, []);
+}
+
+function prepareEntries(entries) {
+    return entries.map(entry => ({
+        ...entry,
+        devnet: normalizeDevnet(entry.devnet) || devnetFromEntry(entry),
+    }));
+}
+
+function collectDevnets(entries) {
+    const devnets = new Set();
+    entries.forEach(entry => {
+        if (entry.devnet) {
+            devnets.add(entry.devnet);
+        }
+    });
+    return Array.from(devnets).sort(compareDevnets);
+}
+
+function entriesForDevnet(entries, devnet) {
+    if (!devnet) {
+        return entries;
+    }
+    return entries.filter(entry => entry.devnet === devnet);
+}
+
+function selectedDevnetFromURL(devnets) {
+    const params = new URLSearchParams(window.location.search);
+    const devnet = normalizeDevnet(params.get('devnet'));
+    return devnets.includes(devnet) ? devnet : '';
+}
+
+function defaultDevnet(devnets) {
+    return devnets[devnets.length - 1] || '';
+}
+
+function updateDevnetURL(devnet) {
+    const url = new URL(window.location.href);
+    if (devnet) {
+        url.searchParams.set('devnet', devnet);
+    } else {
+        url.searchParams.delete('devnet');
+    }
+    window.history.replaceState(null, '', url);
+}
+
+function devnetFromEntry(entry) {
+    for (const client of entry.clients || []) {
+        const devnet = normalizeDevnet(client);
+        if (devnet) {
+            return devnet;
+        }
+    }
+    for (const client of Object.keys(entry.versions || {})) {
+        const devnet = normalizeDevnet(client);
+        if (devnet) {
+            return devnet;
+        }
+    }
+    return '';
+}
+
+function normalizeDevnet(value) {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+    const match = value.match(/(?:^|[^a-z0-9])(devnet[0-9][a-z0-9_-]*)/i);
+    return match ? match[1].toLowerCase() : '';
+}
+
+function compareDevnets(a, b) {
+    const left = devnetSortParts(a);
+    const right = devnetSortParts(b);
+    if (left.number !== right.number) {
+        return left.number - right.number;
+    }
+    return left.suffix.localeCompare(right.suffix) || a.localeCompare(b);
+}
+
+function devnetSortParts(devnet) {
+    const match = devnet.match(/^devnet([0-9]+)(.*)$/i);
+    if (!match) {
+        return { number: Number.MAX_SAFE_INTEGER, suffix: devnet };
+    }
+    return {
+        number: Number.parseInt(match[1], 10),
+        suffix: match[2] || '',
+    };
 }
 
 function latestSuiteEntries(entries) {
@@ -407,7 +521,7 @@ function isSuiteSetupTest(test, suiteName) {
     return /:\s*client launch$/i.test(name);
 }
 
-function renderLeanLatest(matrices) {
+function renderLeanLatest(matrices, devnet) {
     if (matrices.length === 0) {
         renderEmptyState('No lean suite runs found.');
         return;
@@ -419,7 +533,8 @@ function renderLeanLatest(matrices) {
             .filter(matrix => matrix.stats.failed > 0)
             .map(matrix => matrix.linkSuiteName || matrix.suiteName)
     ).size;
-    $('#lean-latest-subtitle').text(`Latest runs for ${suiteNames.size} suites.`);
+    const devnetLabel = devnet ? `${devnet} ` : '';
+    $('#lean-latest-subtitle').text(`Latest ${devnetLabel}runs for ${suiteNames.size} suites.`);
     $('#lean-latest-summary').empty()
         .append(summaryPill('Suites', suiteNames.size))
         .append(summaryPill('Failing', failingSuites, failingSuites > 0 ? 'danger' : 'success'));
@@ -427,6 +542,39 @@ function renderLeanLatest(matrices) {
     const content = $('#lean-latest-content').empty();
     matrices.forEach(matrix => {
         content.append(renderSuiteSection(matrix));
+    });
+}
+
+function renderDevnetControls(devnets, selectedDevnet) {
+    const controls = $('#lean-latest-devnets').empty();
+    if (!controls.length || devnets.length === 0) {
+        return;
+    }
+
+    devnets.forEach(devnet => {
+        const active = devnet === selectedDevnet;
+        const button = $('<button />')
+            .attr('type', 'button')
+            .addClass('btn btn-sm btn-secondary lean-devnet-button')
+            .toggleClass('active', active)
+            .attr('aria-pressed', active ? 'true' : 'false')
+            .text(devnet)
+            .on('click', async function() {
+                if (leanLatestState.selectedDevnet === devnet) {
+                    return;
+                }
+
+                $('#loading-container').addClass('show');
+                $('#lean-latest-error').hide();
+                try {
+                    await renderSelectedDevnet(devnet, true);
+                } catch (err) {
+                    showError(`Unable to load ${devnet} results: ${err.message || err}`);
+                } finally {
+                    $('#loading-container').removeClass('show');
+                }
+            });
+        controls.append(button);
     });
 }
 

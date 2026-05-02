@@ -673,6 +673,24 @@ kbd {
     gap: 0.5rem;
 }
 
+.lean-latest-summary-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-devnet-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-devnet-button {
+    min-width: 5.75rem;
+}
+
 .lean-summary-pill {
     display: inline-flex;
     align-items: baseline;
@@ -869,7 +887,10 @@ kbd {
     }
 
     .lean-latest-summary,
+    .lean-latest-summary-panel,
+    .lean-devnet-controls,
     .lean-suite-actions {
+        align-items: flex-start;
         justify-content: flex-start;
     }
 
