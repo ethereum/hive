@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
   <head>
-    <title>hive</title>
+    <title>Lean latest - hive</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="icon" href="images/favicon.svg">
@@ -9,13 +9,13 @@
   </head>
 
   <body>
-    <script src="lib/app-index.js" type="module"></script>
+    <script src="lib/app-lean-latest.js" type="module"></script>
     <main role="main">
       <div id="hive-header">
         <a href="index.html"><img id="hive-logo" height="35" src="images/hive3.svg"></a>
         <nav id="hive-static-nav">
-          <a class="nav-item btn btn-sm btn-secondary lean-latest-nav" id="lean-latest-nav-link" href="lean-latest" style="display: none">Lean latest</a>
           <span class="nav-item" id="hive-instance-info"></span>
+          <a class="nav-item" href="index.html">Runs</a>
           <a class="nav-item" href="https://github.com/ethereum/hive/blob/master/docs/overview.md#what-is-hive">What is Hive?</a>
           <span class="nav-item theme-toggle">🌙</span>
         </nav>
@@ -32,12 +32,19 @@
         </div>
       </div>
 
-      <div class="script-content">
-        <div id="summary-section" class="mb-3">
-          <div id="suite-summary" class="d-flex flex-wrap"></div>
+      <div class="script-content lean-latest-page">
+        <div class="lean-latest-title-row">
+          <div>
+            <h1>Lean latest</h1>
+            <p id="lean-latest-subtitle" class="text-secondary"></p>
+          </div>
+          <div class="lean-latest-summary-panel">
+            <div id="lean-latest-summary" class="lean-latest-summary"></div>
+            <div id="lean-latest-devnets" class="lean-devnet-controls"></div>
+          </div>
         </div>
-        <p id="filters-notice" style="display: none">Note: column filters are active: <a id="filters-clear" href="">[Clear Filters]</a></p>
-        <table id="filetable" class="table table-bordered"></table>
+        <div id="lean-latest-error" class="alert alert-danger" style="display: none"></div>
+        <div id="lean-latest-content"></div>
       </div>
     </main>
   </body>

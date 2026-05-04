@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -61,6 +62,7 @@ type listingEntry struct {
 	Timeout  bool              `json:"timeout"`
 	Clients  []string          `json:"clients"`  // client names involved in this run
 	Versions map[string]string `json:"versions"` // client versions
+	Devnet   string            `json:"devnet,omitempty"`
 	Start    time.Time         `json:"start"`    // timestamp of test start (ISO 8601 format)
 	FileName string            `json:"fileName"` // hive output file
 	Size     int64             `json:"size"`     // size of hive output file
@@ -95,7 +97,62 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 			}
 		}
 	}
+	e.Devnet = suiteDevnet(s, e.Clients)
 	return e
+}
+
+var devnetLabelPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])((?:devnet)[0-9][a-z0-9_-]*)`)
+
+func suiteDevnet(s *libhive.TestSuite, clients []string) string {
+	if s.RunMetadata != nil {
+		if devnet := devnetFromClientConfig(s.RunMetadata.ClientConfig); devnet != "" {
+			return devnet
+		}
+		for _, arg := range s.RunMetadata.HiveCommand {
+			if devnet := devnetFromString(arg); devnet != "" {
+				return devnet
+			}
+		}
+	}
+	for _, client := range clients {
+		if devnet := devnetFromString(client); devnet != "" {
+			return devnet
+		}
+	}
+	for client := range s.ClientVersions {
+		if devnet := devnetFromString(client); devnet != "" {
+			return devnet
+		}
+	}
+	return devnetFromString(s.Description)
+}
+
+func devnetFromClientConfig(config *libhive.ClientConfigInfo) string {
+	if config == nil {
+		return ""
+	}
+	if clients, ok := config.Content["clients"].([]any); ok {
+		for _, rawClient := range clients {
+			client, ok := rawClient.(map[string]any)
+			if !ok {
+				continue
+			}
+			if nametag, ok := client["nametag"].(string); ok {
+				if devnet := devnetFromString(nametag); devnet != "" {
+					return devnet
+				}
+			}
+		}
+	}
+	return devnetFromString(config.FilePath)
+}
+
+func devnetFromString(value string) string {
+	match := devnetLabelPattern.FindStringSubmatch(value)
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.ToLower(match[1])
 }
 
 type suiteCB func(*libhive.TestSuite, fs.FileInfo) error

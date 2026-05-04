@@ -2,12 +2,14 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -17,10 +19,11 @@ import (
 var embeddedAssets embed.FS
 
 type serverConfig struct {
-	listenAddr    string
-	logDir        string
-	assetsDir     string
-	disableBundle bool
+	listenAddr       string
+	logDir           string
+	assetsDir        string
+	disableBundle    bool
+	enableLeanLatest bool
 }
 
 func (cfg *serverConfig) assetFS() (fs.FS, error) {
@@ -54,9 +57,13 @@ func runServer(config serverConfig) {
 	listingHandler := serveListing{fsys: logDirFS}
 
 	mux := mux.NewRouter()
+	mux.Handle("/features.json", serveFeatures{enableLeanLatest: config.enableLeanLatest}).Methods("GET")
 	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
-	mux.PathPrefix("/").Handler(serveFiles{deployFS})
+	mux.PathPrefix("/").Handler(serveFiles{
+		fsys:             deployFS,
+		enableLeanLatest: config.enableLeanLatest,
+	})
 
 	// Start the server.
 	l, err := net.Listen("tcp", config.listenAddr)
@@ -71,18 +78,59 @@ type serveListing struct{ fsys fs.FS }
 
 func (h serveListing) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Generating listing...")
-	err := generateListing(h.fsys, ".", w, 200)
+	limit := 200
+	if rawLimit := r.URL.Query().Get("limit"); rawLimit != "" {
+		parsedLimit, err := strconv.Atoi(rawLimit)
+		if err != nil || parsedLimit <= 0 {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+		limit = min(parsedLimit, 5000)
+	}
+
+	err := generateListing(h.fsys, ".", w, limit)
 	if err != nil {
 		fmt.Println("error:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
-type serveFiles struct{ fsys fs.FS }
+type serveFeatures struct {
+	enableLeanLatest bool
+}
+
+func (h serveFeatures) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("cache-control", "no-cache")
+	w.Header().Set("content-type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{
+		"leanLatest": h.enableLeanLatest,
+	})
+}
+
+type serveFiles struct {
+	fsys             fs.FS
+	enableLeanLatest bool
+}
 
 func (h serveFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add caching-related headers.
 	path := r.URL.Path
+	if isLeanLatestPath(path) && !h.enableLeanLatest {
+		http.NotFound(w, r)
+		return
+	}
+	if path == "/lean-latest/" {
+		target := "/lean-latest"
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return
+	}
+	if path == "/lean-latest" {
+		r.URL.Path = "/lean-latest.html"
+		path = r.URL.Path
+	}
 	if path == "/" || strings.HasSuffix(path, ".html") {
 		w.Header().Set("cache-control", "no-cache")
 	}
@@ -90,4 +138,8 @@ func (h serveFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	srv := http.FileServer(http.FS(h.fsys))
 	srv.ServeHTTP(w, r)
 
+}
+
+func isLeanLatestPath(path string) bool {
+	return path == "/lean-latest" || path == "/lean-latest/" || path == "/lean-latest.html"
 }

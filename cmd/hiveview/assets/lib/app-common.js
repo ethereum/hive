@@ -24,6 +24,8 @@ $(document).ready(function() {
 
 // updateHeader populates the page header with version information from hive.json.
 export function updateHeader() {
+    updateFeatureNav();
+
     $.ajax({
         type: 'GET',
         url: routes.resultsRoot + 'hive.json',
@@ -35,6 +37,26 @@ export function updateHeader() {
         },
         error: function(xhr, status, error) {
             console.log('error fetching hive.json:', error);
+        },
+    });
+}
+
+function updateFeatureNav() {
+    const link = $('#lean-latest-nav-link');
+    if (!link.length) {
+        return;
+    }
+
+    $.ajax({
+        type: 'GET',
+        url: 'features.json',
+        dataType: 'json',
+        cache: false,
+        success: function(features) {
+            link.toggle(!!features.leanLatest);
+        },
+        error: function(xhr, status, error) {
+            console.log('error fetching features.json:', error);
         },
     });
 }

@@ -21,6 +21,7 @@ main {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
     background: color-mix(in srgb, var(--bs-body-bg) 97%, var(--bs-primary));
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -43,8 +44,11 @@ main {
     margin: 0;
     font-size: 0.9rem;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 1.2rem;
+    min-width: 0;
 }
 
 #hive-static-nav a {
@@ -56,6 +60,18 @@ main {
 
 #hive-static-nav a:hover {
     color: var(--bs-primary);
+}
+
+#hive-static-nav a.lean-latest-nav {
+    color: var(--bs-btn-color);
+    padding: 0.25rem 0.65rem;
+    border-radius: 4px;
+}
+
+#hive-static-nav a.lean-latest-nav:hover {
+    color: var(--bs-btn-hover-color);
+    background-color: var(--bs-btn-hover-bg);
+    border-color: var(--bs-btn-hover-border-color);
 }
 
 .theme-toggle {
@@ -626,4 +642,269 @@ kbd {
     border-radius: 4px;
     box-shadow: 0 2px 0 var(--bs-border-color);
     margin: 0 0.2rem;
+}
+
+.lean-latest-page {
+    overflow: hidden;
+}
+
+.lean-latest-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.lean-latest-title-row h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    line-height: 1.2;
+}
+
+.lean-latest-title-row p {
+    margin: 0.25rem 0 0;
+}
+
+.lean-latest-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-latest-summary-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-devnet-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-devnet-button {
+    min-width: 5.75rem;
+}
+
+.lean-summary-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    background: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-border-color));
+}
+
+.lean-summary-pill-success {
+    border-color: color-mix(in srgb, var(--bs-success) 55%, var(--bs-border-color));
+}
+
+.lean-summary-pill-danger {
+    border-color: color-mix(in srgb, var(--bs-danger) 55%, var(--bs-border-color));
+}
+
+.lean-summary-label {
+    color: var(--bs-secondary);
+    font-size: 0.85rem;
+}
+
+.lean-summary-value {
+    font-weight: 600;
+}
+
+.lean-suite-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.lean-suite-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.lean-suite-title h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.25;
+}
+
+.lean-suite-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    margin-top: 0.35rem;
+    color: var(--bs-secondary);
+    font-size: 0.9rem;
+}
+
+.lean-suite-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.lean-grid-scroll {
+    width: 100%;
+    overflow: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    background: var(--bs-body-bg);
+}
+
+.lean-latest-grid {
+    width: 100%;
+    min-width: max-content;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.lean-latest-grid th,
+.lean-latest-grid td {
+    border-bottom: 1px solid var(--bs-border-color);
+    border-right: 1px solid var(--bs-border-color);
+    padding: 0.45rem 0.55rem;
+}
+
+.lean-latest-grid tr:last-child th,
+.lean-latest-grid tr:last-child td {
+    border-bottom: 0;
+}
+
+.lean-latest-grid th:last-child,
+.lean-latest-grid td:last-child {
+    border-right: 0;
+}
+
+.lean-latest-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: color-mix(in srgb, var(--bs-body-bg) 86%, var(--bs-border-color));
+    font-weight: 600;
+}
+
+.lean-test-column {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 28rem;
+    min-width: 18rem;
+    max-width: 32rem;
+    background: var(--bs-body-bg);
+    text-align: left;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+}
+
+.lean-latest-grid thead .lean-test-column {
+    z-index: 3;
+    background: color-mix(in srgb, var(--bs-body-bg) 86%, var(--bs-border-color));
+}
+
+.lean-result-column {
+    width: 6.5rem;
+    min-width: 6.5rem;
+    max-width: 8rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.lean-client-heading {
+    display: inline-block;
+    max-width: 7rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.lean-result-box {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 4px;
+    color: #fff;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.lean-result-box:hover {
+    color: #fff;
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.lean-result-box.pass {
+    background: var(--bs-success);
+    border-color: color-mix(in srgb, var(--bs-success) 75%, #000);
+}
+
+.lean-result-box.fail,
+.lean-result-box.timeout {
+    background: var(--bs-danger);
+    border-color: color-mix(in srgb, var(--bs-danger) 75%, #000);
+}
+
+.lean-result-box.empty {
+    background: color-mix(in srgb, var(--bs-body-bg) 82%, var(--bs-border-color));
+    border-color: var(--bs-border-color);
+}
+
+.lean-result-count {
+    position: absolute;
+    right: -0.35rem;
+    bottom: -0.35rem;
+    min-width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    font-size: 0.65rem;
+    line-height: 0.9rem;
+    font-weight: 600;
+}
+
+@media screen and (max-width: 700px) {
+    .lean-latest-title-row,
+    .lean-suite-header {
+        flex-direction: column;
+    }
+
+    .lean-latest-summary,
+    .lean-latest-summary-panel,
+    .lean-devnet-controls,
+    .lean-suite-actions {
+        align-items: flex-start;
+        justify-content: flex-start;
+    }
+
+    .lean-test-column {
+        width: 16rem;
+        min-width: 14rem;
+    }
+
+    .lean-result-column {
+        width: 5.25rem;
+        min-width: 5.25rem;
+    }
+
+    .lean-client-heading {
+        max-width: 5.5rem;
+    }
 }

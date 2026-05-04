@@ -33,6 +33,7 @@ func main() {
 	flag.StringVar(&config.logDir, "logdir", "workspace/logs", "Path to hive simulator log directory")
 	flag.StringVar(&config.assetsDir, "assets", "", "Path to static files directory. Serves baked-in assets when not set.")
 	flag.BoolVar(&config.disableBundle, "assets.nobundle", false, "Disables JS/CSS bundling (for development).")
+	flag.BoolVar(&config.enableLeanLatest, "lean-latest", false, "Enables the Lean latest status page at /lean-latest.")
 	flag.Parse()
 
 	log.SetFlags(log.LstdFlags)
