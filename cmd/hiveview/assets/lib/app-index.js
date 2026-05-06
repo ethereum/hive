@@ -7,6 +7,7 @@ import * as bootstrap from 'bootstrap';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
+import { loadLeanLatest } from './app-lean-latest.js';
 import { makeButton } from './html.js';
 import { formatBytes, escapeRegExp } from './utils.js';
 
@@ -85,23 +86,7 @@ $(document).ready(function () {
 
     common.updateHeader();
 
-    $('#loading-container').addClass('show');
-    console.log('Loading file list...');
-    $.ajax({
-        type: 'GET',
-        url: 'listing.jsonl',
-        cache: false,
-        success: function(data) {
-            $('#page-text').show();
-            showFileListing(data);
-        },
-        failure: function(status, err) {
-            alert(err);
-        },
-        complete: function () {
-            $('#loading-container').removeClass('show');
-        },
-    });
+    loadIndexPage();
 
     // Add keyboard navigation
     document.addEventListener('keydown', (e) => {
@@ -186,6 +171,9 @@ $(document).ready(function () {
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();
                     const currentGrouping = $('.summary-controls button[data-group-by].active').data('group-by');
+                    if (!currentGrouping) {
+                        return;
+                    }
                     const newGrouping = currentGrouping === 'suite' ? 'client' : 'suite';
                     window.toggleGrouping(newGrouping);
                 }
@@ -199,263 +187,59 @@ $(document).ready(function () {
         }
     });
 
-    // Add keyboard shortcut hints to UI elements
-    $('.dataTables_filter input').attr('placeholder', 'Search... (Press /)');
-    $('.summary-controls button[data-group-by]').attr('title', 'Toggle grouping (Ctrl/⌘ + G)');
-
-    // Update keyboard shortcuts modal content
-    const shortcutsModal = $(`
-        <div class="modal fade" id="keyboardShortcutsModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Keyboard Shortcuts</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <table class="table table-sm">
-                            <tbody>
-                                <tr>
-                                    <td><kbd>/</kbd></td>
-                                    <td>Focus search input</td>
-                                </tr>
-                                <tr>
-                                    <td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>←</kbd> <kbd>→</kbd></td>
-                                    <td>Navigate between client boxes</td>
-                                </tr>
-                                <tr>
-                                    <td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>↑</kbd> <kbd>↓</kbd></td>
-                                    <td>Navigate between suite boxes</td>
-                                </tr>
-                                <tr>
-                                    <td><kbd>Esc</kbd></td>
-                                    <td>Clear filters and selections</td>
-                                </tr>
-                                <tr>
-                                    <td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>G</kbd></td>
-                                    <td>Toggle between suite/client grouping</td>
-                                </tr>
-                                <tr>
-                                    <td><kbd>?</kbd></td>
-                                    <td>Show this help</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
-    $('body').append(shortcutsModal);
-
-    // Add keyboard shortcut to open modal
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '?' && !e.target.closest('input, textarea')) {
-            e.preventDefault();
-            new bootstrap.Modal('#keyboardShortcutsModal').show();
-        }
-    });
-
-    // Add floating filters notice
-    const filtersNotice = $(`
-        <div id="filters-notice" class="btn-group" role="group" style="display: none">
-            <button type="button" class="btn btn-light" disabled>Filters active</button>
-            <button type="button" class="btn btn-primary" id="filters-clear">Clear Filters <kbd>Esc</kbd></button>
-        </div>
-    `);
-    $('main').prepend(filtersNotice);
-
-    let suites = [];
-    data.split('\n').forEach(function(elem) {
-        if (!elem) {
-            return;
-        }
-        let suite = JSON.parse(elem);
-        suite.start = new Date(suite.start);
-        suites.push(suite);
-    });
-
-    // Store the processed data globally for reuse
-    window.processedData = {
-        suiteGroups,
-        clientGroups: processClientGroups(suites)
-    };
-
-    // Initial display based on URL hash
-    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-    const groupBy = urlParams.get('group-by') || 'suite';
-
-    // Set initial button state
-    $('.summary-controls button[data-group-by]').removeClass('active');
-    $(`.summary-controls button[data-group-by="${groupBy}"]`).addClass('active');
-
-    displayGroups(groupBy);
-
-    // Apply initial sort from URL hash if present
-    const initialSort = urlParams.get('summary-sort') || 'name';
-    window.sortAllClients(initialSort);
-
-    // Handle suite and client selection from URL hash
-    const hashSuite = urlParams.get('suite');
-    const hashClient = urlParams.get('client');
-    if (hashSuite) {
-        // Find and highlight the clicked suite box
-        $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
-            return $(this).find('.title').text() === hashSuite;
-        }).addClass('selected');
-
-        if (hashClient) {
-            // Find and highlight the clicked client box
-            $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
-        }
-    }
-
-    let theTable = $('#filetable').DataTable({
-        data: suites,
-        pageLength: 50,
-        autoWidth: false,
-        dom: '<"row"<"col-sm-6"l><"col-sm-6"f>>' +
-             '<"row"<"col-sm-12"tr>>' +
-             '<"row"<"col-sm-5"i><"col-sm-7"p>>',
-        language: {
-            lengthMenu: "Show _MENU_",
-            search: "",
-            searchPlaceholder: "Search...",
-            info: "Showing _START_ to _END_ of _TOTAL_ results",
-            infoEmpty: "No results found",
-            paginate: {
-                first: "«",
-                last: "»",
-                next: "›",
-                previous: "‹"
-            }
-        },
-        responsive: {
-            details: {
-                type: 'none',
-                display: $.fn.dataTable.Responsive.display.childRowImmediate,
-                renderer: function (table, rowIdx, columns) {
-                    var output = '<div class="responsive-overflow">';
-                    columns.forEach(function (col, i) {
-                        if (col.hidden) {
-                            output += '<span class="responsive-overflow-col">';
-                            output += col.data;
-                            output += '</span> ';
-                        }
-                    });
-                    output += '</div>';
-                    return output;
-                },
-            },
-        },
-        order: [[0, 'desc']],
-        columns: [
-            {
-                title: '🕒',
-                data: 'start',
-                type: 'date',
-                width: '10em',
-                render: function(v, type) {
-                    if (type === 'display' || type == 'filter') {
-                        return v.toLocaleString();
-                    }
-                    return v.toISOString();
-                },
-            },
-            {
-                title: 'Suite',
-                data: 'name',
-                width: '14em',
-            },
-            {
-                title: 'Clients',
-                data: 'clients',
-                width: 'auto',
-                render: function(data, type, row) {
-                    // For searching and ordering, return raw data
-                    if (type === 'filter' || type === 'sort') {
-                        return data.join(',');  // Return comma-separated list for searching
-                    }
-                    // For display, return the HTML
-                    const clients = data.map(client => {
-                        const version = row.versions ? row.versions[client] || '' : '';
-                        return `<div class="client-entry">
-                            <span class="client-name">${client}</span>
-                            ${version ? `<span class="client-version"><code>${version}</code></span>` : ''}
-                        </div>`;
-                    }).join('');
-                    return `<div class="client-list" data-suite-id="${row.fileName}" data-suite-name="${row.name}">${clients}</div>`;
-                },
-            },
-            {
-                title: 'Status',
-                data: null,
-                width: '5.5em',
-                className: 'suite-status-column',
-                render: function(data, type, row) {
-                    if (data.fails > 0) {
-                        let prefix = data.timeout ? 'Timeout' : 'Fail';
-                        return `<span><span class="pass-count">✓ ${data.passes}</span> <span class="fail-count">✗ ${data.fails}</span> <span class="badge bg-danger ms-1">${prefix}</span></span>`;
-                    }
-                    return `<span class="pass-count">✓ ${data.passes} <span class="badge bg-success ms-1">Pass</span></span>`;
-                },
-            },
-            {
-                title: 'Diff',
-                data: null,
-                width: '2em',
-                className: 'suite-diff-column',
-                orderable: false,
-                render: function(data, type, row) {
-                    // Find previous run with same suite and clients
-                    const prevRun = suites.find(s =>
-                        s.name === data.name &&
-                        s.clients.join(',') === data.clients.join(',') &&
-                        new Date(s.start) < new Date(data.start)
-                    );
-
-                    if (!prevRun || prevRun.passes === data.passes) {
-                        return '';
-                    }
-
-                    const passDiff = prevRun.passes - data.passes;
-                    const sign = passDiff > 0 ? '-' : '+';
-                    const absValue = Math.abs(passDiff);
-                    return `<span class="${passDiff > 0 ? 'fail-diff' : 'pass-diff'}" title="Change in passing tests compared to previous run">${sign}${absValue}</span>`;
-                },
-            },
-            {
-                title: '',
-                data: null,
-                width: '11em',
-                className: 'action-buttons-column',
-                orderable: false,
-                render: function(data) {
-                    let url = routes.suite(data.fileName, data.name);
-                    let loadText = 'Load (' + formatBytes(data.size) + ')';
-                    const clientKey = data.clients.join(',');
-
-                    return `<div class="btn-group w-100">
-                        ${makeButton('#', '<i class="bi bi-funnel"></i>', `btn-outline-secondary btn-sm`, `onclick="filterSuiteAndClient('${data.name}', '${clientKey}'); return false;" title="Filter by this suite and client"`).outerHTML}
-                        ${makeButton(url, loadText, "btn-secondary btn-sm flex-grow-1").outerHTML}
-                    </div>`;
-                },
-            },
-        ],
-    });
-
-    const filters = new ColumnFilterSet(theTable);
-    filters.build();
-    $('#filters-clear').click(function () {
-        filters.clear();
-        $('.suite-box').removeClass('selected');
-        $('.client-box').removeClass('selected');
-        return false;
-    });
 });
 
-function showFileListing(data) {
+async function loadIndexPage() {
+    $('#loading-container').addClass('show');
+    console.log('Loading file list...');
+
+    try {
+        const [features, listing] = await Promise.all([
+            loadIndexFeatures(),
+            loadText('listing.jsonl'),
+        ]);
+        const showLeanLatest = !!features.leanLatest;
+
+        $('#lean-latest-section').toggle(showLeanLatest);
+        $('#summary-section').toggle(!showLeanLatest);
+
+        if (showLeanLatest) {
+            await loadLeanLatest({ manageLoading: false });
+        }
+
+        $('#page-text').show();
+        showFileListing(listing, { showSummary: !showLeanLatest });
+    } catch (err) {
+        alert(err.message || err);
+    } finally {
+        $('#loading-container').removeClass('show');
+    }
+}
+
+async function loadIndexFeatures() {
+    try {
+        const response = await fetch('features.json', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`features.json returned ${response.status}`);
+        }
+        return response.json();
+    } catch (err) {
+        console.log('error fetching features.json:', err);
+        return { leanLatest: false };
+    }
+}
+
+async function loadText(url) {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`${url} returned ${response.status}`);
+    }
+    return response.text();
+}
+
+function showFileListing(data, options = {}) {
     console.log('Got file list');
+    const showSummary = options.showSummary !== false;
 
     // Process summary data
     const lines = data.trim().split('\n');
@@ -486,8 +270,9 @@ function showFileListing(data) {
     }
 
     // Display summary boxes
-    const summaryDiv = $('#suite-summary');
+    const summaryDiv = $('#suite-summary').empty();
 
+    if (showSummary) {
     // Add global sort controls
     const sortControls = $(`
         <div class="summary-controls d-flex gap-2">
@@ -564,6 +349,7 @@ function showFileListing(data) {
             new bootstrap.Modal('#keyboardShortcutsModal').show();
         }
     });
+    }
 
     // Add floating filters notice
     const filtersNotice = $(`
@@ -590,32 +376,34 @@ function showFileListing(data) {
         clientGroups: processClientGroups(suites)
     };
 
-    // Initial display based on URL hash
-    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-    const groupBy = urlParams.get('group-by') || 'suite';
+    if (showSummary) {
+        // Initial display based on URL hash
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const groupBy = urlParams.get('group-by') || 'suite';
 
-    // Set initial button state
-    $('.summary-controls button[data-group-by]').removeClass('active');
-    $(`.summary-controls button[data-group-by="${groupBy}"]`).addClass('active');
+        // Set initial button state
+        $('.summary-controls button[data-group-by]').removeClass('active');
+        $(`.summary-controls button[data-group-by="${groupBy}"]`).addClass('active');
 
-    displayGroups(groupBy);
+        displayGroups(groupBy);
 
-    // Apply initial sort from URL hash if present
-    const initialSort = urlParams.get('summary-sort') || 'name';
-    window.sortAllClients(initialSort);
+        // Apply initial sort from URL hash if present
+        const initialSort = urlParams.get('summary-sort') || 'name';
+        window.sortAllClients(initialSort);
 
-    // Handle suite and client selection from URL hash
-    const hashSuite = urlParams.get('suite');
-    const hashClient = urlParams.get('client');
-    if (hashSuite) {
-        // Find and highlight the clicked suite box
-        $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
-            return $(this).find('.title').text() === hashSuite;
-        }).addClass('selected');
+        // Handle suite and client selection from URL hash
+        const hashSuite = urlParams.get('suite');
+        const hashClient = urlParams.get('client');
+        if (hashSuite) {
+            // Find and highlight the clicked suite box
+            $(`.suite-box:has(.title:contains('${hashSuite}'))`).filter(function() {
+                return $(this).find('.title').text() === hashSuite;
+            }).addClass('selected');
 
-        if (hashClient) {
-            // Find and highlight the clicked client box
-            $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
+            if (hashClient) {
+                // Find and highlight the clicked client box
+                $(`.client-box[data-suite="${hashSuite}"][data-client="${hashClient}"]`).addClass('selected');
+            }
         }
     }
 
@@ -782,7 +570,7 @@ class ColumnFilterSet {
         // Build header row.
         const ncol = this.table.columns().nodes().length;
         const th = '<th></th>';
-        const thead = $('thead', this.table.table);
+        const thead = $('thead', this.table.table().node());
         $('<tr class="filters">' + th.repeat(ncol) + '</tr>').appendTo(thead);
 
         // Create select boxes.
@@ -882,7 +670,7 @@ class ColumnFilter {
 
     // buildSelect creates an empty <select> element and adds it to the table header.
     buildSelect() {
-        const header = $('.filters th', this._controller.table.table);
+        const header = $('tr.filters th', this._controller.table.table().node());
         const cell = header.eq(this._columnIndex);
 
         // Create the select list and search operation
@@ -1048,6 +836,10 @@ class StatusFilter extends ColumnFilter {
     }
 }
 
+function tableFilterCell(index) {
+    return $('#filetable thead tr.filters th').eq(index);
+}
+
 // Add this function at the global scope
 window.filterSuite = function(suiteName) {
     // Remove all selections
@@ -1065,14 +857,14 @@ window.filterSuite = function(suiteName) {
     const suiteFilter = filters.byKey('suite');
     if (suiteFilter) {
         suiteFilter.apply(suiteName);
-        $('select', $('.filters th').eq(1)).val(suiteName);
+        $('select', tableFilterCell(1)).val(suiteName);
     }
 
     // Clear client filter
     const clientFilter = filters.byKey('client');
     if (clientFilter) {
         clientFilter.apply('');
-        $('select', $('.filters th').eq(2)).val('');
+        $('select', tableFilterCell(2)).val('');
     }
 
     // Scroll to the table
@@ -1097,14 +889,14 @@ window.filterSuiteAndClient = function(suiteName, clientKey) {
     const suiteFilter = filters.byKey('suite');
     if (suiteFilter) {
         suiteFilter.apply(suiteName);
-        $('select', $('.filters th').eq(1)).val(suiteName);
+        $('select', tableFilterCell(1)).val(suiteName);
     }
 
     // Apply client filter
     const clientFilter = filters.byKey('client');
     if (clientFilter) {
         clientFilter.apply(clientKey);
-        $('select', $('.filters th').eq(2)).val(clientKey);
+        $('select', tableFilterCell(2)).val(clientKey);
     }
 
     // Scroll to the table
@@ -1327,14 +1119,14 @@ window.filterClient = function(clientName) {
     const clientFilter = filters.byKey('client');
     if (clientFilter) {
         clientFilter.apply(clientName);
-        $('select', $('.filters th').eq(2)).val(clientName);
+        $('select', tableFilterCell(2)).val(clientName);
     }
 
     // Clear suite filter
     const suiteFilter = filters.byKey('suite');
     if (suiteFilter) {
         suiteFilter.apply('');
-        $('select', $('.filters th').eq(1)).val('');
+        $('select', tableFilterCell(1)).val('');
     }
 
     // Scroll to the table

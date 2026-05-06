@@ -8,63 +8,35 @@ import (
 	"testing/fstest"
 )
 
-func TestServeFilesLeanLatestFlag(t *testing.T) {
-	fsys := fstest.MapFS{
-		"lean-latest.html": {Data: []byte("ok")},
-	}
+func TestServeFilesLeanLatestRedirect(t *testing.T) {
+	handler := serveFiles{fsys: fstest.MapFS{
+		"index.html": {Data: []byte("ok")},
+	}}
 
 	tests := []struct {
-		name              string
-		path              string
-		enableLeanLatest  bool
-		wantStatus        int
-		wantLocation      string
-		wantCacheDisabled bool
+		path         string
+		wantStatus   int
+		wantLocation string
 	}{
 		{
-			name:       "disabled route",
-			path:       "/lean-latest",
-			wantStatus: http.StatusNotFound,
+			path:         "/lean-latest",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/",
 		},
 		{
-			name:       "disabled trailing slash",
-			path:       "/lean-latest/",
-			wantStatus: http.StatusNotFound,
+			path:         "/lean-latest/",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/",
 		},
 		{
-			name:       "disabled html file",
-			path:       "/lean-latest.html",
-			wantStatus: http.StatusNotFound,
-		},
-		{
-			name:              "enabled route",
-			path:              "/lean-latest",
-			enableLeanLatest:  true,
-			wantStatus:        http.StatusOK,
-			wantCacheDisabled: true,
-		},
-		{
-			name:              "enabled html file",
-			path:              "/lean-latest.html",
-			enableLeanLatest:  true,
-			wantStatus:        http.StatusOK,
-			wantCacheDisabled: true,
-		},
-		{
-			name:             "enabled trailing slash redirects",
-			path:             "/lean-latest/",
-			enableLeanLatest: true,
-			wantStatus:       http.StatusMovedPermanently,
-			wantLocation:     "/lean-latest",
+			path:         "/lean-latest.html?devnet=devnet4",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/?devnet=devnet4",
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			handler := serveFiles{
-				fsys:             fsys,
-				enableLeanLatest: test.enableLeanLatest,
-			}
+		t.Run(test.path, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, test.path, nil)
 			rec := httptest.NewRecorder()
 
@@ -75,9 +47,6 @@ func TestServeFilesLeanLatestFlag(t *testing.T) {
 			}
 			if loc := rec.Header().Get("Location"); loc != test.wantLocation {
 				t.Fatalf("location mismatch: got %q, want %q", loc, test.wantLocation)
-			}
-			if cache := rec.Header().Get("cache-control"); test.wantCacheDisabled && cache != "no-cache" {
-				t.Fatalf("cache-control mismatch: got %q, want no-cache", cache)
 			}
 		})
 	}

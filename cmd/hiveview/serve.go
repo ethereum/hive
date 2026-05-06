@@ -61,8 +61,7 @@ func runServer(config serverConfig) {
 	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
 	mux.PathPrefix("/").Handler(serveFiles{
-		fsys:             deployFS,
-		enableLeanLatest: config.enableLeanLatest,
+		fsys: deployFS,
 	})
 
 	// Start the server.
@@ -108,28 +107,19 @@ func (h serveFeatures) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type serveFiles struct {
-	fsys             fs.FS
-	enableLeanLatest bool
+	fsys fs.FS
 }
 
 func (h serveFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add caching-related headers.
 	path := r.URL.Path
-	if isLeanLatestPath(path) && !h.enableLeanLatest {
-		http.NotFound(w, r)
-		return
-	}
-	if path == "/lean-latest/" {
-		target := "/lean-latest"
+	if isLegacyLeanLatestPath(path) {
+		target := "/"
 		if r.URL.RawQuery != "" {
 			target += "?" + r.URL.RawQuery
 		}
 		http.Redirect(w, r, target, http.StatusMovedPermanently)
 		return
-	}
-	if path == "/lean-latest" {
-		r.URL.Path = "/lean-latest.html"
-		path = r.URL.Path
 	}
 	if path == "/" || strings.HasSuffix(path, ".html") {
 		w.Header().Set("cache-control", "no-cache")
@@ -137,9 +127,8 @@ func (h serveFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	srv := http.FileServer(http.FS(h.fsys))
 	srv.ServeHTTP(w, r)
-
 }
 
-func isLeanLatestPath(path string) bool {
+func isLegacyLeanLatestPath(path string) bool {
 	return path == "/lean-latest" || path == "/lean-latest/" || path == "/lean-latest.html"
 }

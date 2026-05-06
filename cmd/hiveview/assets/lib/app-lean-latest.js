@@ -1,6 +1,5 @@
 import $ from 'jquery';
 
-import * as common from './app-common.js';
 import * as routes from './routes.js';
 import { formatDuration } from './utils.js';
 
@@ -12,13 +11,11 @@ const leanLatestState = {
     selectedDevnet: '',
 };
 
-$(document).ready(function () {
-    common.updateHeader();
-    loadLeanLatest();
-});
-
-async function loadLeanLatest() {
-    $('#loading-container').addClass('show');
+export async function loadLeanLatest(options = {}) {
+    const manageLoading = options.manageLoading !== false;
+    if (manageLoading) {
+        $('#loading-container').addClass('show');
+    }
     $('#lean-latest-error').hide();
 
     try {
@@ -36,7 +33,9 @@ async function loadLeanLatest() {
     } catch (err) {
         showError(`Unable to load lean latest results: ${err.message || err}`);
     } finally {
-        $('#loading-container').removeClass('show');
+        if (manageLoading) {
+            $('#loading-container').removeClass('show');
+        }
     }
 }
 
@@ -294,14 +293,14 @@ function buildClientInteropMatrices(entry, suiteData) {
 
     const clients = collectClients(entry, suiteData, topologyCases);
     const clientOrder = clientOrderMap(clients);
-    const rows = buildClientInteropRows(topologyCases, 'majority', 'minority', clientOrder, 'maj');
+    const rows = buildClientInteropRows(topologyCases, 'majority', 'minority', clientOrder, '2 nodes');
 
     return [{
         entry,
         suiteData,
         suiteName,
         linkSuiteName: suiteName,
-        clients: roleLabelClients(clients, 'min'),
+        clients: roleLabelClients(clients, '1 node'),
         cases,
         rowHeaderLabel: '',
         rowRoleLabel: 'majority',
@@ -527,6 +526,8 @@ function renderLeanLatest(matrices, devnet) {
         return;
     }
 
+    renderClientScores(matrices);
+
     const suiteNames = new Set(matrices.map(matrix => matrix.linkSuiteName || matrix.suiteName));
     const failingSuites = new Set(
         matrices
@@ -543,6 +544,193 @@ function renderLeanLatest(matrices, devnet) {
     matrices.forEach(matrix => {
         content.append(renderSuiteSection(matrix));
     });
+}
+
+function renderClientScores(matrices) {
+    const section = $('#lean-client-score-section');
+    const content = $('#lean-client-score-content').empty();
+    if (!section.length) {
+        return;
+    }
+
+    const scores = buildClientScores(matrices);
+    if (scores.clients.length === 0 || scores.rows.length === 0) {
+        section.hide();
+        return;
+    }
+
+    section.show();
+    const scroll = $('<div />').addClass('lean-grid-scroll');
+    const table = $('<table />').addClass('lean-latest-grid lean-score-grid');
+    const thead = $('<thead />');
+    const headerRow = $('<tr />');
+
+    headerRow.append($('<th />').addClass('lean-test-column').text('Suite'));
+    scores.clients.forEach(client => {
+        headerRow.append($('<th />')
+            .addClass('lean-result-column')
+            .attr('title', client)
+            .append($('<span />').addClass('lean-client-heading').text(client)));
+    });
+    thead.append(headerRow);
+    table.append(thead);
+
+    const tbody = $('<tbody />');
+    scores.rows.forEach(row => {
+        const tr = $('<tr />');
+        tr.append($('<th />').addClass('lean-test-column').attr('scope', 'row').text(row.suiteName));
+        scores.clients.forEach(client => {
+            tr.append(renderScoreCell(row.cells.get(client), {
+                href: suiteClientURL(row, client),
+                client,
+                suiteName: row.suiteName,
+            }));
+        });
+        tbody.append(tr);
+    });
+    table.append(tbody);
+
+    const tfoot = $('<tfoot />');
+    const totalRow = $('<tr />').addClass('lean-score-total-row');
+    totalRow.append($('<th />').addClass('lean-test-column').attr('scope', 'row').text('Total'));
+    scores.clients.forEach(client => {
+        totalRow.append(renderScoreCell(scores.totals.get(client), { isTotal: true }));
+    });
+    tfoot.append(totalRow);
+    table.append(tfoot);
+
+    scroll.append(table);
+    content.append(scroll);
+}
+
+function buildClientScores(matrices) {
+    const clients = [];
+    const seenClients = new Set();
+    const rows = [];
+    const rowsBySuite = new Map();
+    const totals = new Map();
+
+    const addClient = name => {
+        if (!name || seenClients.has(name)) {
+            return;
+        }
+        seenClients.add(name);
+        clients.push(name);
+        totals.set(name, emptyScore());
+    };
+
+    const scoreFor = (cells, client) => {
+        if (!cells.has(client)) {
+            cells.set(client, emptyScore());
+        }
+        return cells.get(client);
+    };
+
+    matrices.forEach(matrix => {
+        const suiteName = matrix.linkSuiteName || matrix.suiteName;
+        if (!rowsBySuite.has(suiteName)) {
+            const row = {
+                suiteName,
+                fileName: matrix.entry.fileName,
+                linkSuiteName: matrix.linkSuiteName || matrix.suiteName,
+                cells: new Map(),
+            };
+            rowsBySuite.set(suiteName, row);
+            rows.push(row);
+        }
+        const row = rowsBySuite.get(suiteName);
+
+        matrix.clients.forEach(client => addClient(client.name));
+        matrix.cases.forEach(test => {
+            if (isSuiteSetupTest(test, suiteName)) {
+                return;
+            }
+
+            scoreClientNamesForTest(test).forEach(client => {
+                addClient(client);
+                incrementScore(scoreFor(row.cells, client), test);
+                incrementScore(totals.get(client), test);
+            });
+        });
+    });
+
+    clients.sort((a, b) => compareClientScores(totals, a, b));
+    return { clients, rows, totals };
+}
+
+function suiteClientURL(row, client) {
+    return `${routes.suite(row.fileName, row.linkSuiteName)}&client=${encodeURIComponent(client)}`;
+}
+
+function compareClientScores(totals, a, b) {
+    const left = scorePercent(totals.get(a));
+    const right = scorePercent(totals.get(b));
+    if (left !== right) {
+        return right - left;
+    }
+
+    const leftTotal = totals.get(a)?.total || 0;
+    const rightTotal = totals.get(b)?.total || 0;
+    if (leftTotal !== rightTotal) {
+        return rightTotal - leftTotal;
+    }
+    return a.localeCompare(b);
+}
+
+function scorePercent(score) {
+    return score && score.total > 0 ? score.passed / score.total : -1;
+}
+
+function emptyScore() {
+    return { passed: 0, failed: 0, total: 0 };
+}
+
+function incrementScore(score, test) {
+    score.total++;
+    if (test.summaryResult && test.summaryResult.pass) {
+        score.passed++;
+    } else {
+        score.failed++;
+    }
+}
+
+function scoreClientNamesForTest(test) {
+    const names = test.topology && test.topology.length > 0 ? test.topology : clientNamesForTest(test);
+    const seen = new Set();
+    return names.filter(name => {
+        if (!name || seen.has(name)) {
+            return false;
+        }
+        seen.add(name);
+        return true;
+    });
+}
+
+function renderScoreCell(score, options = {}) {
+    const td = $('<td />').addClass('lean-result-column');
+    const shouldLink = score && score.total > 0 && options.href;
+    const value = $(shouldLink ? '<a />' : '<span />').addClass('lean-score-value');
+    if (options.isTotal) {
+        value.addClass('total');
+    }
+
+    if (!score || score.total === 0) {
+        value.addClass('empty').text('-');
+        td.append(value);
+        return td;
+    }
+
+    const statusClass = score.failed > 0 ? 'has-failures' : 'all-passed';
+    value.addClass(statusClass)
+        .attr('title', `${score.passed} passed, ${score.failed} failed`)
+        .text(`${score.passed}/${score.total}`);
+    if (shouldLink) {
+        value.addClass('clickable')
+            .attr('href', options.href)
+            .attr('aria-label', `Open ${options.suiteName} filtered to ${options.client}`);
+    }
+    td.append(value);
+    return td;
 }
 
 function renderDevnetControls(devnets, selectedDevnet) {
@@ -734,6 +922,8 @@ function summaryPill(label, value, tone) {
 }
 
 function renderEmptyState(message) {
+    $('#lean-client-score-section').hide();
+    $('#lean-client-score-content').empty();
     $('#lean-latest-subtitle').text('');
     $('#lean-latest-summary').empty();
     $('#lean-latest-content').empty().append($('<p />').addClass('text-secondary').text(message));
