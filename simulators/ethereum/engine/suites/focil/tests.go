@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -153,6 +154,12 @@ func fundTestAccounts(t *hivesim.T, genesis *core.Genesis) {
 
 func Run(t *hivesim.T, c *hivesim.Client) {
 	t.Run(hivesim.TestSpec{
+		Name:        fmt.Sprintf("engine_getInclusionListV1 unknown parent (%s)", c.Type),
+		Description: "Requests an inclusion list for a missing parent block and verifies the Engine API Unknown parent error.",
+		Run:         func(st *hivesim.T) { testGetInclusionListUnknownParent(st, c) },
+	})
+
+	t.Run(hivesim.TestSpec{
 		Name:        fmt.Sprintf("engine_getInclusionListV1 response validation (%s)", c.Type),
 		Description: "Requests an inclusion list from the client and verifies the returned byte list is size-bounded, non-blob, and safe to deserialize.",
 		Run:         func(st *hivesim.T) { testGetInclusionList(st, c) },
@@ -171,6 +178,25 @@ func Run(t *hivesim.T, c *hivesim.Client) {
 				}
 			},
 		})
+	}
+}
+
+func testGetInclusionListUnknownParent(t *hivesim.T, c *hivesim.Client) {
+	parent := common.HexToHash("0x000000000000000000000000000000000000000000000000000000000000f0c1")
+
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	defer cancel()
+	var il []hexutil.Bytes
+	err := c.EngineAPI().CallContext(ctx, &il, "engine_getInclusionListV1", parent)
+	if err == nil {
+		t.Fatal("engine_getInclusionListV1 accepted an unknown parent")
+	}
+	rpcErr, ok := err.(rpc.Error)
+	if !ok {
+		t.Fatalf("engine_getInclusionListV1 returned non-RPC error for unknown parent: %v", err)
+	}
+	if rpcErr.ErrorCode() != *globals.UNKNOWN_PARENT {
+		t.Fatalf("engine_getInclusionListV1 returned error code %d for unknown parent, want %d: %v", rpcErr.ErrorCode(), *globals.UNKNOWN_PARENT, err)
 	}
 }
 
