@@ -17,7 +17,6 @@ import (
 func hiveviewBundler(fsys fs.FS) *bundler {
 	entrypoints := []string{
 		"lib/app-index.js",
-		"lib/app-lean-latest.js",
 		"lib/app-suite.js",
 		"lib/app-viewer.js",
 		"lib/app.css",

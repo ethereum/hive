@@ -62,18 +62,6 @@ main {
     color: var(--bs-primary);
 }
 
-#hive-static-nav a.lean-latest-nav {
-    color: var(--bs-btn-color);
-    padding: 0.25rem 0.65rem;
-    border-radius: 4px;
-}
-
-#hive-static-nav a.lean-latest-nav:hover {
-    color: var(--bs-btn-hover-color);
-    background-color: var(--bs-btn-hover-bg);
-    border-color: var(--bs-btn-hover-border-color);
-}
-
 .theme-toggle {
     cursor: pointer;
     padding: 4px 12px;
@@ -648,6 +636,10 @@ kbd {
     overflow: hidden;
 }
 
+#run-history-section {
+    margin-top: 2rem;
+}
+
 .lean-latest-title-row {
     display: flex;
     align-items: flex-start;
@@ -678,6 +670,12 @@ kbd {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.5rem;
+}
+
+.lean-client-score-section {
+    margin-bottom: 1.75rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
 }
 
 .lean-devnet-controls {
@@ -878,6 +876,57 @@ kbd {
     font-size: 0.65rem;
     line-height: 0.9rem;
     font-weight: 600;
+}
+
+.lean-score-grid tfoot th,
+.lean-score-grid tfoot td {
+    border-top: 1px solid var(--bs-border-color);
+    background: color-mix(in srgb, var(--bs-body-bg) 88%, var(--bs-border-color));
+    font-weight: 600;
+}
+
+.lean-score-value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5rem;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.lean-score-value.clickable {
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.lean-score-value.clickable:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.lean-score-value.all-passed {
+    color: var(--bs-success);
+    border-color: color-mix(in srgb, var(--bs-success) 55%, var(--bs-border-color));
+    background: color-mix(in srgb, var(--bs-success) 12%, var(--bs-body-bg));
+}
+
+.lean-score-value.has-failures {
+    color: var(--bs-danger);
+    border-color: color-mix(in srgb, var(--bs-danger) 55%, var(--bs-border-color));
+    background: color-mix(in srgb, var(--bs-danger) 10%, var(--bs-body-bg));
+}
+
+.lean-score-value.empty {
+    color: var(--bs-secondary);
+    background: color-mix(in srgb, var(--bs-body-bg) 88%, var(--bs-border-color));
+}
+
+.lean-score-value.total {
+    font-weight: 700;
 }
 
 @media screen and (max-width: 700px) {

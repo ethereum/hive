@@ -8,7 +8,7 @@ import * as common from './app-common.js';
 import * as routes from './routes.js';
 import * as html from './html.js';
 import * as testlog from './testlog.js';
-import { formatDuration, queryParam } from './utils.js';
+import { escapeRegExp, formatDuration, queryParam } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
@@ -201,6 +201,9 @@ function showSuiteData(data, suiteID) {
                 width: '20%',
                 responsivePriority: 1,
                 render: function (clientInfo, type, row) {
+                    if (type === 'filter' || type === 'sort') {
+                        return clientNamesFromInfo(clientInfo).join(',');
+                    }
                     return formatClientLogsList(data, row.testIndex, clientInfo);
                 }
             },
@@ -212,12 +215,23 @@ function showSuiteData(data, suiteID) {
         },
     });
 
+    applyClientFilterFromURL(table);
+
     // This sets up the expanded info on click.
     // https://www.datatables.net/examples/api/row_details.html
     $('#execresults tbody').on('click', 'td.test-name-column', function() {
         let tr = $(this).closest('tr');
         toggleTestDetails(data, table, tr);
     });
+}
+
+function applyClientFilterFromURL(table) {
+    const client = queryParam('client');
+    if (!client) {
+        return;
+    }
+
+    table.column('logs:name').search(escapeRegExp(client), true, false).draw();
 }
 
 // testSuiteTimes computes start/end/duration of a test suite.
@@ -342,6 +356,19 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
         links.push(link.outerHTML);
     }
     return links.join(', ');
+}
+
+function clientNamesFromInfo(clientInfo) {
+    const names = [];
+    const seen = new Set();
+    for (let instanceID in clientInfo || {}) {
+        const name = clientInfo[instanceID].name;
+        if (name && !seen.has(name)) {
+            seen.add(name);
+            names.push(name);
+        }
+    }
+    return names;
 }
 
 function formatTestStatus(summaryResult) {
