@@ -654,11 +654,31 @@ function buildClientScores(matrices) {
         });
     });
 
+    clients.sort((a, b) => compareClientScores(totals, a, b));
     return { clients, rows, totals };
 }
 
 function suiteClientURL(row, client) {
     return `${routes.suite(row.fileName, row.linkSuiteName)}&client=${encodeURIComponent(client)}`;
+}
+
+function compareClientScores(totals, a, b) {
+    const left = scorePercent(totals.get(a));
+    const right = scorePercent(totals.get(b));
+    if (left !== right) {
+        return right - left;
+    }
+
+    const leftTotal = totals.get(a)?.total || 0;
+    const rightTotal = totals.get(b)?.total || 0;
+    if (leftTotal !== rightTotal) {
+        return rightTotal - leftTotal;
+    }
+    return a.localeCompare(b);
+}
+
+function scorePercent(score) {
+    return score && score.total > 0 ? score.passed / score.total : -1;
 }
 
 function emptyScore() {
