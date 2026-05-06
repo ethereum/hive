@@ -243,6 +243,84 @@ impl Simulation {
         Ok(())
     }
 
+    /// Stops a running client container.
+    pub async fn stop_client(
+        &self,
+        test_suite: SuiteID,
+        test: TestID,
+        node_id: &str,
+    ) -> Result<(), String> {
+        let url = format!(
+            "{}/testsuite/{}/test/{}/node/{}",
+            self.url, test_suite, test, node_id
+        );
+        let resp = self.http_client.delete(&url).send().await.map_err(|err| {
+            format!("stop_client transport error (node={node_id}, test={test}): {err}")
+        })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!(
+                "stop_client rejected (node={node_id}, test={test}): status={status} body={body}"
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Pauses a running client container.
+    pub async fn pause_client(
+        &self,
+        test_suite: SuiteID,
+        test: TestID,
+        node_id: &str,
+    ) -> Result<(), String> {
+        let url = format!(
+            "{}/testsuite/{}/test/{}/node/{}/pause",
+            self.url, test_suite, test, node_id
+        );
+        let resp = self.http_client.post(&url).send().await.map_err(|err| {
+            format!("pause_client transport error (node={node_id}, test={test}): {err}")
+        })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!(
+                "pause_client rejected (node={node_id}, test={test}): status={status} body={body}"
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Unpauses a paused client container.
+    pub async fn unpause_client(
+        &self,
+        test_suite: SuiteID,
+        test: TestID,
+        node_id: &str,
+    ) -> Result<(), String> {
+        let url = format!(
+            "{}/testsuite/{}/test/{}/node/{}/pause",
+            self.url, test_suite, test, node_id
+        );
+        let resp = self.http_client.delete(&url).send().await.map_err(|err| {
+            format!("unpause_client transport error (node={node_id}, test={test}): {err}")
+        })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!(
+                "unpause_client rejected (node={node_id}, test={test}): status={status} body={body}"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Returns all client types available to this simulator run. This depends on
     /// both the available client set and the command line filters.
     pub async fn client_types(&self) -> Vec<ClientDefinition> {

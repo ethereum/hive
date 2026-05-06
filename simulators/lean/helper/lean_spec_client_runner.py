@@ -95,6 +95,11 @@ HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_GOSSIP
 HELPER_P2P_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_P2P_PORT"
 HELPER_API_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_API_PORT"
 HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_METADATA_PORT"
+DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_DISABLE_VALIDATOR_SERVICE"
+GOSSIPSUB_V11_PROTOCOL_ID: Final = "/meshsub/1.1.0"
+IDENTIFY_PROTOCOL_ID: Final = "/ipfs/id/1.0.0"
+IDENTIFY_PUSH_PROTOCOL_ID: Final = "/ipfs/id/push/1.0.0"
+LIBP2P_SECP256K1_PUBLIC_KEY_TYPE: Final = 2
 VALIDATOR_COUNT: Final = 3
 ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
@@ -131,6 +136,7 @@ _SSZ_FAST_DESERIALIZATION_PATCHED = False
 _SNAPPY_COMPRESS_PATCHED = False
 _REQRESP_BLOCK_CACHE_PATCHED = False
 _NETWORK_SERVICE_GOSSIP_PATCHED = False
+_IDENTIFY_PROTOCOL_PATCHED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
@@ -430,6 +436,233 @@ def patch_network_service_gossip_processing() -> None:
 
     network_service_cls._handle_event = handle_event_with_helper_backfill
     _NETWORK_SERVICE_GOSSIP_PATCHED = True
+
+
+def encode_unsigned_varint(value: int) -> bytes:
+    output = bytearray()
+    while value >= 0x80:
+        output.append((value & 0x7F) | 0x80)
+        value >>= 7
+    output.append(value)
+    return bytes(output)
+
+
+def protobuf_key(field_number: int, wire_type: int) -> bytes:
+    return encode_unsigned_varint((field_number << 3) | wire_type)
+
+
+def protobuf_varint_field(field_number: int, value: int) -> bytes:
+    return protobuf_key(field_number, 0) + encode_unsigned_varint(value)
+
+
+def protobuf_bytes_field(field_number: int, value: bytes) -> bytes:
+    return protobuf_key(field_number, 2) + encode_unsigned_varint(len(value)) + value
+
+
+def protobuf_string_field(field_number: int, value: str) -> bytes:
+    return protobuf_bytes_field(field_number, value.encode("utf-8"))
+
+
+def build_libp2p_public_key(public_key: object) -> bytes:
+    raw_public_key = public_key.to_bytes()
+    return (
+        protobuf_varint_field(1, LIBP2P_SECP256K1_PUBLIC_KEY_TYPE)
+        + protobuf_bytes_field(2, raw_public_key)
+    )
+
+
+def build_identify_response(identity_key: IdentityKeypair) -> bytes:
+    public_key = build_libp2p_public_key(identity_key.public_key)
+    protocols = (
+        IDENTIFY_PROTOCOL_ID,
+        IDENTIFY_PUSH_PROTOCOL_ID,
+        "/leanconsensus/req/status/1/ssz_snappy",
+        "/leanconsensus/req/blocks_by_root/1/ssz_snappy",
+        "/leanconsensus/req/blocks_by_range/1/ssz_snappy",
+        "/meshsub/1.2.0",
+        GOSSIPSUB_V11_PROTOCOL_ID,
+    )
+
+    response = bytearray()
+    response.extend(protobuf_bytes_field(1, public_key))
+    for protocol in protocols:
+        response.extend(protobuf_string_field(3, protocol))
+    response.extend(protobuf_string_field(5, "ipfs/0.1.0"))
+    response.extend(protobuf_string_field(6, "hive-lean-spec-helper/0.1.0"))
+    return bytes(response)
+
+
+async def read_delimited_identify_message(wrapper: object) -> bytes:
+    length = 0
+    shift = 0
+    for _ in range(10):
+        chunk = await wrapper.read(1)
+        if not chunk:
+            raise EOFError("identify stream closed before length prefix")
+        byte = chunk[0]
+        length |= (byte & 0x7F) << shift
+        if byte & 0x80 == 0:
+            break
+        shift += 7
+    else:
+        raise ValueError("identify length prefix is too long")
+
+    if length == 0:
+        return b""
+    if length > 1_048_576:
+        raise ValueError(f"identify message too large: {length} bytes")
+    return await wrapper.readexactly(length)
+
+
+async def handle_identify_stream(
+    event_source: object,
+    peer_id: object,
+    protocol_id: str,
+    wrapper: object,
+) -> None:
+    if protocol_id == IDENTIFY_PROTOCOL_ID:
+        response = getattr(event_source, "_hive_identify_response", b"")
+        wrapper.write(encode_unsigned_varint(len(response)) + response)
+        await wrapper.drain()
+        logger.info("Served identify response to %s", peer_id)
+    elif protocol_id == IDENTIFY_PUSH_PROTOCOL_ID:
+        try:
+            await asyncio.wait_for(read_delimited_identify_message(wrapper), timeout=2.0)
+        except (asyncio.TimeoutError, EOFError):
+            logger.debug("Identify push stream from %s closed without a full payload", peer_id)
+        except Exception as err:
+            logger.debug("Ignoring invalid identify push payload from %s: %s", peer_id, err)
+        else:
+            logger.info("Accepted identify push from %s", peer_id)
+
+    with suppress(Exception):
+        await wrapper.finish_write()
+
+
+def patch_identify_protocol() -> None:
+    global _IDENTIFY_PROTOCOL_PATCHED
+
+    if _IDENTIFY_PROTOCOL_PATCHED:
+        return
+
+    live_module = importlib.import_module(
+        "lean_spec.subspecs.networking.client.event_source.live"
+    )
+    protocol_module = importlib.import_module(
+        "lean_spec.subspecs.networking.client.event_source.protocol"
+    )
+
+    extra_protocols = {
+        GOSSIPSUB_V11_PROTOCOL_ID,
+        IDENTIFY_PROTOCOL_ID,
+        IDENTIFY_PUSH_PROTOCOL_ID,
+    }
+    live_module.SUPPORTED_PROTOCOLS = frozenset(
+        set(live_module.SUPPORTED_PROTOCOLS) | extra_protocols
+    )
+    protocol_module.SUPPORTED_PROTOCOLS = frozenset(
+        set(protocol_module.SUPPORTED_PROTOCOLS) | extra_protocols
+    )
+
+    event_source_cls = live_module.LiveNetworkEventSource
+
+    async def setup_gossipsub_stream_with_v11_fallback(
+        self: object,
+        peer_id: object,
+        conn: object,
+    ) -> None:
+        protocol_ids = []
+        for protocol_id in (
+            live_module.GOSSIPSUB_DEFAULT_PROTOCOL_ID,
+            live_module.GOSSIPSUB_PROTOCOL_ID_V12,
+            GOSSIPSUB_V11_PROTOCOL_ID,
+        ):
+            if protocol_id not in protocol_ids:
+                protocol_ids.append(protocol_id)
+
+        last_error = None
+        for protocol_id in protocol_ids:
+            try:
+                stream = await conn.open_stream(protocol_id)
+                logger.info(
+                    "Opened outbound gossipsub stream_id=%d protocol=%s to %s",
+                    stream.stream_id,
+                    protocol_id,
+                    peer_id,
+                )
+
+                wrapper = live_module.QuicStreamAdapter(stream)
+                await self._gossipsub_behavior.add_peer(
+                    peer_id,
+                    wrapper,
+                    inbound=False,
+                )
+
+                logger.info(
+                    "GossipSub outbound stream established with %s using %s (stream_id=%d)",
+                    peer_id,
+                    protocol_id,
+                    stream.stream_id,
+                )
+                return
+            except Exception as err:
+                last_error = err
+                logger.debug(
+                    "Failed to setup outbound gossipsub stream with %s using %s: %s",
+                    peer_id,
+                    protocol_id,
+                    err,
+                )
+
+        logger.warning("Failed to setup gossipsub stream with %s: %s", peer_id, last_error)
+
+    async def accept_streams_with_identify(
+        self: object,
+        peer_id: object,
+        conn: object,
+    ) -> None:
+        try:
+            logger.info("Stream acceptor started for peer %s", peer_id)
+            while self._running and peer_id in self._connections:
+                try:
+                    stream = await conn.accept_stream()
+                except Exception as err:
+                    logger.debug("Stream accept failed for %s: %s", peer_id, err)
+                    break
+
+                negotiated = await self._negotiate_inbound_stream(peer_id, stream)
+                if negotiated is None:
+                    continue
+                protocol_id, wrapper = negotiated
+
+                if protocol_id in (
+                    live_module.GOSSIPSUB_DEFAULT_PROTOCOL_ID,
+                    live_module.GOSSIPSUB_PROTOCOL_ID_V12,
+                    GOSSIPSUB_V11_PROTOCOL_ID,
+                ):
+                    await self._handle_gossipsub_inbound_stream(
+                        peer_id,
+                        conn,
+                        protocol_id,
+                        wrapper,
+                    )
+                elif protocol_id in live_module.REQRESP_PROTOCOL_IDS:
+                    self._handle_reqresp_inbound_stream(peer_id, protocol_id, wrapper)
+                elif protocol_id in (IDENTIFY_PROTOCOL_ID, IDENTIFY_PUSH_PROTOCOL_ID):
+                    await handle_identify_stream(self, peer_id, protocol_id, wrapper)
+                else:
+                    logger.debug(
+                        "Unknown protocol %s from %s, closing stream", protocol_id, peer_id
+                    )
+                    await stream.close()
+        except asyncio.CancelledError:
+            logger.debug("Stream acceptor cancelled for %s", peer_id)
+        except Exception as err:
+            logger.warning("Stream acceptor error for %s: %s", peer_id, err)
+
+    event_source_cls._setup_gossipsub_stream = setup_gossipsub_stream_with_v11_fallback
+    event_source_cls._accept_streams = accept_streams_with_identify
+    _IDENTIFY_PROTOCOL_PATCHED = True
 
 
 def parse_bootnodes() -> list[str]:
@@ -924,6 +1157,7 @@ async def run() -> None:
     patch_snappy_compress()
     patch_reqresp_block_cache()
     patch_network_service_gossip_processing()
+    patch_identify_protocol()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -938,6 +1172,9 @@ async def run() -> None:
     validator_registry = load_validator_registry(node_id)
     bootnodes = parse_bootnodes()
     is_aggregator = os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
+    disable_validator_service = (
+        os.environ.get(DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE, "0") == "1"
+    )
 
     assigned_validators = (
         [int(index) for index in validator_registry.indices()]
@@ -945,10 +1182,11 @@ async def run() -> None:
         else []
     )
     logger.info(
-        "Configured helper genesis_time=%d validator_count=%d assigned_validators=%s",
+        "Configured helper genesis_time=%d validator_count=%d assigned_validators=%s disable_validator_service=%s",
         genesis.genesis_time,
         len(genesis.genesis_validators),
         assigned_validators,
+        disable_validator_service,
     )
     connection_manager = await QuicConnectionManager.create(identity_key)
     metadata["bootnode_enr"] = build_helper_bootnode_enr(identity_key)
@@ -960,6 +1198,7 @@ async def run() -> None:
         str(connection_manager.peer_id)
     )
     event_source = await LiveNetworkEventSource.create(connection_manager=connection_manager)
+    event_source._hive_identify_response = build_identify_response(identity_key)
     configure_event_source_network(event_source, helper_gossip_fork_digest())
     subscribe_gossip_topics(event_source, validator_registry, is_aggregator)
     logger.info("Helper peer_id=%s", connection_manager.peer_id)
@@ -974,6 +1213,10 @@ async def run() -> None:
             fork_digest=helper_gossip_fork_digest(),
         )
     )
+    if disable_validator_service and node.validator_service is not None:
+        logger.info("Disabling local validator service for passive helper")
+        node.validator_service = None
+
     published_blocks: dict[Bytes32, object] = {}
     api_server_kwargs = {
         "config": ApiServerConfig(port=helper_api_port()),
@@ -1004,9 +1247,9 @@ async def run() -> None:
 
     event_source.set_block_lookup(lookup_published_block)
 
-    await dial_bootnodes(event_source, bootnodes)
     listener_task = await start_listener_and_gossipsub(event_source)
     event_source._running = True
+    await dial_bootnodes(event_source, bootnodes)
 
     node_task = asyncio.create_task(
         node.run(install_signal_handlers=False),

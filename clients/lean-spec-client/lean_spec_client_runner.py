@@ -794,9 +794,9 @@ async def run() -> None:
 
     event_source.set_block_lookup(lookup_published_block)
 
-    await dial_bootnodes(event_source, bootnodes)
     listener_task = await start_listener_and_gossipsub(event_source)
     event_source._running = True
+    await dial_bootnodes(event_source, bootnodes)
 
     node_task = asyncio.create_task(
         node.run(install_signal_handlers=False),

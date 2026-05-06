@@ -9,7 +9,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::utils::util::{
-    bootnode_enr_for_client, client_uses_enr_bootnodes, default_genesis_time,
+    bootnode_enr_for_client, client_uses_enr_bootnodes, current_unix_time, default_genesis_time,
     fork_choice_head_slot, http_client, lean_api_url, lean_environment, panic_payload_to_string,
     prepare_client_runtime_files, selected_lean_devnet, simulator_container_ip, CheckpointResponse,
     ClientUnderTestRole, ForkChoiceResponse, ForkChoiceSnapshot, LeanDevnet,
@@ -31,6 +31,7 @@ const LEAN_GENESIS_VALIDATOR_ENTRIES_ENVIRONMENT_VARIABLE: &str =
 const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
 const CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
+const DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_DISABLE_VALIDATOR_SERVICE";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
@@ -46,6 +47,7 @@ const DEFAULT_HELPER_P2P_PORT: u16 = 9001;
 const DEFAULT_HELPER_API_PORT: u16 = 5052;
 const DEFAULT_HELPER_METADATA_PORT: u16 = 5053;
 const MESH_HELPER_GENESIS_BUFFER_PER_PEER_SECS: u64 = 10;
+const MESH_HELPER_SOURCE_STARTUP_CUSHION_SECS: u64 = 60;
 const POST_GENESIS_TIMEOUT_SECS: u64 = 600;
 const MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC: u64 = 10;
 const LOCAL_HELPER_STARTUP_TIMEOUT_SECS: u64 = 120;
@@ -56,6 +58,7 @@ const CLIENT_UNDER_TEST_STARTUP_ATTEMPTS: u64 = 3;
 const CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS: u64 = 120;
 const CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS: u64 = 30;
 const MESH_HELPER_READY_TIMEOUT_SECS: u64 = 120;
+const OPTIONAL_MESH_HELPER_READY_GRACE_SECS: u64 = 15;
 const LIVE_HELPER_FORK_CHOICE_RETRY_ATTEMPTS: u64 = 10;
 const LOCAL_HELPER_ENTRYPOINT: &str = "/app/hive/leanspec-client.sh";
 const LOCAL_HELPER_KIND: &str = "lean-spec-local-helper";
@@ -151,6 +154,7 @@ struct LocalLeanSpecHelperConfig {
     genesis_time: u64,
     bootnodes: Option<String>,
     is_aggregator: bool,
+    disable_validator_service: bool,
     gossip_fork_digest: String,
     p2p_port: u16,
     api_port: u16,
@@ -239,6 +243,7 @@ impl LocalLeanSpecHelperConfig {
             genesis_time,
             bootnodes: None,
             is_aggregator: true,
+            disable_validator_service: false,
             gossip_fork_digest,
             p2p_port: DEFAULT_HELPER_P2P_PORT,
             api_port: DEFAULT_HELPER_API_PORT,
@@ -251,15 +256,18 @@ impl LocalLeanSpecHelperConfig {
         mesh_index: usize,
         genesis_time: u64,
         bootnode: String,
+        validator_indices: String,
+        disable_validator_service: bool,
         gossip_fork_digest: String,
     ) -> Self {
         let mesh_index = mesh_index as u16;
         Self {
             node_id: format!("lean_spec_mesh_{mesh_index}"),
-            validator_indices: String::new(),
+            validator_indices,
             genesis_time,
             bootnodes: Some(bootnode),
             is_aggregator: false,
+            disable_validator_service,
             gossip_fork_digest,
             p2p_port: DEFAULT_HELPER_P2P_PORT + mesh_index,
             api_port: DEFAULT_HELPER_API_PORT + (mesh_index * 2),
@@ -450,15 +458,88 @@ fn adjusted_genesis_time_for_helper_mesh(
     helper_peer_count: usize,
     connect_client_to_lean_spec_mesh: bool,
 ) -> u64 {
-    if !connect_client_to_lean_spec_mesh || helper_peer_count <= 1 {
+    let helper_startup_buffer = helper_mesh_pre_genesis_launch_buffer_secs(
+        helper_peer_count,
+        connect_client_to_lean_spec_mesh,
+    );
+    if helper_startup_buffer == 0 {
         return requested_genesis_time;
     }
 
     // Mesh helpers don't backfill the earliest chain history on startup so they need a fresh pre-genesis launch window to observe the canonical chain from
     // the beginning instead of joining after the source helper is already live
-    let helper_startup_buffer =
-        ((helper_peer_count - 1) as u64) * MESH_HELPER_GENESIS_BUFFER_PER_PEER_SECS;
-    requested_genesis_time.max(default_genesis_time() + helper_startup_buffer)
+    requested_genesis_time.max(
+        default_genesis_time() + helper_startup_buffer + MESH_HELPER_SOURCE_STARTUP_CUSHION_SECS,
+    )
+}
+
+fn helper_mesh_pre_genesis_launch_buffer_secs(
+    helper_peer_count: usize,
+    connect_client_to_lean_spec_mesh: bool,
+) -> u64 {
+    if !connect_client_to_lean_spec_mesh || helper_peer_count <= 1 {
+        0
+    } else {
+        ((helper_peer_count - 1) as u64) * MESH_HELPER_GENESIS_BUFFER_PER_PEER_SECS
+    }
+}
+
+fn helper_mesh_genesis_has_launch_window(
+    genesis_time: u64,
+    helper_peer_count: usize,
+    connect_client_to_lean_spec_mesh: bool,
+) -> bool {
+    let helper_startup_buffer = helper_mesh_pre_genesis_launch_buffer_secs(
+        helper_peer_count,
+        connect_client_to_lean_spec_mesh,
+    );
+    if helper_startup_buffer == 0 {
+        return true;
+    }
+
+    genesis_time >= current_unix_time() + helper_startup_buffer
+}
+
+async fn refresh_source_helper_for_mesh_launch_window(
+    mut source_helper: RunningLocalLeanSpecHelper,
+    mut source_genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
+    source_helper_config: &mut LocalLeanSpecHelperConfig,
+    helper_peer_count: usize,
+    connect_client_to_lean_spec_mesh: bool,
+) -> Result<(RunningLocalLeanSpecHelper, Vec<HelperGenesisValidatorEntry>), String> {
+    let mut refresh_attempt = 0;
+    while !helper_mesh_genesis_has_launch_window(
+        source_helper_config.genesis_time,
+        helper_peer_count,
+        connect_client_to_lean_spec_mesh,
+    ) {
+        refresh_attempt += 1;
+        if refresh_attempt > LOCAL_HELPER_STARTUP_ATTEMPTS {
+            return Err(format!(
+                "Unable to refresh {LOCAL_HELPER_KIND} with a genesis_time that leaves a mesh pre-genesis launch window after {} attempts",
+                LOCAL_HELPER_STARTUP_ATTEMPTS
+            ));
+        }
+
+        let stale_genesis_time = source_helper_config.genesis_time;
+        drop(source_helper);
+        source_helper_config.genesis_time = adjusted_genesis_time_for_helper_mesh(
+            default_genesis_time(),
+            helper_peer_count,
+            connect_client_to_lean_spec_mesh,
+        );
+        eprintln!(
+            "Restarting {LOCAL_HELPER_KIND} with fresh genesis_time {} after startup consumed the mesh pre-genesis launch window for genesis_time {}",
+            source_helper_config.genesis_time, stale_genesis_time
+        );
+
+        let refreshed_source =
+            start_local_lean_spec_helper_with_genesis_metadata(source_helper_config).await?;
+        source_helper = refreshed_source.0;
+        source_genesis_validator_entries = refreshed_source.1;
+    }
+
+    Ok((source_helper, source_genesis_validator_entries))
 }
 
 fn helper_gossip_fork_digest(profile: HelperGossipForkDigestProfile) -> String {
@@ -471,6 +552,34 @@ fn helper_gossip_fork_digest(profile: HelperGossipForkDigestProfile) -> String {
             LeanDevnet::Devnet4 => DEVNET4_HELPER_GOSSIP_FORK_DIGEST.to_string(),
         },
     }
+}
+
+fn helper_mesh_validator_assignments(
+    test_data: &PostGenesisSyncTestData,
+    helper_peer_count: usize,
+) -> Vec<String> {
+    let helper_peer_count = helper_peer_count.max(1);
+    let source_validator_indices = test_data
+        .source_helper_validator_indices
+        .clone()
+        .unwrap_or_else(|| LEAN_SPEC_SOURCE_VALIDATORS.to_string());
+
+    if should_start_passive_validator_mesh(test_data, helper_peer_count) {
+        return vec![source_validator_indices; helper_peer_count];
+    }
+
+    let mut assignments = vec![String::new(); helper_peer_count];
+    assignments[0] = source_validator_indices;
+    assignments
+}
+
+fn should_start_passive_validator_mesh(
+    test_data: &PostGenesisSyncTestData,
+    helper_peer_count: usize,
+) -> bool {
+    !test_data.use_checkpoint_sync
+        && test_data.connect_client_to_lean_spec_mesh
+        && helper_peer_count > 1
 }
 
 pub(crate) async fn start_checkpoint_sync_helper_mesh(
@@ -488,10 +597,12 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
         test_data.connect_client_to_lean_spec_mesh,
     );
     let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
-    let source_helper_config = LocalLeanSpecHelperConfig::source(
+    let helper_validator_assignments =
+        helper_mesh_validator_assignments(test_data, helper_peer_count);
+    let mut source_helper_config = LocalLeanSpecHelperConfig::source(
         genesis_time,
         helper_fork_digest.clone(),
-        test_data.source_helper_validator_indices.clone(),
+        Some(helper_validator_assignments[0].clone()),
     );
     let (source_helper, source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
@@ -501,11 +612,27 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
                     "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
                 )
             });
+    let (source_helper, source_genesis_validator_entries) =
+        refresh_source_helper_for_mesh_launch_window(
+            source_helper,
+            source_genesis_validator_entries,
+            &mut source_helper_config,
+            helper_peer_count,
+            test_data.connect_client_to_lean_spec_mesh,
+        )
+        .await
+        .unwrap_or_else(|err| {
+            panic!(
+                "Unable to refresh {LOCAL_HELPER_KIND} genesis before helper mesh startup: {err}"
+            )
+        });
+    let genesis_time = source_helper_config.genesis_time;
     let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
         start_mesh_helpers(
             &source_helper,
             genesis_time,
-            helper_peer_count - 1,
+            &helper_validator_assignments[1..],
+            false,
             helper_fork_digest.clone(),
         )
         .await
@@ -544,7 +671,8 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
             helpers.mesh_peers = start_mesh_helpers(
                 &helpers.source,
                 genesis_time,
-                helper_peer_count - 1,
+                &helper_validator_assignments[1..],
+                false,
                 helper_fork_digest.clone(),
             )
             .await
@@ -552,7 +680,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
         }
 
         if let Err(err) =
-            wait_for_any_mesh_helper_to_reach_post_genesis(&mut helpers.mesh_peers).await
+            wait_briefly_for_any_mesh_helper_to_reach_post_genesis(&mut helpers.mesh_peers).await
         {
             eprintln!("Continuing checkpoint-sync test despite auxiliary helper lag: {err}");
         }
@@ -620,188 +748,281 @@ pub(crate) async fn start_post_genesis_sync_context(
     test: &Test,
     test_data: &PostGenesisSyncTestData,
 ) -> PostGenesisSyncContext {
-    let helper_peer_count = test_data.helper_peer_count.max(1);
-    let genesis_time = adjusted_genesis_time_for_helper_mesh(
-        test_data.genesis_time,
-        helper_peer_count,
-        test_data.connect_client_to_lean_spec_mesh,
-    );
-    let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
-    let source_helper_config = LocalLeanSpecHelperConfig::source(
-        genesis_time,
-        helper_fork_digest.clone(),
-        test_data.source_helper_validator_indices.clone(),
-    );
-    let (source_helper, source_genesis_validator_entries) =
-        start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
+    loop {
+        let helper_peer_count = test_data.helper_peer_count.max(1);
+        let genesis_time = adjusted_genesis_time_for_helper_mesh(
+            test_data.genesis_time,
+            helper_peer_count,
+            test_data.connect_client_to_lean_spec_mesh,
+        );
+        let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
+        let passive_validator_mesh =
+            should_start_passive_validator_mesh(test_data, helper_peer_count);
+        let helper_validator_assignments =
+            helper_mesh_validator_assignments(test_data, helper_peer_count);
+        let mut source_helper_config = LocalLeanSpecHelperConfig::source(
+            genesis_time,
+            helper_fork_digest.clone(),
+            Some(helper_validator_assignments[0].clone()),
+        );
+        let (source_helper, source_genesis_validator_entries) =
+            start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
+                .await
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
+                    )
+                });
+        let (source_helper, source_genesis_validator_entries) =
+            refresh_source_helper_for_mesh_launch_window(
+                source_helper,
+                source_genesis_validator_entries,
+                &mut source_helper_config,
+                helper_peer_count,
+                test_data.connect_client_to_lean_spec_mesh,
+            )
             .await
             .unwrap_or_else(|err| {
                 panic!(
-                    "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
+                    "Unable to refresh {LOCAL_HELPER_KIND} genesis before post-genesis helper mesh startup: {err}"
                 )
             });
-    let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
-        start_mesh_helpers(
-            &source_helper,
-            genesis_time,
-            helper_peer_count - 1,
-            helper_fork_digest.clone(),
-        )
-        .await
-        .unwrap_or_else(|err| panic!("{err}"))
-    } else {
-        Vec::new()
-    };
-    let mut helpers = RunningLocalLeanSpecHelperGroup {
-        source: source_helper,
-        mesh_peers,
-    };
-    let should_start_client_early =
-        !test_data.use_checkpoint_sync && test_data.connect_client_to_lean_spec_mesh;
-    let initial_client_under_test_environment = client_under_test_environment(
-        &helpers,
-        &test_data.client_under_test.name,
-        genesis_time,
-        &source_genesis_validator_entries,
-        test_data.use_checkpoint_sync,
-        test_data.connect_client_to_lean_spec_mesh,
-        test_data.client_role,
-    );
-
-    let client_under_test = if should_start_client_early {
-        Some(
-            start_client_under_test_with_retry(
-                test,
-                test_data.client_under_test.name.clone(),
-                initial_client_under_test_environment.clone(),
-            )
-            .await,
-        )
-    } else {
-        None
-    };
-
-    let (mut source_fork_choice, mut source_helper_restarted) =
-        match wait_for_checkpoint_slot_with_retry(
-            &mut helpers.source,
-            minimum_source_checkpoint_slot(test_data),
-            &source_helper_config,
-        )
-        .await
-        {
-            Ok(source_fork_choice) => source_fork_choice,
-            Err(err) => {
-                if client_under_test.is_none() && !helper_startup_error_is_retryable(&err) {
-                    let files = prepare_client_runtime_files(
-                    &test_data.client_under_test.name,
-                    &initial_client_under_test_environment,
-                )
-                .unwrap_or_else(|prep_err| {
-                    panic!(
-                        "Unable to prepare runtime assets for {} after checkpoint wait failure: {prep_err}",
-                        test_data.client_under_test.name
-                    )
-                });
-                    test.start_client_with_files(
-                        test_data.client_under_test.name.clone(),
-                        Some(initial_client_under_test_environment.clone()),
-                        Some(files),
-                    )
-                    .await;
-                }
-
-                panic!("{err}");
-            }
-        };
-
-    if test_data.use_checkpoint_sync {
-        source_helper_restarted |= ensure_checkpoint_sync_source_ready(
-            &mut helpers.source,
-            &mut source_fork_choice,
-            &source_helper_config,
-            minimum_source_checkpoint_slot(test_data),
-        )
-        .await
-        .unwrap_or_else(|err| panic!("{err}"));
-    }
-
-    if !test_data.use_checkpoint_sync && !helpers.mesh_peers.is_empty() {
-        wait_for_mesh_helpers_to_reach_post_genesis(&mut helpers.mesh_peers)
-            .await
-            .unwrap_or_else(|err| panic!("{err}"));
-    }
-
-    if test_data.use_checkpoint_sync
-        && test_data.connect_client_to_lean_spec_mesh
-        && helper_peer_count > 1
-    {
-        if source_helper_restarted {
-            helpers.mesh_peers = start_mesh_helpers(
-                &helpers.source,
+        let genesis_time = source_helper_config.genesis_time;
+        let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
+            start_mesh_helpers(
+                &source_helper,
                 genesis_time,
-                helper_peer_count - 1,
+                &helper_validator_assignments[1..],
+                passive_validator_mesh,
                 helper_fork_digest.clone(),
             )
             .await
+            .unwrap_or_else(|err| panic!("{err}"))
+        } else {
+            Vec::new()
+        };
+        let mut helpers = RunningLocalLeanSpecHelperGroup {
+            source: source_helper,
+            mesh_peers,
+        };
+        let should_start_client_early =
+            !test_data.use_checkpoint_sync && test_data.connect_client_to_lean_spec_mesh;
+        let initial_client_under_test_environment = client_under_test_environment(
+            &helpers,
+            &test_data.client_under_test.name,
+            genesis_time,
+            &source_genesis_validator_entries,
+            test_data.use_checkpoint_sync,
+            test_data.connect_client_to_lean_spec_mesh,
+            test_data.client_role,
+        );
+
+        let client_under_test = if should_start_client_early {
+            Some(
+                start_client_under_test_with_retry(
+                    test,
+                    test_data.client_under_test.name.clone(),
+                    initial_client_under_test_environment.clone(),
+                )
+                .await,
+            )
+        } else {
+            None
+        };
+
+        let (mut source_fork_choice, mut source_helper_restarted) = if should_start_client_early {
+            match wait_for_checkpoint_slot(
+                &mut helpers.source,
+                minimum_source_checkpoint_slot(test_data),
+            )
+            .await
+            {
+                Ok(source_fork_choice) => (source_fork_choice, false),
+                Err(error) => panic!(
+                    "{}",
+                    helper_failed_after_client_started_message(
+                        &test_data.client_under_test.name,
+                        "waiting for the source helper to reach the required finalized checkpoint",
+                        &error,
+                    )
+                ),
+            }
+        } else {
+            match wait_for_checkpoint_slot_with_retry(
+                &mut helpers.source,
+                minimum_source_checkpoint_slot(test_data),
+                &source_helper_config,
+            )
+            .await
+            {
+                Ok(source_fork_choice) => source_fork_choice,
+                Err(err) => {
+                    if client_under_test.is_none() && !helper_startup_error_is_retryable(&err) {
+                        let files = prepare_client_runtime_files(
+                            &test_data.client_under_test.name,
+                            &initial_client_under_test_environment,
+                        )
+                        .unwrap_or_else(|prep_err| {
+                            panic!(
+                                "Unable to prepare runtime assets for {} after checkpoint wait failure: {prep_err}",
+                                test_data.client_under_test.name
+                            )
+                        });
+                        test.start_client_with_files(
+                            test_data.client_under_test.name.clone(),
+                            Some(initial_client_under_test_environment.clone()),
+                            Some(files),
+                        )
+                        .await;
+                    }
+
+                    panic!("{err}");
+                }
+            }
+        };
+
+        if test_data.use_checkpoint_sync {
+            source_helper_restarted |= ensure_checkpoint_sync_source_ready(
+                &mut helpers.source,
+                &mut source_fork_choice,
+                &source_helper_config,
+                minimum_source_checkpoint_slot(test_data),
+            )
+            .await
             .unwrap_or_else(|err| panic!("{err}"));
         }
 
-        if let Err(err) =
-            wait_for_any_mesh_helper_to_reach_post_genesis(&mut helpers.mesh_peers).await
-        {
-            eprintln!("Continuing checkpoint-sync test despite auxiliary helper lag: {err}");
-        }
-    }
-
-    let client_under_test = match client_under_test {
-        Some(client_under_test) => client_under_test,
-        None if test_data.use_checkpoint_sync => {
-            let checkpoint_sync_client_environment = client_under_test_environment(
-                &helpers,
-                &test_data.client_under_test.name,
-                genesis_time,
-                &source_genesis_validator_entries,
-                test_data.use_checkpoint_sync,
-                test_data.connect_client_to_lean_spec_mesh,
-                test_data.client_role,
-            );
-            start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
-                test,
-                helper: &mut helpers.source,
-                source_fork_choice: &mut source_fork_choice,
-                helper_config: source_helper_config.clone(),
-                client_type: test_data.client_under_test.name.clone(),
-                environment: checkpoint_sync_client_environment,
-                minimum_slot: minimum_source_checkpoint_slot(test_data),
-            })
-            .await
-        }
-        None => {
-            start_client_under_test_with_retry(
-                test,
-                test_data.client_under_test.name.clone(),
-                initial_client_under_test_environment,
-            )
-            .await
-        }
-    };
-
-    let client_checkpoint = if test_data.wait_for_client_justified_checkpoint {
-        Some(
-            wait_for_non_genesis_justified_checkpoint(&client_under_test)
+        if !test_data.use_checkpoint_sync && source_helper_restarted {
+            if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
+                eprintln!(
+                    "Restarting post-genesis helper mesh after {LOCAL_HELPER_KIND} was refreshed during source finalization wait"
+                );
+                helpers.mesh_peers = start_mesh_helpers(
+                    &helpers.source,
+                    genesis_time,
+                    &helper_validator_assignments[1..],
+                    passive_validator_mesh,
+                    helper_fork_digest.clone(),
+                )
                 .await
-                .unwrap_or_else(|err| panic!("{err}")),
-        )
-    } else {
-        None
-    };
+                .unwrap_or_else(|err| panic!("{err}"));
+            }
 
-    PostGenesisSyncContext {
-        _helpers: helpers,
-        client_under_test,
-        source_fork_choice,
-        client_checkpoint,
+            if client_under_test.is_some() {
+                panic!(
+                    "{}",
+                    helper_failed_after_client_started_message(
+                        &test_data.client_under_test.name,
+                        "refreshing the source helper during post-genesis setup",
+                        "the source helper was restarted after the client under test had already started",
+                    )
+                );
+            }
+        }
+
+        if !test_data.use_checkpoint_sync && !helpers.mesh_peers.is_empty() {
+            match wait_for_all_mesh_helpers_to_reach_post_genesis(&mut helpers.mesh_peers).await {
+                Ok(()) => {}
+                Err(error) if should_start_client_early => panic!(
+                    "{}",
+                    helper_failed_after_client_started_message(
+                        &test_data.client_under_test.name,
+                        "waiting for auxiliary helpers to reach post-genesis forkchoice",
+                        &error,
+                    )
+                ),
+                Err(error) => {
+                    eprintln!(
+                        "Continuing post-genesis sync test despite auxiliary helper lag: {error}"
+                    );
+                }
+            }
+        }
+
+        if test_data.use_checkpoint_sync
+            && test_data.connect_client_to_lean_spec_mesh
+            && helper_peer_count > 1
+        {
+            if source_helper_restarted {
+                helpers.mesh_peers = start_mesh_helpers(
+                    &helpers.source,
+                    genesis_time,
+                    &helper_validator_assignments[1..],
+                    false,
+                    helper_fork_digest.clone(),
+                )
+                .await
+                .unwrap_or_else(|err| panic!("{err}"));
+            }
+
+            if let Err(err) =
+                wait_briefly_for_any_mesh_helper_to_reach_post_genesis(&mut helpers.mesh_peers)
+                    .await
+            {
+                eprintln!("Continuing checkpoint-sync test despite auxiliary helper lag: {err}");
+            }
+        }
+
+        let client_under_test = match client_under_test {
+            Some(client_under_test) => client_under_test,
+            None if test_data.use_checkpoint_sync => {
+                let checkpoint_sync_client_environment = client_under_test_environment(
+                    &helpers,
+                    &test_data.client_under_test.name,
+                    genesis_time,
+                    &source_genesis_validator_entries,
+                    test_data.use_checkpoint_sync,
+                    test_data.connect_client_to_lean_spec_mesh,
+                    test_data.client_role,
+                );
+                start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
+                    test,
+                    helper: &mut helpers.source,
+                    source_fork_choice: &mut source_fork_choice,
+                    helper_config: source_helper_config.clone(),
+                    client_type: test_data.client_under_test.name.clone(),
+                    environment: checkpoint_sync_client_environment,
+                    minimum_slot: minimum_source_checkpoint_slot(test_data),
+                })
+                .await
+            }
+            None => {
+                start_client_under_test_with_retry(
+                    test,
+                    test_data.client_under_test.name.clone(),
+                    initial_client_under_test_environment,
+                )
+                .await
+            }
+        };
+
+        let client_checkpoint = if test_data.wait_for_client_justified_checkpoint {
+            Some(
+                wait_for_non_genesis_justified_checkpoint(&client_under_test)
+                    .await
+                    .unwrap_or_else(|err| panic!("{err}")),
+            )
+        } else {
+            None
+        };
+
+        return PostGenesisSyncContext {
+            _helpers: helpers,
+            client_under_test,
+            source_fork_choice,
+            client_checkpoint,
+        };
     }
+}
+
+fn helper_failed_after_client_started_message(
+    client_name: &str,
+    phase: &str,
+    reason: &str,
+) -> String {
+    format!(
+        "{LOCAL_HELPER_KIND} failed after client under test {client_name} was started while {phase}; test result is indeterminate and should not be interpreted as a client failure. Helper failure: {reason}"
+    )
 }
 
 fn lean_spec_environment(
@@ -810,6 +1031,7 @@ fn lean_spec_environment(
     genesis_time: u64,
     bootnodes: Option<String>,
     is_aggregator: bool,
+    disable_validator_service: bool,
 ) -> HashMap<String, String> {
     let mut environment = lean_environment();
     environment.insert(
@@ -839,6 +1061,13 @@ fn lean_spec_environment(
         );
     }
 
+    if disable_validator_service {
+        environment.insert(
+            DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE.to_string(),
+            "1".to_string(),
+        );
+    }
+
     environment
 }
 
@@ -851,6 +1080,7 @@ fn local_lean_spec_helper_environment(
         helper_config.genesis_time,
         helper_config.bootnodes.clone(),
         helper_config.is_aggregator,
+        helper_config.disable_validator_service,
     );
     environment.insert(
         LEAN_HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE.to_string(),
@@ -1062,21 +1292,37 @@ async fn start_checkpoint_sync_client_under_test_with_retry(
             )
         });
     let mut last_error = None;
+    let mut client_was_started = false;
 
     for attempt in 1..=CLIENT_UNDER_TEST_STARTUP_ATTEMPTS {
-        ensure_checkpoint_sync_source_ready(
-            params.helper,
-            params.source_fork_choice,
-            &params.helper_config,
-            params.minimum_slot,
-        )
-        .await
-        .unwrap_or_else(|err| {
-            panic!(
-                "Checkpoint-sync source state endpoint was not ready for {} before startup attempt {}: {}",
-                params.client_type, attempt, err
+        if client_was_started {
+            wait_for_checkpoint_sync_state_ready(params.helper)
+                .await
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "{}",
+                        helper_failed_after_client_started_message(
+                            &params.client_type,
+                            "checking checkpoint-sync source readiness before a retry",
+                            &err,
+                        )
+                    )
+                });
+        } else {
+            ensure_checkpoint_sync_source_ready(
+                params.helper,
+                params.source_fork_choice,
+                &params.helper_config,
+                params.minimum_slot,
             )
-        });
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Checkpoint-sync source state endpoint was not ready for {} before initial client startup attempt {}: {}",
+                    params.client_type, attempt, err
+                )
+            });
+        }
         sleep(Duration::from_secs(1)).await;
 
         let test = params.test.clone();
@@ -1095,6 +1341,7 @@ async fn start_checkpoint_sync_client_under_test_with_retry(
             Ok(client) => match wait_for_checkpoint_sync_client_post_genesis(&client).await {
                 Ok(()) => return client,
                 Err(error) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
+                    client_was_started = true;
                     eprintln!(
                         "Retrying checkpoint-sync client-under-test startup for {} after attempt {} never reached a post-genesis forkchoice state: {}",
                         params.client_type, attempt, error
@@ -1422,47 +1669,6 @@ async fn wait_for_checkpoint_sync_state_ready(
     ))
 }
 
-async fn wait_for_helper_to_reach_post_genesis(
-    helper: &mut RunningLocalLeanSpecHelper,
-) -> Result<(), String> {
-    let mut last_error = String::new();
-
-    for _attempt in 0..MESH_HELPER_READY_TIMEOUT_SECS {
-        match wait_for_helper_to_reach_post_genesis_once(helper).await {
-            Ok(true) => return Ok(()),
-            Ok(false) => {
-                last_error = format!(
-                    "{} `{}` is still reporting a pre-genesis forkchoice",
-                    LOCAL_HELPER_KIND, helper.node_id
-                );
-            }
-            Err(err) => last_error = err,
-        }
-
-        sleep(Duration::from_secs(1)).await;
-    }
-
-    Err(format!(
-        "{LOCAL_HELPER_KIND} `{}` never exposed a post-genesis forkchoice state (last error: {})",
-        helper.node_id,
-        if last_error.is_empty() {
-            "none".to_string()
-        } else {
-            last_error
-        }
-    ))
-}
-
-async fn wait_for_mesh_helpers_to_reach_post_genesis(
-    helpers: &mut [RunningLocalLeanSpecHelper],
-) -> Result<(), String> {
-    for helper in helpers {
-        wait_for_helper_to_reach_post_genesis(helper).await?;
-    }
-
-    Ok(())
-}
-
 async fn wait_for_any_mesh_helper_to_reach_post_genesis(
     helpers: &mut [RunningLocalLeanSpecHelper],
 ) -> Result<(), String> {
@@ -1494,6 +1700,67 @@ async fn wait_for_any_mesh_helper_to_reach_post_genesis(
         MESH_HELPER_READY_TIMEOUT_SECS,
         last_errors.join(" | ")
     ))
+}
+
+async fn wait_for_all_mesh_helpers_to_reach_post_genesis(
+    helpers: &mut [RunningLocalLeanSpecHelper],
+) -> Result<(), String> {
+    if helpers.is_empty() {
+        return Ok(());
+    }
+
+    let mut helper_ready = vec![false; helpers.len()];
+    let mut last_errors = Vec::new();
+
+    for _attempt in 0..MESH_HELPER_READY_TIMEOUT_SECS {
+        last_errors.clear();
+
+        for (index, helper) in helpers.iter_mut().enumerate() {
+            if helper_ready[index] {
+                continue;
+            }
+
+            match wait_for_helper_to_reach_post_genesis_once(helper).await {
+                Ok(true) => helper_ready[index] = true,
+                Ok(false) => last_errors.push(format!(
+                    "{} `{}` is still reporting a pre-genesis forkchoice",
+                    LOCAL_HELPER_KIND, helper.node_id
+                )),
+                Err(err) => last_errors.push(err),
+            }
+        }
+
+        if helper_ready.iter().all(|ready| *ready) {
+            return Ok(());
+        }
+
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    let ready_count = helper_ready.iter().filter(|ready| **ready).count();
+    Err(format!(
+        "Only {ready_count}/{} auxiliary {LOCAL_HELPER_KIND} instances reached a post-genesis forkchoice state within {} seconds: {}",
+        helpers.len(),
+        MESH_HELPER_READY_TIMEOUT_SECS,
+        last_errors.join(" | ")
+    ))
+}
+
+async fn wait_briefly_for_any_mesh_helper_to_reach_post_genesis(
+    helpers: &mut [RunningLocalLeanSpecHelper],
+) -> Result<(), String> {
+    match timeout(
+        Duration::from_secs(OPTIONAL_MESH_HELPER_READY_GRACE_SECS),
+        wait_for_any_mesh_helper_to_reach_post_genesis(helpers),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => Err(format!(
+            "No auxiliary {LOCAL_HELPER_KIND} reached a post-genesis forkchoice state within {} seconds",
+            OPTIONAL_MESH_HELPER_READY_GRACE_SECS
+        )),
+    }
 }
 
 async fn wait_for_helper_to_reach_post_genesis_once(
@@ -1585,6 +1852,7 @@ async fn load_helper_genesis_metadata(
 
 fn helper_startup_error_is_retryable(error: &str) -> bool {
     error.contains("exited before the test completed")
+        || error.contains("Unable to load helper genesis metadata")
         || error.contains("SIGSEGV")
         || error.contains("signal: 11")
         || error.contains("SIGABRT")
@@ -1636,17 +1904,22 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
 async fn start_mesh_helpers(
     source_helper: &RunningLocalLeanSpecHelper,
     genesis_time: u64,
-    mesh_peer_count: usize,
+    mesh_validator_indices: &[String],
+    disable_validator_service: bool,
     helper_fork_digest: String,
 ) -> Result<Vec<RunningLocalLeanSpecHelper>, String> {
+    let mesh_peer_count = mesh_validator_indices.len();
     let mut mesh_helpers = Vec::with_capacity(mesh_peer_count);
     let source_bootnode = source_helper.bootnode_multiaddr();
 
-    for mesh_index in 1..=mesh_peer_count {
+    for (mesh_index, validator_indices) in mesh_validator_indices.iter().enumerate() {
+        let mesh_index = mesh_index + 1;
         let helper_config = LocalLeanSpecHelperConfig::mesh_peer(
             mesh_index,
             genesis_time,
             source_bootnode.clone(),
+            validator_indices.clone(),
+            disable_validator_service,
             helper_fork_digest.clone(),
         );
         let (helper, _source_genesis_validator_entries) =
@@ -1819,6 +2092,47 @@ mod tests {
         assert!(helper_startup_error_is_retryable(
             "lean-spec-local-helper exited before the test completed with status signal: 8 (SIGFPE) (core dumped)"
         ));
+    }
+
+    #[test]
+    fn helper_startup_error_is_retryable_for_metadata_timeout() {
+        assert!(helper_startup_error_is_retryable(
+            "Unable to load helper genesis metadata from http://127.0.0.1:5053/hive/genesis for genesis_time 1 (last observed genesis_time: none, last error: error sending request for url)"
+        ));
+    }
+
+    #[test]
+    fn helper_mesh_validator_assignments_repeat_source_for_passive_mesh() {
+        let mut test_data = PostGenesisSyncTestData {
+            client_under_test: ClientDefinition {
+                name: "ream_devnet4".to_string(),
+                version: "test".to_string(),
+                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
+            },
+            genesis_time: 1,
+            wait_for_client_justified_checkpoint: false,
+            use_checkpoint_sync: false,
+            connect_client_to_lean_spec_mesh: true,
+            client_role: ClientUnderTestRole::Observer,
+            source_helper_validator_indices: None,
+            helper_peer_count: 3,
+            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
+        };
+
+        assert_eq!(
+            helper_mesh_validator_assignments(&test_data, 3),
+            vec![LEAN_SPEC_SOURCE_VALIDATORS.to_string(); 3]
+        );
+
+        test_data.use_checkpoint_sync = true;
+        assert_eq!(
+            helper_mesh_validator_assignments(&test_data, 3),
+            vec![
+                LEAN_SPEC_SOURCE_VALIDATORS.to_string(),
+                String::new(),
+                String::new()
+            ]
+        );
     }
 
     #[test]

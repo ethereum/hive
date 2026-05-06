@@ -158,6 +158,32 @@ impl Test {
     }
 }
 
+impl Client {
+    /// Stops the client container.
+    pub async fn stop(&self) -> Result<(), String> {
+        self.test
+            .sim
+            .stop_client(self.test.suite_id, self.test.test_id, &self.container)
+            .await
+    }
+
+    /// Pauses the client container.
+    pub async fn pause(&self) -> Result<(), String> {
+        self.test
+            .sim
+            .pause_client(self.test.suite_id, self.test.test_id, &self.container)
+            .await
+    }
+
+    /// Unpauses the client container.
+    pub async fn unpause(&self) -> Result<(), String> {
+        self.test
+            .sim
+            .unpause_client(self.test.suite_id, self.test.test_id, &self.container)
+            .await
+    }
+}
+
 #[derive(Clone)]
 pub struct TestSpec {
     // These fields are displayed in the UI. Be sure to add
