@@ -411,13 +411,15 @@ def patch_network_service_gossip_processing() -> None:
             return
 
         event_source, node = event_context
-        processed_count = await self.sync_service.process_pending_blocks()
-        if processed_count > 0:
-            logger.info(
-                "Processed %d cached backfill blocks after slot=%s gossip",
-                processed_count,
-                extract_inner_block(event.block).slot,
-            )
+        process_pending_blocks = getattr(self.sync_service, "process_pending_blocks", None)
+        if process_pending_blocks is not None:
+            processed_count = await process_pending_blocks()
+            if processed_count > 0:
+                logger.info(
+                    "Processed %d cached backfill blocks after slot=%s gossip",
+                    processed_count,
+                    extract_inner_block(event.block).slot,
+                )
 
         refresh_status(event_source, node)
 

@@ -18,8 +18,7 @@ except ModuleNotFoundError as error:
         "lean_spec.subspecs.containers.validator",
     }:
         raise
-    from lean_spec.forks.lstar.containers import Checkpoint
-    from lean_spec.forks.lstar.containers.validator import SubnetId, ValidatorIndex
+    from lean_spec.types import Checkpoint, SubnetId, ValidatorIndex
 
 
 def gossip_network_name(fork_digest: str) -> str:
