@@ -73,6 +73,7 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 		Withdrawals:   b.Withdrawals(),
 		BlobGasUsed:   b.BlobGasUsed(),
 		ExcessBlobGas: b.ExcessBlobGas(),
+		SlotNumber:    b.SlotNumber(),
 	}
 	var blobHashes = make([]common.Hash, 0)
 	for _, tx := range b.Transactions() {
@@ -90,6 +91,13 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 	var params = []any{ed}
 	cfg := g.genesis.Config
 	switch {
+	case cfg.IsAmsterdam(b.Number(), b.Time()):
+		method = "engine_newPayloadV5"
+		requests, ok := g.clRequests[b.NumberU64()]
+		if !ok {
+			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
+		}
+		params = append(params, blobHashes, b.BeaconRoot(), requests)
 	case cfg.IsPrague(b.Number(), b.Time()):
 		method = "engine_newPayloadV4"
 		requests, ok := g.clRequests[b.NumberU64()]
@@ -125,6 +133,8 @@ func (g *generator) block2fcu(b *types.Block) *rpcRequest {
 	var method string
 	cfg := g.genesis.Config
 	switch {
+	case cfg.IsAmsterdam(b.Number(), b.Time()):
+		method = "engine_forkchoiceUpdatedV4"
 	case cfg.IsCancun(b.Number(), b.Time()):
 		method = "engine_forkchoiceUpdatedV3"
 	case cfg.IsShanghai(b.Number(), b.Time()):
