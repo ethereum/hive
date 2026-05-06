@@ -108,6 +108,7 @@ func RunLoader(t *hivesim.T) {
 	if err := json.Unmarshal(focilGenesisJSON, &genesis); err != nil {
 		t.Fatalf("focil: parse embedded genesis: %v", err)
 	}
+	fundTestAccounts(t, &genesis)
 	startOpt, err := helper.GenesisStartOption(&genesis)
 	if err != nil {
 		t.Fatalf("focil: build genesis start option: %v", err)
@@ -132,6 +133,21 @@ func RunLoader(t *hivesim.T) {
 				Run(st, c)
 			},
 		})
+	}
+}
+
+func fundTestAccounts(t *hivesim.T, genesis *core.Genesis) {
+	if genesis.Alloc == nil {
+		genesis.Alloc = core.GenesisAlloc{}
+	}
+	balance, ok := new(big.Int).SetString("123450000000000000000", 16)
+	if !ok {
+		t.Fatal("focil: failed to parse test account balance")
+	}
+	for _, testAcc := range globals.TestAccounts {
+		account := genesis.Alloc[testAcc.GetAddress()]
+		account.Balance = new(big.Int).Set(balance)
+		genesis.Alloc[testAcc.GetAddress()] = account
 	}
 }
 
