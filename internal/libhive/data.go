@@ -182,6 +182,16 @@ type ClientInfo struct {
 	LogOffsets *TestLogOffsets `json:"logOffsets,omitempty"`
 
 	wait func()
+
+	// poolKey, when non-empty, marks this container as a candidate for return
+	// to the client pool at end-of-test. Empty for unpooled (legacy) containers.
+	poolKey string
+
+	// resetPort is the JSON-RPC port the pool's debug_setHead reset RPC
+	// targets. Defaults to 8545; overridable per-suite via HIVE_RESET_PORT.
+	// Distinct from options.CheckLive, which a simulator may set to a
+	// different (e.g. JWT-protected engine) port for liveness purposes.
+	resetPort uint16
 }
 
 // HiveInstance contains information about hive itself.

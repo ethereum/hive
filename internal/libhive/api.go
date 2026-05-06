@@ -247,6 +247,22 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
+	// Compute pool key from the inputs that define a "fresh state" for this
+	// client run. Empty string means pooling is disabled. Networks are part
+	// of the key because the warm path skips ConnectContainer — two tests
+	// requesting different network sets must not share a container.
+	pool := api.tm.ClientPool()
+	var poolKey string
+	if pool.Enabled() {
+		k, err := ComputePoolKey(clientDef.Image, env, files, networks)
+		if err != nil {
+			slog.Warn("API: pool key computation failed; falling back to fresh container",
+				"client", clientDef.Name, "err", err)
+		} else {
+			poolKey = k
+		}
+	}
+
 	// Create labels for client container.
 	labels := NewBaseLabels(api.tm.hiveInstanceID, api.tm.hiveVersion)
 	labels[LabelHiveType] = ContainerTypeClient
@@ -254,31 +270,65 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	labels[LabelHiveTestCase] = testID.String()
 	labels[LabelHiveClientName] = clientDef.Name
 	labels[LabelHiveClientImage] = clientDef.Image
+	if poolKey != "" {
+		labels[LabelHivePoolKey] = poolKey
+	}
 
 	// Generate container name.
 	containerName := GenerateClientContainerName(clientDef.Name, suiteID, testID)
 
-	// Create the client container.
+	// Acquire from the pool first. On a hit, the container is already
+	// running with its chain reset to genesis (done at Release time);
+	// we skip CreateContainer + StartContainer entirely.
 	options := ContainerOptions{Env: env, Files: files, Labels: labels, Name: containerName}
-	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
-	if err != nil {
-		slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
-		err := fmt.Errorf("client container create failed (%v)", err)
-		serveError(w, err, http.StatusInternalServerError)
-		return
+	var (
+		containerID string
+		poolEntry   *PoolEntry
+		fromPool    bool
+	)
+	if poolKey != "" {
+		if entry := pool.Acquire(poolKey); entry != nil {
+			containerID = entry.ID
+			poolEntry = entry
+			fromPool = true
+		}
 	}
-
-	// Set the log file. We need the container ID for this,
-	// so it can only be set after creating the container.
-	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
-	options.LogFile = logFilePath
-
-	// Connect to the networks if requested, so it is started already joined to each one.
-	for _, network := range networks {
-		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
-			slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+	if !fromPool {
+		var err error
+		containerID, err = api.backend.CreateContainer(ctx, clientDef.Image, options)
+		if err != nil {
+			slog.Error("API: client container create failed", "client", clientDef.Name, "error", err)
+			err := fmt.Errorf("client container create failed (%v)", err)
 			serveError(w, err, http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Set the log file path. On the cold path the path is derived from the
+	// (full) container ID so each container gets its own file. On pool reuse
+	// we MUST keep using the original path: the docker attach goroutine was
+	// wired up at first start-time and continues to write there. Recomputing
+	// from the (short) reused ID would point per-test offsets at an empty
+	// file while the real output piles up at the original path.
+	var logPath, logFilePath string
+	if fromPool {
+		logPath = poolEntry.LogFile
+		logFilePath = filepath.Join(api.env.LogDir, filepath.FromSlash(logPath))
+	} else {
+		logPath, logFilePath = api.clientLogFilePaths(clientDef.Name, containerID)
+	}
+	options.LogFile = logFilePath
+
+	// Connect to the networks if requested. For pool reuse the container
+	// is already on its networks from the original creation (and networks
+	// are part of the pool key, so the set matches), so skip.
+	if !fromPool {
+		for _, network := range networks {
+			if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
+				slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+				serveError(w, err, http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
@@ -294,8 +344,40 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		options.CheckLive = uint16(v)
 	}
 
-	// Start it!
-	info, err := api.backend.StartContainer(ctx, containerID, options)
+	// Reset port for the pool's debug_setHead RPC. Defaults to the standard
+	// JSON-RPC port (8545) — distinct from CheckLive, which a simulator may
+	// set to e.g. the JWT-protected engine API port (8551). debug_setHead
+	// lives on the public RPC port; pointing at the engine port returns
+	// "403: missing token" and every Release fails.
+	resetPort := uint16(8545)
+	if portStr := env["HIVE_RESET_PORT"]; portStr != "" {
+		v, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			slog.Error("API: could not parse reset port", "error", err)
+			serveError(w, err, http.StatusBadRequest)
+			return
+		}
+		resetPort = uint16(v)
+	}
+
+	// Start it (or, on pool reuse, synthesise a ContainerInfo from the
+	// pool entry — the daemon is already up).
+	var info *ContainerInfo
+	if fromPool {
+		info = &ContainerInfo{
+			ID:      containerID,
+			IP:      poolEntry.IP,
+			LogFile: logFilePath,
+			// No-op wait: the daemon stays up across tests; the container is
+			// only torn down at pool drain, where its original create-time
+			// wait goroutine fires. EndTest only checks for non-nil so any
+			// callable works.
+			Wait: func() {},
+		}
+		err = nil
+	} else {
+		info, err = api.backend.StartContainer(ctx, containerID, options)
+	}
 	if info != nil {
 		// Capture the current log file size as the starting offset for this test.
 		logBegin := logFileSize(logFilePath)
@@ -307,6 +389,8 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogFile:        logPath,
 			LogOffsets:     &TestLogOffsets{Begin: logBegin},
 			wait:           info.Wait,
+			poolKey:        poolKey,
+			resetPort:      resetPort,
 		}
 
 		// Add client version to the test suite.
@@ -321,14 +405,18 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		slog.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
+		slog.Error("API: could not start client", "client", clientDef.Name, "container", shortID(containerID), "error", err)
 		err := fmt.Errorf("client did not start: %v", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	// It's started.
-	slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+	if fromPool {
+		slog.Info("API: client "+clientDef.Name+" started (pool reuse)", "suite", suiteID, "test", testID, "container", shortID(containerID))
+	} else {
+		slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", shortID(containerID))
+	}
 	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
 }
 
