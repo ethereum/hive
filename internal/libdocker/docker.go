@@ -25,6 +25,14 @@ type Config struct {
 	// This forces pulling of base images when building clients and simulators.
 	PullEnabled bool
 
+	// BuildRetries is the number of times to retry a failed image build before giving up.
+	// Zero (the default) means no retries: a single attempt.
+	// Each retry re-invokes `docker build` on the whole Dockerfile rather than
+	// resuming from the failed step. Docker's layer cache means previously-successful
+	// steps are skipped (unless --docker.nocache is passed, in which case
+	// every retry rebuilds from scratch).
+	BuildRetries int
+
 	// These two are log destinations for output from docker.
 	ContainerOutput io.Writer
 	BuildOutput     io.Writer

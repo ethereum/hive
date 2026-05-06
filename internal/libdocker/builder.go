@@ -74,16 +74,40 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArg
 // which must contain a file called "Dockerfile".
 func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
 	opts := b.buildConfig(ctx, name)
+	b.logger.Info("building image", "image", name, "nocache", opts.NoCache, "pull", b.config.PullEnabled)
+
+	attempts := b.config.BuildRetries + 1
+	var buildErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		buildErr = b.buildImageFromFS(ctx, name, fsys)
+		if buildErr == nil {
+			return nil
+		}
+		if attempt < attempts {
+			b.logger.Warn("image build failed, retrying", "image", name, "err", buildErr, "attempt", attempt, "of", attempts)
+			continue
+		}
+		b.logger.Error("image build failed", "image", name, "err", buildErr)
+	}
+	return buildErr
+}
+
+func (b *Builder) buildImageFromFS(ctx context.Context, name string, fsys fs.FS) error {
+	opts := b.buildConfig(ctx, name)
 	pipeR, pipeW := io.Pipe()
 	opts.InputStream = pipeR
-	go b.archiveFS(ctx, pipeW, fsys)
 
-	b.logger.Info("building image", "image", name, "nocache", opts.NoCache, "pull", b.config.PullEnabled)
-	if err := b.client.BuildImage(opts); err != nil {
-		b.logger.Error("image build failed", "image", name, "err", err)
+	archiveErr := make(chan error, 1)
+	go func() {
+		archiveErr <- b.archiveFS(ctx, pipeW, fsys)
+	}()
+
+	buildErr := b.client.BuildImage(opts)
+	pipeR.Close()
+	if err := <-archiveErr; buildErr == nil && err != nil {
 		return err
 	}
-	return nil
+	return buildErr
 }
 
 func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
@@ -231,11 +255,20 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageT
 	}
 
 	logger.Info("building image", logctx...)
-	if err := b.client.BuildImage(opts); err != nil {
-		logger.Error("image build failed", "err", err)
-		return err
+	attempts := b.config.BuildRetries + 1
+	var buildErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		buildErr = b.client.BuildImage(opts)
+		if buildErr == nil {
+			return nil
+		}
+		if attempt < attempts {
+			logger.Warn("image build failed, retrying", "err", buildErr, "attempt", attempt, "of", attempts)
+			continue
+		}
+		logger.Error("image build failed", "err", buildErr)
 	}
-	return nil
+	return buildErr
 }
 
 func convertBuildArgs(m map[string]string) []docker.BuildArg {
