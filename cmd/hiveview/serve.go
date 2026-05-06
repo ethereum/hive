@@ -113,10 +113,22 @@ type serveFiles struct {
 func (h serveFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add caching-related headers.
 	path := r.URL.Path
+	if isLegacyLeanLatestPath(path) {
+		target := "/"
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return
+	}
 	if path == "/" || strings.HasSuffix(path, ".html") {
 		w.Header().Set("cache-control", "no-cache")
 	}
 
 	srv := http.FileServer(http.FS(h.fsys))
 	srv.ServeHTTP(w, r)
+}
+
+func isLegacyLeanLatestPath(path string) bool {
+	return path == "/lean-latest" || path == "/lean-latest/" || path == "/lean-latest.html"
 }

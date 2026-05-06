@@ -5,7 +5,52 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 )
+
+func TestServeFilesLeanLatestRedirect(t *testing.T) {
+	handler := serveFiles{fsys: fstest.MapFS{
+		"index.html": {Data: []byte("ok")},
+	}}
+
+	tests := []struct {
+		path         string
+		wantStatus   int
+		wantLocation string
+	}{
+		{
+			path:         "/lean-latest",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/",
+		},
+		{
+			path:         "/lean-latest/",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/",
+		},
+		{
+			path:         "/lean-latest.html?devnet=devnet4",
+			wantStatus:   http.StatusMovedPermanently,
+			wantLocation: "/?devnet=devnet4",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, test.path, nil)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != test.wantStatus {
+				t.Fatalf("status mismatch: got %d, want %d", rec.Code, test.wantStatus)
+			}
+			if loc := rec.Header().Get("Location"); loc != test.wantLocation {
+				t.Fatalf("location mismatch: got %q, want %q", loc, test.wantLocation)
+			}
+		})
+	}
+}
 
 func TestServeFeatures(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
