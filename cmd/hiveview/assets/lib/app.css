@@ -672,6 +672,12 @@ kbd {
     margin: 0.25rem 0 0;
 }
 
+.lean-section-note {
+    margin: 0.25rem 0 0;
+    color: var(--bs-secondary);
+    font-size: 0.9rem;
+}
+
 .lean-latest-summary {
     display: flex;
     flex-wrap: wrap;

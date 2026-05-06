@@ -293,14 +293,14 @@ function buildClientInteropMatrices(entry, suiteData) {
 
     const clients = collectClients(entry, suiteData, topologyCases);
     const clientOrder = clientOrderMap(clients);
-    const rows = buildClientInteropRows(topologyCases, 'majority', 'minority', clientOrder, 'maj');
+    const rows = buildClientInteropRows(topologyCases, 'majority', 'minority', clientOrder, '2 nodes');
 
     return [{
         entry,
         suiteData,
         suiteName,
         linkSuiteName: suiteName,
-        clients: roleLabelClients(clients, 'min'),
+        clients: roleLabelClients(clients, '1 node'),
         cases,
         rowHeaderLabel: '',
         rowRoleLabel: 'majority',
