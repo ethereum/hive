@@ -84,7 +84,6 @@ type inclusionListCase struct {
 	name        string
 	description string
 	txs         []hexutil.Bytes
-	oversized   bool
 }
 
 func ClientParameters() hivesim.Params {
@@ -165,17 +164,19 @@ func Run(t *hivesim.T, c *hivesim.Client) {
 		Run:         func(st *hivesim.T) { testGetInclusionList(st, c) },
 	})
 
+	t.Run(hivesim.TestSpec{
+		Name:        fmt.Sprintf("engine_forkchoiceUpdatedV5 accepts IL larger than MAX_BYTES_PER_INCLUSION_LIST (%s)", c.Type),
+		Description: "Sends a 10 KiB inclusion list via engine_forkchoiceUpdatedV5 and verifies it is accepted; the size cap only applies to engine_getInclusionListV1 responses.",
+		Run:         func(st *hivesim.T) { testForkchoiceUpdatedAcceptsLargeIL(st, c) },
+	})
+
 	for _, tc := range makeInclusionListCases(t) {
 		tc := tc
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("FOCIL IL bytes: %s (%s)", tc.name, c.Type),
 			Description: tc.description,
 			Run: func(st *hivesim.T) {
-				if tc.oversized {
-					testOversizedInclusionListRejected(st, c, tc.txs)
-				} else {
-					testInclusionListBytes(st, c, tc.txs)
-				}
+				testInclusionListBytes(st, c, tc.txs)
 			},
 		})
 	}
@@ -210,9 +211,25 @@ func testGetInclusionList(t *hivesim.T, c *hivesim.Client) {
 	t.Logf("engine_getInclusionListV1 returned %d transaction byte strings", len(il))
 }
 
-func testInclusionListBytes(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes) {
-	validateInclusionListBytes(t, il)
+func testForkchoiceUpdatedAcceptsLargeIL(t *hivesim.T, c *hivesim.Client) {
+	const ilSize = 10 * 1024
+	il := []hexutil.Bytes{bytes.Repeat([]byte{0x42}, ilSize)}
+	if encodedLen := inclusionListRLPSize(t, il); encodedLen <= maxBytesPerInclusionList {
+		t.Fatalf("test vector RLP size is %d bytes, expected > %d", encodedLen, maxBytesPerInclusionList)
+	}
 
+	parent := latestBlock(t, c)
+	timestamp := uint64(parent.Timestamp) + 1
+	fcu := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, il)
+	if fcu.PayloadStatus.Status == "INVALID" || fcu.PayloadStatus.Status == "INCLUSION_LIST_UNSATISFIED" {
+		t.Fatalf("engine_forkchoiceUpdatedV5 rejected a %d-byte inclusion list with status %s", ilSize, fcu.PayloadStatus.Status)
+	}
+	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
+		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId for a %d-byte IL: %+v", ilSize, fcu)
+	}
+}
+
+func testInclusionListBytes(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes) {
 	parent := latestBlock(t, c)
 	timestamp := uint64(parent.Timestamp) + 1
 	fcu := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, il)
@@ -234,40 +251,11 @@ func testInclusionListBytes(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes)
 	forkchoiceUpdatedV5NoPayload(t, c, header.BlockHash)
 }
 
-func testOversizedInclusionListRejected(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes) {
-	if encodedLen := inclusionListRLPSize(t, il); encodedLen <= maxBytesPerInclusionList {
-		t.Fatalf("oversized test vector is only %d bytes", encodedLen)
-	}
-
-	parent := latestBlock(t, c)
-	timestamp := uint64(parent.Timestamp) + 1
-	validBuild := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, []hexutil.Bytes{})
-	if validBuild.PayloadID == nil || *validBuild.PayloadID == "" {
-		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId before oversized newPayload test: %+v", validBuild)
-	}
-	envelope := getPayloadV6(t, c, *validBuild.PayloadID)
-
-	err := forkchoiceUpdatedV5Err(c, parent.Hash, timestamp, il)
-	if err == nil {
-		t.Fatalf("engine_forkchoiceUpdatedV5 accepted an inclusion list larger than %d bytes", maxBytesPerInclusionList)
-	}
-	t.Logf("oversized inclusion list rejected by engine_forkchoiceUpdatedV5: %v", err)
-
-	if status, err := newPayloadV6Err(c, envelope, il); err == nil && status.Status != "INVALID" {
-		t.Fatalf("engine_newPayloadV6 accepted an inclusion list larger than %d bytes, status: %+v", maxBytesPerInclusionList, status)
-	} else if err != nil {
-		t.Logf("oversized inclusion list rejected by engine_newPayloadV6: %v", err)
-	} else {
-		t.Logf("oversized inclusion list rejected by engine_newPayloadV6 with status %s", status.Status)
-	}
-}
-
 func makeInclusionListCases(t *hivesim.T) []inclusionListCase {
 	type2Tx := makeRawTransaction(t, types.DynamicFeeTxType, 0, 10_000, []byte("focil-single-type-2"))
 	legacyTx := makeRawTransaction(t, types.LegacyTxType, 1, 10_000, []byte("focil-legacy"))
 	accessListTx := makeRawTransaction(t, types.AccessListTxType, 2, 10_000, []byte("focil-access-list"))
 	dynamicFeeTx := makeRawTransaction(t, types.DynamicFeeTxType, 3, 10_000, []byte("focil-dynamic-fee"))
-	oversized := hexutil.Bytes(bytes.Repeat([]byte{0x42}, maxBytesPerInclusionList))
 
 	return []inclusionListCase{
 		{
@@ -289,12 +277,6 @@ func makeInclusionListCases(t *hivesim.T) []inclusionListCase {
 			name:        "mixed transaction types",
 			description: "Sends legacy, access-list, and dynamic-fee transaction byte strings in one IL.",
 			txs:         []hexutil.Bytes{legacyTx, accessListTx, dynamicFeeTx},
-		},
-		{
-			name:        "oversized",
-			description: "Sends an IL whose RLP-encoded transaction list exceeds MAX_BYTES_PER_INCLUSION_LIST.",
-			txs:         []hexutil.Bytes{oversized},
-			oversized:   true,
 		},
 	}
 }
@@ -319,17 +301,6 @@ func forkchoiceUpdatedV5NoPayload(t *hivesim.T, c *hivesim.Client, head common.H
 	if resp.PayloadStatus.Status == "INVALID" {
 		t.Fatalf("canonical forkchoiceUpdatedV5 returned INVALID: %+v", resp)
 	}
-}
-
-func forkchoiceUpdatedV5Err(c *hivesim.Client, head common.Hash, timestamp uint64, il []hexutil.Bytes) error {
-	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
-	defer cancel()
-	var resp forkchoiceResponse
-	return c.EngineAPI().CallContext(ctx, &resp, "engine_forkchoiceUpdatedV5", forkchoiceState{
-		HeadBlockHash:      head,
-		SafeBlockHash:      zeroHash,
-		FinalizedBlockHash: zeroHash,
-	}, payloadAttributes(timestamp, il))
 }
 
 func payloadAttributes(timestamp uint64, il []hexutil.Bytes) payloadAttributesV5 {
@@ -363,12 +334,6 @@ func newPayloadV6(t *hivesim.T, c *hivesim.Client, envelope payloadEnvelope, il 
 		t.Fatalf("engine_newPayloadV6 failed: %v", err)
 	}
 	return status
-}
-
-func newPayloadV6Err(c *hivesim.Client, envelope payloadEnvelope, il []hexutil.Bytes) (payloadStatus, error) {
-	var status payloadStatus
-	err := callNewPayloadV6(c, &status, envelope, il)
-	return status, err
 }
 
 func callNewPayloadV6(c *hivesim.Client, status *payloadStatus, envelope payloadEnvelope, il []hexutil.Bytes) error {
