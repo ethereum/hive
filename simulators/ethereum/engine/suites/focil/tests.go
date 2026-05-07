@@ -176,6 +176,12 @@ func Run(t *hivesim.T, c *hivesim.Client) {
 		Run:         func(st *hivesim.T) { testNewPayloadInclusionListUnsatisfied(st, c) },
 	})
 
+	t.Run(hivesim.TestSpec{
+		Name:        fmt.Sprintf("engine_newPayloadV6 returns VALID when payload includes the appendable IL tx (%s)", c.Type),
+		Description: "Drives payload building with an IL containing an appendable transaction, asserts the built payload contains that transaction, then verifies engine_newPayloadV6 returns VALID via the IL satisfaction shortcut.",
+		Run:         func(st *hivesim.T) { testNewPayloadInclusionListSatisfied(st, c) },
+	})
+
 	for _, tc := range makeInclusionListCases(t) {
 		tc := tc
 		t.Run(hivesim.TestSpec{
@@ -256,6 +262,54 @@ func testNewPayloadInclusionListUnsatisfied(t *hivesim.T, c *hivesim.Client) {
 	if status.Status != "INCLUSION_LIST_UNSATISFIED" {
 		t.Fatalf("engine_newPayloadV6 returned %s, want INCLUSION_LIST_UNSATISFIED for a payload that omits an appendable IL tx", status.Status)
 	}
+}
+
+func testNewPayloadInclusionListSatisfied(t *hivesim.T, c *hivesim.Client) {
+	parent := latestBlock(t, c)
+	timestamp := uint64(parent.Timestamp) + 1
+
+	// Use a high-index TestAccount untouched by other tests so the tx is
+	// guaranteed to validate against the post-state.
+	appendableTx := makeRawTransaction(t, types.DynamicFeeTxType, 51, 0, []byte("focil-satisfied"))
+	il := []hexutil.Bytes{appendableTx}
+
+	// Drive payload building with the IL — the client must include the tx.
+	fcu := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, il)
+	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
+		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId, response: %+v", fcu)
+	}
+	envelope := getPayloadV6(t, c, *fcu.PayloadID)
+
+	// Without this assertion an empty payload could still produce VALID via
+	// the validator's skip branches and give a false positive.
+	payloadTxs := decodePayloadTransactions(t, envelope.ExecutionPayload)
+	if !containsTransaction(payloadTxs, appendableTx) {
+		t.Fatalf("built payload does not contain the appendable IL tx (payload has %d txs)", len(payloadTxs))
+	}
+
+	status := newPayloadV6(t, c, envelope, il)
+	if status.Status != "VALID" {
+		t.Fatalf("engine_newPayloadV6 returned %s, want VALID for a payload that includes the IL tx", status.Status)
+	}
+}
+
+func decodePayloadTransactions(t *hivesim.T, payload json.RawMessage) []hexutil.Bytes {
+	var p struct {
+		Transactions []hexutil.Bytes `json:"transactions"`
+	}
+	if err := json.Unmarshal(payload, &p); err != nil {
+		t.Fatalf("could not decode execution payload transactions: %v", err)
+	}
+	return p.Transactions
+}
+
+func containsTransaction(txs []hexutil.Bytes, target hexutil.Bytes) bool {
+	for _, tx := range txs {
+		if bytes.Equal(tx, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func testInclusionListBytes(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes) {
