@@ -179,6 +179,7 @@ func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
 	g.setDifficulty(gen)
 	g.setParentBeaconRoot(gen)
+	g.setSlotNumber(gen)
 	g.runModifiers(i, gen)
 	g.clRequests[gen.Number().Uint64()] = gen.ConsensusLayerRequests()
 }
@@ -206,6 +207,13 @@ func (g *generator) setParentBeaconRoot(gen *core.BlockGen) {
 		g.rand.Read(h[:])
 		gen.SetParentBeaconRoot(h)
 	}
+}
+
+func (g *generator) setSlotNumber(gen *core.BlockGen) {
+	if !g.genesis.Config.IsAmsterdam(gen.Number(), gen.Timestamp()) {
+		return
+	}
+	gen.SetSlotNumber(gen.Number().Uint64())
 }
 
 // runModifiers executes the chain modifiers.
