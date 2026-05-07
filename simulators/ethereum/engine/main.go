@@ -15,6 +15,7 @@ import (
 	suite_cancun "github.com/ethereum/hive/simulators/ethereum/engine/suites/cancun"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	suite_excap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
+	suite_focil "github.com/ethereum/hive/simulators/ethereum/engine/suites/focil"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
@@ -45,6 +46,11 @@ var (
 		Name: "engine-cancun",
 		Description: `
 	Test Engine API on Cancun.`[1:],
+	}
+	focil = hivesim.Suite{
+		Name: "engine-focil",
+		Description: `
+	Test Engine API FOCIL inclusion-list byte handling.`[1:],
 	}
 )
 
@@ -79,6 +85,12 @@ func main() {
 		Run:         makeRunner(suite_cancun.Tests, "full"),
 		AlwaysRun:   true,
 	})
+	focil.Add(hivesim.TestSpec{
+		Name:        "engine-focil test loader",
+		Description: "Runs FOCIL Engine API inclusion-list handling tests.",
+		AlwaysRun:   true,
+		Run:         suite_focil.RunLoader,
+	})
 	simulator := hivesim.New()
 
 	// Mark suites for execution
@@ -87,6 +99,7 @@ func main() {
 	hivesim.MustRunSuite(simulator, excap)
 	hivesim.MustRunSuite(simulator, withdrawals)
 	hivesim.MustRunSuite(simulator, cancun)
+	hivesim.MustRunSuite(simulator, focil)
 }
 
 func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {

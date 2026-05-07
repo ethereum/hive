@@ -60,6 +60,7 @@ def to_bool:
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
     "osakaTime": env.HIVE_OSAKA_TIMESTAMP|to_int,
     "amsterdamTime": env.HIVE_AMSTERDAM_TIMESTAMP|to_int,
+    "hegotaTime": (if env.HIVE_HEGOTA_TIMESTAMP then env.HIVE_HEGOTA_TIMESTAMP else env.HIVE_BOGOTA_TIMESTAMP end)|to_int,
     "bpo1Time": env.HIVE_BPO1_TIMESTAMP|to_int,
     "bpo2Time": env.HIVE_BPO2_TIMESTAMP|to_int,
     "bpo3Time": env.HIVE_BPO3_TIMESTAMP|to_int,
