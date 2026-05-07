@@ -20,7 +20,6 @@ var (
 )
 
 var engineTests = []testSpec{
-	//{Name: "transition-testnet", Run: TransitionTestnet},
 	{Name: "test-rpc-error", Run: TestRPCError},
 	{Name: "block-latest-safe-finalized", Run: BlockLatestSafeFinalized},
 	{Name: "invalid-canonical-payload", Run: InvalidPayloadGen(2, Invalid)},
@@ -31,18 +30,6 @@ var engineTests = []testSpec{
 	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
 	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
 	{Name: "timeouts", Run: Timeouts},
-}
-
-var transitionTests = []testSpec{
-	// Transition (TERMINAL_TOTAL_DIFFICULTY) tests
-	{Name: "invalid-transition-payload", Run: InvalidPayloadGen(1, Invalid)},
-	{Name: "unknown-pow-parent-transition-payload", Run: UnknownPoWParent},
-	{Name: "ttd-before-bellatrix", Run: TTDBeforeBellatrix},
-	{Name: "equal-timestamp-terminal-transition-block", Run: EqualTimestampTerminalTransitionBlock},
-	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockGen(-2)},
-	{Name: "invalid-terminal-block-payload-higher-ttd", Run: IncorrectTerminalBlockGen(1)},
-	{Name: "build-atop-invalid-terminal-block", Run: IncorrectTTDConfigEL},
-	{Name: "no-viable-head-due-to-optimistic-sync", Run: NoViableHeadDueToOptimisticSync},
 }
 
 func main() {
@@ -64,23 +51,15 @@ func main() {
 		panic("choose 1 validator client type")
 	}
 	// Create the test suites
-	var (
-		engineSuite = hivesim.Suite{
-			Name:        "eth2-engine",
-			Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
-		}
-		transitionSuite = hivesim.Suite{
-			Name:        "eth2-engine-transition",
-			Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient transition testnet.`,
-		}
-	)
-	// Add all tests to the suites
+	engineSuite := hivesim.Suite{
+		Name:        "eth2-engine",
+		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
+	}
+	// Add all tests to the suite
 	addAllTests(&engineSuite, c, engineTests)
-	addAllTests(&transitionSuite, c, transitionTests)
 
-	// Mark suites for execution
+	// Mark suite for execution
 	hivesim.MustRunSuite(sim, engineSuite)
-	hivesim.MustRunSuite(sim, transitionSuite)
 }
 
 func addAllTests(suite *hivesim.Suite, c *clients.ClientDefinitionsByRole, tests []testSpec) {
