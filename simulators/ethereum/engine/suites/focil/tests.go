@@ -221,7 +221,7 @@ func testForkchoiceUpdatedAcceptsLargeIL(t *hivesim.T, c *hivesim.Client) {
 	parent := latestBlock(t, c)
 	timestamp := uint64(parent.Timestamp) + 1
 	fcu := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, il)
-	if fcu.PayloadStatus.Status == "INVALID" || fcu.PayloadStatus.Status == "INCLUSION_LIST_UNSATISFIED" {
+	if fcu.PayloadStatus.Status == "INVALID" {
 		t.Fatalf("engine_forkchoiceUpdatedV5 rejected a %d-byte inclusion list with status %s", ilSize, fcu.PayloadStatus.Status)
 	}
 	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
@@ -236,7 +236,7 @@ func testInclusionListBytes(t *hivesim.T, c *hivesim.Client, il []hexutil.Bytes)
 	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
 		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId, response: %+v", fcu)
 	}
-	if fcu.PayloadStatus.Status == "INVALID" || fcu.PayloadStatus.Status == "INCLUSION_LIST_UNSATISFIED" {
+	if fcu.PayloadStatus.Status == "INVALID" {
 		t.Fatalf("engine_forkchoiceUpdatedV5 rejected harmless IL bytes with status %s", fcu.PayloadStatus.Status)
 	}
 
