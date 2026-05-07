@@ -16,6 +16,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 const GOSSIPSUB_TIMEOUT_SECS: u64 = 30;
+const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
+const CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 
 // Suite: gossip
 // Tests gossipsub protocol behavior using a mock node.
@@ -104,6 +106,8 @@ async fn setup_mock_bootnode(clients: Vec<Client>) -> (MockNode, Client, String)
     let client = expect_single_client(clients);
     let client_type = client.kind.clone();
     let test = client.test.clone();
+    let client_kind = crate::utils::util::lean_client_kind(&client_type)
+        .unwrap_or_else(|err| panic!("Unable to derive client kind for gossip test: {err}"));
 
     let mut mock = MockNode::new().expect("failed to create mock node");
     let listen_addr = mock
@@ -131,6 +135,14 @@ async fn setup_mock_bootnode(clients: Vec<Client>) -> (MockNode, Client, String)
 
     let mut environment = lean_environment();
     environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
+    environment.insert(
+        NODE_ID_ENVIRONMENT_VARIABLE.to_string(),
+        format!("{client_kind}_mock"),
+    );
+    environment.insert(
+        CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(),
+        format!("{:064x}", 0xfeed_u64),
+    );
     let files = prepare_client_runtime_files(&client_type, &environment)
         .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
     let client = test

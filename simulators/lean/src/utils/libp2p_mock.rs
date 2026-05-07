@@ -505,7 +505,7 @@ impl MockNode {
                 let cfg = request_response::Config::default();
                 let gossipsub_config = GossipsubConfig::default();
                 let gossipsub = GossipsubBehaviour::new(
-                    MessageAuthenticity::Signed(keypair.clone()),
+                    MessageAuthenticity::Anonymous,
                     gossipsub_config,
                 )
                 .expect("Failed to create gossipsub behaviour");
