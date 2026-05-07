@@ -391,8 +391,12 @@ function clientInteropRoles(topology) {
 
     const counts = new Map();
     topology.forEach(client => counts.set(client, (counts.get(client) || 0) + 1));
-    if (counts.size < 2) {
+    if (counts.size === 0) {
         return null;
+    }
+    if (counts.size === 1) {
+        const [client] = counts.keys();
+        return { majority: client, minority: client };
     }
 
     const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -918,6 +922,9 @@ function rowLabel(row) {
 }
 
 function resultTitle(matrix, row, client, tests, label) {
+    if (matrix.columnRoleLabel && row.name === client.name) {
+        return `${row.name} (3 nodes): ${label}`;
+    }
     if (matrix.columnRoleLabel) {
         const rowRole = matrix.rowRoleLabel || matrix.rowHeaderLabel;
         return `${rowRole} ${rowLabel(row)}, ${matrix.columnRoleLabel} ${client.label}: ${label}`;
