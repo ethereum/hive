@@ -526,7 +526,8 @@ function renderLeanLatest(matrices, devnet) {
         return;
     }
 
-    renderClientScores(matrices);
+    const clientRanking = renderClientScores(matrices);
+    applyClientRanking(matrices, clientRanking);
 
     const suiteNames = new Set(matrices.map(matrix => matrix.linkSuiteName || matrix.suiteName));
     const failingSuites = new Set(
@@ -550,13 +551,13 @@ function renderClientScores(matrices) {
     const section = $('#lean-client-score-section');
     const content = $('#lean-client-score-content').empty();
     if (!section.length) {
-        return;
+        return [];
     }
 
     const scores = buildClientScores(matrices);
     if (scores.clients.length === 0 || scores.rows.length === 0) {
         section.hide();
-        return;
+        return [];
     }
 
     section.show();
@@ -601,6 +602,30 @@ function renderClientScores(matrices) {
 
     scroll.append(table);
     content.append(scroll);
+    return scores.clients.slice();
+}
+
+function applyClientRanking(matrices, ranking) {
+    if (!ranking || ranking.length === 0) {
+        return;
+    }
+    const rank = new Map();
+    ranking.forEach((name, index) => rank.set(name, index));
+    const rankOf = name => (rank.has(name) ? rank.get(name) : Number.MAX_SAFE_INTEGER);
+
+    matrices.forEach(matrix => {
+        matrix.clients = matrix.clients.slice().sort((a, b) => {
+            const diff = rankOf(a.name) - rankOf(b.name);
+            return diff !== 0 ? diff : (a.label || a.name).localeCompare(b.label || b.name);
+        });
+
+        if (matrix.rowRoleLabel) {
+            matrix.rows = matrix.rows.slice().sort((a, b) => {
+                const diff = rankOf(a.name) - rankOf(b.name);
+                return diff !== 0 ? diff : a.name.localeCompare(b.name);
+            });
+        }
+    });
 }
 
 function buildClientScores(matrices) {
