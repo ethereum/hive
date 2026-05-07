@@ -4,8 +4,7 @@ use crate::utils::helper::{
 use crate::utils::libp2p_mock::{
     client_multiaddr, compute_client_peer_id, decode_request, encode_request, encode_request_raw,
     extract_ip_port, replace_multiaddr_ip, BlocksByRootV1Request, Checkpoint, LeanSignedBlock,
-    MockNode, Status, MAX_REQUEST_BLOCKS, RESPONSE_CODE_INVALID_REQUEST,
-    RESPONSE_CODE_SUCCESS,
+    MockNode, Status, MAX_REQUEST_BLOCKS, RESPONSE_CODE_INVALID_REQUEST, RESPONSE_CODE_SUCCESS,
 };
 use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
