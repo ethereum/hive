@@ -1,5 +1,6 @@
 use crate::utils::helper::{
     start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncTestData,
+    LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::libp2p_mock::{
     client_multiaddr, compute_client_peer_id, decode_request, encode_request, encode_request_raw,
@@ -137,7 +138,10 @@ dyn_async! {
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
-                        source_helper_validator_indices: None,
+                        // Helper owns V1+V2 so client (default V0) has exclusive proposer slots; see #1470.
+                        source_helper_validator_indices: Some(
+                            LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                        ),
                         helper_peer_count: 2,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -633,12 +637,16 @@ dyn_async! {
 
         sleep(Duration::from_secs(10)).await;
 
-        let source_fork_choice = context.load_live_helper_fork_choice().await;
-
+        // Compare against the helper's *live* head re-fetched each iteration
+        // rather than a single T+10s snapshot. The helper keeps producing
+        // blocks (it's still aggregating V1+V2) so a frozen snapshot becomes
+        // unreachable as soon as the helper moves on; equality with a moving
+        // target is the right invariant for "client has caught up".
         let mut caught_up = false;
         let deadline = std::time::Instant::now() + Duration::from_secs(REQRESP_SYNC_TIMEOUT_SECS);
 
         while std::time::Instant::now() < deadline {
+            let source_fork_choice = context.load_live_helper_fork_choice().await;
             let client_fork_choice = load_fork_choice_response(&context.client_under_test).await;
 
             if client_fork_choice.head == source_fork_choice.head {
