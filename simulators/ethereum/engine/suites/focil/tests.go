@@ -170,6 +170,12 @@ func Run(t *hivesim.T, c *hivesim.Client) {
 		Run:         func(st *hivesim.T) { testForkchoiceUpdatedAcceptsLargeIL(st, c) },
 	})
 
+	t.Run(hivesim.TestSpec{
+		Name:        fmt.Sprintf("engine_newPayloadV6 returns INCLUSION_LIST_UNSATISFIED when payload omits an appendable IL tx (%s)", c.Type),
+		Description: "Builds a payload with an empty IL, then resubmits it via engine_newPayloadV6 with a non-empty IL whose transaction is appendable against the post-state, and verifies the client returns INCLUSION_LIST_UNSATISFIED.",
+		Run:         func(st *hivesim.T) { testNewPayloadInclusionListUnsatisfied(st, c) },
+	})
+
 	for _, tc := range makeInclusionListCases(t) {
 		tc := tc
 		t.Run(hivesim.TestSpec{
@@ -226,6 +232,29 @@ func testForkchoiceUpdatedAcceptsLargeIL(t *hivesim.T, c *hivesim.Client) {
 	}
 	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
 		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId for a %d-byte IL: %+v", ilSize, fcu)
+	}
+}
+
+func testNewPayloadInclusionListUnsatisfied(t *hivesim.T, c *hivesim.Client) {
+	parent := latestBlock(t, c)
+	timestamp := uint64(parent.Timestamp) + 1
+
+	// Drive payload building with an empty IL so the resulting block omits
+	// our appendable tx.
+	fcu := forkchoiceUpdatedV5(t, c, parent.Hash, timestamp, []hexutil.Bytes{})
+	if fcu.PayloadID == nil || *fcu.PayloadID == "" {
+		t.Fatalf("engine_forkchoiceUpdatedV5 did not return a payloadId, response: %+v", fcu)
+	}
+	envelope := getPayloadV6(t, c, *fcu.PayloadID)
+
+	// Use a high-index TestAccount that is untouched by other tests so the
+	// tx is guaranteed to validate against the block's post-state.
+	appendableTx := makeRawTransaction(t, types.DynamicFeeTxType, 50, 0, []byte("focil-unsatisfied"))
+	il := []hexutil.Bytes{appendableTx}
+
+	status := newPayloadV6(t, c, envelope, il)
+	if status.Status != "INCLUSION_LIST_UNSATISFIED" {
+		t.Fatalf("engine_newPayloadV6 returned %s, want INCLUSION_LIST_UNSATISFIED for a payload that omits an appendable IL tx", status.Status)
 	}
 }
 
