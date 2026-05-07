@@ -616,13 +616,13 @@ function applyClientRanking(matrices, ranking) {
     matrices.forEach(matrix => {
         matrix.clients = matrix.clients.slice().sort((a, b) => {
             const diff = rankOf(a.name) - rankOf(b.name);
-            return diff !== 0 ? diff : (a.label || a.name).localeCompare(b.label || b.name);
+            return diff !== 0 ? diff : (b.label || b.name).localeCompare(a.label || a.name);
         });
 
         if (matrix.rowRoleLabel) {
             matrix.rows = matrix.rows.slice().sort((a, b) => {
                 const diff = rankOf(a.name) - rankOf(b.name);
-                return diff !== 0 ? diff : a.name.localeCompare(b.name);
+                return diff !== 0 ? diff : b.name.localeCompare(a.name);
             });
         }
     });
@@ -699,7 +699,7 @@ function compareClientScores(totals, a, b) {
     if (leftTotal !== rightTotal) {
         return rightTotal - leftTotal;
     }
-    return a.localeCompare(b);
+    return b.localeCompare(a);
 }
 
 function scorePercent(score) {
