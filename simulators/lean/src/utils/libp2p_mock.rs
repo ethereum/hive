@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{self, Cursor, Write};
 use std::time::Duration;
 
@@ -9,7 +9,7 @@ use futures::prelude::*;
 use libp2p::{
     gossipsub::{
         Behaviour as GossipsubBehaviour, Config as GossipsubConfig, Event as GossipsubEvent,
-        IdentTopic, MessageAuthenticity,
+        IdentTopic, MessageAuthenticity, TopicHash,
     },
     request_response::{
         self, Behaviour as RequestResponseBehaviour, Codec, Event as ReqRespEvent,
@@ -484,6 +484,11 @@ pub struct MockNode {
     >,
     gossip_messages: Vec<(PeerId, IdentTopic, Vec<u8>)>,
     secret_key_bytes: Option<[u8; 32]>,
+    /// Gossipsub Subscribed events captured while draining events for other
+    /// purposes (e.g. during `wait_for_request`). Tests that look for a peer
+    /// subscription check this set first so they don't miss events that
+    /// arrived before the test loop started.
+    pub seen_subscriptions: HashMap<TopicHash, HashSet<PeerId>>,
 }
 
 impl MockNode {
@@ -534,6 +539,7 @@ impl MockNode {
             pending_requests: HashMap::new(),
             gossip_messages: Vec::new(),
             secret_key_bytes: Some(secret_key_bytes),
+            seen_subscriptions: HashMap::new(),
         })
     }
 
@@ -653,6 +659,12 @@ impl MockNode {
     }
 
     /// Wait for an incoming request and return it along with the response channel.
+    ///
+    /// Gossipsub `Subscribed` events that arrive while waiting are buffered
+    /// into `self.seen_subscriptions` so that tests can check them
+    /// retroactively.  Without this, clients that send their gossipsub
+    /// SUBSCRIBE before the reqresp Status handshake completes would have
+    /// their subscription silently dropped.
     pub async fn wait_for_request(
         &mut self,
     ) -> Option<(
@@ -676,6 +688,14 @@ impl MockNode {
                     },
                 ))) => {
                     return Some((peer, request_id, request, channel));
+                }
+                Some(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
+                    GossipsubEvent::Subscribed { peer_id, topic },
+                ))) => {
+                    self.seen_subscriptions
+                        .entry(topic)
+                        .or_default()
+                        .insert(peer_id);
                 }
                 Some(_) => continue,
                 None => return None,

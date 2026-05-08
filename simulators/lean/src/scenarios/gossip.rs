@@ -176,17 +176,27 @@ dyn_async! {
     async fn test_gossipsub_subscribes_to_block_topic<'a>(clients: Vec<Client>, _: ()) {
         let (mut mock, _client, fork_digest) = setup_mock_bootnode(clients).await;
 
-        let mut subscribed = false;
+        let block_topic_hash = lean_block_topic(&fork_digest).hash();
+
+        // Check events captured during setup_mock_bootnode's wait_for_request
+        // loop first.  Clients that send their gossipsub SUBSCRIBE before the
+        // reqresp Status handshake arrives would otherwise have their
+        // subscription silently dropped before this loop starts.
+        let mut subscribed = mock
+            .seen_subscriptions
+            .get(&block_topic_hash)
+            .map(|peers| !peers.is_empty())
+            .unwrap_or(false);
+
         let deadline = std::time::Instant::now() + Duration::from_secs(GOSSIPSUB_TIMEOUT_SECS);
 
-        while std::time::Instant::now() < deadline {
+        while !subscribed && std::time::Instant::now() < deadline {
             match tokio::time::timeout(Duration::from_secs(1), mock.swarm.select_next_some()).await {
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
-                    libp2p::gossipsub::Event::Subscribed { peer_id: _, topic } ,
+                    libp2p::gossipsub::Event::Subscribed { peer_id: _, topic },
                 ))) => {
-                    if topic == lean_block_topic(&fork_digest).hash() {
+                    if topic == block_topic_hash {
                         subscribed = true;
-                        break;
                     }
                 }
                 Ok(_) => continue,
