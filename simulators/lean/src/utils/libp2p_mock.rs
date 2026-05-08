@@ -8,8 +8,8 @@ use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use futures::prelude::*;
 use libp2p::{
     gossipsub::{
-        Behaviour as GossipsubBehaviour, ConfigBuilder as GossipsubConfigBuilder,
-        Event as GossipsubEvent, IdentTopic, MessageAuthenticity, ValidationMode,
+        Behaviour as GossipsubBehaviour, Config as GossipsubConfig, Event as GossipsubEvent,
+        IdentTopic, MessageAuthenticity,
     },
     request_response::{
         self, Behaviour as RequestResponseBehaviour, Codec, Event as ReqRespEvent,
@@ -503,12 +503,9 @@ impl MockNode {
             .with_quic()
             .with_behaviour(|_| {
                 let cfg = request_response::Config::default();
-                let gossipsub_config = GossipsubConfigBuilder::default()
-                    .validation_mode(ValidationMode::Anonymous)
-                    .build()
-                    .expect("Failed to build gossipsub config");
+                let gossipsub_config = GossipsubConfig::default();
                 let gossipsub = GossipsubBehaviour::new(
-                    MessageAuthenticity::Anonymous,
+                    MessageAuthenticity::Signed(keypair.clone()),
                     gossipsub_config,
                 )
                 .expect("Failed to create gossipsub behaviour");
