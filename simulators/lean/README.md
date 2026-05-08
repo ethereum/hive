@@ -10,9 +10,10 @@ compatibility coverage:
 - uses the `lean-spec-client` helper to drive post-genesis
   justification/finalization cases for the shared RPC endpoints.
 
-The `client-interop` suite runs every selected client against every other
-selected client in both three-node 2:1 topologies, using one shared genesis per
-run and asserting that all three nodes finalize past genesis at the same slot.
+The `client-interop` suite runs every selected client against itself once and
+against every other selected client in both three-node 2:1 topologies, using one
+shared genesis per run and asserting that all three nodes finalize past genesis
+at the same slot.
 
 The helper-backed post-genesis cases are part of the default suite. The
 LeanSpec helper image generates and caches a small fixed set of validator keys

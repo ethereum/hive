@@ -6,7 +6,7 @@ use crate::utils::util::{
 };
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, Test};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
@@ -45,6 +45,12 @@ struct ClientInteropTestData {
     genesis_time: u64,
 }
 
+struct ClientInteropTopologySpec {
+    left_name: String,
+    right_name: String,
+    topology: Vec<ClientDefinition>,
+}
+
 struct RunningInteropClient {
     node_id: String,
     client_kind: String,
@@ -61,47 +67,39 @@ struct FinalizationObservation {
 dyn_async! {
     pub async fn run_client_interop_lean_test_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
         let clients = lean_clients(test.sim.client_types().await);
-        assert!(clients.len() > 1, "client-interop requires at least two selected lean clients, got {}", clients.len());
+        assert!(!clients.is_empty(), "client-interop requires at least one selected lean client, got {}", clients.len());
 
-        for left_index in 0..clients.len() {
-            for right_index in (left_index + 1)..clients.len() {
-                let left = clients[left_index].clone();
-                let right = clients[right_index].clone();
-                let topologies = [
-                    vec![left.clone(), left.clone(), right.clone()],
-                    vec![left.clone(), right.clone(), right.clone()],
-                ];
+        for topology_spec in interop_topology_matrix(&clients) {
+            let mut nodes = build_interop_nodes(topology_spec.topology);
+            assign_aggregator(&mut nodes);
 
-                for topology in topologies {
-                    let mut nodes = build_interop_nodes(topology);
-                    assign_aggregator(&mut nodes);
+            let genesis_time = default_genesis_time();
+            let topology_label = topology_label(&nodes);
+            let run_label = format!(
+                "{} and {} / {}",
+                topology_spec.left_name, topology_spec.right_name, topology_label
+            );
 
-                    let genesis_time = default_genesis_time();
-                    let topology_label = topology_label(&nodes);
-                    let run_label = format!("{} and {} / {}", left.name, right.name, topology_label);
-
-                    run_data_test_with_timeout(
-                        test,
-                        TimedDataTestSpec {
-                            name: format!("client-interop: {}", run_label),
-                            description: format!(
-                                "Starts {} with a shared genesis and checks that all three nodes finalize past genesis at the same slot.",
-                                topology_label
-                            ),
-                            always_run: false,
-                            client_name: run_label.clone(),
-                            timeout_duration: outer_timeout_for_genesis(genesis_time),
-                            test_data: ClientInteropTestData {
-                                run_label,
-                                nodes,
-                                genesis_time,
-                            },
-                        },
-                        test_client_interop_finalizes,
-                    )
-                    .await;
-                }
-            }
+            run_data_test_with_timeout(
+                test,
+                TimedDataTestSpec {
+                    name: format!("client-interop: {}", run_label),
+                    description: format!(
+                        "Starts {} with a shared genesis and checks that all three nodes finalize past genesis at the same slot.",
+                        topology_label
+                    ),
+                    always_run: false,
+                    client_name: run_label.clone(),
+                    timeout_duration: outer_timeout_for_genesis(genesis_time),
+                    test_data: ClientInteropTestData {
+                        run_label,
+                        nodes,
+                        genesis_time,
+                    },
+                },
+                test_client_interop_finalizes,
+            )
+            .await;
         }
     }
 }
@@ -131,6 +129,46 @@ dyn_async! {
         )
         .await;
     }
+}
+
+fn interop_topology_matrix(clients: &[ClientDefinition]) -> Vec<ClientInteropTopologySpec> {
+    let mut topology_specs = Vec::new();
+    let mut self_tested = HashSet::new();
+
+    for left_index in 0..clients.len() {
+        for right_index in left_index..clients.len() {
+            let left = &clients[left_index];
+            let right = &clients[right_index];
+
+            if left.name == right.name && !self_tested.insert(left.name.clone()) {
+                continue;
+            }
+
+            topology_specs.extend(interop_topologies(left, right).into_iter().map(|topology| {
+                ClientInteropTopologySpec {
+                    left_name: left.name.clone(),
+                    right_name: right.name.clone(),
+                    topology,
+                }
+            }));
+        }
+    }
+
+    topology_specs
+}
+
+fn interop_topologies(
+    left: &ClientDefinition,
+    right: &ClientDefinition,
+) -> Vec<Vec<ClientDefinition>> {
+    if left.name == right.name {
+        return vec![vec![left.clone(), left.clone(), left.clone()]];
+    }
+
+    vec![
+        vec![left.clone(), left.clone(), right.clone()],
+        vec![left.clone(), right.clone(), right.clone()],
+    ]
 }
 
 fn build_interop_nodes(topology: Vec<ClientDefinition>) -> Vec<ClientInteropNode> {

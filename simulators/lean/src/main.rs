@@ -56,7 +56,7 @@ async fn main() {
     let mut client_interop = Suite {
         name: "client-interop".to_string(),
         description: format!(
-            "Runs three-node Lean client interoperability tests across every selected client pair using the {} profile.",
+            "Runs three-node Lean client interoperability tests across every selected client pair and each selected client by itself using the {} profile.",
             devnet
         ),
         tests: vec![],
@@ -65,7 +65,7 @@ async fn main() {
     client_interop.add(TestSpec {
         name: "client-interop: matrix".to_string(),
         description:
-            "Runs every selected Lean client against every other selected Lean client in both 2:1 topologies."
+            "Runs every selected Lean client against itself once and every other selected Lean client in both 2:1 topologies."
                 .to_string(),
         always_run: true,
         run: run_client_interop_lean_test_suite,
