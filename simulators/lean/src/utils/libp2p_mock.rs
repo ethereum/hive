@@ -98,13 +98,22 @@ impl BlocksByRootV1Request {
 
 // === Block / Attestation SSZ Types ===
 
-/// 3112-byte post-quantum signature placeholder.
+/// Fixed-size XMSS signature bytes.
+///
+/// This matches leanSpec's `TARGET_CONFIG.SIGNATURE_LEN_BYTES` for the devnet4
+/// production XMSS parameters:
+/// 32 path siblings * 8 field elements * 4 bytes
+/// + 7 randomness field elements * 4 bytes
+/// + 46 hashes * 8 field elements * 4 bytes
+/// + 3 SSZ offsets * 4 bytes.
+pub const LEAN_SIGNATURE_SIZE: usize = 2536;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LeanSignature(pub [u8; 3112]);
+pub struct LeanSignature(pub [u8; LEAN_SIGNATURE_SIZE]);
 
 impl Default for LeanSignature {
     fn default() -> Self {
-        Self([0u8; 3112])
+        Self([0u8; LEAN_SIGNATURE_SIZE])
     }
 }
 
@@ -113,13 +122,13 @@ impl ssz::Encode for LeanSignature {
         true
     }
     fn ssz_fixed_len() -> usize {
-        3112
+        LEAN_SIGNATURE_SIZE
     }
     fn ssz_append(&self, buf: &mut Vec<u8>) {
         buf.extend_from_slice(&self.0);
     }
     fn ssz_bytes_len(&self) -> usize {
-        3112
+        LEAN_SIGNATURE_SIZE
     }
 }
 
@@ -128,16 +137,16 @@ impl ssz::Decode for LeanSignature {
         true
     }
     fn ssz_fixed_len() -> usize {
-        3112
+        LEAN_SIGNATURE_SIZE
     }
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        if bytes.len() != 3112 {
+        if bytes.len() != LEAN_SIGNATURE_SIZE {
             return Err(ssz::DecodeError::InvalidByteLength {
                 len: bytes.len(),
-                expected: 3112,
+                expected: LEAN_SIGNATURE_SIZE,
             });
         }
-        let mut arr = [0u8; 3112];
+        let mut arr = [0u8; LEAN_SIGNATURE_SIZE];
         arr.copy_from_slice(bytes);
         Ok(Self(arr))
     }

@@ -47,6 +47,15 @@ async fn wait_for_client_blocks(client: &Client) {
     );
 }
 
+fn encode_blocks_by_root_request_unchecked(roots: &[B256]) -> Vec<u8> {
+    let mut raw_request = Vec::with_capacity(4 + roots.len() * std::mem::size_of::<B256>());
+    raw_request.extend_from_slice(&4u32.to_le_bytes());
+    for root in roots {
+        raw_request.extend_from_slice(root.as_slice());
+    }
+    encode_request_raw(&raw_request)
+}
+
 // Suite: reqresp
 // Tests request/response protocol behavior including Status exchange,
 // BlocksByRoot, peer scoring, timeout handling, and interoperability.
@@ -282,7 +291,7 @@ dyn_async! {
                         client_under_test: client.clone(),
                         genesis_time: blocks_multiple_genesis_time,
                         wait_for_client_justified_checkpoint: false,
-                        use_checkpoint_sync: true,
+                        use_checkpoint_sync: false,
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
@@ -812,30 +821,44 @@ dyn_async! {
 dyn_async! {
     async fn test_blocks_by_root_single_known<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
         let context = start_post_genesis_sync_context(test, &test_data).await;
+        let client = &context.client_under_test;
+        let peer_id = compute_client_peer_id(&client.kind);
 
         sleep(Duration::from_secs(5)).await;
 
-        let fork_choice = load_fork_choice_response(&context.client_under_test).await;
+        let fork_choice = load_fork_choice_response(client).await;
         assert!(
             !fork_choice.nodes.is_empty(),
             "client should have nodes in fork choice"
         );
 
         let head_root = fork_choice.head;
+        assert_ne!(head_root, B256::ZERO, "head root should not be zero");
 
-        let response = http_client()
-            .get(lean_api_url(&context.client_under_test, "/lean/v0/states/finalized"))
-            .send()
+        let expected_node = fork_choice
+            .nodes
+            .iter()
+            .find(|node| node.root == head_root)
+            .expect("fork_choice head should be present in nodes");
+
+        let mut mock = MockNode::new_blocks_by_root_only().expect("failed to create mock node");
+        dial_client(&mut mock, client).await.expect("failed to dial client");
+        let request = encode_request(&BlocksByRootV1Request::new(vec![head_root]));
+        let chunks = mock
+            .send_request(peer_id, request)
             .await
-            .expect("state endpoint should respond");
+            .expect("client should return block for known head root");
+        let success_payloads = chunks
+            .iter()
+            .filter_map(|(code, payload)| (*code == RESPONSE_CODE_SUCCESS && !payload.is_empty()).then_some(payload))
+            .collect::<Vec<_>>();
+        assert_eq!(success_payloads.len(), 1, "client should return exactly one known block");
 
-        assert_eq!(response.status(), 200, "client should serve state");
-
-        assert_ne!(
-            head_root,
-            B256::ZERO,
-            "head root should not be zero"
-        );
+        let signed_block = LeanSignedBlock::from_ssz_bytes(success_payloads[0])
+            .expect("returned head block should decode from SSZ");
+        assert_eq!(signed_block.block.slot, expected_node.slot, "returned block slot should match fork_choice head");
+        assert_eq!(signed_block.block.parent_root, expected_node.parent_root, "returned block parent should match fork_choice head");
+        assert_eq!(signed_block.block.proposer_index, expected_node.proposer_index, "returned block proposer should match fork_choice head");
     }
 }
 
@@ -845,54 +868,56 @@ dyn_async! {
         let client = &context.client_under_test;
         let peer_id = compute_client_peer_id(&client.kind);
 
-        let fork_choice = load_fork_choice_response(client).await;
-        let head_root = fork_choice.head;
-        assert_ne!(head_root, B256::ZERO, "head root should not be zero");
+        let deadline = std::time::Instant::now() + Duration::from_secs(REQRESP_SYNC_TIMEOUT_SECS);
+        let known_nodes = loop {
+            let fork_choice = load_fork_choice_response(client).await;
+            let mut known_nodes = fork_choice
+                .nodes
+                .iter()
+                .filter(|node| node.root != B256::ZERO)
+                .cloned()
+                .collect::<Vec<_>>();
+            known_nodes.sort_by(|a, b| b.slot.cmp(&a.slot));
+            if known_nodes.len() >= 2 {
+                break known_nodes.into_iter().take(2).collect::<Vec<_>>();
+            }
 
-        let mut single_mock = MockNode::new_blocks_by_root_only().expect("failed to create mock node");
-        dial_client(&mut single_mock, client).await.expect("failed to dial client");
-        let single_request = encode_request(&BlocksByRootV1Request::new(vec![head_root]));
-        let single_chunks = single_mock
-            .send_request(peer_id, single_request)
-            .await
-            .expect("client should return block for known head root");
-        let head_block_bytes = single_chunks
-            .iter()
-            .find_map(|(code, payload)| (*code == RESPONSE_CODE_SUCCESS && !payload.is_empty()).then_some(payload));
-        if head_block_bytes.is_none() {
-            let response = http_client()
-                .get(lean_api_url(client, "/lean/v0/fork_choice"))
-                .send()
-                .await
-                .expect("client should still respond to HTTP after single-root request");
-            assert_eq!(response.status(), 200, "client should remain healthy after single-root request");
-            return;
-        }
-        let head_block_bytes = head_block_bytes.expect("checked above");
-        let head_block = LeanSignedBlock::from_ssz_bytes(head_block_bytes)
-            .expect("returned head block should decode from SSZ");
-        let parent_root = head_block.block.parent_root;
-        assert_ne!(parent_root, B256::ZERO, "head block parent root should not be zero");
+            if std::time::Instant::now() >= deadline {
+                panic!(
+                    "client should expose at least two known fork-choice blocks within {} seconds",
+                    REQRESP_SYNC_TIMEOUT_SECS
+                );
+            }
+
+            sleep(Duration::from_secs(1)).await;
+        };
+
+        let requested_roots = known_nodes.iter().map(|node| node.root).collect::<Vec<_>>();
 
         let mut multi_mock = MockNode::new_blocks_by_root_only().expect("failed to create mock node");
         dial_client(&mut multi_mock, client).await.expect("failed to dial client");
-        let request = encode_request(&BlocksByRootV1Request::new(vec![head_root, parent_root]));
+        let request = encode_request(&BlocksByRootV1Request::new(requested_roots.clone()));
         let chunks = multi_mock
             .send_request(peer_id, request)
             .await
-            .expect("client should return blocks for a head block and its known parent");
+            .expect("client should return blocks for known fork-choice roots");
 
-        let success_responses = chunks
+        let success_payloads = chunks
             .iter()
-            .filter(|(code, payload)| *code == RESPONSE_CODE_SUCCESS && !payload.is_empty())
-            .count();
-        if success_responses == 0 {
-            let response = http_client()
-                .get(lean_api_url(client, "/lean/v0/fork_choice"))
-                .send()
-                .await
-                .expect("client should still respond to HTTP after multiple-root request");
-            assert_eq!(response.status(), 200, "client should remain healthy after multiple-root request");
+            .filter_map(|(code, payload)| (*code == RESPONSE_CODE_SUCCESS && !payload.is_empty()).then_some(payload))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            success_payloads.len(),
+            requested_roots.len(),
+            "client should return one block for each requested known root"
+        );
+
+        for (payload, expected_node) in success_payloads.iter().zip(known_nodes.iter()) {
+            let signed_block = LeanSignedBlock::from_ssz_bytes(payload)
+                .expect("returned block should decode from SSZ");
+            assert_eq!(signed_block.block.slot, expected_node.slot, "returned block slot should match requested fork_choice node");
+            assert_eq!(signed_block.block.parent_root, expected_node.parent_root, "returned block parent should match requested fork_choice node");
+            assert_eq!(signed_block.block.proposer_index, expected_node.proposer_index, "returned block proposer should match requested fork_choice node");
         }
     }
 }
@@ -988,11 +1013,7 @@ dyn_async! {
         let peer_id = compute_client_peer_id(&client.kind);
 
         let roots = vec![known_root; MAX_REQUEST_BLOCKS + 1];
-        let mut raw_request = Vec::with_capacity(roots.len() * std::mem::size_of::<B256>());
-        for root in roots {
-            raw_request.extend_from_slice(root.as_slice());
-        }
-        let request = encode_request_raw(&raw_request);
+        let request = encode_blocks_by_root_request_unchecked(&roots);
         let result = mock.send_request(peer_id, request).await;
 
         if let Ok(chunks) = result {
