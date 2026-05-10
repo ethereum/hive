@@ -484,6 +484,9 @@ pub struct MockNode {
     >,
     gossip_messages: Vec<(PeerId, IdentTopic, Vec<u8>)>,
     secret_key_bytes: Option<[u8; 32]>,
+    /// Subscription announcements seen on any swarm-poll path; test setup
+    /// drains events past the test's own `select_next_some` loop.
+    observed_subscriptions: std::collections::HashSet<(PeerId, libp2p::gossipsub::TopicHash)>,
 }
 
 impl MockNode {
@@ -534,7 +537,23 @@ impl MockNode {
             pending_requests: HashMap::new(),
             gossip_messages: Vec::new(),
             secret_key_bytes: Some(secret_key_bytes),
+            observed_subscriptions: std::collections::HashSet::new(),
         })
+    }
+
+    pub fn has_observed_subscription(&self, topic_hash: &libp2p::gossipsub::TopicHash) -> bool {
+        self.observed_subscriptions
+            .iter()
+            .any(|(_, t)| t == topic_hash)
+    }
+
+    fn record_subscription_event(&mut self, event: &SwarmEvent<MockBehaviourEvent>) {
+        if let SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
+            libp2p::gossipsub::Event::Subscribed { peer_id, topic },
+        )) = event
+        {
+            self.observed_subscriptions.insert((*peer_id, topic.clone()));
+        }
     }
 
     pub fn new_status_only() -> Result<Self, String> {
@@ -677,7 +696,10 @@ impl MockNode {
                 ))) => {
                     return Some((peer, request_id, request, channel));
                 }
-                Some(_) => continue,
+                Some(event) => {
+                    self.record_subscription_event(&event);
+                    continue;
+                }
                 None => return None,
             }
         }
@@ -769,7 +791,9 @@ impl MockNode {
                     self.gossip_messages
                         .push((propagation_source, topic, message.data));
                 }
-                Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(_))) => {}
+                Ok(event @ SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(_))) => {
+                    self.record_subscription_event(&event);
+                }
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Identify(_))) => {}
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Ping(_))) => {}
                 Ok(_) => {}

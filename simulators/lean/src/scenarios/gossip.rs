@@ -175,16 +175,21 @@ async fn setup_mock_bootnode(clients: Vec<Client>) -> (MockNode, Client, String)
 dyn_async! {
     async fn test_gossipsub_subscribes_to_block_topic<'a>(clients: Vec<Client>, _: ()) {
         let (mut mock, _client, fork_digest) = setup_mock_bootnode(clients).await;
+        let target_topic = lean_block_topic(&fork_digest).hash();
 
-        let mut subscribed = false;
+        if mock.has_observed_subscription(&target_topic) {
+            return;
+        }
+
         let deadline = std::time::Instant::now() + Duration::from_secs(GOSSIPSUB_TIMEOUT_SECS);
+        let mut subscribed = false;
 
         while std::time::Instant::now() < deadline {
             match tokio::time::timeout(Duration::from_secs(1), mock.swarm.select_next_some()).await {
                 Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
                     libp2p::gossipsub::Event::Subscribed { peer_id: _, topic } ,
                 ))) => {
-                    if topic == lean_block_topic(&fork_digest).hash() {
+                    if topic == target_topic {
                         subscribed = true;
                         break;
                     }
