@@ -147,13 +147,6 @@ pub struct LeanAttestationData {
     pub source: Checkpoint,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
-pub struct LeanSignedAttestation {
-    pub validator_id: u64,
-    pub data: LeanAttestationData,
-    pub signature: LeanSignature,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
 pub struct LeanAggregatedAttestation {
     pub aggregation_bits: BitList<U4096>,
