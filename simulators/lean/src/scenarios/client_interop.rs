@@ -83,10 +83,9 @@ dyn_async! {
             run_data_test_with_timeout(
                 test,
                 TimedDataTestSpec {
-                    name: format!("client-interop: {}", run_label),
+                    name: format!("client-interop: {run_label}"),
                     description: format!(
-                        "Starts {} with a shared genesis and checks that all three nodes finalize past genesis at the same slot.",
-                        topology_label
+                        "Starts {topology_label} with a shared genesis and checks that all three nodes finalize past genesis at the same slot."
                     ),
                     always_run: false,
                     client_name: run_label.clone(),
@@ -303,8 +302,7 @@ async fn start_interop_client_attempt(
             handle.abort();
             handle.await.ok();
             Err(format!(
-                "startup attempt exceeded {} seconds",
-                CLIENT_STARTUP_TIMEOUT_SECS
+                "startup attempt exceeded {CLIENT_STARTUP_TIMEOUT_SECS} seconds"
             ))
         }
     }

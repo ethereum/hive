@@ -76,6 +76,7 @@ ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
 ARG devnet4_tag=main
 ARG devnet3_keys_tag=leanSpec-ad9a3226
 ARG devnet4_keys_tag=latest
+ARG lean_spec_tests_ref=master
 ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
 ENV LEAN_SPEC_DEVNET4_KEYS_METADATA_URL=https://api.github.com/repos/leanEthereum/leansig-test-keys/releases/tags/${devnet4_keys_tag}
 
@@ -121,7 +122,10 @@ COPY ./simulators/lean/config/lean-devnets.txt /app/hive/lean-devnets.txt
 
 ADD ${LEAN_SPEC_DEVNET4_KEYS_METADATA_URL} /tmp/devnet4-keys-release.json
 
-RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /tmp/leansig \
+RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hive/lean-spec-tests /tmp/leansig \
+    && curl -4 -fsSL \
+        https://github.com/ReamLabs/lean-spec-tests/archive/${lean_spec_tests_ref}.tar.gz \
+        | tar --warning=no-unknown-keyword -xz --strip-components=1 -C /app/hive/lean-spec-tests \
     && curl -4 -fsSL \
         https://github.com/leanEthereum/leansig-test-keys/releases/download/${devnet3_keys_tag}/prod_scheme.tar.gz \
         -o /tmp/leansig/prod_scheme_devnet3.tar.gz \

@@ -291,7 +291,7 @@ mod tests {
                 let _ = socket.shutdown().await;
             }
         });
-        (format!("http://{}", addr), hits, handle)
+        (format!("http://{addr}"), hits, handle)
     }
 
     #[tokio::test]

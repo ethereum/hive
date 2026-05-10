@@ -197,10 +197,7 @@ pub(crate) async fn resolve_selected_lean_devnet(simulation: &Simulation) -> Lea
         let (base_name, explicit_devnet) = split_client_devnet_name(&client.name);
         let devnet = explicit_devnet.unwrap_or(config.default_devnet);
         let supported_devnets = config.client_support.get(base_name).unwrap_or_else(|| {
-            panic!(
-                "Lean client {} is missing from {}",
-                base_name, LEAN_DEVNET_CONFIG_PATH
-            )
+            panic!("Lean client {base_name} is missing from {LEAN_DEVNET_CONFIG_PATH}")
         });
 
         if !supported_devnets.contains(&devnet) {
@@ -449,8 +446,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
 
         let (key, value) = line.split_once('=').unwrap_or_else(|| {
             panic!(
-                "Invalid lean devnet config line {} in {}: expected key=value, got {:?}",
-                line_number, LEAN_DEVNET_CONFIG_PATH, raw_line
+                "Invalid lean devnet config line {line_number} in {LEAN_DEVNET_CONFIG_PATH}: expected key=value, got {raw_line:?}"
             )
         });
         let key = key.trim();
@@ -459,8 +455,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
         if key == "default" {
             default_devnet = Some(LeanDevnet::try_from(value).unwrap_or_else(|err| {
                 panic!(
-                    "Invalid default lean devnet in {} line {}: {}",
-                    LEAN_DEVNET_CONFIG_PATH, line_number, err
+                    "Invalid default lean devnet in {LEAN_DEVNET_CONFIG_PATH} line {line_number}: {err}"
                 )
             }));
             continue;
@@ -471,8 +466,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
             .map(|label| {
                 LeanDevnet::try_from(label).unwrap_or_else(|err| {
                     panic!(
-                        "Invalid lean devnet in {} line {} for client {}: {}",
-                        LEAN_DEVNET_CONFIG_PATH, line_number, key, err
+                        "Invalid lean devnet in {LEAN_DEVNET_CONFIG_PATH} line {line_number} for client {key}: {err}"
                     )
                 })
             })
@@ -480,8 +474,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
 
         if supported_devnets.is_empty() {
             panic!(
-                "Lean devnet config {} line {} defines client {} without any supported devnets",
-                LEAN_DEVNET_CONFIG_PATH, line_number, key
+                "Lean devnet config {LEAN_DEVNET_CONFIG_PATH} line {line_number} defines client {key} without any supported devnets"
             );
         }
 
@@ -491,8 +484,7 @@ fn load_lean_devnet_config() -> LeanDevnetConfig {
     LeanDevnetConfig {
         default_devnet: default_devnet.unwrap_or_else(|| {
             panic!(
-                "Lean devnet config {} must define a default=<devnet> entry",
-                LEAN_DEVNET_CONFIG_PATH
+                "Lean devnet config {LEAN_DEVNET_CONFIG_PATH} must define a default=<devnet> entry"
             )
         }),
         client_support,
@@ -863,8 +855,7 @@ pub(crate) fn simulator_container_ip() -> IpAddr {
     });
     socket.connect((host, port)).unwrap_or_else(|err| {
         panic!(
-            "Unable to connect UDP socket to HIVE_SIMULATOR host {}:{} to determine simulator container IP: {err}",
-            host, port
+            "Unable to connect UDP socket to HIVE_SIMULATOR host {host}:{port} to determine simulator container IP: {err}"
         )
     });
     socket

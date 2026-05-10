@@ -7,6 +7,10 @@ use crate::scenarios::client_interop::run_client_interop_lean_test_suite;
 use crate::scenarios::gossip::run_gossip_lean_test_suite;
 use crate::scenarios::reqresp::run_reqresp_lean_test_suite;
 use crate::scenarios::rpc_compat::run_rpc_compat_lean_test_suite;
+use crate::scenarios::spec_assets::{
+    run_spec_assets_fork_choice_lean_test_suite, run_spec_assets_state_transition_lean_test_suite,
+    run_spec_assets_verify_signatures_lean_test_suite,
+};
 use crate::scenarios::sync::run_sync_lean_test_suite;
 use crate::scenarios::validation::run_validation_lean_test_suite;
 use crate::utils::util::{resolve_selected_lean_devnet, set_selected_lean_devnet};
@@ -22,8 +26,7 @@ async fn main() {
     let mut rpc_compat = Suite {
         name: "rpc-compat".to_string(),
         description: format!(
-            "Runs Lean RPC compatibility tests against the selected lean clients using the {} profile.",
-            devnet
+            "Runs Lean RPC compatibility tests against the selected lean clients using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -39,8 +42,7 @@ async fn main() {
     let mut sync = Suite {
         name: "sync".to_string(),
         description: format!(
-            "Runs Lean sync tests against the selected lean clients using the {} profile.",
-            devnet
+            "Runs Lean sync tests against the selected lean clients using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -56,8 +58,7 @@ async fn main() {
     let mut client_interop = Suite {
         name: "client-interop".to_string(),
         description: format!(
-            "Runs three-node Lean client interoperability tests across every selected client pair and each selected client by itself using the {} profile.",
-            devnet
+            "Runs three-node Lean client interoperability tests across every selected client pair and each selected client by itself using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -75,8 +76,7 @@ async fn main() {
     let mut validation = Suite {
         name: "validation".to_string(),
         description: format!(
-            "Runs Lean validation tests against the selected lean clients using the {} profile.",
-            devnet
+            "Runs Lean validation tests against the selected lean clients using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -92,8 +92,7 @@ async fn main() {
     let mut gossip = Suite {
         name: "gossip".to_string(),
         description: format!(
-            "Runs Lean gossipsub tests against the selected lean clients using the {} profile.",
-            devnet
+            "Runs Lean gossipsub tests against the selected lean clients using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -109,8 +108,7 @@ async fn main() {
     let mut reqresp = Suite {
         name: "reqresp".to_string(),
         description: format!(
-            "Runs Lean req/resp protocol tests against the selected lean clients using the {} profile.",
-            devnet
+            "Runs Lean req/resp protocol tests against the selected lean clients using the {devnet} profile."
         ),
         tests: vec![],
     };
@@ -123,6 +121,60 @@ async fn main() {
         client: None,
     });
 
+    let mut spec_assets_fork_choice = Suite {
+        name: "spec-assets-fork-choice".to_string(),
+        description: format!(
+            "Runs generated Lean fork-choice spec-test fixtures against selected lean clients using the {devnet} profile."
+        ),
+        tests: vec![],
+    };
+
+    spec_assets_fork_choice.add(TestSpec {
+        name: "spec-assets-fork-choice: fixture loader".to_string(),
+        description:
+            "Loads Lean fork-choice spec-test fixture files and runs each fixture as a distinct Hive test."
+                .to_string(),
+        always_run: true,
+        run: run_spec_assets_fork_choice_lean_test_suite,
+        client: None,
+    });
+
+    let mut spec_assets_state_transition = Suite {
+        name: "spec-assets-state-transition".to_string(),
+        description: format!(
+            "Runs generated Lean state-transition spec-test fixtures against selected lean clients using the {devnet} profile."
+        ),
+        tests: vec![],
+    };
+
+    spec_assets_state_transition.add(TestSpec {
+        name: "spec-assets-state-transition: fixture loader".to_string(),
+        description:
+            "Loads Lean state-transition spec-test fixture files and runs each fixture as a distinct Hive test."
+                .to_string(),
+        always_run: true,
+        run: run_spec_assets_state_transition_lean_test_suite,
+        client: None,
+    });
+
+    let mut spec_assets_verify_signatures = Suite {
+        name: "spec-assets-verify-signatures".to_string(),
+        description: format!(
+            "Runs generated Lean signature-verification spec-test fixtures against selected lean clients using the {devnet} profile."
+        ),
+        tests: vec![],
+    };
+
+    spec_assets_verify_signatures.add(TestSpec {
+        name: "spec-assets-verify-signatures: fixture loader".to_string(),
+        description:
+            "Loads Lean signature-verification spec-test fixture files and runs each fixture as a distinct Hive test."
+                .to_string(),
+        always_run: true,
+        run: run_spec_assets_verify_signatures_lean_test_suite,
+        client: None,
+    });
+
     run_suite(
         simulation,
         vec![
@@ -132,6 +184,9 @@ async fn main() {
             validation,
             gossip,
             reqresp,
+            spec_assets_fork_choice,
+            spec_assets_state_transition,
+            spec_assets_verify_signatures,
         ],
     )
     .await;

@@ -166,7 +166,7 @@ impl From<LeanStateDevnet4> for LeanState {
 }
 
 fn assert_hex_root(root: &B256, field_name: &str) {
-    let encoded = format!("{:#x}", root);
+    let encoded = format!("{root:#x}");
     assert!(
         encoded.starts_with("0x"),
         "{field_name} should be 0x-prefixed, got {encoded}"

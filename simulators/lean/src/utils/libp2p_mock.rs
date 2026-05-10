@@ -38,22 +38,9 @@ pub fn lean_block_topic(fork_digest: &str) -> IdentTopic {
     IdentTopic::new(format!("/leanconsensus/{fork_digest}/block/ssz_snappy"))
 }
 
-pub fn lean_attestation_topic(fork_digest: &str, subnet_id: u64) -> IdentTopic {
-    IdentTopic::new(format!(
-        "/leanconsensus/{fork_digest}/attestation_{subnet_id}/ssz_snappy"
-    ))
-}
-
-pub fn lean_aggregation_topic(fork_digest: &str) -> IdentTopic {
-    IdentTopic::new(format!(
-        "/leanconsensus/{fork_digest}/aggregated_attestation/ssz_snappy"
-    ))
-}
-
 // Response codes
 pub const RESPONSE_CODE_SUCCESS: u8 = 0;
 pub const RESPONSE_CODE_INVALID_REQUEST: u8 = 1;
-pub const RESPONSE_CODE_SERVER_ERROR: u8 = 2;
 pub const RESPONSE_CODE_RESOURCE_UNAVAILABLE: u8 = 3;
 
 /// Maximum number of block roots in a BlocksByRoot request.
@@ -167,17 +154,6 @@ pub struct LeanSignedAttestation {
     pub signature: LeanSignature,
 }
 
-impl LeanSignedAttestation {
-    /// Build a signed attestation with the given data and a zero signature.
-    pub fn build_unsigned(validator_id: u64, data: LeanAttestationData) -> Self {
-        Self {
-            validator_id,
-            data,
-            signature: LeanSignature::default(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
 pub struct LeanAggregatedAttestation {
     pub aggregation_bits: BitList<U4096>,
@@ -243,26 +219,19 @@ impl LeanSignedBlock {
     }
 }
 
-/// Build a response chunk for a successful BlocksByRoot response.
-pub fn build_block_response_chunk(block: &LeanSignedBlock) -> Vec<u8> {
-    let ssz_bytes = block.as_ssz_bytes();
-    let mut encoder = FrameEncoder::new(Vec::new());
-    encoder.write_all(&ssz_bytes).unwrap();
-    encoder.flush().unwrap();
-    let compressed = encoder.into_inner().unwrap();
-
-    let mut result = encode_varint_usize(ssz_bytes.len());
-    result.extend_from_slice(&compressed);
-    result
-}
-
 /// Encode data for gossipsub: snappy-compressed SSZ bytes (no varint prefix).
 pub fn encode_gossip_data<T: Encode>(item: &T) -> Vec<u8> {
     let ssz_bytes = item.as_ssz_bytes();
     let mut encoder = FrameEncoder::new(Vec::new());
-    encoder.write_all(&ssz_bytes).unwrap();
-    encoder.flush().unwrap();
-    encoder.into_inner().unwrap()
+    encoder
+        .write_all(&ssz_bytes)
+        .expect("failed to snappy-compress gossip bytes");
+    encoder
+        .flush()
+        .expect("failed to flush gossip snappy encoder");
+    encoder
+        .into_inner()
+        .expect("failed to finish gossip snappy encoder")
 }
 
 // === Peer ID Computation ===
@@ -273,7 +242,7 @@ pub fn encode_gossip_data<T: Encode>(item: &T) -> Vec<u8> {
 /// where NODE_ID defaults to "{client_kind}_0".
 pub fn compute_client_peer_id(client_name: &str) -> PeerId {
     let base_name = client_name.split('_').next().unwrap_or(client_name);
-    let label = format!("{}:{}_0:node", base_name, base_name);
+    let label = format!("{base_name}:{base_name}_0:node");
     let hash = Sha256::digest(label.as_bytes());
     let mut key_bytes = hash.to_vec();
 
@@ -341,9 +310,15 @@ fn decode_varint_usize(buf: &[u8]) -> io::Result<(usize, &[u8])> {
 pub fn encode_request<T: Encode>(item: &T) -> Vec<u8> {
     let ssz_bytes = item.as_ssz_bytes();
     let mut encoder = FrameEncoder::new(Vec::new());
-    encoder.write_all(&ssz_bytes).unwrap();
-    encoder.flush().unwrap();
-    let compressed = encoder.into_inner().unwrap();
+    encoder
+        .write_all(&ssz_bytes)
+        .expect("failed to snappy-compress request bytes");
+    encoder
+        .flush()
+        .expect("failed to flush request snappy encoder");
+    let compressed = encoder
+        .into_inner()
+        .expect("failed to finish request snappy encoder");
 
     let mut result = encode_varint_usize(ssz_bytes.len());
     result.extend_from_slice(&compressed);
@@ -353,9 +328,15 @@ pub fn encode_request<T: Encode>(item: &T) -> Vec<u8> {
 /// Encode raw bytes with snappy compression for a request payload.
 pub fn encode_request_raw(bytes: &[u8]) -> Vec<u8> {
     let mut encoder = FrameEncoder::new(Vec::new());
-    encoder.write_all(bytes).unwrap();
-    encoder.flush().unwrap();
-    let compressed = encoder.into_inner().unwrap();
+    encoder
+        .write_all(bytes)
+        .expect("failed to snappy-compress raw request bytes");
+    encoder
+        .flush()
+        .expect("failed to flush raw request snappy encoder");
+    let compressed = encoder
+        .into_inner()
+        .expect("failed to finish raw request snappy encoder");
 
     let mut result = encode_varint_usize(bytes.len());
     result.extend_from_slice(&compressed);
@@ -466,9 +447,18 @@ impl Codec for LeanReqRespCodec {
             io.write_all(&encode_varint_usize(data.len())).await?;
 
             let mut encoder = FrameEncoder::new(Vec::new());
-            encoder.write_all(&data).unwrap();
-            encoder.flush().unwrap();
-            io.write_all(&encoder.into_inner().unwrap()).await?;
+            encoder
+                .write_all(&data)
+                .expect("failed to snappy-compress response bytes");
+            encoder
+                .flush()
+                .expect("failed to flush response snappy encoder");
+            io.write_all(
+                &encoder
+                    .into_inner()
+                    .expect("failed to finish response snappy encoder"),
+            )
+            .await?;
         }
         io.flush().await?;
         Ok(())
@@ -485,12 +475,11 @@ pub struct MockBehaviour {
     pub ping: libp2p::ping::Behaviour,
 }
 
+type PendingRequestSender = tokio::sync::oneshot::Sender<Result<Vec<(u8, Vec<u8>)>, String>>;
+
 pub struct MockNode {
     pub swarm: Swarm<MockBehaviour>,
-    pending_requests: HashMap<
-        OutboundRequestId,
-        tokio::sync::oneshot::Sender<Result<Vec<(u8, Vec<u8>)>, String>>,
-    >,
+    pending_requests: HashMap<OutboundRequestId, PendingRequestSender>,
     gossip_messages: Vec<(PeerId, IdentTopic, Vec<u8>)>,
     secret_key_bytes: Option<[u8; 32]>,
     /// Gossipsub Subscribed events captured while draining events for other
@@ -540,7 +529,11 @@ impl MockNode {
             .build();
 
         swarm
-            .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap())
+            .listen_on(
+                "/ip4/0.0.0.0/udp/0/quic-v1"
+                    .parse()
+                    .expect("valid mock node listen multiaddr"),
+            )
             .map_err(|e| format!("Failed to listen: {e}"))?;
 
         Ok(MockNode {
@@ -832,40 +825,6 @@ impl MockNode {
                 }
                 Ok(_) => continue,
                 Err(_) => return None,
-            }
-        }
-    }
-
-    /// Drain all received gossip messages.
-    pub fn drain_gossip_messages(&mut self) -> Vec<(PeerId, IdentTopic, Vec<u8>)> {
-        std::mem::take(&mut self.gossip_messages)
-    }
-
-    /// Wait for a gossip message and return it.
-    pub async fn wait_for_gossip_message(&mut self) -> Option<(PeerId, IdentTopic, Vec<u8>)> {
-        loop {
-            match self.swarm.next().await {
-                Some(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
-                    GossipsubEvent::Message {
-                        propagation_source,
-                        message,
-                        ..
-                    },
-                ))) => {
-                    let topic_str = message.topic.into_string();
-                    let topic = IdentTopic::new(topic_str);
-                    return Some((propagation_source, topic, message.data));
-                }
-                Some(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(_))) => continue,
-                Some(SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
-                    ReqRespEvent::Message { .. },
-                ))) => continue,
-                Some(SwarmEvent::Behaviour(MockBehaviourEvent::Reqresp(
-                    ReqRespEvent::OutboundFailure { .. },
-                ))) => continue,
-                Some(SwarmEvent::NewListenAddr { .. }) => continue,
-                Some(_) => continue,
-                None => return None,
             }
         }
     }

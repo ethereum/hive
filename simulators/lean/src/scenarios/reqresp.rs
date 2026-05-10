@@ -41,14 +41,11 @@ async fn wait_for_client_blocks(client: &Client) {
         }
         sleep(Duration::from_secs(1)).await;
     }
-    panic!(
-        "client did not produce blocks within {} seconds",
-        REQRESP_SYNC_TIMEOUT_SECS
-    );
+    panic!("client did not produce blocks within {REQRESP_SYNC_TIMEOUT_SECS} seconds");
 }
 
 fn encode_blocks_by_root_request_unchecked(roots: &[B256]) -> Vec<u8> {
-    let mut raw_request = Vec::with_capacity(4 + roots.len() * std::mem::size_of::<B256>());
+    let mut raw_request = Vec::with_capacity(4 + std::mem::size_of_val(roots));
     raw_request.extend_from_slice(&4u32.to_le_bytes());
     for root in roots {
         raw_request.extend_from_slice(root.as_slice());
@@ -884,8 +881,7 @@ dyn_async! {
 
             if std::time::Instant::now() >= deadline {
                 panic!(
-                    "client should expose at least two known fork-choice blocks within {} seconds",
-                    REQRESP_SYNC_TIMEOUT_SECS
+                    "client should expose at least two known fork-choice blocks within {REQRESP_SYNC_TIMEOUT_SECS} seconds"
                 );
             }
 

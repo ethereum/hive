@@ -130,7 +130,7 @@ impl Test {
             )
             .await;
 
-        let rpc_url = format!("http://{}:8545", ip);
+        let rpc_url = format!("http://{ip}:8545");
 
         let rpc_client = HttpClientBuilder::default()
             .build(rpc_url)
@@ -517,7 +517,7 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
                     container: container_for_spawn,
                     ip,
                     rpc: HttpClientBuilder::default()
-                        .build(format!("http://{}:8545", ip))
+                        .build(format!("http://{ip}:8545"))
                         .expect("Failed to build rpc_client"),
                     test: Test {
                         sim: host_for_spawn,

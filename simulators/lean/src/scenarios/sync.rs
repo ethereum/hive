@@ -211,8 +211,7 @@ dyn_async! {
         .await
         .unwrap_or_else(|_| {
             panic!(
-                "checkpoint-sync helper mesh setup for {} exceeded {} seconds before client startup",
-                client_name, CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS
+                "checkpoint-sync helper mesh setup for {client_name} exceeded {CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS} seconds before client startup"
             )
         });
 
@@ -232,8 +231,7 @@ dyn_async! {
         .await
         .unwrap_or_else(|_| {
             panic!(
-                "checkpoint-sync client {} did not start and catch up to the helper head within {} seconds after checkpoint sync startup",
-                client_name, CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS
+                "checkpoint-sync client {client_name} did not start and catch up to the helper head within {CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS} seconds after checkpoint sync startup"
             )
         });
 

@@ -9,7 +9,7 @@ pub fn client_test_name(name: String, client_type: String) -> String {
     if name.contains("CLIENT") {
         return name.replace("CLIENT", &client_type);
     }
-    format!("{} ({})", name, client_type)
+    format!("{name} ({client_type})")
 }
 
 pub fn extract_test_results(join_handle: Result<(), JoinError>) -> TestResult {
@@ -25,7 +25,7 @@ pub fn extract_test_results(join_handle: Result<(), JoinError>) -> TestResult {
             } else if let Some(err) = err.downcast_ref::<String>() {
                 err.clone()
             } else {
-                format!("?{:?}", err)
+                format!("?{err:?}")
             };
 
             TestResult {

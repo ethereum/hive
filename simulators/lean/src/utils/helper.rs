@@ -988,8 +988,7 @@ async fn start_client_under_test_attempt(
             handle.abort();
             handle.await.ok();
             Err(format!(
-                "startup attempt exceeded {} seconds",
-                CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS
+                "startup attempt exceeded {CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS} seconds"
             ))
         }
     }
@@ -1021,16 +1020,14 @@ async fn start_client_under_test_with_retry(
             Ok(client) => return client,
             Err(message) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
                 eprintln!(
-                    "Retrying client-under-test startup for {} after attempt {} failed: {}",
-                    client_type, attempt, message
+                    "Retrying client-under-test startup for {client_type} after attempt {attempt} failed: {message}"
                 );
                 last_error = Some(message);
                 sleep(Duration::from_secs(1)).await;
             }
             Err(message) => {
                 panic!(
-                    "Unable to start client under test {} after {} attempts: {}",
-                    client_type, CLIENT_UNDER_TEST_STARTUP_ATTEMPTS, message
+                    "Unable to start client under test {client_type} after {CLIENT_UNDER_TEST_STARTUP_ATTEMPTS} attempts: {message}"
                 );
             }
         }
@@ -1257,8 +1254,7 @@ async fn wait_for_checkpoint_slot_with_retry(
 
     Err(last_error.unwrap_or_else(|| {
         format!(
-            "{LOCAL_HELPER_KIND} never reached finalized slot {} after {} attempts",
-            minimum_slot, LOCAL_HELPER_STARTUP_ATTEMPTS
+            "{LOCAL_HELPER_KIND} never reached finalized slot {minimum_slot} after {LOCAL_HELPER_STARTUP_ATTEMPTS} attempts"
         )
     }))
 }
@@ -1624,8 +1620,7 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
 
     Err(last_error.unwrap_or_else(|| {
         format!(
-            "Unable to start {LOCAL_HELPER_KIND} after {} attempts",
-            LOCAL_HELPER_STARTUP_ATTEMPTS
+            "Unable to start {LOCAL_HELPER_KIND} after {LOCAL_HELPER_STARTUP_ATTEMPTS} attempts"
         )
     }))
 }
@@ -1673,10 +1668,7 @@ fn start_local_lean_spec_helper(
     command.env(LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE, &asset_root);
 
     let child = command.spawn().unwrap_or_else(|err| {
-        panic!(
-            "Unable to start local LeanSpec helper from {}: {err}",
-            LOCAL_HELPER_ENTRYPOINT
-        )
+        panic!("Unable to start local LeanSpec helper from {LOCAL_HELPER_ENTRYPOINT}: {err}")
     });
 
     RunningLocalLeanSpecHelper {
