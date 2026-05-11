@@ -141,7 +141,7 @@ async fn run_spec_assets_lean_test_suite_for_kind(test: &mut Test, kind: SpecFix
         for fixture in &fixtures {
             let mut fixture = fixture.clone();
             fixture.client_name = client.name.clone();
-            let name = format!("{} ({})", hive_test_name(&fixture), client.name);
+            let name = hive_test_name(&fixture);
             let description = format!("Lean spec-test fixture: {}", fixture.path.display());
             run_data_test_with_timeout(
                 test,

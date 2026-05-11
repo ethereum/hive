@@ -122,7 +122,7 @@ async fn main() {
     });
 
     let mut spec_assets_fork_choice = Suite {
-        name: "spec-assets-fork-choice".to_string(),
+        name: "lean-spec-tests-fork-choice".to_string(),
         description: format!(
             "Runs generated Lean fork-choice spec-test fixtures against selected lean clients using the {devnet} profile."
         ),
@@ -130,7 +130,7 @@ async fn main() {
     };
 
     spec_assets_fork_choice.add(TestSpec {
-        name: "spec-assets-fork-choice: fixture loader".to_string(),
+        name: "lean-spec-tests-fork-choice: fixture loader".to_string(),
         description:
             "Loads Lean fork-choice spec-test fixture files and runs each fixture as a distinct Hive test."
                 .to_string(),
@@ -140,7 +140,7 @@ async fn main() {
     });
 
     let mut spec_assets_state_transition = Suite {
-        name: "spec-assets-state-transition".to_string(),
+        name: "lean-spec-tests-state-transition".to_string(),
         description: format!(
             "Runs generated Lean state-transition spec-test fixtures against selected lean clients using the {devnet} profile."
         ),
@@ -148,7 +148,7 @@ async fn main() {
     };
 
     spec_assets_state_transition.add(TestSpec {
-        name: "spec-assets-state-transition: fixture loader".to_string(),
+        name: "lean-spec-tests-state-transition: fixture loader".to_string(),
         description:
             "Loads Lean state-transition spec-test fixture files and runs each fixture as a distinct Hive test."
                 .to_string(),
@@ -158,7 +158,7 @@ async fn main() {
     });
 
     let mut spec_assets_verify_signatures = Suite {
-        name: "spec-assets-verify-signatures".to_string(),
+        name: "lean-spec-tests-verify-signatures".to_string(),
         description: format!(
             "Runs generated Lean signature-verification spec-test fixtures against selected lean clients using the {devnet} profile."
         ),
@@ -166,7 +166,7 @@ async fn main() {
     };
 
     spec_assets_verify_signatures.add(TestSpec {
-        name: "spec-assets-verify-signatures: fixture loader".to_string(),
+        name: "lean-spec-tests-verify-signatures: fixture loader".to_string(),
         description:
             "Loads Lean signature-verification spec-test fixture files and runs each fixture as a distinct Hive test."
                 .to_string(),
