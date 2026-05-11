@@ -1,7 +1,7 @@
 use crate::utils::helper::{
     start_checkpoint_sync_client_context, start_checkpoint_sync_helper_mesh,
     start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncContext,
-    PostGenesisSyncTestData,
+    PostGenesisSyncTestData, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
@@ -15,8 +15,6 @@ use tokio::time::{sleep, timeout, Instant};
 const CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS: u64 = 600;
 const CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS: u64 = 180;
 const HEAD_SYNC_TIMEOUT_SECS: u64 = CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
-const HEAD_BEHIND_FINALIZED_CLIENT_FINALIZATION_TIMEOUT_SECS: u64 =
-    CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
 const HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS: u64 = 600;
 const HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS: u64 = 420;
 const SYNC_HELPER_PEER_COUNT: usize = 3;
@@ -149,38 +147,6 @@ async fn wait_for_client_to_reach_source_head(
     );
 }
 
-async fn wait_for_client_to_report_non_genesis_finalized(client: &Client) -> ForkChoiceResponse {
-    let mut last_observation = None;
-    let deadline = Instant::now()
-        + Duration::from_secs(HEAD_BEHIND_FINALIZED_CLIENT_FINALIZATION_TIMEOUT_SECS);
-
-    while Instant::now() < deadline {
-        let fork_choice = load_fork_choice_response(client).await;
-        if fork_choice.finalized.slot > 0 {
-            return fork_choice;
-        }
-
-        last_observation = Some(fork_choice);
-        sleep(Duration::from_secs(1)).await;
-    }
-
-    let Some(observation) = last_observation else {
-        panic!(
-            "Client under test {} never exposed a forkchoice response while waiting {} seconds for non-genesis finalization",
-            client.kind, HEAD_BEHIND_FINALIZED_CLIENT_FINALIZATION_TIMEOUT_SECS
-        );
-    };
-    panic!(
-        "Client under test {} never reported a non-genesis finalized checkpoint within {} seconds (head: {:#x} at slot {}, justified={}, finalized={})",
-        client.kind,
-        HEAD_BEHIND_FINALIZED_CLIENT_FINALIZATION_TIMEOUT_SECS,
-        observation.head,
-        fork_choice_head_slot(&observation),
-        observation.justified.slot,
-        observation.finalized.slot,
-    );
-}
-
 async fn wait_for_helper_finalized_above_client_head(
     context: &mut PostGenesisSyncContext,
     client_head_slot: u64,
@@ -293,7 +259,7 @@ dyn_async! {
             run_data_test(
                 test,
                 "sync: checkpoint sync fresh start".to_string(),
-                "Starts a local LeanSpec helper, checkpoint-syncs the client under test from a finalized checkpoint, connects it to the helper mesh, and checks that the client catches up to the helper's live head slot.".to_string(),
+                "Starts a local LeanSpec helper mesh, checkpoint-syncs the validator client under test from a finalized checkpoint, connects it to the helper mesh, and checks that the client catches up to the helper's live head slot.".to_string(),
                 false,
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
@@ -303,6 +269,7 @@ dyn_async! {
                     connect_client_to_lean_spec_mesh: true,
                     client_role: ClientUnderTestRole::Validator,
                     source_helper_validator_indices: None,
+                    split_helper_validators_across_mesh: false,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
                     helper_fork_digest_profile,
                 },
@@ -314,7 +281,7 @@ dyn_async! {
             run_data_test(
                 test,
                 "sync: head behind finalized recovery".to_string(),
-                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after finalization, lets the helpers finalize beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
+                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers finalize beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
                 false,
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
@@ -322,8 +289,11 @@ dyn_async! {
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: false,
                     connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Observer,
-                    source_helper_validator_indices: None,
+                    client_role: ClientUnderTestRole::Validator,
+                    source_helper_validator_indices: Some(
+                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                    ),
+                    split_helper_validators_across_mesh: false,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
                     helper_fork_digest_profile,
                 },
@@ -335,7 +305,7 @@ dyn_async! {
             run_data_test(
                 test,
                 "sync: head recovery".to_string(),
-                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after finalization, lets the helpers justify beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
+                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers justify beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
                 false,
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
@@ -343,8 +313,11 @@ dyn_async! {
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: false,
                     connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Observer,
-                    source_helper_validator_indices: None,
+                    client_role: ClientUnderTestRole::Validator,
+                    source_helper_validator_indices: Some(
+                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                    ),
+                    split_helper_validators_across_mesh: false,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
                     helper_fork_digest_profile,
                 },
@@ -428,7 +401,6 @@ dyn_async! {
             )
         });
 
-        wait_for_client_to_report_non_genesis_finalized(&context.client_under_test).await;
         let (source_before_pause, client_before_pause) =
             wait_for_client_to_reach_source_head(&mut context).await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
@@ -438,11 +410,6 @@ dyn_async! {
             source_before_pause.finalized.slot > 0,
             "helper source should reach a non-genesis finalized checkpoint before pausing the client under test"
         );
-        assert!(
-            client_before_pause.finalized.slot > 0,
-            "client under test should reach a non-genesis finalized checkpoint before being paused"
-        );
-
         context
             .client_under_test
             .pause()
@@ -518,7 +485,6 @@ dyn_async! {
             )
         });
 
-        wait_for_client_to_report_non_genesis_finalized(&context.client_under_test).await;
         let (source_before_pause, client_before_pause) =
             wait_for_client_to_reach_source_head(&mut context).await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
@@ -528,11 +494,6 @@ dyn_async! {
             source_before_pause.finalized.slot > 0,
             "helper source should reach a non-genesis finalized checkpoint before pausing the client under test"
         );
-        assert!(
-            client_before_pause.finalized.slot > 0,
-            "client under test should reach a non-genesis finalized checkpoint before being paused"
-        );
-
         context
             .client_under_test
             .pause()

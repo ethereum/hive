@@ -86,6 +86,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -115,6 +116,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Observer,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -147,6 +149,7 @@ dyn_async! {
                         source_helper_validator_indices: Some(
                             LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
                         ),
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -176,6 +179,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -205,6 +209,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -234,6 +239,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -263,6 +269,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -292,6 +299,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -321,6 +329,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -350,6 +359,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -379,6 +389,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -408,6 +419,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -437,6 +449,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -466,6 +479,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -495,6 +509,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -524,6 +539,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
@@ -553,6 +569,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
                             HelperGossipForkDigestProfile::SelectedDevnet
