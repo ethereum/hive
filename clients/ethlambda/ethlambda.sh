@@ -58,7 +58,11 @@ fi
 materialize_runtime_local_ip
 
 FLAGS=(
-    --custom-network-config-dir "$ASSET_ROOT"
+    --genesis "$ASSET_ROOT/config.yaml"
+    --validators "$ASSET_ROOT/annotated_validators.yaml"
+    --bootnodes "$ASSET_ROOT/nodes.yaml"
+    --validator-config "$ASSET_ROOT/validator-config.yaml"
+    --hash-sig-keys-dir "$ASSET_ROOT/hash-sig-keys"
     --gossipsub-port 9000
     --http-address 0.0.0.0
     --api-port 5052
