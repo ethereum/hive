@@ -29,6 +29,7 @@ const LEAN_GENESIS_VALIDATORS_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_VA
 const LEAN_GENESIS_VALIDATOR_ENTRIES_ENVIRONMENT_VARIABLE: &str =
     "HIVE_LEAN_GENESIS_VALIDATOR_ENTRIES";
 const NODE_ID_ENVIRONMENT_VARIABLE: &str = "HIVE_NODE_ID";
+const CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
@@ -890,6 +891,13 @@ fn client_under_test_environment(
     environment.insert(
         LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE.to_string(),
         genesis_time.to_string(),
+    );
+    // Pin the libp2p peer id to the value `compute_client_peer_id` derives,
+    // so MockNode dials the client at its actual peer id instead of an
+    // unrelated one (which surfaces as `Outbound failure: DialFailure`).
+    environment.insert(
+        CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(),
+        crate::utils::libp2p_mock::deterministic_client_private_key_hex(client_type),
     );
     if source_genesis_validator_entries
         .iter()

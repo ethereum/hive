@@ -229,15 +229,33 @@ pub fn encode_gossip_data<T: Encode>(item: &T) -> Vec<u8> {
 
 // === Peer ID Computation ===
 
-/// Compute the deterministic PeerId for a lean client based on its name.
-/// This matches the logic in `prepare_lean_client_assets.py`:
-///   key = sha256(f"{client_kind}:{node_id}:node").hexdigest()
-/// where NODE_ID defaults to "{client_kind}_0".
-pub fn compute_client_peer_id(client_name: &str) -> PeerId {
-    let base_name = client_name.split('_').next().unwrap_or(client_name);
-    let label = format!("{base_name}:{base_name}_0:node");
+/// Resolve the canonical lean client kind from a hive client type string.
+/// Falls back to the raw input when the client is not in the supported set so
+/// out-of-tree client kinds still get a stable derivation.
+fn client_kind_label(client_name: &str) -> String {
+    crate::utils::util::lean_client_kind(client_name)
+        .map(|kind| kind.to_string())
+        .unwrap_or_else(|_| client_name.to_string())
+}
+
+/// Hex-encoded deterministic secp256k1 secret for a lean client, matching
+/// `prepare_lean_client_assets.py::deterministic_private_key`:
+///   key = sha256(f"{client_kind}:{client_kind}_0:node").hexdigest()
+///
+/// Inject this as `HIVE_CLIENT_PRIVATE_KEY` when starting the client so the
+/// libp2p peer id matches what `compute_client_peer_id` expects.
+pub fn deterministic_client_private_key_hex(client_name: &str) -> String {
+    let kind = client_kind_label(client_name);
+    let label = format!("{kind}:{kind}_0:node");
     let hash = Sha256::digest(label.as_bytes());
-    let mut key_bytes = hash.to_vec();
+    alloy_primitives::hex::encode(hash)
+}
+
+/// Compute the deterministic PeerId for a lean client based on its name.
+pub fn compute_client_peer_id(client_name: &str) -> PeerId {
+    let hex = deterministic_client_private_key_hex(client_name);
+    let mut key_bytes =
+        alloy_primitives::hex::decode(&hex).expect("derived private key hex is valid");
 
     let secret_key = SecretKey::try_from_bytes(&mut key_bytes)
         .expect("Failed to create secp256k1 secret key from deterministic bytes");
