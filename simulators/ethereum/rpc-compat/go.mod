@@ -8,6 +8,8 @@ require (
 	github.com/ethereum/go-ethereum v1.14.5
 	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
+	github.com/open-rpc/meta-schema v0.0.0-20210416041958-626a15d0a618
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5
 )
