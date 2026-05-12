@@ -103,7 +103,15 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Configure RPC.
-FLAGS="$FLAGS --http.addr=0.0.0.0  --authrpc.addr=0.0.0.0"
+# Hive tests exercise admin/debug/txpool namespaces over the public HTTP port.
+# Newer ethrex builds default the HTTP allowlist to eth,net,web3, so we have to
+# opt those namespaces in via --http.api. Older builds don't know that flag, so
+# probe --help to keep this launcher working against both.
+HTTP_API_FLAG=""
+if "$ethrex" --help 2>&1 | grep -q -- '--http.api'; then
+    HTTP_API_FLAG="--http.api=eth,net,web3,debug,admin,txpool"
+fi
+FLAGS="$FLAGS --http.addr=0.0.0.0 --authrpc.addr=0.0.0.0 $HTTP_API_FLAG"
 
 # We don't support pre merge
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
