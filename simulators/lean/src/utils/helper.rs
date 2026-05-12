@@ -33,14 +33,13 @@ const CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_DISABLE_VALIDATOR_SERVICE";
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
+const LEAN_GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_COUNT";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
 const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
-/// Helper validator subset that excludes V0, used by tests where the
-/// client-under-test owns V0 itself. Keep in sync with
-/// [`LEAN_SPEC_SOURCE_VALIDATORS`] if the validator count ever changes.
-pub(crate) const LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0: &str = "1,2";
+/// Helper validator subset used by tests where the client-under-test owns V0.
+pub(crate) const LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0: &str = "1,2,3";
 const LEAN_SPEC_SOURCE_PEER_ID: &str = "16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3";
 const DEFAULT_HELPER_GOSSIP_FORK_DIGEST: &str = "devnet0";
 const DEFAULT_HELPER_P2P_PORT: u16 = 9001;
@@ -152,6 +151,7 @@ struct RunningLocalLeanSpecHelperGroup {
 struct LocalLeanSpecHelperConfig {
     node_id: String,
     validator_indices: String,
+    genesis_validator_count: u64,
     genesis_time: u64,
     bootnodes: Option<String>,
     is_aggregator: bool,
@@ -236,11 +236,13 @@ impl LocalLeanSpecHelperConfig {
         genesis_time: u64,
         gossip_fork_digest: String,
         validator_indices: Option<String>,
+        genesis_validator_count: u64,
     ) -> Self {
         Self {
             node_id: LEAN_SPEC_SOURCE_NODE_ID.to_string(),
             validator_indices: validator_indices
                 .unwrap_or_else(|| LEAN_SPEC_SOURCE_VALIDATORS.to_string()),
+            genesis_validator_count,
             genesis_time,
             bootnodes: None,
             is_aggregator: true,
@@ -258,16 +260,19 @@ impl LocalLeanSpecHelperConfig {
         genesis_time: u64,
         bootnode: String,
         validator_indices: String,
+        genesis_validator_count: u64,
         disable_validator_service: bool,
         gossip_fork_digest: String,
     ) -> Self {
         let mesh_index = mesh_index as u16;
+        let is_aggregator = !disable_validator_service && !validator_indices.is_empty();
         Self {
             node_id: format!("lean_spec_mesh_{mesh_index}"),
             validator_indices,
+            genesis_validator_count,
             genesis_time,
             bootnodes: Some(bootnode),
-            is_aggregator: false,
+            is_aggregator,
             disable_validator_service,
             gossip_fork_digest,
             p2p_port: DEFAULT_HELPER_P2P_PORT + mesh_index,
@@ -290,6 +295,13 @@ impl RunningLocalLeanSpecHelper {
     fn checkpoint_sync_url(&self) -> String {
         format!(
             "http://{}:{}/lean/v0/states/finalized",
+            self.ip, self.api_port
+        )
+    }
+
+    fn checkpoint_sync_block_url(&self) -> String {
+        format!(
+            "http://{}:{}/lean/v0/blocks/finalized",
             self.ip, self.api_port
         )
     }
@@ -412,8 +424,13 @@ pub(crate) async fn lean_single_client_runtime_setup_with_live_helper(
     connect_to_lean_spec_mesh: bool,
 ) -> LiveHelperSingleClientRuntimeSetup {
     let helper_fork_digest = helper_gossip_fork_digest(helper_fork_digest_profile);
-    let source_helper_config =
-        LocalLeanSpecHelperConfig::source(genesis_time, helper_fork_digest, None);
+    let genesis_validator_count = validator_count_for_indices(LEAN_SPEC_SOURCE_VALIDATORS);
+    let source_helper_config = LocalLeanSpecHelperConfig::source(
+        genesis_time,
+        helper_fork_digest,
+        None,
+        genesis_validator_count,
+    );
     let (source_helper, source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
             .await
@@ -560,10 +577,7 @@ fn helper_mesh_validator_assignments(
     helper_peer_count: usize,
 ) -> Vec<String> {
     let helper_peer_count = helper_peer_count.max(1);
-    let source_validator_indices = test_data
-        .source_helper_validator_indices
-        .clone()
-        .unwrap_or_else(|| LEAN_SPEC_SOURCE_VALIDATORS.to_string());
+    let source_validator_indices = source_helper_validator_indices(test_data);
 
     if test_data.split_helper_validators_across_mesh {
         return split_validator_indices_across_helpers(
@@ -581,25 +595,57 @@ fn helper_mesh_validator_assignments(
     assignments
 }
 
+fn source_helper_validator_indices(test_data: &PostGenesisSyncTestData) -> String {
+    test_data
+        .source_helper_validator_indices
+        .clone()
+        .unwrap_or_else(|| LEAN_SPEC_SOURCE_VALIDATORS.to_string())
+}
+
+fn helper_genesis_validator_count(test_data: &PostGenesisSyncTestData) -> u64 {
+    validator_count_for_indices(&source_helper_validator_indices(test_data))
+}
+
+fn validator_count_for_indices(validator_indices: &str) -> u64 {
+    validator_indices
+        .split(',')
+        .map(str::trim)
+        .filter(|validator_index| !validator_index.is_empty())
+        .map(|validator_index| {
+            validator_index.parse::<u64>().unwrap_or_else(|err| {
+                panic!("invalid Lean validator index {validator_index:?}: {err}")
+            })
+        })
+        .max()
+        .map(|max_validator_index| max_validator_index + 1)
+        .unwrap_or(0)
+}
+
 fn split_validator_indices_across_helpers(
     validator_indices: &str,
     helper_peer_count: usize,
 ) -> Vec<String> {
     let helper_peer_count = helper_peer_count.max(1);
-    let mut assignments = vec![Vec::new(); helper_peer_count];
-
-    for (validator_offset, validator_index) in validator_indices
+    let validator_indices = validator_indices
         .split(',')
         .map(str::trim)
         .filter(|validator_index| !validator_index.is_empty())
-        .enumerate()
-    {
-        assignments[validator_offset % helper_peer_count].push(validator_index.to_string());
-    }
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let validator_count = validator_indices.len();
+    let base_assignment_size = validator_count / helper_peer_count;
+    let extra_assignments = validator_count % helper_peer_count;
+    let mut next_validator = 0;
 
-    assignments
-        .into_iter()
-        .map(|validator_indices| validator_indices.join(","))
+    (0..helper_peer_count)
+        .map(|helper_index| {
+            let assignment_size =
+                base_assignment_size + usize::from(helper_index < extra_assignments);
+            let assignment =
+                validator_indices[next_validator..next_validator + assignment_size].join(",");
+            next_validator += assignment_size;
+            assignment
+        })
         .collect()
 }
 
@@ -628,12 +674,14 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
         test_data.connect_client_to_lean_spec_mesh,
     );
     let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
+    let genesis_validator_count = helper_genesis_validator_count(test_data);
     let helper_validator_assignments =
         helper_mesh_validator_assignments(test_data, helper_peer_count);
     let mut source_helper_config = LocalLeanSpecHelperConfig::source(
         genesis_time,
         helper_fork_digest.clone(),
         Some(helper_validator_assignments[0].clone()),
+        genesis_validator_count,
     );
     let (source_helper, source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
@@ -663,6 +711,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
             &source_helper,
             genesis_time,
             &helper_validator_assignments[1..],
+            genesis_validator_count,
             false,
             helper_fork_digest.clone(),
         )
@@ -703,6 +752,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
                 &helpers.source,
                 genesis_time,
                 &helper_validator_assignments[1..],
+                genesis_validator_count,
                 false,
                 helper_fork_digest.clone(),
             )
@@ -787,12 +837,14 @@ pub(crate) async fn start_post_genesis_sync_context(
     );
     let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
     let passive_validator_mesh = should_start_passive_validator_mesh(test_data, helper_peer_count);
+    let genesis_validator_count = helper_genesis_validator_count(test_data);
     let helper_validator_assignments =
         helper_mesh_validator_assignments(test_data, helper_peer_count);
     let mut source_helper_config = LocalLeanSpecHelperConfig::source(
         genesis_time,
         helper_fork_digest.clone(),
         Some(helper_validator_assignments[0].clone()),
+        genesis_validator_count,
     );
     let (source_helper, source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
@@ -822,6 +874,7 @@ pub(crate) async fn start_post_genesis_sync_context(
             &source_helper,
             genesis_time,
             &helper_validator_assignments[1..],
+            genesis_validator_count,
             passive_validator_mesh,
             helper_fork_digest.clone(),
         )
@@ -930,6 +983,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                 &helpers.source,
                 genesis_time,
                 &helper_validator_assignments[1..],
+                genesis_validator_count,
                 passive_validator_mesh,
                 helper_fork_digest.clone(),
             )
@@ -981,6 +1035,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                 &helpers.source,
                 genesis_time,
                 &helper_validator_assignments[1..],
+                genesis_validator_count,
                 false,
                 helper_fork_digest.clone(),
             )
@@ -1112,6 +1167,10 @@ fn local_lean_spec_helper_environment(
         helper_config.bootnodes.clone(),
         helper_config.is_aggregator,
         helper_config.disable_validator_service,
+    );
+    environment.insert(
+        LEAN_GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE.to_string(),
+        helper_config.genesis_validator_count.to_string(),
     );
     environment.insert(
         LEAN_HELPER_GOSSIP_FORK_DIGEST_ENVIRONMENT_VARIABLE.to_string(),
@@ -1662,33 +1721,61 @@ async fn wait_for_checkpoint_sync_state_ready(
     helper: &mut RunningLocalLeanSpecHelper,
 ) -> Result<(), String> {
     let http = http_client();
-    let url = helper.checkpoint_sync_url();
+    let state_url = helper.checkpoint_sync_url();
+    let block_url = helper.checkpoint_sync_block_url();
     let mut last_error = String::new();
     let mut consecutive_successes = 0;
 
     for _attempt in 0..LOCAL_HELPER_STARTUP_TIMEOUT_SECS {
         helper.ensure_running()?;
-        match http
-            .get(&url)
+        let state_result = http
+            .get(&state_url)
             .header(reqwest::header::ACCEPT, SSZ_CONTENT_TYPE)
             .send()
-            .await
-        {
+            .await;
+        let block_result = http
+            .get(&block_url)
+            .header(reqwest::header::ACCEPT, SSZ_CONTENT_TYPE)
+            .send()
+            .await;
+
+        let state_ready = match state_result {
             Ok(response) => {
                 let status = response.status();
-                if status.is_success() {
-                    consecutive_successes += 1;
-                    if consecutive_successes >= 3 {
-                        return Ok(());
-                    }
-                } else {
-                    consecutive_successes = 0;
-                    last_error = format!("received HTTP {status} from {url}");
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {state_url}");
                 }
+                status.is_success()
             }
             Err(err) => {
-                consecutive_successes = 0;
-                last_error = format!("error sending request for url ({url}): {err}");
+                last_error = format!("error sending request for url ({state_url}): {err}");
+                false
+            }
+        };
+
+        let block_ready = match block_result {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    last_error = format!("received HTTP {status} from {block_url}");
+                }
+                status.is_success()
+            }
+            Err(err) => {
+                last_error = format!("error sending request for url ({block_url}): {err}");
+                false
+            }
+        };
+
+        if state_ready && block_ready {
+            consecutive_successes += 1;
+            if consecutive_successes >= 3 {
+                return Ok(());
+            }
+        } else {
+            consecutive_successes = 0;
+            if !state_ready && last_error.is_empty() {
+                last_error = format!("{state_url} was not ready");
             }
         }
 
@@ -1696,7 +1783,7 @@ async fn wait_for_checkpoint_sync_state_ready(
     }
 
     Err(format!(
-        "Checkpoint-sync source state endpoint never became ready at {url}: {last_error}"
+        "Checkpoint-sync source state/block endpoints never became ready at {state_url} and {block_url}: {last_error}"
     ))
 }
 
@@ -1936,6 +2023,7 @@ async fn start_mesh_helpers(
     source_helper: &RunningLocalLeanSpecHelper,
     genesis_time: u64,
     mesh_validator_indices: &[String],
+    genesis_validator_count: u64,
     disable_validator_service: bool,
     helper_fork_digest: String,
 ) -> Result<Vec<RunningLocalLeanSpecHelper>, String> {
@@ -1950,6 +2038,7 @@ async fn start_mesh_helpers(
             genesis_time,
             source_bootnode.clone(),
             validator_indices.clone(),
+            genesis_validator_count,
             disable_validator_service,
             helper_fork_digest.clone(),
         );
@@ -2191,6 +2280,62 @@ mod tests {
             vec!["0".to_string(), "1".to_string(), "2".to_string()]
         );
         assert!(!should_start_passive_validator_mesh(&test_data, 3));
+    }
+
+    #[test]
+    fn helper_mesh_validator_assignments_split_client_excluding_validators() {
+        let test_data = PostGenesisSyncTestData {
+            client_under_test: ClientDefinition {
+                name: "ream_devnet4".to_string(),
+                version: "test".to_string(),
+                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
+            },
+            genesis_time: 1,
+            wait_for_client_justified_checkpoint: false,
+            use_checkpoint_sync: false,
+            connect_client_to_lean_spec_mesh: true,
+            client_role: ClientUnderTestRole::Validator,
+            source_helper_validator_indices: Some(
+                LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+            ),
+            split_helper_validators_across_mesh: true,
+            helper_peer_count: 3,
+            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
+        };
+
+        assert_eq!(
+            helper_mesh_validator_assignments(&test_data, 3),
+            vec!["1".to_string(), "2".to_string(), "3".to_string()]
+        );
+        assert_eq!(helper_genesis_validator_count(&test_data), 4);
+    }
+
+    #[test]
+    fn helper_mesh_validator_assignments_split_client_excluding_validators_across_two_helpers() {
+        let test_data = PostGenesisSyncTestData {
+            client_under_test: ClientDefinition {
+                name: "ream_devnet4".to_string(),
+                version: "test".to_string(),
+                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
+            },
+            genesis_time: 1,
+            wait_for_client_justified_checkpoint: false,
+            use_checkpoint_sync: false,
+            connect_client_to_lean_spec_mesh: true,
+            client_role: ClientUnderTestRole::Validator,
+            source_helper_validator_indices: Some(
+                LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+            ),
+            split_helper_validators_across_mesh: true,
+            helper_peer_count: 2,
+            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
+        };
+
+        assert_eq!(
+            helper_mesh_validator_assignments(&test_data, 2),
+            vec!["1,2".to_string(), "3".to_string()]
+        );
+        assert_eq!(helper_genesis_validator_count(&test_data), 4);
     }
 
     #[test]

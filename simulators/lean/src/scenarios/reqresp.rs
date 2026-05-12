@@ -145,7 +145,7 @@ dyn_async! {
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
                         client_role: ClientUnderTestRole::Validator,
-                        // Helper owns V1+V2 so client (default V0) has exclusive proposer slots; see #1470.
+                        // Helper owns V1+V2+V3 so client (default V0) has exclusive proposer slots; see #1470.
                         source_helper_validator_indices: Some(
                             LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
                         ),
@@ -661,7 +661,7 @@ dyn_async! {
 
         // Compare against the helper's *live* head re-fetched each iteration
         // rather than a single T+10s snapshot. The helper keeps producing
-        // blocks (it's still aggregating V1+V2) so a frozen snapshot becomes
+        // blocks (it's still aggregating V1+V2+V3) so a frozen snapshot becomes
         // unreachable as soon as the helper moves on; equality with a moving
         // target is the right invariant for "client has caught up".
         let mut caught_up = false;

@@ -12,12 +12,12 @@ use hivesim::{dyn_async, Client, Test};
 use std::time::Duration;
 use tokio::time::{sleep, timeout, Instant};
 
-const CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS: u64 = 600;
+const CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS: u64 = 420;
 const CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS: u64 = 180;
 const HEAD_SYNC_TIMEOUT_SECS: u64 = CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
 const HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS: u64 = 600;
 const HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS: u64 = 420;
-const SYNC_HELPER_PEER_COUNT: usize = 3;
+const SYNC_HELPER_PEER_COUNT: usize = 2;
 const HEAD_SYNC_MAX_SLOT_LAG: u64 = 2;
 
 struct HeadSyncObservation {
@@ -268,7 +268,9 @@ dyn_async! {
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: true,
                     client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: None,
+                    source_helper_validator_indices: Some(
+                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                    ),
                     split_helper_validators_across_mesh: false,
                     helper_peer_count: SYNC_HELPER_PEER_COUNT,
                     helper_fork_digest_profile,

@@ -42,11 +42,13 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicStream,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
+from lean_spec.types.aggregation import AggregationBits, ValidatorIndices
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
 from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 from lean_spec.types.container import Container
@@ -96,11 +98,12 @@ HELPER_P2P_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_P2P_PORT"
 HELPER_API_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_API_PORT"
 HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_METADATA_PORT"
 DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_DISABLE_VALIDATOR_SERVICE"
+GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_VALIDATOR_COUNT"
 GOSSIPSUB_V11_PROTOCOL_ID: Final = "/meshsub/1.1.0"
 IDENTIFY_PROTOCOL_ID: Final = "/ipfs/id/1.0.0"
 IDENTIFY_PUSH_PROTOCOL_ID: Final = "/ipfs/id/push/1.0.0"
 LIBP2P_SECP256K1_PUBLIC_KEY_TYPE: Final = 2
-VALIDATOR_COUNT: Final = 3
+DEFAULT_VALIDATOR_COUNT: Final = 3
 ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
 PROPOSAL_PUBKEY_FIELD: Final = "proposal_public"
@@ -131,12 +134,13 @@ def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypa
         public_key=Secp256k1PublicKey(_key=private_key.public_key()),
     )
 
-_QUIC_STREAM_CLOSE_PATCHED = False
-_SSZ_FAST_DESERIALIZATION_PATCHED = False
-_SNAPPY_COMPRESS_PATCHED = False
-_REQRESP_BLOCK_CACHE_PATCHED = False
-_NETWORK_SERVICE_GOSSIP_PATCHED = False
-_IDENTIFY_PROTOCOL_PATCHED = False
+_QUIC_STREAM_CLOSE_COMPAT_INSTALLED = False
+_SSZ_FAST_DESERIALIZATION_INSTALLED = False
+_SNAPPY_COMPRESS_FALLBACK_INSTALLED = False
+_REQRESP_BLOCK_CACHE_TRACKING_INSTALLED = False
+_NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED = False
+_IDENTIFY_PROTOCOL_COMPAT_INSTALLED = False
+_CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
@@ -150,10 +154,10 @@ def setup_logging() -> None:
     )
 
 
-def patch_quic_stream_close() -> None:
-    global _QUIC_STREAM_CLOSE_PATCHED
+def install_quic_stream_close_reset_tolerance() -> None:
+    global _QUIC_STREAM_CLOSE_COMPAT_INSTALLED
 
-    if _QUIC_STREAM_CLOSE_PATCHED:
+    if _QUIC_STREAM_CLOSE_COMPAT_INSTALLED:
         return
 
     original_close = QuicStream.close
@@ -174,13 +178,13 @@ def patch_quic_stream_close() -> None:
             )
 
     QuicStream.close = close_ignoring_reset
-    _QUIC_STREAM_CLOSE_PATCHED = True
+    _QUIC_STREAM_CLOSE_COMPAT_INSTALLED = True
 
 
-def patch_fast_ssz_deserialization() -> None:
-    global _SSZ_FAST_DESERIALIZATION_PATCHED
+def install_fast_ssz_deserialization() -> None:
+    global _SSZ_FAST_DESERIALIZATION_INSTALLED
 
-    if _SSZ_FAST_DESERIALIZATION_PATCHED:
+    if _SSZ_FAST_DESERIALIZATION_INSTALLED:
         return
 
     @classmethod
@@ -324,20 +328,19 @@ def patch_fast_ssz_deserialization() -> None:
     SSZVector.deserialize = vector_deserialize_without_validation
     SSZList.deserialize = list_deserialize_without_validation
     Container.deserialize = container_deserialize_without_validation
-    _SSZ_FAST_DESERIALIZATION_PATCHED = True
+    _SSZ_FAST_DESERIALIZATION_INSTALLED = True
 
 
-def patch_snappy_compress() -> None:
-    global _SNAPPY_COMPRESS_PATCHED
+def install_snappy_compress_fallback() -> None:
+    global _SNAPPY_COMPRESS_FALLBACK_INSTALLED
 
-    if _SNAPPY_COMPRESS_PATCHED:
+    if _SNAPPY_COMPRESS_FALLBACK_INSTALLED:
         return
 
     snappy_compress_module = importlib.import_module("lean_spec.snappy.compress")
     networking_service_module = importlib.import_module(
         "lean_spec.subspecs.networking.service.service"
     )
-    original_compress = snappy_compress_module.compress
 
     def literal_only_compress(data: bytes) -> bytes:
         if not data:
@@ -353,23 +356,17 @@ def patch_snappy_compress() -> None:
         return bytes(output)
 
     def compress_with_fallback(data: bytes) -> bytes:
-        try:
-            return original_compress(data)
-        except IndexError:
-            logger.warning(
-                "Falling back to literal-only Snappy compression after helper compressor bug"
-            )
-            return literal_only_compress(data)
+        return literal_only_compress(data)
 
     snappy_compress_module.compress = compress_with_fallback
     networking_service_module.compress = compress_with_fallback
-    _SNAPPY_COMPRESS_PATCHED = True
+    _SNAPPY_COMPRESS_FALLBACK_INSTALLED = True
 
 
-def patch_reqresp_block_cache() -> None:
-    global _REQRESP_BLOCK_CACHE_PATCHED
+def install_reqresp_block_cache_tracking() -> None:
+    global _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED
 
-    if _REQRESP_BLOCK_CACHE_PATCHED:
+    if _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED:
         return
 
     reqresp_client_module = importlib.import_module(
@@ -391,13 +388,13 @@ def patch_reqresp_block_cache() -> None:
         return signed_blocks
 
     reqresp_client_cls.request_blocks_by_root = request_blocks_by_root_with_cache
-    _REQRESP_BLOCK_CACHE_PATCHED = True
+    _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED = True
 
 
-def patch_network_service_gossip_processing() -> None:
-    global _NETWORK_SERVICE_GOSSIP_PATCHED
+def install_network_service_gossip_tracking() -> None:
+    global _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED
 
-    if _NETWORK_SERVICE_GOSSIP_PATCHED:
+    if _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED:
         return
 
     networking_service_module = importlib.import_module(
@@ -435,7 +432,7 @@ def patch_network_service_gossip_processing() -> None:
         refresh_status(event_source, node)
 
     network_service_cls._handle_event = handle_event_with_helper_backfill
-    _NETWORK_SERVICE_GOSSIP_PATCHED = True
+    _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED = True
 
 
 def encode_unsigned_varint(value: int) -> bytes:
@@ -539,10 +536,10 @@ async def handle_identify_stream(
         await wrapper.finish_write()
 
 
-def patch_identify_protocol() -> None:
-    global _IDENTIFY_PROTOCOL_PATCHED
+def install_identify_protocol_compatibility() -> None:
+    global _IDENTIFY_PROTOCOL_COMPAT_INSTALLED
 
-    if _IDENTIFY_PROTOCOL_PATCHED:
+    if _IDENTIFY_PROTOCOL_COMPAT_INSTALLED:
         return
 
     live_module = importlib.import_module(
@@ -662,7 +659,55 @@ def patch_identify_protocol() -> None:
 
     event_source_cls._setup_gossipsub_stream = setup_gossipsub_stream_with_v11_fallback
     event_source_cls._accept_streams = accept_streams_with_identify
-    _IDENTIFY_PROTOCOL_PATCHED = True
+    _IDENTIFY_PROTOCOL_COMPAT_INSTALLED = True
+
+
+def install_child_only_aggregation_compatibility() -> None:
+    global _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED
+
+    if _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED:
+        return
+
+    original_to_aggregation_bits = ValidatorIndices.to_aggregation_bits
+    original_aggregate = AggregatedSignatureProof.aggregate.__func__
+
+    def to_aggregation_bits_allowing_empty(
+        self: ValidatorIndices,
+    ) -> AggregationBits:
+        if not self.data:
+            return AggregationBits(data=[])
+        return original_to_aggregation_bits(self)
+
+    @classmethod
+    def aggregate_allowing_child_only_merge(
+        cls: type[AggregatedSignatureProof],
+        xmss_participants: AggregationBits | None,
+        children: object,
+        raw_xmss: object,
+        message: Bytes32,
+        slot: object,
+        mode: object | None = None,
+    ) -> AggregatedSignatureProof:
+        if (
+            not raw_xmss
+            and xmss_participants is not None
+            and not any(bool(bit) for bit in xmss_participants.data)
+        ):
+            xmss_participants = None
+
+        return original_aggregate(
+            cls,
+            xmss_participants=xmss_participants,
+            children=children,
+            raw_xmss=raw_xmss,
+            message=message,
+            slot=slot,
+            mode=mode,
+        )
+
+    ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
+    AggregatedSignatureProof.aggregate = aggregate_allowing_child_only_merge
+    _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = True
 
 
 def parse_bootnodes() -> list[str]:
@@ -679,6 +724,17 @@ def parse_validator_indices() -> list[int]:
         return []
 
     return [int(index) for index in raw_indices.split(",") if index]
+
+
+def genesis_validator_count() -> int:
+    raw_count = os.environ.get(GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE, "")
+    if not raw_count:
+        return DEFAULT_VALIDATOR_COUNT
+
+    count = int(raw_count)
+    if count < 0:
+        raise ValueError(f"{GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE} must be non-negative")
+    return count
 
 
 def devnet_label() -> str:
@@ -850,7 +906,13 @@ def write_validator_keys(
 def prepare_runtime_assets(node_id: str) -> None:
     genesis_time = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", int(time.time()) + 30))
     validator_indices = parse_validator_indices()
-    validators = [load_validator(index) for index in range(VALIDATOR_COUNT)]
+    validator_count = genesis_validator_count()
+    if validator_indices and max(validator_indices) >= validator_count:
+        raise ValueError(
+            f"{GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE}={validator_count} does not include "
+            f"assigned validator index {max(validator_indices)}"
+        )
+    validators = [load_validator(index) for index in range(validator_count)]
 
     prepare_output_dirs()
     write_genesis(validators, genesis_time)
@@ -1041,6 +1103,10 @@ def subscribe_gossip_topics(
     block_topic = GossipTopic.block(fork_digest).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
 
+    if is_aggregator and hasattr(GossipTopic, "committee_aggregation"):
+        aggregation_topic = GossipTopic.committee_aggregation(fork_digest).to_topic_id()
+        event_source.subscribe_gossip_topic(aggregation_topic)
+
     subscribed_subnets: set[SubnetId] = set()
     if validator_registry is not None:
         for validator_index in validator_registry.indices():
@@ -1152,12 +1218,12 @@ async def dial_bootnodes(
 
 async def run() -> None:
     setup_logging()
-    patch_quic_stream_close()
-    patch_fast_ssz_deserialization()
-    patch_snappy_compress()
-    patch_reqresp_block_cache()
-    patch_network_service_gossip_processing()
-    patch_identify_protocol()
+    install_quic_stream_close_reset_tolerance()
+    install_snappy_compress_fallback()
+    install_reqresp_block_cache_tracking()
+    install_network_service_gossip_tracking()
+    install_identify_protocol_compatibility()
+    install_child_only_aggregation_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -1218,19 +1284,25 @@ async def run() -> None:
         node.validator_service = None
 
     published_blocks: dict[Bytes32, object] = {}
+    _BLOCK_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks
+    _SYNC_EVENT_CONTEXT[id(node.sync_service)] = (event_source, node)
+    _BLOCK_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = published_blocks
+
+    def lookup_published_block(root: Bytes32) -> object | None:
+        return published_blocks.get(root)
+
+    async def lookup_published_block_async(root: Bytes32) -> object | None:
+        return lookup_published_block(root)
+
     api_server_kwargs = {
         "config": ApiServerConfig(port=helper_api_port()),
         "store_getter": lambda: node.sync_service.store,
     }
     if api_server_supports_signed_block_getter():
-        api_server_kwargs["signed_block_getter"] = lambda root: published_blocks.get(root)
+        api_server_kwargs["signed_block_getter"] = lookup_published_block
     api_server = ApiServer(**api_server_kwargs)
     metadata_runner = await start_metadata_server(metadata)
     refresh_status(event_source, node)
-
-    _BLOCK_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks
-    _SYNC_EVENT_CONTEXT[id(node.sync_service)] = (event_source, node)
-    _BLOCK_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = published_blocks
 
     if node.validator_service is not None:
         original_on_block = node.validator_service.on_block
@@ -1242,10 +1314,7 @@ async def run() -> None:
 
         node.validator_service.on_block = cache_and_publish_block
 
-    async def lookup_published_block(root: Bytes32) -> object | None:
-        return published_blocks.get(root)
-
-    event_source.set_block_lookup(lookup_published_block)
+    event_source.set_block_lookup(lookup_published_block_async)
 
     listener_task = await start_listener_and_gossipsub(event_source)
     event_source._running = True

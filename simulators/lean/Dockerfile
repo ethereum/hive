@@ -2,7 +2,7 @@ FROM rust:bookworm AS rust-builder
 
 WORKDIR /workspace
 
-ENV RUST_MIN_STACK=16777216
+ENV RUST_MIN_STACK=33554432
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
@@ -112,7 +112,9 @@ ENV LEAN_ENV=prod \
     LEAN_SPEC_DEVNET3_ROOT=/app/devnet3 \
     LEAN_SPEC_DEVNET4_ROOT=/app/devnet4 \
     LEAN_SPEC_DEVNET3_KEYS_DIR=/app/hive/prod_scheme_devnet3 \
-    LEAN_SPEC_DEVNET4_KEYS_DIR=/app/hive/prod_scheme_devnet4
+    LEAN_SPEC_DEVNET4_KEYS_DIR=/app/hive/prod_scheme_devnet4 \
+    PYTHONFAULTHANDLER=1 \
+    RUST_MIN_STACK=33554432
 
 COPY ./simulators/lean/helper/leanspec-client.sh /app/hive/leanspec-client.sh
 COPY ./simulators/lean/helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
@@ -133,6 +135,7 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         prod_scheme/0.json \
         prod_scheme/1.json \
         prod_scheme/2.json \
+        prod_scheme/3.json \
     && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet3/ \
     && rm -rf /tmp/leansig/prod_scheme \
     && curl -4 -fsSL \
@@ -142,6 +145,7 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         prod_scheme/0.json \
         prod_scheme/1.json \
         prod_scheme/2.json \
+        prod_scheme/3.json \
     && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet4/ \
     && DEVNET3_COMMIT="$(cat /app/devnet3/.git-commit)" \
     && DEVNET4_COMMIT="$(cat /app/devnet4/.git-commit)" \

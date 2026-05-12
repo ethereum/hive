@@ -35,6 +35,7 @@ fi
 
 export VIRTUAL_ENV="${LEAN_SPEC_APP_ROOT}/.venv"
 export PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ulimit -s 32768 2>/dev/null || true
 
 cd "${LEAN_SPEC_APP_ROOT}"
 

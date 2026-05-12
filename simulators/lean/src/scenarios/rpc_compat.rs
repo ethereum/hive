@@ -966,6 +966,7 @@ dyn_async! {
                         connect_client_to_lean_spec_mesh: false,
                         client_role: ClientUnderTestRole::Validator,
                         source_helper_validator_indices: None,
+                        split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
                         helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
                     },
