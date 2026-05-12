@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import inspect
 import io
 import ipaddress
 import json
@@ -103,6 +104,10 @@ LEGACY_PUBLIC_FIELD: Final = "public"
 LEGACY_SECRET_FIELD: Final = "secret"
 
 logger = logging.getLogger("lean_spec_client_runner")
+
+
+def api_server_supports_signed_block_getter() -> bool:
+    return "signed_block_getter" in inspect.signature(ApiServer).parameters
 
 
 def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypair:
@@ -969,14 +974,17 @@ async def run() -> None:
             fork_digest=helper_gossip_fork_digest(),
         )
     )
-    api_server = ApiServer(
-        config=ApiServerConfig(port=helper_api_port()),
-        store_getter=lambda: node.sync_service.store,
-    )
+    published_blocks: dict[Bytes32, object] = {}
+    api_server_kwargs = {
+        "config": ApiServerConfig(port=helper_api_port()),
+        "store_getter": lambda: node.sync_service.store,
+    }
+    if api_server_supports_signed_block_getter():
+        api_server_kwargs["signed_block_getter"] = lambda root: published_blocks.get(root)
+    api_server = ApiServer(**api_server_kwargs)
     metadata_runner = await start_metadata_server(metadata)
     refresh_status(event_source, node)
 
-    published_blocks: dict[Bytes32, object] = {}
     _BLOCK_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks
     _SYNC_EVENT_CONTEXT[id(node.sync_service)] = (event_source, node)
     _BLOCK_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = published_blocks

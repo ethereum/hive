@@ -2,6 +2,7 @@ use crate::utils::helper::{
     lean_single_client_runtime_setup_with_live_helper, start_post_genesis_sync_context,
     HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
 };
+use crate::utils::libp2p_mock::LeanSignature;
 use crate::utils::util::{
     default_genesis_time, expect_single_client, get_json_with_retry, http_client, lean_api_url,
     lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
@@ -22,23 +23,25 @@ use ssz_types::{
 };
 use std::time::Duration;
 use tokio::time::sleep;
+use tree_hash::TreeHash;
+use tree_hash_derive::TreeHash as TreeHashDerive;
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
 const FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS: u64 = 60;
 const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanPublicKey {
     inner: FixedBytes<52>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanConfig {
     genesis_time: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanBlockHeader {
     slot: u64,
     proposer_index: u64,
@@ -47,19 +50,19 @@ struct LeanBlockHeader {
     body_root: B256,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanCheckpoint {
     root: B256,
     slot: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanValidatorDevnet3 {
     public_key: LeanPublicKey,
     index: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanValidatorDevnet4 {
     attestation_public_key: LeanPublicKey,
     proposal_public_key: LeanPublicKey,
@@ -73,7 +76,7 @@ struct LeanValidator {
     index: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanStateDevnet3 {
     config: LeanConfig,
     slot: u64,
@@ -87,7 +90,7 @@ struct LeanStateDevnet3 {
     justifications_validators: BitList<U1073741824>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanStateDevnet4 {
     config: LeanConfig,
     slot: u64,
@@ -113,10 +116,58 @@ struct LeanState {
     validators: Vec<LeanValidator>,
     justifications_roots: VariableList<B256, U262144>,
     justifications_validators: BitList<U1073741824>,
+    tree_hash_root: B256,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
+struct LeanRpcAttestationData {
+    slot: u64,
+    head: LeanCheckpoint,
+    target: LeanCheckpoint,
+    source: LeanCheckpoint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
+struct LeanRpcAggregatedAttestation {
+    aggregation_bits: BitList<U4096>,
+    message: LeanRpcAttestationData,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanRpcAggregatedSignatureProof {
+    participants: BitList<U4096>,
+    proof_data: VariableList<u8, ssz_types::typenum::U1048576>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
+struct LeanRpcBlockBody {
+    attestations: VariableList<LeanRpcAggregatedAttestation, U4096>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
+struct LeanRpcBlock {
+    slot: u64,
+    proposer_index: u64,
+    parent_root: B256,
+    state_root: B256,
+    body: LeanRpcBlockBody,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanRpcBlockSignatures {
+    attestation_signatures: VariableList<LeanRpcAggregatedSignatureProof, U4096>,
+    proposer_signature: LeanSignature,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanRpcSignedBlock {
+    block: LeanRpcBlock,
+    signature: LeanRpcBlockSignatures,
 }
 
 impl From<LeanStateDevnet3> for LeanState {
     fn from(state: LeanStateDevnet3) -> Self {
+        let tree_hash_root = state.tree_hash_root();
         Self {
             config: state.config,
             slot: state.slot,
@@ -136,12 +187,14 @@ impl From<LeanStateDevnet3> for LeanState {
                 .collect(),
             justifications_roots: state.justifications_roots,
             justifications_validators: state.justifications_validators,
+            tree_hash_root,
         }
     }
 }
 
 impl From<LeanStateDevnet4> for LeanState {
     fn from(state: LeanStateDevnet4) -> Self {
+        let tree_hash_root = state.tree_hash_root();
         Self {
             config: state.config,
             slot: state.slot,
@@ -161,6 +214,7 @@ impl From<LeanStateDevnet4> for LeanState {
                 .collect(),
             justifications_roots: state.justifications_roots,
             justifications_validators: state.justifications_validators,
+            tree_hash_root,
         }
     }
 }
@@ -175,6 +229,19 @@ fn assert_hex_root(root: &B256, field_name: &str) {
         encoded.len(),
         66,
         "{field_name} should be 32 bytes of hex plus 0x prefix"
+    );
+}
+
+fn assert_octet_stream_content_type(response: &reqwest::Response, endpoint_name: &str) {
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_else(|| panic!("{endpoint_name} should return a content-type header"));
+
+    assert_eq!(
+        content_type, SSZ_CONTENT_TYPE,
+        "{endpoint_name} should return {SSZ_CONTENT_TYPE}"
     );
 }
 
@@ -276,6 +343,28 @@ async fn load_finalized_state(client: &Client) -> LeanState {
     decode_finalized_state(&load_finalized_state_bytes(client).await)
 }
 
+async fn load_finalized_block_response(client: &Client) -> reqwest::Response {
+    load_response_with_retry(client, "/lean/v0/blocks/finalized", Some(SSZ_CONTENT_TYPE)).await
+}
+
+async fn load_finalized_block_bytes(client: &Client) -> Vec<u8> {
+    let response = load_finalized_block_response(client).await;
+    response
+        .bytes()
+        .await
+        .unwrap_or_else(|err| panic!("Unable to read finalized block response body: {err}"))
+        .to_vec()
+}
+
+fn decode_finalized_block(ssz_bytes: &[u8]) -> LeanRpcSignedBlock {
+    LeanRpcSignedBlock::from_ssz_bytes(ssz_bytes)
+        .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized block: {err:?}"))
+}
+
+async fn load_finalized_block(client: &Client) -> LeanRpcSignedBlock {
+    decode_finalized_block(&load_finalized_block_bytes(client).await)
+}
+
 async fn load_fresh_state_setup(client: &Client) -> LeanState {
     load_finalized_state(client).await
 }
@@ -332,6 +421,51 @@ async fn wait_for_finalized_state_to_reach_observed_finalized_slot(
         target_finalized.slot,
         last_state_slot.unwrap_or(0),
         last_state_latest_finalized_slot.unwrap_or(0),
+        last_current_fork_choice_slot.unwrap_or(0),
+    );
+}
+
+async fn wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(
+    client: &Client,
+) -> (
+    LeanState,
+    LeanRpcSignedBlock,
+    ForkChoiceResponse,
+    CheckpointResponse,
+) {
+    let target_fork_choice = wait_for_non_genesis_fork_choice_response(client).await;
+    let target_finalized = target_fork_choice.finalized;
+    let mut last_state_slot = None;
+    let mut last_block_slot = None;
+    let mut last_current_fork_choice_slot = None;
+
+    for _attempt in 0..FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS {
+        let state = load_finalized_state(client).await;
+        let block = load_finalized_block(client).await;
+        let current_fork_choice = load_fork_choice_response(client).await;
+
+        last_state_slot = Some(state.slot);
+        last_block_slot = Some(block.block.slot);
+        last_current_fork_choice_slot = Some(current_fork_choice.finalized.slot);
+
+        let block_root = block.block.tree_hash_root();
+        if state.slot >= target_finalized.slot
+            && block.block.slot == state.slot
+            && block.block.state_root == state.tree_hash_root
+            && block_root == current_fork_choice.finalized.root
+        {
+            return (state, block, current_fork_choice, target_finalized);
+        }
+
+        sleep(std::time::Duration::from_secs(1)).await;
+    }
+
+    panic!(
+        "finalized state and block endpoints never reached the observed finalized forkchoice slot within {} seconds (target forkchoice finalized slot: {}, latest state slot: {}, latest block slot: {}, latest current forkchoice finalized slot: {})",
+        FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS,
+        target_finalized.slot,
+        last_state_slot.unwrap_or(0),
+        last_block_slot.unwrap_or(0),
         last_current_fork_choice_slot.unwrap_or(0),
     );
 }
@@ -807,6 +941,33 @@ dyn_async! {
                 test_state_finalized_endpoint_tracks_latest_finalized_slot,
             )
             .await;
+
+            let finalized_block_pairing_genesis_time = default_genesis_time();
+
+            run_data_test_with_timeout(
+                test,
+                TimedDataTestSpec {
+                    name: "rpc_compat: finalized block pairs with finalized state".to_string(),
+                    description: "Starts the local LeanSpec helper, checkpoint-syncs the client under test to a finalized checkpoint, and checks that the finalized block endpoint returns SSZ for the block that anchors the finalized state."
+                        .to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: POST_GENESIS_TEST_TIMEOUT,
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: finalized_block_pairing_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: false,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: None,
+                        helper_peer_count: 1,
+                        helper_fork_digest_profile: helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
+                    },
+                },
+                test_finalized_block_pairs_with_finalized_state,
+            )
+            .await;
         }
     }
 }
@@ -1220,16 +1381,7 @@ dyn_async! {
 dyn_async! {
     async fn test_state_returns_octet_stream_content_type<'a>(client: Client, _: ()) {
         let response = load_finalized_state_response(&client).await;
-        let content_type = response
-            .headers()
-            .get(CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .expect("finalized state endpoint should return a content-type header");
-
-        assert_eq!(
-            content_type, "application/octet-stream",
-            "finalized state endpoint should return application/octet-stream"
-        );
+        assert_octet_stream_content_type(&response, "finalized state endpoint");
     }
 }
 
@@ -1254,6 +1406,46 @@ dyn_async! {
         assert!(
             fork_choice.finalized.slot >= observed_finalized.slot,
             "forkchoice finalized checkpoint should not regress while waiting for finalized state"
+        );
+    }
+}
+
+// /lean/v0/blocks/finalized
+dyn_async! {
+    async fn test_finalized_block_pairs_with_finalized_state<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
+        let context = start_post_genesis_sync_context(test, &test_data).await;
+        let response = load_finalized_block_response(&context.client_under_test).await;
+        assert_octet_stream_content_type(&response, "finalized block endpoint");
+
+        let initial_block_bytes = response
+            .bytes()
+            .await
+            .unwrap_or_else(|err| panic!("Unable to read finalized block response body: {err}"));
+        let _initial_block = decode_finalized_block(&initial_block_bytes);
+        assert!(
+            !initial_block_bytes.is_empty(),
+            "finalized block endpoint should return a non-empty SSZ payload"
+        );
+
+        let (state, block, fork_choice, observed_finalized) =
+            wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(&context.client_under_test).await;
+        let finalized_block_root = block.block.tree_hash_root();
+
+        assert_eq!(
+            block.block.state_root, state.tree_hash_root,
+            "finalized block state_root should match the finalized state tree hash root"
+        );
+        assert_eq!(
+            block.block.slot, state.slot,
+            "finalized block slot should match the finalized state slot"
+        );
+        assert_eq!(
+            finalized_block_root, fork_choice.finalized.root,
+            "finalized block root should match the finalized checkpoint reported by forkchoice"
+        );
+        assert!(
+            fork_choice.finalized.slot >= observed_finalized.slot,
+            "forkchoice finalized checkpoint should not regress while waiting for finalized block and state"
         );
     }
 }

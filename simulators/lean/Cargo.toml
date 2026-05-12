@@ -24,6 +24,8 @@ ssz = { package = "ethereum_ssz", version = "0.10" }
 ssz_derive = { package = "ethereum_ssz_derive", version = "0.10" }
 ssz_types = { git = "https://github.com/sigp/ssz_types.git", rev = "5dc2d521ed31f8e38b0065a80bf98af55aac06f8" }
 tokio = { version = "1.14.0", features = ["full"] }
+tree_hash = "0.12.1"
+tree_hash_derive = "0.12.1"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 unsigned-varint = { version = "0.8", features = ["asynchronous_codec"] }
