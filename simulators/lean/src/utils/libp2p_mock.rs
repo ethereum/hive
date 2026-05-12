@@ -157,7 +157,6 @@ pub struct LeanAggregatedAttestation {
 pub struct LeanAggregatedSignatureProof {
     pub participants: BitList<U4096>,
     pub proof_data: VariableList<u8, U1048576>,
-    pub bytecode_point: Option<VariableList<u8, U1048576>>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
