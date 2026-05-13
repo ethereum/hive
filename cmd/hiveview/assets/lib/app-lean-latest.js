@@ -5,12 +5,23 @@ import { formatDuration } from './utils.js';
 
 const listingURL = 'listing.jsonl?limit=1000';
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
+const trendPointLimitOptions = [5, 10, 25, 50];
 const leanLatestState = {
     entries: [],
     devnets: [],
     selectedDevnet: '',
     suiteRuns: new Map(),
     selectedRunIndexes: new Map(),
+    simLogRuns: [],
+    selectedSimLog: '',
+    collapsedSuites: new Set(),
+    suiteDataCache: new Map(),
+    trendClient: '',
+    trendSuite: '',
+    trendPointLimit: trendPointLimitOptions[0],
+    displayPreviousRunsForBlankGrids: false,
+    trendClientOptions: [],
+    trendRenderID: 0,
 };
 
 export async function loadLeanLatest(options = {}) {
@@ -44,6 +55,9 @@ export async function loadLeanLatest(options = {}) {
 async function renderSelectedDevnet(devnet, updateURL) {
     leanLatestState.selectedDevnet = devnet || '';
     leanLatestState.selectedRunIndexes = new Map();
+    leanLatestState.selectedSimLog = '';
+    leanLatestState.trendClient = '';
+    leanLatestState.trendSuite = '';
     if (updateURL) {
         updateDevnetURL(leanLatestState.selectedDevnet);
     }
@@ -51,24 +65,43 @@ async function renderSelectedDevnet(devnet, updateURL) {
 
     const entries = entriesForDevnet(leanLatestState.entries, leanLatestState.selectedDevnet);
     leanLatestState.suiteRuns = suiteRunEntries(entries);
+    leanLatestState.simLogRuns = simLogRunEntries(entries);
     if (leanLatestState.suiteRuns.size === 0) {
         const suffix = leanLatestState.selectedDevnet ? ` for ${leanLatestState.selectedDevnet}` : '';
         renderEmptyState(`No lean suite runs found${suffix}.`);
         return;
     }
 
+    applySimLogSelection(leanLatestState.simLogRuns[0]?.simLog || '');
     await renderSelectedRuns();
 }
 
 async function renderSelectedRuns() {
     const matrixGroups = await Promise.all(Array.from(leanLatestState.suiteRuns.entries()).map(([suiteName, runs]) => {
-        const runIndex = selectedRunIndex(suiteName);
-        if (runIndex >= runs.length) {
-            return [blankSuiteMatrix(suiteName, runs, runIndex)];
-        }
-        return loadSuiteMatricesForRun(runs[runIndex], runs, runIndex);
+        return leanLatestState.displayPreviousRunsForBlankGrids
+            ? loadDisplayMatricesForSuite(suiteName, runs)
+            : loadSelectedMatricesForSuite(suiteName, runs);
     }));
-    renderLeanLatest(matrixGroups.flat().filter(Boolean), leanLatestState.selectedDevnet);
+    await renderLeanLatest(matrixGroups.flat().filter(Boolean), leanLatestState.selectedDevnet);
+}
+
+async function loadSelectedMatricesForSuite(suiteName, runs) {
+    const runIndex = selectedRunIndex(suiteName);
+    if (runIndex >= runs.length) {
+        return [blankSuiteMatrix(suiteName, runs, runIndex)];
+    }
+    return loadSuiteMatricesForRun(runs[runIndex], runs, runIndex);
+}
+
+async function loadDisplayMatricesForSuite(suiteName, runs) {
+    const fallbackRuns = scoreFallbackRuns(suiteName, runs);
+    if (fallbackRuns.length === 0) {
+        return [blankSuiteMatrix(suiteName, runs, selectedRunIndex(suiteName))];
+    }
+
+    const entry = fallbackRuns[0];
+    const runIndex = runs.findIndex(run => run.fileName === entry.fileName);
+    return loadSuiteMatricesForRun(entry, runs, runIndex === -1 ? selectedRunIndex(suiteName) : runIndex);
 }
 
 async function loadSuiteMatricesForRun(entry, runHistory, runIndex) {
@@ -83,6 +116,11 @@ async function loadSuiteMatricesForRun(entry, runHistory, runIndex) {
 
 function blankSuiteMatrix(suiteName, runHistory, runIndex) {
     const devnet = leanLatestState.selectedDevnet ? ` for ${leanLatestState.selectedDevnet}` : '';
+    const simLogRun = selectedSimLogRun();
+    const missingRunLabel = simLogRun ? 'Not run in selected simulator run' : `Run ${runIndex + 1} unavailable`;
+    const emptyMessage = simLogRun
+        ? `No ${suiteName} run found in simulator run ${simLogRunDateLabel(simLogRun)}.`
+        : `No run ${runIndex + 1} found${devnet}.`;
     return {
         entry: null,
         suiteData: null,
@@ -105,7 +143,8 @@ function blankSuiteMatrix(suiteName, runHistory, runIndex) {
         runIndex,
         runSuiteName: suiteName,
         missingRun: true,
-        emptyMessage: `No run ${runIndex + 1} found${devnet}.`,
+        missingRunLabel,
+        emptyMessage,
     };
 }
 
@@ -117,62 +156,46 @@ function selectedRunIndex(suiteName) {
     return index;
 }
 
-async function selectSuiteRun(suiteName, runIndex) {
-    const runs = leanLatestState.suiteRuns.get(suiteName);
-    if (!runs || !Number.isInteger(runIndex) || runIndex < 0 || runIndex >= runs.length) {
+async function selectGlobalRun(simLog) {
+    if (!simLog || !leanLatestState.simLogRuns.some(run => run.simLog === simLog)) {
         return;
     }
 
-    leanLatestState.selectedRunIndexes.set(suiteName, runIndex);
+    applySimLogSelection(simLog);
     $('#loading-container').addClass('show');
     $('#lean-latest-error').hide();
     try {
         await renderSelectedRuns();
     } catch (err) {
-        showError(`Unable to load ${suiteName} run ${runIndex + 1}: ${err.message || err}`);
+        showError(`Unable to load simulator run ${simLog}: ${err.message || err}`);
     } finally {
         $('#loading-container').removeClass('show');
     }
 }
 
-async function selectGlobalRun(runIndex) {
-    const maxRuns = maxSuiteRunCount();
-    if (!Number.isInteger(runIndex) || runIndex < 0 || runIndex >= maxRuns) {
-        return;
-    }
-
-    Array.from(leanLatestState.suiteRuns.keys()).forEach(suiteName => {
-        leanLatestState.selectedRunIndexes.set(suiteName, runIndex);
+function applySimLogSelection(simLog) {
+    leanLatestState.selectedSimLog = simLog || '';
+    Array.from(leanLatestState.suiteRuns.entries()).forEach(([suiteName, runs]) => {
+        const runIndex = simLog ? runs.findIndex(entry => entry.simLog === simLog) : 0;
+        leanLatestState.selectedRunIndexes.set(suiteName, runIndex === -1 ? runs.length : runIndex);
     });
-    $('#loading-container').addClass('show');
-    $('#lean-latest-error').hide();
-    try {
-        await renderSelectedRuns();
-    } catch (err) {
-        showError(`Unable to load run ${runIndex + 1}: ${err.message || err}`);
-    } finally {
-        $('#loading-container').removeClass('show');
-    }
 }
 
-function maxSuiteRunCount() {
-    return Array.from(leanLatestState.suiteRuns.values()).reduce((max, runs) => Math.max(max, runs.length), 0);
-}
-
-function commonSelectedRunIndex() {
-    const suiteNames = Array.from(leanLatestState.suiteRuns.keys());
-    if (suiteNames.length === 0) {
-        return 0;
-    }
-
-    const firstIndex = selectedRunIndex(suiteNames[0]);
-    const allMatch = suiteNames.every(suiteName => selectedRunIndex(suiteName) === firstIndex);
-    return allMatch ? firstIndex : null;
+function selectedSimLogRun() {
+    return leanLatestState.simLogRuns.find(run => run.simLog === leanLatestState.selectedSimLog);
 }
 
 async function loadSuiteMatrices(entry) {
-    const suiteData = await loadJSON(routes.resultsRoot + entry.fileName);
+    const suiteData = await loadSuiteData(entry);
     return buildSuiteMatrices(entry, suiteData);
+}
+
+async function loadSuiteData(entry) {
+    const cacheKey = entry.fileName;
+    if (!leanLatestState.suiteDataCache.has(cacheKey)) {
+        leanLatestState.suiteDataCache.set(cacheKey, loadJSON(routes.resultsRoot + entry.fileName));
+    }
+    return leanLatestState.suiteDataCache.get(cacheKey);
 }
 
 async function loadText(url) {
@@ -318,6 +341,33 @@ function suiteRunEntries(entries) {
         .sort(([a], [b]) => compareSuiteNames(a, b)));
 }
 
+function simLogRunEntries(entries) {
+    const groups = new Map();
+    entries.forEach(entry => {
+        const simLog = entry.simLog || entry.fileName;
+        if (!simLog) {
+            return;
+        }
+
+        if (!groups.has(simLog)) {
+            groups.set(simLog, {
+                simLog,
+                date: simLogDate(simLog) || entry.startDate,
+                entries: [],
+            });
+        }
+        const group = groups.get(simLog);
+        group.entries.push(entry);
+        if (!group.date) {
+            group.date = entry.startDate;
+        }
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+        return compareDates(b.date, a.date) || b.simLog.localeCompare(a.simLog);
+    });
+}
+
 function compareSuiteNames(a, b) {
     const ar = suiteRank(a);
     const br = suiteRank(b);
@@ -346,6 +396,9 @@ function buildSuiteMatrix(entry, suiteData) {
             ...test,
             testIndex,
             numericIndex: numericTestIndex(testIndex),
+            sourceFileName: entry.fileName,
+            sourceSuiteName: suiteName,
+            sourceLabel: scoreSourceLabel(entry),
         }))
         .sort((a, b) => a.numericIndex - b.numericIndex || testName(a).localeCompare(testName(b)));
 
@@ -398,6 +451,9 @@ function buildClientInteropMatrices(entry, suiteData) {
             ...test,
             testIndex,
             numericIndex: numericTestIndex(testIndex),
+            sourceFileName: entry.fileName,
+            sourceSuiteName: suiteName,
+            sourceLabel: scoreSourceLabel(entry),
             topology: clientInteropTopology(test),
         }))
         .sort((a, b) => a.numericIndex - b.numericIndex || testName(a).localeCompare(testName(b)));
@@ -642,13 +698,14 @@ function isSuiteSetupTest(test, suiteName) {
     return /:\s*client launch$/i.test(name);
 }
 
-function renderLeanLatest(matrices, devnet) {
+async function renderLeanLatest(matrices, devnet) {
     if (matrices.length === 0) {
         renderEmptyState('No lean suite runs found.');
         return;
     }
 
-    const clientRanking = renderClientScores(matrices);
+    const clientRanking = await renderClientScores(matrices);
+    void renderClientTrend(clientRanking);
     applyClientRanking(matrices, clientRanking);
 
     const suiteNames = new Set(matrices.map(matrix => matrix.linkSuiteName || matrix.suiteName));
@@ -658,12 +715,16 @@ function renderLeanLatest(matrices, devnet) {
             .map(matrix => matrix.linkSuiteName || matrix.suiteName)
     ).size;
     const devnetLabel = devnet ? `${devnet} ` : '';
-    const runPrefix = matrices.some(matrix => (matrix.runIndex || 0) > 0) ? 'Selected' : 'Latest';
+    const latestSimLog = leanLatestState.simLogRuns[0]?.simLog || '';
+    const runPrefix = leanLatestState.selectedSimLog
+        ? (leanLatestState.selectedSimLog === latestSimLog ? 'Latest' : 'Selected')
+        : (matrices.some(matrix => (matrix.runIndex || 0) > 0) ? 'Selected' : 'Latest');
     $('#lean-latest-subtitle').text(`${runPrefix} ${devnetLabel}runs for ${suiteNames.size} suites.`);
     $('#lean-latest-summary').empty()
+        .append(renderGlobalRunSelector())
+        .append(renderDisplayFallbackSwitch())
         .append(summaryPill('Suites', suiteNames.size))
-        .append(summaryPill('Failing', failingSuites, failingSuites > 0 ? 'danger' : 'success'))
-        .append(renderGlobalRunSelector());
+        .append(summaryPill('Failing', failingSuites, failingSuites > 0 ? 'danger' : 'success'));
 
     const content = $('#lean-latest-content').empty();
     matrices.forEach(matrix => {
@@ -671,14 +732,14 @@ function renderLeanLatest(matrices, devnet) {
     });
 }
 
-function renderClientScores(matrices) {
+async function renderClientScores(matrices) {
     const section = $('#lean-client-score-section');
     const content = $('#lean-client-score-content').empty();
     if (!section.length) {
         return [];
     }
 
-    const scores = buildClientScores(matrices);
+    const scores = await buildClientScores(matrices);
     if (scores.clients.length === 0 || scores.rows.length === 0) {
         section.hide();
         return [];
@@ -729,6 +790,295 @@ function renderClientScores(matrices) {
     return scores.clients.slice();
 }
 
+async function renderClientTrend(clientRanking = null) {
+    const section = $('#lean-client-trend-section');
+    const controls = $('#lean-client-trend-controls').empty();
+    const content = $('#lean-client-trend-content').empty();
+    if (!section.length) {
+        return;
+    }
+
+    if (Array.isArray(clientRanking)) {
+        leanLatestState.trendClientOptions = collectTrendClients(clientRanking);
+    }
+    const clients = leanLatestState.trendClientOptions;
+    if (clients.length === 0 || leanLatestState.simLogRuns.length === 0) {
+        section.hide();
+        return;
+    }
+
+    if (!leanLatestState.trendClient || !clients.includes(leanLatestState.trendClient)) {
+        leanLatestState.trendClient = clients[0];
+    }
+
+    const suites = trendSuiteOptions();
+    if (leanLatestState.trendSuite && !suites.includes(leanLatestState.trendSuite)) {
+        leanLatestState.trendSuite = '';
+    }
+
+    section.show();
+    renderTrendControls(controls, clients, suites);
+    content.append($('<p />').addClass('text-secondary').text('Loading trend...'));
+
+    const renderID = ++leanLatestState.trendRenderID;
+    try {
+        const points = await buildTrendPoints(leanLatestState.trendClient, leanLatestState.trendSuite);
+        if (renderID !== leanLatestState.trendRenderID) {
+            return;
+        }
+        renderTrendChart(content.empty(), points, leanLatestState.trendClient, leanLatestState.trendSuite);
+    } catch (err) {
+        if (renderID !== leanLatestState.trendRenderID) {
+            return;
+        }
+        content.empty().append($('<p />').addClass('text-danger').text(`Unable to load trend: ${err.message || err}`));
+    }
+}
+
+function collectTrendClients(clientRanking) {
+    const clients = [];
+    const seen = new Set();
+    const addClient = client => {
+        if (!client || seen.has(client)) {
+            return;
+        }
+        seen.add(client);
+        clients.push(client);
+    };
+
+    clientRanking.forEach(addClient);
+    entriesForDevnet(leanLatestState.entries, leanLatestState.selectedDevnet).forEach(entry => {
+        (entry.clients || []).forEach(addClient);
+        Object.keys(entry.versions || {}).forEach(addClient);
+    });
+    return clients;
+}
+
+function trendSuiteOptions() {
+    return Array.from(leanLatestState.suiteRuns.keys());
+}
+
+function renderTrendControls(controls, clients, suites) {
+    controls.append(renderTrendSelect('Client', 'Client trend client', leanLatestState.trendClient, clients.map(client => ({
+        value: client,
+        label: client,
+    })), value => {
+        leanLatestState.trendClient = value;
+        void renderClientTrend();
+    }));
+
+    controls.append(renderTrendSelect('Suite', 'Client trend score source', leanLatestState.trendSuite, [
+        { value: '', label: 'Total' },
+        ...suites.map(suiteName => ({ value: suiteName, label: suiteName })),
+    ], value => {
+        leanLatestState.trendSuite = value;
+        void renderClientTrend();
+    }));
+
+    controls.append(renderTrendSelect('Runs', 'Client trend simlog point count', String(leanLatestState.trendPointLimit), trendPointLimitOptions.map(count => ({
+        value: String(count),
+        label: String(count),
+    })), value => {
+        const nextLimit = Number(value);
+        leanLatestState.trendPointLimit = trendPointLimitOptions.includes(nextLimit)
+            ? nextLimit
+            : trendPointLimitOptions[0];
+        void renderClientTrend();
+    }));
+}
+
+function renderTrendSelect(labelText, ariaLabel, value, options, onChange) {
+    const label = $('<label />').addClass('lean-trend-select');
+    const select = $('<select />')
+        .addClass('form-select form-select-sm')
+        .attr('aria-label', ariaLabel);
+
+    options.forEach(option => {
+        select.append($('<option />').val(option.value).text(option.label));
+    });
+    select.val(value);
+    select.on('change', function() {
+        onChange($(this).val());
+    });
+
+    label.append($('<span />').text(labelText));
+    label.append(select);
+    return label;
+}
+
+async function buildTrendPoints(client, suiteName) {
+    const points = [];
+    const pointLimit = leanLatestState.trendPointLimit || trendPointLimitOptions[0];
+    for (const run of trendCandidateRuns(suiteName)) {
+        const entries = suiteName
+            ? run.entries.filter(entry => entry.name === suiteName)
+            : run.entries;
+        const score = await scoreClientForEntries(entries, client);
+        if (score.total === 0) {
+            continue;
+        }
+
+        points.push({ run, score });
+        if (points.length >= pointLimit) {
+            break;
+        }
+    }
+    return points;
+}
+
+function trendCandidateRuns(suiteName) {
+    return suiteName
+        ? leanLatestState.simLogRuns.filter(run => run.entries.some(entry => entry.name === suiteName))
+        : leanLatestState.simLogRuns;
+}
+
+async function scoreClientForEntries(entries, client) {
+    const matrixGroups = await Promise.all(entries.map(loadSuiteMatrices));
+    const score = emptyScore();
+    matrixGroups.flat().forEach(matrix => {
+        const suiteName = matrix.linkSuiteName || matrix.suiteName;
+        matrix.cases.forEach(test => {
+            if (isSuiteSetupTest(test, suiteName)) {
+                return;
+            }
+            if (scoreClientNamesForTest(test).includes(client)) {
+                incrementScore(score, test);
+            }
+        });
+    });
+    return score;
+}
+
+function renderTrendChart(content, points, client, suiteName) {
+    if (points.length === 0) {
+        content.append($('<p />').addClass('text-secondary').text('No trend data available.'));
+        return;
+    }
+
+    const source = suiteName || 'Total score';
+    content.append($('<p />')
+        .addClass('lean-trend-summary')
+        .text(`${client} - ${source} (Newest to Oldest)`));
+
+    const chart = $('<div />').addClass('lean-trend-chart');
+    const yAxis = $('<div />').addClass('lean-trend-y-axis');
+    [100, 75, 50, 25, 0].forEach(percent => {
+        yAxis.append($('<span />').text(`${percent}%`));
+    });
+
+    const axisWidth = trendAxisWidth(points.length);
+    const plot = $('<div />')
+        .addClass('lean-trend-plot')
+        .css('width', axisWidth);
+    plot.append(renderTrendGridLines());
+    plot.append(renderTrendLinePlot(points, client));
+
+    const xAxis = $('<div />')
+        .addClass('lean-trend-x-axis')
+        .css('width', axisWidth);
+    const xAxisInner = $('<div />').addClass('lean-trend-x-axis-inner');
+    points.forEach((point, index) => {
+        xAxisInner.append($('<span />')
+            .addClass('lean-trend-x-label')
+            .css('left', `${trendPointX(index, points.length)}%`)
+            .attr('title', simLogRunDateTitle(point.run))
+            .text(simLogRunDateLabel(point.run)));
+    });
+    xAxis.append(xAxisInner);
+
+    chart.append(yAxis, plot, $('<div />'), xAxis);
+    content.append(chart);
+}
+
+function trendAxisWidth(pointCount) {
+    const labelWidthRem = 5.75;
+    const labelGapRem = 0.5;
+    return `max(100%, ${(pointCount * labelWidthRem) + (Math.max(pointCount - 1, 0) * labelGapRem)}rem)`;
+}
+
+function renderTrendGridLines() {
+    const svg = $(svgElement('svg', {
+        class: 'lean-trend-grid-svg',
+        viewBox: '0 0 100 100',
+        preserveAspectRatio: 'none',
+        'aria-hidden': 'true',
+        focusable: 'false',
+    }));
+    [25, 50, 75].forEach(y => {
+        svg.append(svgElement('line', {
+            class: 'lean-trend-grid-line',
+            x1: '0',
+            y1: String(y),
+            x2: '100',
+            y2: String(y),
+        }));
+    });
+    return svg;
+}
+
+function renderTrendLinePlot(points, client) {
+    const plot = $('<div />')
+        .addClass('lean-trend-line-plot')
+        .attr('role', 'img')
+        .attr('aria-label', `${client} passing percentage trend`);
+    const svg = $(svgElement('svg', {
+        class: 'lean-trend-line-svg',
+        viewBox: '0 0 100 100',
+        preserveAspectRatio: 'none',
+        'aria-hidden': 'true',
+        focusable: 'false',
+    }));
+    const linePoints = [];
+
+    points.forEach((point, index) => {
+        const score = point.score;
+        const percent = Math.round(scorePercent(score) * 100);
+        const coords = trendPointCoordinates(index, points.length, percent);
+        const labelAbove = coords.y >= 14;
+        linePoints.push(coords);
+        plot.append($('<span />')
+            .addClass('lean-trend-value')
+            .toggleClass('below', !labelAbove)
+            .css('left', `${coords.x}%`)
+            .css('top', `${coords.y}%`)
+            .text(`${percent}%`));
+        plot.append($('<span />')
+            .addClass('lean-trend-dot')
+            .toggleClass('has-failures', score.failed > 0)
+            .css('left', `${coords.x}%`)
+            .css('top', `${coords.y}%`)
+            .attr('title', `${percent}% (${score.passed}/${score.total} passed)`));
+    });
+
+    if (linePoints.length > 1) {
+        svg.append(svgElement('polyline', {
+            class: 'lean-trend-line',
+            points: linePoints.map(point => `${point.x},${point.y}`).join(' '),
+        }));
+    }
+    plot.prepend(svg);
+    return plot;
+}
+
+function trendPointCoordinates(index, total, percent) {
+    return {
+        x: trendPointX(index, total),
+        y: 100 - percent,
+    };
+}
+
+function trendPointX(index, total) {
+    return total <= 1 ? 50 : index * (100 / (total - 1));
+}
+
+function svgElement(name, attrs = {}) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+    Object.entries(attrs).forEach(([key, value]) => {
+        element.setAttribute(key, value);
+    });
+    return element;
+}
+
 function applyClientRanking(matrices, ranking) {
     if (!ranking || ranking.length === 0) {
         return;
@@ -752,12 +1102,14 @@ function applyClientRanking(matrices, ranking) {
     });
 }
 
-function buildClientScores(matrices) {
+async function buildClientScores(matrices) {
     const clients = [];
     const seenClients = new Set();
     const rows = [];
     const rowsBySuite = new Map();
     const totals = new Map();
+    const matrixCache = scoreMatrixCache(matrices);
+    const targetClients = collectScoreTargetClients(matrices);
 
     const addClient = name => {
         if (!name || seenClients.has(name)) {
@@ -775,40 +1127,211 @@ function buildClientScores(matrices) {
         return cells.get(client);
     };
 
-    matrices.forEach(matrix => {
-        const suiteName = matrix.linkSuiteName || matrix.suiteName;
+    const suiteNames = Array.from(leanLatestState.suiteRuns.keys());
+    if (suiteNames.length === 0) {
+        matrices.forEach(matrix => {
+            const suiteName = matrix.linkSuiteName || matrix.suiteName;
+            if (!rowsBySuite.has(suiteName)) {
+                const row = {
+                    suiteName,
+                    fileName: matrix.entry ? matrix.entry.fileName : '',
+                    linkSuiteName: matrix.linkSuiteName || matrix.suiteName,
+                    cells: new Map(),
+                };
+                rowsBySuite.set(suiteName, row);
+                rows.push(row);
+            }
+            const row = rowsBySuite.get(suiteName);
+
+            addMatrixScoresToRow(row, [matrix], addClient, scoreFor, totals, matrix.entry, targetClients);
+        });
+        clients.sort((a, b) => compareClientScores(totals, a, b));
+        return { clients, rows, totals };
+    }
+
+    for (const suiteName of suiteNames) {
         if (!rowsBySuite.has(suiteName)) {
             const row = {
                 suiteName,
-                fileName: matrix.entry ? matrix.entry.fileName : '',
-                linkSuiteName: matrix.linkSuiteName || matrix.suiteName,
+                fileName: '',
+                linkSuiteName: suiteName,
                 cells: new Map(),
             };
             rowsBySuite.set(suiteName, row);
             rows.push(row);
         }
         const row = rowsBySuite.get(suiteName);
+        const runs = leanLatestState.suiteRuns.get(suiteName) || [];
 
-        matrix.clients.forEach(client => addClient(client.name));
-        matrix.cases.forEach(test => {
-            if (isSuiteSetupTest(test, suiteName)) {
-                return;
+        for (const entry of scoreFallbackRuns(suiteName, runs)) {
+            const scoreMatrices = await loadScoreMatrices(entry, matrixCache);
+            addMatrixScoresToRow(row, scoreMatrices, addClient, scoreFor, totals, entry, targetClients);
+            if (scoreRowComplete(row, targetClients)) {
+                break;
             }
-
-            scoreClientNamesForTest(test).forEach(client => {
-                addClient(client);
-                incrementScore(scoreFor(row.cells, client), test);
-                incrementScore(totals.get(client), test);
-            });
-        });
-    });
+        }
+    }
 
     clients.sort((a, b) => compareClientScores(totals, a, b));
     return { clients, rows, totals };
 }
 
+function collectScoreTargetClients(matrices) {
+    const clients = new Set();
+    entriesForDevnet(leanLatestState.entries, leanLatestState.selectedDevnet).forEach(entry => {
+        (entry.clients || []).forEach(client => clients.add(client));
+        Object.keys(entry.versions || {}).forEach(client => clients.add(client));
+    });
+    matrices.forEach(matrix => {
+        matrix.clients.forEach(client => clients.add(client.name));
+        matrix.cases.forEach(test => {
+            scoreClientNamesForTest(test).forEach(client => clients.add(client));
+        });
+    });
+    return clients;
+}
+
+function scoreRowComplete(row, targetClients) {
+    if (targetClients.size === 0) {
+        return false;
+    }
+    return Array.from(targetClients).every(client => {
+        const score = row.cells.get(client);
+        return score && score.total > 0;
+    });
+}
+
+function scoreMatrixCache(matrices) {
+    const cache = new Map();
+    matrices.forEach(matrix => {
+        if (!matrix.entry || !matrix.entry.fileName) {
+            return;
+        }
+        if (!cache.has(matrix.entry.fileName)) {
+            cache.set(matrix.entry.fileName, []);
+        }
+        cache.get(matrix.entry.fileName).push(matrix);
+    });
+    return cache;
+}
+
+async function loadScoreMatrices(entry, matrixCache) {
+    if (matrixCache.has(entry.fileName)) {
+        return matrixCache.get(entry.fileName);
+    }
+    const matrices = await loadSuiteMatrices(entry);
+    matrixCache.set(entry.fileName, matrices);
+    return matrices;
+}
+
+function scoreFallbackRuns(suiteName, runs) {
+    if (runs.length === 0) {
+        return [];
+    }
+
+    const runIndex = selectedRunIndex(suiteName);
+    if (runIndex < runs.length) {
+        return runs.slice(runIndex);
+    }
+
+    const selectedRun = selectedSimLogRun();
+    if (!selectedRun || !selectedRun.date) {
+        return runs.slice(0);
+    }
+
+    const fallbackIndex = runs.findIndex(entry => compareDates(scoreEntryDate(entry), selectedRun.date) <= 0);
+    return fallbackIndex === -1 ? [] : runs.slice(fallbackIndex);
+}
+
+function scoreEntryDate(entry) {
+    return simLogDate(entry.simLog) || entry.startDate;
+}
+
+function addMatrixScoresToRow(row, matrices, addClient, scoreFor, totals, entry, targetClients) {
+    const sourceScores = clientScoresForMatrices(matrices);
+    sourceScores.forEach((sourceScore, client) => {
+        if (targetClients.size > 0 && !targetClients.has(client)) {
+            return;
+        }
+        addClient(client);
+        const cell = scoreFor(row.cells, client);
+        if (cell.total > 0 || sourceScore.total === 0) {
+            return;
+        }
+
+        const matrix = sourceScore.matrix;
+        cell.passed = sourceScore.passed;
+        cell.failed = sourceScore.failed;
+        cell.total = sourceScore.total;
+        cell.fileName = entry ? entry.fileName : (matrix.entry ? matrix.entry.fileName : '');
+        cell.linkSuiteName = matrix.linkSuiteName || matrix.suiteName || row.linkSuiteName;
+        cell.sourceLabel = scoreSourceLabel(entry || matrix.entry);
+        incrementScoreBy(totals.get(client), sourceScore);
+        if (!row.fileName) {
+            row.fileName = cell.fileName;
+        }
+    });
+}
+
+function clientScoresForMatrices(matrices) {
+    const scores = new Map();
+    matrices.forEach(matrix => {
+        const suiteName = matrix.linkSuiteName || matrix.suiteName;
+        clientScoresForMatrix(matrix, suiteName).forEach((sourceScore, client) => {
+            if (!scores.has(client)) {
+                scores.set(client, {
+                    ...emptyScore(),
+                    matrix,
+                });
+            }
+            incrementScoreBy(scores.get(client), sourceScore);
+        });
+    });
+    return scores;
+}
+
+function clientScoresForMatrix(matrix, suiteName) {
+    const scores = new Map();
+    const scoreForClient = client => {
+        if (!scores.has(client)) {
+            scores.set(client, emptyScore());
+        }
+        return scores.get(client);
+    };
+
+    matrix.cases.forEach(test => {
+        if (isSuiteSetupTest(test, suiteName)) {
+            return;
+        }
+
+        scoreClientNamesForTest(test).forEach(client => {
+            incrementScore(scoreForClient(client), test);
+        });
+    });
+    return scores;
+}
+
+function incrementScoreBy(score, sourceScore) {
+    score.passed += sourceScore.passed;
+    score.failed += sourceScore.failed;
+    score.total += sourceScore.total;
+}
+
+function scoreSourceLabel(entry) {
+    if (!entry) {
+        return '';
+    }
+    return formatDateLabel(scoreEntryDate(entry), entry.simLog || entry.start || entry.fileName);
+}
+
 function suiteClientURL(row, client) {
-    return `${routes.suite(row.fileName, row.linkSuiteName)}&client=${encodeURIComponent(client)}`;
+    const cell = row.cells.get(client);
+    const fileName = cell?.fileName || row.fileName;
+    const suiteName = cell?.linkSuiteName || row.linkSuiteName;
+    if (!fileName || !suiteName) {
+        return '';
+    }
+    return `${routes.suite(fileName, suiteName)}&client=${encodeURIComponent(client)}`;
 }
 
 function compareClientScores(totals, a, b) {
@@ -870,8 +1393,9 @@ function renderScoreCell(score, options = {}) {
     }
 
     const statusClass = score.failed > 0 ? 'has-failures' : 'all-passed';
+    const source = score.sourceLabel ? ` from ${score.sourceLabel}` : '';
     value.addClass(statusClass)
-        .attr('title', `${score.passed} passed, ${score.failed} failed`)
+        .attr('title', `${score.passed} passed, ${score.failed} failed${source}`)
         .text(`${score.passed}/${score.total}`);
     if (shouldLink) {
         value.addClass('clickable')
@@ -920,13 +1444,18 @@ function renderSuiteSection(matrix) {
     const header = $('<div />').addClass('lean-suite-header');
     const title = $('<div />').addClass('lean-suite-title');
     const actions = $('<div />').addClass('lean-suite-actions');
+    const suiteKey = suiteCollapseKey(matrix);
+    const hasGrid = !matrix.missingRun && matrix.rows.length > 0 && matrix.clients.length > 0;
+    const collapsed = hasGrid && leanLatestState.collapsedSuites.has(suiteKey);
 
     title.append($('<h2 />').text(matrix.suiteName));
     title.append(renderSuiteMeta(matrix));
 
     const statusClass = matrix.stats.failed > 0 ? 'bg-danger' : 'bg-success';
     const statusText = matrix.stats.failed > 0 ? 'Fail' : 'Pass';
-    actions.append(renderRunSelector(matrix));
+    if (hasGrid) {
+        actions.append(renderCollapseButton(suiteKey, collapsed));
+    }
     if (!matrix.missingRun) {
         actions.append($('<span />').addClass(`badge ${statusClass}`).text(statusText));
         actions.append($('<a />')
@@ -937,9 +1466,13 @@ function renderSuiteSection(matrix) {
 
     header.append(title, actions);
     section.append(header);
+    section.toggleClass('is-collapsed', collapsed);
+
+    const body = $('<div />').addClass('lean-suite-body').prop('hidden', collapsed);
+    section.append(body);
 
     if (matrix.missingRun || matrix.rows.length === 0 || matrix.clients.length === 0) {
-        section.append($('<p />').addClass('text-secondary').text(matrix.emptyMessage || 'No test cases with client results.'));
+        body.append($('<p />').addClass('text-secondary').text(matrix.emptyMessage || 'No test cases with client results.'));
         return section;
     }
 
@@ -972,37 +1505,73 @@ function renderSuiteSection(matrix) {
     });
     table.append(tbody);
     scroll.append(table);
-    section.append(scroll);
+    body.append(scroll);
 
     return section;
 }
 
+function suiteCollapseKey(matrix) {
+    return matrix.linkSuiteName || matrix.suiteName;
+}
+
+function renderCollapseButton(suiteKey, collapsed) {
+    const button = $('<button />')
+        .attr('type', 'button')
+        .addClass('btn btn-sm btn-secondary lean-collapse-button');
+    updateCollapseButton(button, collapsed);
+
+    button.on('click', function() {
+        const nextCollapsed = !leanLatestState.collapsedSuites.has(suiteKey);
+        if (nextCollapsed) {
+            leanLatestState.collapsedSuites.add(suiteKey);
+        } else {
+            leanLatestState.collapsedSuites.delete(suiteKey);
+        }
+
+        const section = $(this).closest('.lean-suite-section');
+        section.toggleClass('is-collapsed', nextCollapsed);
+        section.children('.lean-suite-body').prop('hidden', nextCollapsed);
+        updateCollapseButton($(this), nextCollapsed);
+    });
+
+    return button;
+}
+
+function updateCollapseButton(button, collapsed) {
+    button
+        .attr('aria-expanded', collapsed ? 'false' : 'true')
+        .attr('aria-label', collapsed ? 'Expand grid' : 'Collapse grid')
+        .attr('title', collapsed ? 'Expand grid' : 'Collapse grid')
+        .empty()
+        .append($('<i />').addClass(collapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'));
+}
+
 function renderGlobalRunSelector() {
-    const maxRuns = maxSuiteRunCount();
-    if (maxRuns === 0) {
+    const simLogRuns = leanLatestState.simLogRuns;
+    if (simLogRuns.length === 0) {
         return $();
     }
 
     const label = $('<label />').addClass('lean-run-selector lean-global-run-selector');
     const select = $('<select />')
         .addClass('form-select form-select-sm')
-        .attr('aria-label', 'Set run for all suites');
-    const selectedIndex = commonSelectedRunIndex();
+        .attr('aria-label', 'Set simulator run for all suites');
+    const selectedRun = selectedSimLogRun();
 
-    if (selectedIndex === null) {
+    if (!selectedRun) {
         select.append($('<option />').val('').text('Mixed').prop('disabled', true));
     }
-    for (let index = 0; index < maxRuns; index++) {
+    simLogRuns.forEach(run => {
         select.append($('<option />')
-            .val(String(index))
-            .text(String(index + 1))
-            .attr('title', globalRunDateTitle(index)));
-    }
+            .val(run.simLog)
+            .text(simLogRunDateLabel(run))
+            .attr('title', simLogRunDateTitle(run)));
+    });
 
-    select.val(selectedIndex === null ? '' : String(selectedIndex));
-    select.attr('title', selectedIndex === null ? 'Suite run selections differ' : globalRunDateTitle(selectedIndex));
+    select.val(selectedRun ? selectedRun.simLog : '');
+    select.attr('title', selectedRun ? simLogRunDateTitle(selectedRun) : 'Suite run selections differ');
     select.on('change', function() {
-        selectGlobalRun(Number.parseInt($(this).val(), 10));
+        selectGlobalRun($(this).val());
     });
 
     label.append($('<span />').text('Run'));
@@ -1010,81 +1579,82 @@ function renderGlobalRunSelector() {
     return label;
 }
 
-function renderRunSelector(matrix) {
-    const runHistory = matrix.runHistory || [];
-    const suiteName = matrix.runSuiteName || matrix.linkSuiteName || matrix.suiteName;
-    if (runHistory.length === 0) {
-        return $();
-    }
+function renderDisplayFallbackSwitch() {
+    const labelText = 'display previous simulator runs for blank grids';
+    const wrapper = $('<label />').addClass('form-check form-switch lean-display-fallback-switch');
+    const input = $('<input />')
+        .addClass('form-check-input')
+        .attr('type', 'checkbox')
+        .attr('role', 'switch')
+        .attr('aria-label', labelText)
+        .prop('checked', leanLatestState.displayPreviousRunsForBlankGrids)
+        .on('change', function() {
+            selectDisplayFallback($(this).prop('checked'));
+        });
 
-    const label = $('<label />').addClass('lean-run-selector');
-    const select = $('<select />')
-        .addClass('form-select form-select-sm')
-        .attr('aria-label', `${matrix.suiteName} run history`);
-
-    const optionCount = Math.max(runHistory.length, (matrix.runIndex || 0) + 1);
-    for (let index = 0; index < optionCount; index++) {
-        const entry = runHistory[index];
-        const option = $('<option />').val(String(index)).text(String(index + 1));
-        if (!entry) {
-            option.prop('disabled', true).attr('title', 'No run found for this suite');
-            select.append(option);
-            continue;
-        }
-
-        const start = runDateTitle(entry);
-        if (start) {
-            option.attr('title', start);
-        }
-        select.append(option);
-    }
-
-    select.val(String(matrix.runIndex || 0));
-    select.attr('title', suiteRunDateTitle(runHistory, matrix.runIndex || 0));
-    if (optionCount === 1) {
-        select.prop('disabled', true);
-    }
-    select.on('change', function() {
-        selectSuiteRun(suiteName, Number.parseInt($(this).val(), 10));
-    });
-
-    label.append($('<span />').text('Run'));
-    label.append(select);
-    return label;
+    wrapper.append(input);
+    wrapper.append($('<span />').addClass('form-check-label').text(labelText));
+    return wrapper;
 }
 
-function suiteRunDateTitle(runHistory, runIndex) {
-    const entry = runHistory[runIndex];
-    return entry ? runDateTitle(entry) : 'No run found for this suite';
-}
-
-function globalRunDateTitle(runIndex) {
-    const entries = Array.from(leanLatestState.suiteRuns.values())
-        .map(runs => runs[runIndex])
-        .filter(Boolean);
-    if (entries.length === 0) {
-        return 'No run found for any suite';
+async function selectDisplayFallback(enabled) {
+    if (leanLatestState.displayPreviousRunsForBlankGrids === enabled) {
+        return;
     }
 
-    const latestEntry = entries.reduce((latest, entry) => {
-        return compareDates(entry.startDate, latest.startDate) > 0 ? entry : latest;
-    }, entries[0]);
-    const start = runDateTitle(latestEntry);
-    return start ? `Most recent suite run: ${start}` : 'No run date available';
+    leanLatestState.displayPreviousRunsForBlankGrids = enabled;
+    $('#loading-container').addClass('show');
+    $('#lean-latest-error').hide();
+    try {
+        await renderSelectedRuns();
+    } catch (err) {
+        showError(`Unable to update grid display: ${err.message || err}`);
+    } finally {
+        $('#loading-container').removeClass('show');
+    }
 }
 
-function runDateTitle(entry) {
-    if (!entry) {
-        return '';
+function simLogRunDateTitle(run) {
+    const label = simLogRunDateLabel(run);
+    return run.simLog ? `Simulator run: ${label} - ${run.simLog}` : label;
+}
+
+function simLogRunDateLabel(run) {
+    if (!run) {
+        return 'Unavailable';
     }
-    const start = entry.startDate || parseDate(entry.start);
-    return start ? start.toLocaleString() : entry.start || '';
+    return formatDateLabel(run.date, run.simLog || 'Unavailable');
+}
+
+function simLogDate(simLog) {
+    const match = (simLog || '').match(/^([0-9]+)-simulator-/);
+    if (!match) {
+        return null;
+    }
+    const seconds = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(seconds)) {
+        return null;
+    }
+    return new Date(seconds * 1000);
+}
+
+function formatDateLabel(start, fallback) {
+    if (!start) {
+        return fallback || 'Unavailable';
+    }
+
+    const pad = value => String(value).padStart(2, '0');
+    return [
+        start.getFullYear(),
+        pad(start.getMonth() + 1),
+        pad(start.getDate()),
+    ].join('/') + ` ${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`;
 }
 
 function renderSuiteMeta(matrix) {
     const meta = $('<div />').addClass('lean-suite-meta');
     if (matrix.missingRun) {
-        meta.append($('<span />').text(`Run ${matrix.runIndex + 1} unavailable`));
+        meta.append($('<span />').text(matrix.missingRunLabel || `Run ${matrix.runIndex + 1} unavailable`));
         return meta;
     }
 
@@ -1120,7 +1690,11 @@ function renderResultCell(matrix, row, client) {
 
     const status = resultStatus(tests);
     const linkedTest = preferredLinkedTest(tests);
-    const url = routes.testInSuite(matrix.entry.fileName, matrix.linkSuiteName || matrix.suiteName, linkedTest.testIndex);
+    const url = routes.testInSuite(
+        linkedTest.sourceFileName || matrix.entry.fileName,
+        linkedTest.sourceSuiteName || matrix.linkSuiteName || matrix.suiteName,
+        linkedTest.testIndex
+    );
     const label = statusLabel(status);
     const link = $('<a />')
         .addClass(`lean-result-box ${status}`)
@@ -1154,14 +1728,24 @@ function rowLabel(row) {
 }
 
 function resultTitle(matrix, row, client, tests, label) {
+    const source = resultSourceSuffix(matrix, tests);
     if (matrix.columnRoleLabel && row.name === client.name) {
-        return `${row.name} (3 nodes): ${label}`;
+        return `${row.name} (3 nodes): ${label}${source}`;
     }
     if (matrix.columnRoleLabel) {
         const rowRole = matrix.rowRoleLabel || matrix.rowHeaderLabel;
-        return `${rowRole} ${rowLabel(row)}, ${matrix.columnRoleLabel} ${client.label}: ${label}`;
+        return `${rowRole} ${rowLabel(row)}, ${matrix.columnRoleLabel} ${client.label}: ${label}${source}`;
     }
-    return `${client.label}: ${label} - ${rowLabel(row)}`;
+    return `${client.label}: ${label} - ${rowLabel(row)}${source}`;
+}
+
+function resultSourceSuffix(matrix, tests) {
+    const linkedTest = preferredLinkedTest(tests);
+    if (!linkedTest || !linkedTest.sourceLabel) {
+        return '';
+    }
+    const matrixSource = scoreSourceLabel(matrix.entry);
+    return linkedTest.sourceLabel === matrixSource ? '' : ` from ${linkedTest.sourceLabel}`;
 }
 
 function statusLabel(status) {
@@ -1188,6 +1772,10 @@ function summaryPill(label, value, tone) {
 function renderEmptyState(message) {
     $('#lean-client-score-section').hide();
     $('#lean-client-score-content').empty();
+    $('#lean-client-trend-section').hide();
+    $('#lean-client-trend-controls').empty();
+    $('#lean-client-trend-content').empty();
+    leanLatestState.trendRenderID++;
     $('#lean-latest-subtitle').text('');
     $('#lean-latest-summary').empty();
     $('#lean-latest-content').empty().append($('<p />').addClass('text-secondary').text(message));

@@ -11,7 +11,7 @@ main {
     margin: 8px 8px;
     font-size: 12pt;
     min-width: 340px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 #hive-header {
@@ -634,7 +634,7 @@ kbd {
 
 .lean-latest-page {
     --lean-section-heading-size: 1.35rem;
-    overflow: hidden;
+    overflow: visible;
 }
 
 #run-history-section {
@@ -651,13 +651,19 @@ kbd {
 }
 
 .lean-latest-title-row {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
+    padding-top: 0.65rem;
     padding-bottom: 0.65rem;
     border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    box-shadow: 0 0.45rem 0.85rem rgba(0, 0, 0, 0.12);
 }
 
 .lean-latest-title-row h1,
@@ -694,6 +700,159 @@ kbd {
 
 .lean-client-score-section {
     margin-bottom: 1.75rem;
+}
+
+.lean-client-trend-section {
+    margin-bottom: 1.75rem;
+}
+
+.lean-trend-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.lean-trend-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    color: var(--bs-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.lean-trend-select .form-select {
+    width: auto;
+    min-width: 10rem;
+}
+
+.lean-trend-summary {
+    margin: 0 0 0.5rem;
+    color: var(--bs-secondary);
+    font-size: 0.9rem;
+}
+
+.lean-trend-chart {
+    --lean-trend-plot-inset-x: 2.875rem;
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    grid-template-rows: 13rem auto;
+    gap: 0.4rem 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+}
+
+.lean-trend-y-axis {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    color: var(--bs-secondary);
+    font-size: 0.78rem;
+    line-height: 1;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.lean-trend-plot {
+    position: relative;
+    min-height: 13rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--bs-border-color));
+}
+
+.lean-trend-line-plot {
+    position: absolute;
+    inset: 0 var(--lean-trend-plot-inset-x);
+}
+
+.lean-trend-line-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.lean-trend-grid-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.lean-trend-line {
+    fill: none;
+    stroke: var(--bs-info);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.lean-trend-grid-line {
+    stroke: var(--bs-border-color);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.lean-trend-dot {
+    position: absolute;
+    z-index: 2;
+    width: 0.72rem;
+    height: 0.72rem;
+    border: 2px solid var(--bs-body-bg);
+    border-radius: 999px;
+    background: var(--bs-success);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--bs-success) 70%, #000);
+    transform: translate(-50%, -50%);
+}
+
+.lean-trend-dot.has-failures {
+    background: var(--bs-danger);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--bs-danger) 70%, #000);
+}
+
+.lean-trend-value {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    color: var(--bs-body-color);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 0.55rem));
+}
+
+.lean-trend-value.below {
+    transform: translate(-50%, 0.55rem);
+}
+
+.lean-trend-x-axis {
+    position: relative;
+    min-height: 2.35rem;
+    color: var(--bs-secondary);
+    font-size: 0.78rem;
+    line-height: 1.2;
+}
+
+.lean-trend-x-axis-inner {
+    position: absolute;
+    inset: 0 var(--lean-trend-plot-inset-x);
+}
+
+.lean-trend-x-label {
+    position: absolute;
+    top: 0;
+    width: 5.75rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+    transform: translateX(-50%);
 }
 
 .lean-devnet-controls {
@@ -754,6 +913,12 @@ kbd {
     border-bottom: 0;
 }
 
+.lean-suite-section.is-collapsed .lean-suite-header {
+    margin-bottom: 0;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
 .lean-suite-meta {
     display: flex;
     flex-wrap: wrap;
@@ -772,6 +937,16 @@ kbd {
     flex-shrink: 0;
 }
 
+.lean-collapse-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    min-width: 2rem;
+    padding-left: 0;
+    padding-right: 0;
+}
+
 .lean-run-selector {
     display: inline-flex;
     align-items: center;
@@ -784,7 +959,7 @@ kbd {
 
 .lean-run-selector .form-select {
     width: auto;
-    min-width: 4.25rem;
+    min-width: 12.5rem;
     padding-right: 1.75rem;
 }
 
@@ -793,6 +968,25 @@ kbd {
     border-radius: 6px;
     padding: 0.25rem 0.55rem;
     background: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-border-color));
+}
+
+.lean-display-fallback-switch {
+    display: inline-flex;
+    align-items: center;
+    min-height: 0;
+    gap: 0.45rem;
+    margin: 0;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem 0.35rem 2.6rem;
+    color: var(--bs-secondary);
+    font-size: 0.85rem;
+    line-height: 1.2;
+    background: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-border-color));
+}
+
+.lean-display-fallback-switch .form-check-input {
+    margin-top: 0;
 }
 
 .lean-grid-scroll {
@@ -979,6 +1173,7 @@ kbd {
 
     .lean-latest-summary,
     .lean-latest-summary-panel,
+    .lean-trend-controls,
     .lean-devnet-controls,
     .lean-suite-actions {
         align-items: flex-start;
