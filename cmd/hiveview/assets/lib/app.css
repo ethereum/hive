@@ -767,8 +767,32 @@ kbd {
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 0.5rem;
     flex-shrink: 0;
+}
+
+.lean-run-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    color: var(--bs-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.lean-run-selector .form-select {
+    width: auto;
+    min-width: 4.25rem;
+    padding-right: 1.75rem;
+}
+
+.lean-global-run-selector {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    padding: 0.25rem 0.55rem;
+    background: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-border-color));
 }
 
 .lean-grid-scroll {

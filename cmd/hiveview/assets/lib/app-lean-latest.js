@@ -9,6 +9,8 @@ const leanLatestState = {
     entries: [],
     devnets: [],
     selectedDevnet: '',
+    suiteRuns: new Map(),
+    selectedRunIndexes: new Map(),
 };
 
 export async function loadLeanLatest(options = {}) {
@@ -41,21 +43,131 @@ export async function loadLeanLatest(options = {}) {
 
 async function renderSelectedDevnet(devnet, updateURL) {
     leanLatestState.selectedDevnet = devnet || '';
+    leanLatestState.selectedRunIndexes = new Map();
     if (updateURL) {
         updateDevnetURL(leanLatestState.selectedDevnet);
     }
     renderDevnetControls(leanLatestState.devnets, leanLatestState.selectedDevnet);
 
     const entries = entriesForDevnet(leanLatestState.entries, leanLatestState.selectedDevnet);
-    const latestEntries = latestSuiteEntries(entries);
-    if (latestEntries.length === 0) {
+    leanLatestState.suiteRuns = suiteRunEntries(entries);
+    if (leanLatestState.suiteRuns.size === 0) {
         const suffix = leanLatestState.selectedDevnet ? ` for ${leanLatestState.selectedDevnet}` : '';
         renderEmptyState(`No lean suite runs found${suffix}.`);
         return;
     }
 
-    const matrices = await Promise.all(latestEntries.map(loadSuiteMatrices));
-    renderLeanLatest(matrices.flat().filter(Boolean), leanLatestState.selectedDevnet);
+    await renderSelectedRuns();
+}
+
+async function renderSelectedRuns() {
+    const matrixGroups = await Promise.all(Array.from(leanLatestState.suiteRuns.entries()).map(([suiteName, runs]) => {
+        const runIndex = selectedRunIndex(suiteName);
+        if (runIndex >= runs.length) {
+            return [blankSuiteMatrix(suiteName, runs, runIndex)];
+        }
+        return loadSuiteMatricesForRun(runs[runIndex], runs, runIndex);
+    }));
+    renderLeanLatest(matrixGroups.flat().filter(Boolean), leanLatestState.selectedDevnet);
+}
+
+async function loadSuiteMatricesForRun(entry, runHistory, runIndex) {
+    const matrices = await loadSuiteMatrices(entry);
+    return matrices.map(matrix => ({
+        ...matrix,
+        runHistory,
+        runIndex,
+        runSuiteName: entry.name || matrix.linkSuiteName || matrix.suiteName,
+    }));
+}
+
+function blankSuiteMatrix(suiteName, runHistory, runIndex) {
+    const devnet = leanLatestState.selectedDevnet ? ` for ${leanLatestState.selectedDevnet}` : '';
+    return {
+        entry: null,
+        suiteData: null,
+        suiteName,
+        linkSuiteName: suiteName,
+        clients: [],
+        cases: [],
+        rowHeaderLabel: 'Test',
+        rows: [],
+        stats: {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            timeouts: 0,
+            start: null,
+            end: null,
+            duration: null,
+        },
+        runHistory,
+        runIndex,
+        runSuiteName: suiteName,
+        missingRun: true,
+        emptyMessage: `No run ${runIndex + 1} found${devnet}.`,
+    };
+}
+
+function selectedRunIndex(suiteName) {
+    const index = leanLatestState.selectedRunIndexes.get(suiteName) || 0;
+    if (!Number.isInteger(index) || index < 0) {
+        return 0;
+    }
+    return index;
+}
+
+async function selectSuiteRun(suiteName, runIndex) {
+    const runs = leanLatestState.suiteRuns.get(suiteName);
+    if (!runs || !Number.isInteger(runIndex) || runIndex < 0 || runIndex >= runs.length) {
+        return;
+    }
+
+    leanLatestState.selectedRunIndexes.set(suiteName, runIndex);
+    $('#loading-container').addClass('show');
+    $('#lean-latest-error').hide();
+    try {
+        await renderSelectedRuns();
+    } catch (err) {
+        showError(`Unable to load ${suiteName} run ${runIndex + 1}: ${err.message || err}`);
+    } finally {
+        $('#loading-container').removeClass('show');
+    }
+}
+
+async function selectGlobalRun(runIndex) {
+    const maxRuns = maxSuiteRunCount();
+    if (!Number.isInteger(runIndex) || runIndex < 0 || runIndex >= maxRuns) {
+        return;
+    }
+
+    Array.from(leanLatestState.suiteRuns.keys()).forEach(suiteName => {
+        leanLatestState.selectedRunIndexes.set(suiteName, runIndex);
+    });
+    $('#loading-container').addClass('show');
+    $('#lean-latest-error').hide();
+    try {
+        await renderSelectedRuns();
+    } catch (err) {
+        showError(`Unable to load run ${runIndex + 1}: ${err.message || err}`);
+    } finally {
+        $('#loading-container').removeClass('show');
+    }
+}
+
+function maxSuiteRunCount() {
+    return Array.from(leanLatestState.suiteRuns.values()).reduce((max, runs) => Math.max(max, runs.length), 0);
+}
+
+function commonSelectedRunIndex() {
+    const suiteNames = Array.from(leanLatestState.suiteRuns.keys());
+    if (suiteNames.length === 0) {
+        return 0;
+    }
+
+    const firstIndex = selectedRunIndex(suiteNames[0]);
+    const allMatch = suiteNames.every(suiteName => selectedRunIndex(suiteName) === firstIndex);
+    return allMatch ? firstIndex : null;
 }
 
 async function loadSuiteMatrices(entry) {
@@ -185,28 +297,34 @@ function devnetSortParts(devnet) {
     };
 }
 
-function latestSuiteEntries(entries) {
-    const latest = new Map();
+function suiteRunEntries(entries) {
+    const suites = new Map();
     entries.forEach(entry => {
         if (!entry.name) {
             return;
         }
 
-        const previous = latest.get(entry.name);
-        if (!previous || compareDates(entry.startDate, previous.startDate) > 0) {
-            latest.set(entry.name, entry);
+        if (!suites.has(entry.name)) {
+            suites.set(entry.name, []);
         }
+        suites.get(entry.name).push(entry);
     });
-    return Array.from(latest.values()).sort(compareSuites);
+
+    return new Map(Array.from(suites.entries())
+        .map(([suiteName, runs]) => [
+            suiteName,
+            runs.sort((a, b) => compareDates(b.startDate, a.startDate) || (b.fileName || '').localeCompare(a.fileName || '')),
+        ])
+        .sort(([a], [b]) => compareSuiteNames(a, b)));
 }
 
-function compareSuites(a, b) {
-    const ar = suiteRank(a.name);
-    const br = suiteRank(b.name);
+function compareSuiteNames(a, b) {
+    const ar = suiteRank(a);
+    const br = suiteRank(b);
     if (ar !== br) {
         return ar - br;
     }
-    return a.name.localeCompare(b.name);
+    return a.localeCompare(b);
 }
 
 function suiteRank(name) {
@@ -540,10 +658,12 @@ function renderLeanLatest(matrices, devnet) {
             .map(matrix => matrix.linkSuiteName || matrix.suiteName)
     ).size;
     const devnetLabel = devnet ? `${devnet} ` : '';
-    $('#lean-latest-subtitle').text(`Latest ${devnetLabel}runs for ${suiteNames.size} suites.`);
+    const runPrefix = matrices.some(matrix => (matrix.runIndex || 0) > 0) ? 'Selected' : 'Latest';
+    $('#lean-latest-subtitle').text(`${runPrefix} ${devnetLabel}runs for ${suiteNames.size} suites.`);
     $('#lean-latest-summary').empty()
         .append(summaryPill('Suites', suiteNames.size))
-        .append(summaryPill('Failing', failingSuites, failingSuites > 0 ? 'danger' : 'success'));
+        .append(summaryPill('Failing', failingSuites, failingSuites > 0 ? 'danger' : 'success'))
+        .append(renderGlobalRunSelector());
 
     const content = $('#lean-latest-content').empty();
     matrices.forEach(matrix => {
@@ -660,7 +780,7 @@ function buildClientScores(matrices) {
         if (!rowsBySuite.has(suiteName)) {
             const row = {
                 suiteName,
-                fileName: matrix.entry.fileName,
+                fileName: matrix.entry ? matrix.entry.fileName : '',
                 linkSuiteName: matrix.linkSuiteName || matrix.suiteName,
                 cells: new Map(),
             };
@@ -806,16 +926,19 @@ function renderSuiteSection(matrix) {
 
     const statusClass = matrix.stats.failed > 0 ? 'bg-danger' : 'bg-success';
     const statusText = matrix.stats.failed > 0 ? 'Fail' : 'Pass';
-    actions.append($('<span />').addClass(`badge ${statusClass}`).text(statusText));
-    actions.append($('<a />')
-        .addClass('btn btn-sm btn-secondary')
-        .attr('href', routes.suite(matrix.entry.fileName, matrix.linkSuiteName || matrix.suiteName))
-        .text('Open suite'));
+    actions.append(renderRunSelector(matrix));
+    if (!matrix.missingRun) {
+        actions.append($('<span />').addClass(`badge ${statusClass}`).text(statusText));
+        actions.append($('<a />')
+            .addClass('btn btn-sm btn-secondary')
+            .attr('href', routes.suite(matrix.entry.fileName, matrix.linkSuiteName || matrix.suiteName))
+            .text('Open suite'));
+    }
 
     header.append(title, actions);
     section.append(header);
 
-    if (matrix.rows.length === 0 || matrix.clients.length === 0) {
+    if (matrix.missingRun || matrix.rows.length === 0 || matrix.clients.length === 0) {
         section.append($('<p />').addClass('text-secondary').text(matrix.emptyMessage || 'No test cases with client results.'));
         return section;
     }
@@ -854,8 +977,117 @@ function renderSuiteSection(matrix) {
     return section;
 }
 
+function renderGlobalRunSelector() {
+    const maxRuns = maxSuiteRunCount();
+    if (maxRuns === 0) {
+        return $();
+    }
+
+    const label = $('<label />').addClass('lean-run-selector lean-global-run-selector');
+    const select = $('<select />')
+        .addClass('form-select form-select-sm')
+        .attr('aria-label', 'Set run for all suites');
+    const selectedIndex = commonSelectedRunIndex();
+
+    if (selectedIndex === null) {
+        select.append($('<option />').val('').text('Mixed').prop('disabled', true));
+    }
+    for (let index = 0; index < maxRuns; index++) {
+        select.append($('<option />')
+            .val(String(index))
+            .text(String(index + 1))
+            .attr('title', globalRunDateTitle(index)));
+    }
+
+    select.val(selectedIndex === null ? '' : String(selectedIndex));
+    select.attr('title', selectedIndex === null ? 'Suite run selections differ' : globalRunDateTitle(selectedIndex));
+    select.on('change', function() {
+        selectGlobalRun(Number.parseInt($(this).val(), 10));
+    });
+
+    label.append($('<span />').text('Run'));
+    label.append(select);
+    return label;
+}
+
+function renderRunSelector(matrix) {
+    const runHistory = matrix.runHistory || [];
+    const suiteName = matrix.runSuiteName || matrix.linkSuiteName || matrix.suiteName;
+    if (runHistory.length === 0) {
+        return $();
+    }
+
+    const label = $('<label />').addClass('lean-run-selector');
+    const select = $('<select />')
+        .addClass('form-select form-select-sm')
+        .attr('aria-label', `${matrix.suiteName} run history`);
+
+    const optionCount = Math.max(runHistory.length, (matrix.runIndex || 0) + 1);
+    for (let index = 0; index < optionCount; index++) {
+        const entry = runHistory[index];
+        const option = $('<option />').val(String(index)).text(String(index + 1));
+        if (!entry) {
+            option.prop('disabled', true).attr('title', 'No run found for this suite');
+            select.append(option);
+            continue;
+        }
+
+        const start = runDateTitle(entry);
+        if (start) {
+            option.attr('title', start);
+        }
+        select.append(option);
+    }
+
+    select.val(String(matrix.runIndex || 0));
+    select.attr('title', suiteRunDateTitle(runHistory, matrix.runIndex || 0));
+    if (optionCount === 1) {
+        select.prop('disabled', true);
+    }
+    select.on('change', function() {
+        selectSuiteRun(suiteName, Number.parseInt($(this).val(), 10));
+    });
+
+    label.append($('<span />').text('Run'));
+    label.append(select);
+    return label;
+}
+
+function suiteRunDateTitle(runHistory, runIndex) {
+    const entry = runHistory[runIndex];
+    return entry ? runDateTitle(entry) : 'No run found for this suite';
+}
+
+function globalRunDateTitle(runIndex) {
+    const entries = Array.from(leanLatestState.suiteRuns.values())
+        .map(runs => runs[runIndex])
+        .filter(Boolean);
+    if (entries.length === 0) {
+        return 'No run found for any suite';
+    }
+
+    const latestEntry = entries.reduce((latest, entry) => {
+        return compareDates(entry.startDate, latest.startDate) > 0 ? entry : latest;
+    }, entries[0]);
+    const start = runDateTitle(latestEntry);
+    return start ? `Most recent suite run: ${start}` : 'No run date available';
+}
+
+function runDateTitle(entry) {
+    if (!entry) {
+        return '';
+    }
+    const start = entry.startDate || parseDate(entry.start);
+    return start ? start.toLocaleString() : entry.start || '';
+}
+
 function renderSuiteMeta(matrix) {
     const meta = $('<div />').addClass('lean-suite-meta');
+    if (matrix.missingRun) {
+        meta.append($('<span />').text(`Run ${matrix.runIndex + 1} unavailable`));
+        return meta;
+    }
+
     const start = matrix.entry.startDate || matrix.stats.start;
     if (start) {
         meta.append($('<span />').text(start.toLocaleString()));
