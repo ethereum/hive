@@ -31,7 +31,7 @@ const leanLatestState = {
     trendClient: '',
     trendSuite: '',
     trendPointLimit: trendPointLimitOptions[0],
-    displayPreviousRunsForBlankGrids: false,
+    displayPreviousRunsForBlankGrids: true,
     trendClientOptions: [],
     trendRenderID: 0,
 };
