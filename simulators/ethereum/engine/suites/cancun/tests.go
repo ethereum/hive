@@ -277,7 +277,7 @@ var Tests = []test.Spec{
 			SendBlobTransactions{
 				TransactionCount:              5,
 				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
-				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+				BlobTransactionMaxBlobGasCost: big.NewInt(120),
 				AccountIndex:                  0,
 			},
 			// Then send the single-blob transactions from account B
