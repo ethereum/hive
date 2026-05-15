@@ -58,11 +58,7 @@ fi
 materialize_runtime_local_ip
 
 FLAGS=(
-    --genesis "$ASSET_ROOT/config.yaml"
-    --validators "$ASSET_ROOT/annotated_validators.yaml"
-    --bootnodes "$ASSET_ROOT/nodes.yaml"
-    --validator-config "$ASSET_ROOT/validator-config.yaml"
-    --hash-sig-keys-dir "$ASSET_ROOT/hash-sig-keys"
+    --custom-network-config-dir "$ASSET_ROOT"
     --gossipsub-port 9000
     --http-address 0.0.0.0
     --api-port 5052
@@ -77,6 +73,10 @@ fi
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
+fi
+
+if [ -n "${HIVE_ATTESTATION_COMMITTEE_COUNT:-}" ] && [ "$HIVE_ATTESTATION_COMMITTEE_COUNT" != "1" ]; then
+    FLAGS+=(--attestation-committee-count "$HIVE_ATTESTATION_COMMITTEE_COUNT")
 fi
 
 export RUST_LOG="${RUST_LOG:-info}"
