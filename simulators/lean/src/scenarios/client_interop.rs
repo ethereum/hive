@@ -25,7 +25,7 @@ const CLIENT_INTEROP_P2P_PORT: u16 = 9000;
 const SINGLE_SUBNET_ATTESTATION_COMMITTEE_COUNT: usize = 1;
 const TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT: usize = 2;
 const SINGLE_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS: u64 = 3 * 60;
-const TWO_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS: u64 = 3 * 60;
+const TWO_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS: u64 = 210; //~50 slots
 const TWO_SUBNET_GENESIS_DELAY_SECS: u64 = 60;
 const CLIENT_STARTUP_ATTEMPTS: u64 = 3;
 const CLIENT_STARTUP_TIMEOUT_SECS: u64 = 120;
@@ -92,7 +92,7 @@ dyn_async! {
                 TimedDataTestSpec {
                     name: format!("client-interop: {run_label}"),
                     description: format!(
-                        "Starts {topology_label} with a shared genesis and checks that all three nodes finalize past genesis at the same slot."
+                        "Starts {topology_label} with a shared genesis and checks that all three nodes finalize past genesis at the same checkpoint."
                     ),
                     always_run: false,
                     client_name: run_label.clone(),
@@ -131,7 +131,7 @@ dyn_async! {
                 TimedDataTestSpec {
                     name: format!("client-interop: {run_label}"),
                     description: format!(
-                        "Starts {topology_label} across two attestation subnets with a shared genesis and checks that all nodes finalize past genesis at the same slot."
+                        "Starts {topology_label} across two attestation subnets with a shared genesis and checks that all nodes finalize past genesis at the same checkpoint."
                     ),
                     always_run: false,
                     client_name: run_label.clone(),
@@ -683,6 +683,19 @@ mod tests {
         }
     }
 
+    fn devnet4_lean_clients() -> Vec<ClientDefinition> {
+        vec![
+            client("ethlambda_devnet4"),
+            client("gean_devnet4"),
+            client("grandine_lean_devnet4"),
+            client("lantern_devnet4"),
+            client("nlean_devnet4"),
+            client("ream_devnet4"),
+            client("zeam_devnet4"),
+            client("qlean_devnet4"),
+        ]
+    }
+
     fn finalized_observation(slot: u64, root: B256) -> FinalizationObservation {
         FinalizationObservation {
             node_id: "node".to_string(),
@@ -694,12 +707,7 @@ mod tests {
 
     #[test]
     fn two_subnet_matrix_covers_self_and_majority_minority_pair_orientations() {
-        let clients = vec![
-            client("ream_devnet4"),
-            client("ethlambda_devnet4"),
-            client("grandine_lean_devnet4"),
-            client("gean_devnet4"),
-        ];
+        let clients = devnet4_lean_clients();
 
         let matrix = two_subnet_interop_topology_matrix(&clients);
         let topology_labels = matrix
@@ -715,14 +723,43 @@ mod tests {
 
         assert_eq!(
             matrix.len(),
-            16,
-            "four clients should produce four self subnet tests and twelve mixed orientation tests"
+            64,
+            "eight clients should produce eight self subnet tests and fifty-six mixed orientation tests"
         );
         assert!(topology_labels.contains(&"ream_devnet4>ream_devnet4".to_string()));
         assert!(topology_labels.contains(&"ream_devnet4>ethlambda_devnet4".to_string()));
         assert!(topology_labels.contains(&"ethlambda_devnet4>ream_devnet4".to_string()));
         assert!(topology_labels.contains(&"grandine_lean_devnet4>gean_devnet4".to_string()));
         assert!(topology_labels.contains(&"gean_devnet4>grandine_lean_devnet4".to_string()));
+        assert!(topology_labels.contains(&"lantern_devnet4>qlean_devnet4".to_string()));
+        assert!(topology_labels.contains(&"qlean_devnet4>lantern_devnet4".to_string()));
+        assert!(topology_labels.contains(&"qlean_devnet4>qlean_devnet4".to_string()));
+        assert!(topology_labels.contains(&"nlean_devnet4>zeam_devnet4".to_string()));
+        assert!(topology_labels.contains(&"zeam_devnet4>nlean_devnet4".to_string()));
+    }
+
+    #[test]
+    fn two_subnet_node_builder_accepts_all_devnet4_lean_clients() {
+        for topology_spec in two_subnet_interop_topology_matrix(&devnet4_lean_clients()) {
+            let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
+            assign_two_subnet_aggregators(&mut nodes);
+
+            assert_eq!(validator_count_for_nodes(&nodes), 6);
+            assert_eq!(
+                nodes
+                    .iter()
+                    .map(|node| node.validator_indices.as_slice())
+                    .collect::<Vec<_>>(),
+                vec![&[0][..], &[2, 4][..], &[1][..], &[3, 5][..]]
+            );
+            assert_eq!(
+                nodes
+                    .iter()
+                    .map(|node| node.is_aggregator)
+                    .collect::<Vec<_>>(),
+                vec![true, false, true, false]
+            );
+        }
     }
 
     #[test]

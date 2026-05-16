@@ -64,9 +64,8 @@ materialize_runtime_local_ip
 FLAGS=(
     --data-dir /data
     --genesis-config "$ASSET_ROOT/config.yaml"
-    --validator-registry-path "$ASSET_ROOT/validators.yaml"
     --nodes-path "$ASSET_ROOT/nodes.yaml"
-    --validator-config "$ASSET_ROOT/validator-config.yaml"
+    --validator_config "$ASSET_ROOT"
     --node-id "$NODE_ID"
     --node-key-path "$ASSET_ROOT/node.key"
     --listen-address "/ip4/0.0.0.0/udp/9000/quic-v1"
@@ -84,6 +83,10 @@ FLAGS+=(--devnet "$GOSSIP_TOPIC")
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
+fi
+
+if [ -n "${HIVE_ATTESTATION_COMMITTEE_COUNT:-}" ] && [ "$HIVE_ATTESTATION_COMMITTEE_COUNT" != "1" ]; then
+    FLAGS+=(--attestation-committee-count "$HIVE_ATTESTATION_COMMITTEE_COUNT")
 fi
 
 export RUST_LOG="${RUST_LOG:-info}"
