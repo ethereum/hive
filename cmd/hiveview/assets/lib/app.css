@@ -736,9 +736,10 @@ kbd {
 
 .lean-trend-chart {
     --lean-trend-plot-inset-x: 2.875rem;
+    --lean-trend-plot-height: 20rem;
     display: grid;
     grid-template-columns: 3.5rem minmax(0, 1fr);
-    grid-template-rows: 13rem auto;
+    grid-template-rows: var(--lean-trend-plot-height) auto;
     gap: 0.4rem 0.75rem;
     overflow-x: auto;
     padding-bottom: 0.2rem;
@@ -758,7 +759,7 @@ kbd {
 
 .lean-trend-plot {
     position: relative;
-    min-height: 13rem;
+    min-height: var(--lean-trend-plot-height);
     border: 1px solid var(--bs-border-color);
     border-radius: 6px;
     background: color-mix(in srgb, var(--bs-body-bg) 92%, var(--bs-border-color));
@@ -787,7 +788,7 @@ kbd {
 
 .lean-trend-line {
     fill: none;
-    stroke: var(--bs-info);
+    stroke: var(--lean-trend-client-color, var(--bs-info));
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -853,6 +854,30 @@ kbd {
     text-align: center;
     overflow-wrap: anywhere;
     transform: translateX(-50%);
+}
+
+.lean-trend-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.85rem;
+    margin-top: 0.65rem;
+    color: var(--bs-secondary);
+    font-size: 0.82rem;
+}
+
+.lean-trend-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.lean-trend-legend-swatch {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 999px;
+    background: var(--lean-trend-client-color);
+    box-shadow: 0 0 0 1px var(--lean-trend-client-color);
 }
 
 .lean-devnet-controls {

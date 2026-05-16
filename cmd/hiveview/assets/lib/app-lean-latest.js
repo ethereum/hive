@@ -6,6 +6,18 @@ import { formatDuration } from './utils.js';
 const listingURL = 'listing.jsonl?limit=1000';
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
 const trendPointLimitOptions = [5, 10, 25, 50];
+const trendAllClientsValue = '__all__';
+const trendColorHashSeed = 13663;
+const trendClientPalette = [
+    '#0072B2', '#D55E00', '#009E73', '#CC79A7',
+    '#E69F00', '#56B4E9', '#F0E442', '#6A3D9A',
+    '#B15928', '#E7298A', '#1B9E77', '#7570B3',
+    '#E6AB02', '#A6761D', '#66A61E', '#E41A1C',
+    '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00',
+    '#A65628', '#F781BF', '#999999', '#17BECF',
+    '#BCBD22', '#8C564B', '#9467BD', '#2CA02C',
+    '#DB2777', '#0891B2', '#F97316', '#7C3AED',
+];
 const leanLatestState = {
     entries: [],
     devnets: [],
@@ -19,7 +31,7 @@ const leanLatestState = {
     trendClient: '',
     trendSuite: '',
     trendPointLimit: trendPointLimitOptions[0],
-    displayPreviousRunsForBlankGrids: false,
+    displayPreviousRunsForBlankGrids: true,
     trendClientOptions: [],
     trendRenderID: 0,
 };
@@ -807,8 +819,8 @@ async function renderClientTrend(clientRanking = null) {
         return;
     }
 
-    if (!leanLatestState.trendClient || !clients.includes(leanLatestState.trendClient)) {
-        leanLatestState.trendClient = clients[0];
+    if (!leanLatestState.trendClient || (leanLatestState.trendClient !== trendAllClientsValue && !clients.includes(leanLatestState.trendClient))) {
+        leanLatestState.trendClient = trendAllClientsValue;
     }
 
     const suites = trendSuiteOptions();
@@ -822,11 +834,11 @@ async function renderClientTrend(clientRanking = null) {
 
     const renderID = ++leanLatestState.trendRenderID;
     try {
-        const points = await buildTrendPoints(leanLatestState.trendClient, leanLatestState.trendSuite);
+        const trendData = await buildTrendData(leanLatestState.trendClient, leanLatestState.trendSuite, clients);
         if (renderID !== leanLatestState.trendRenderID) {
             return;
         }
-        renderTrendChart(content.empty(), points, leanLatestState.trendClient, leanLatestState.trendSuite);
+        renderTrendChart(content.empty(), trendData, leanLatestState.trendClient, leanLatestState.trendSuite);
     } catch (err) {
         if (renderID !== leanLatestState.trendRenderID) {
             return;
@@ -859,10 +871,13 @@ function trendSuiteOptions() {
 }
 
 function renderTrendControls(controls, clients, suites) {
-    controls.append(renderTrendSelect('Client', 'Client trend client', leanLatestState.trendClient, clients.map(client => ({
-        value: client,
-        label: client,
-    })), value => {
+    controls.append(renderTrendSelect('Client', 'Client trend client', leanLatestState.trendClient, [
+        { value: trendAllClientsValue, label: 'all' },
+        ...clients.map(client => ({
+            value: client,
+            label: client,
+        })),
+    ], value => {
         leanLatestState.trendClient = value;
         void renderClientTrend();
     }));
@@ -906,6 +921,25 @@ function renderTrendSelect(labelText, ariaLabel, value, options, onChange) {
     return label;
 }
 
+async function buildTrendData(client, suiteName, clients) {
+    if (client === trendAllClientsValue) {
+        return buildAllClientTrendData(clients, suiteName);
+    }
+
+    const points = await buildTrendPoints(client, suiteName);
+    const runs = points.map(point => point.run);
+    return {
+        runs,
+        series: [{
+            client,
+            points: points.map((point, index) => ({
+                ...point,
+                runIndex: index,
+            })),
+        }],
+    };
+}
+
 async function buildTrendPoints(client, suiteName) {
     const points = [];
     const pointLimit = leanLatestState.trendPointLimit || trendPointLimitOptions[0];
@@ -924,6 +958,43 @@ async function buildTrendPoints(client, suiteName) {
         }
     }
     return points;
+}
+
+async function buildAllClientTrendData(clients, suiteName) {
+    const runs = [];
+    const seriesByClient = new Map(clients.map(client => [client, []]));
+    const pointLimit = leanLatestState.trendPointLimit || trendPointLimitOptions[0];
+    for (const run of trendCandidateRuns(suiteName)) {
+        const entries = suiteName
+            ? run.entries.filter(entry => entry.name === suiteName)
+            : run.entries;
+        const scores = await scoreClientsForEntries(entries, clients);
+        const scoredClients = clients.filter(client => (scores.get(client)?.total || 0) > 0);
+        if (scoredClients.length === 0) {
+            continue;
+        }
+
+        const runIndex = runs.length;
+        runs.push(run);
+        scoredClients.forEach(client => {
+            seriesByClient.get(client).push({
+                run,
+                runIndex,
+                score: scores.get(client),
+            });
+        });
+        if (runs.length >= pointLimit) {
+            break;
+        }
+    }
+
+    return {
+        runs,
+        series: clients.map(client => ({
+            client,
+            points: seriesByClient.get(client) || [],
+        })).filter(series => series.points.length > 0),
+    };
 }
 
 function trendCandidateRuns(suiteName) {
@@ -949,16 +1020,37 @@ async function scoreClientForEntries(entries, client) {
     return score;
 }
 
-function renderTrendChart(content, points, client, suiteName) {
-    if (points.length === 0) {
+async function scoreClientsForEntries(entries, clients) {
+    const clientSet = new Set(clients);
+    const scores = new Map(clients.map(client => [client, emptyScore()]));
+    const matrixGroups = await Promise.all(entries.map(loadSuiteMatrices));
+    matrixGroups.flat().forEach(matrix => {
+        const suiteName = matrix.linkSuiteName || matrix.suiteName;
+        matrix.cases.forEach(test => {
+            if (isSuiteSetupTest(test, suiteName)) {
+                return;
+            }
+            scoreClientNamesForTest(test).forEach(client => {
+                if (clientSet.has(client)) {
+                    incrementScore(scores.get(client), test);
+                }
+            });
+        });
+    });
+    return scores;
+}
+
+function renderTrendChart(content, trendData, selectedClient, suiteName) {
+    if (trendData.runs.length === 0 || trendData.series.length === 0) {
         content.append($('<p />').addClass('text-secondary').text('No trend data available.'));
         return;
     }
 
     const source = suiteName || 'Total score';
+    const clientLabel = selectedClient === trendAllClientsValue ? 'all clients' : selectedClient;
     content.append($('<p />')
         .addClass('lean-trend-summary')
-        .text(`${client} - ${source} (Newest to Oldest)`));
+        .text(`${clientLabel} - ${source} (Newest to Oldest)`));
 
     const chart = $('<div />').addClass('lean-trend-chart');
     const yAxis = $('<div />').addClass('lean-trend-y-axis');
@@ -966,28 +1058,29 @@ function renderTrendChart(content, points, client, suiteName) {
         yAxis.append($('<span />').text(`${percent}%`));
     });
 
-    const axisWidth = trendAxisWidth(points.length);
+    const axisWidth = trendAxisWidth(trendData.runs.length);
     const plot = $('<div />')
         .addClass('lean-trend-plot')
         .css('width', axisWidth);
     plot.append(renderTrendGridLines());
-    plot.append(renderTrendLinePlot(points, client));
+    plot.append(renderTrendLinePlot(trendData.series, trendData.runs, clientLabel));
 
     const xAxis = $('<div />')
         .addClass('lean-trend-x-axis')
         .css('width', axisWidth);
     const xAxisInner = $('<div />').addClass('lean-trend-x-axis-inner');
-    points.forEach((point, index) => {
+    trendData.runs.forEach((run, index) => {
         xAxisInner.append($('<span />')
             .addClass('lean-trend-x-label')
-            .css('left', `${trendPointX(index, points.length)}%`)
-            .attr('title', simLogRunDateTitle(point.run))
-            .text(simLogRunDateLabel(point.run)));
+            .css('left', `${trendPointX(index, trendData.runs.length)}%`)
+            .attr('title', simLogRunDateTitle(run))
+            .text(simLogRunDateLabel(run)));
     });
     xAxis.append(xAxisInner);
 
     chart.append(yAxis, plot, $('<div />'), xAxis);
     content.append(chart);
+    content.append(renderTrendLegend(trendData.series));
 }
 
 function trendAxisWidth(pointCount) {
@@ -1016,11 +1109,11 @@ function renderTrendGridLines() {
     return svg;
 }
 
-function renderTrendLinePlot(points, client) {
+function renderTrendLinePlot(seriesList, runs, label) {
     const plot = $('<div />')
         .addClass('lean-trend-line-plot')
         .attr('role', 'img')
-        .attr('aria-label', `${client} passing percentage trend`);
+        .attr('aria-label', `${label} passing percentage trend`);
     const svg = $(svgElement('svg', {
         class: 'lean-trend-line-svg',
         viewBox: '0 0 100 100',
@@ -1028,36 +1121,144 @@ function renderTrendLinePlot(points, client) {
         'aria-hidden': 'true',
         focusable: 'false',
     }));
-    const linePoints = [];
+    const showValueLabels = seriesList.length === 1;
+    const renderSeries = seriesList.map(series => ({
+        ...series,
+        points: series.points.map(point => {
+            const percent = Math.round(scorePercent(point.score) * 100);
+            return {
+                ...point,
+                percent,
+                coords: trendPointCoordinates(point.runIndex, runs.length, percent),
+            };
+        }),
+    }));
+    const dotGroups = trendDotGroups(renderSeries);
 
-    points.forEach((point, index) => {
-        const score = point.score;
-        const percent = Math.round(scorePercent(score) * 100);
-        const coords = trendPointCoordinates(index, points.length, percent);
-        const labelAbove = coords.y >= 14;
-        linePoints.push(coords);
-        plot.append($('<span />')
-            .addClass('lean-trend-value')
-            .toggleClass('below', !labelAbove)
-            .css('left', `${coords.x}%`)
-            .css('top', `${coords.y}%`)
-            .text(`${percent}%`));
-        plot.append($('<span />')
-            .addClass('lean-trend-dot')
-            .toggleClass('has-failures', score.failed > 0)
-            .css('left', `${coords.x}%`)
-            .css('top', `${coords.y}%`)
-            .attr('title', `${percent}% (${score.passed}/${score.total} passed)`));
+    renderSeries.forEach(series => {
+        const linePoints = [];
+        const color = clientTrendColor(series.client);
+        series.points.forEach(point => {
+            const score = point.score;
+            const percent = point.percent;
+            const coords = point.coords;
+            const labelAbove = coords.y >= 14;
+            linePoints.push(coords);
+            if (showValueLabels) {
+                plot.append($('<span />')
+                    .addClass('lean-trend-value')
+                    .toggleClass('below', !labelAbove)
+                    .css('left', `${coords.x}%`)
+                    .css('top', `${coords.y}%`)
+                    .text(`${percent}%`));
+            }
+            plot.append($('<span />')
+                .addClass('lean-trend-dot')
+                .toggleClass('has-failures', score.failed > 0)
+                .css('--lean-trend-client-color', color)
+                .css('left', `${coords.x}%`)
+                .css('top', `${coords.y}%`)
+                .attr('title', trendDotTitle(dotGroups.get(trendDotKey(point)))));
+        });
+
+        if (linePoints.length > 1) {
+            const line = svgElement('polyline', {
+                class: 'lean-trend-line',
+                points: linePoints.map(point => `${point.x},${point.y}`).join(' '),
+            });
+            line.style.setProperty('--lean-trend-client-color', color);
+            svg.append(line);
+        }
     });
-
-    if (linePoints.length > 1) {
-        svg.append(svgElement('polyline', {
-            class: 'lean-trend-line',
-            points: linePoints.map(point => `${point.x},${point.y}`).join(' '),
-        }));
-    }
     plot.prepend(svg);
     return plot;
+}
+
+function trendDotGroups(seriesList) {
+    const groups = new Map();
+    seriesList.forEach(series => {
+        series.points.forEach(point => {
+            const key = trendDotKey(point);
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+            groups.get(key).push({
+                client: series.client,
+                percent: point.percent,
+                score: point.score,
+            });
+        });
+    });
+    return groups;
+}
+
+function trendDotKey(point) {
+    return `${point.runIndex}:${point.percent}`;
+}
+
+function trendDotTitle(group = []) {
+    if (group.length === 0) {
+        return '';
+    }
+    if (group.length === 1) {
+        const point = group[0];
+        return `${point.client}: ${point.percent}% - ${point.score.passed}/${point.score.total} tests passed`;
+    }
+    return [
+        `${group[0].percent}%`,
+        ...group.map(point => `${point.client}: ${point.score.passed}/${point.score.total} tests passed`),
+    ].join('\n');
+}
+
+function renderTrendLegend(seriesList) {
+    const legend = $('<div />')
+        .addClass('lean-trend-legend')
+        .attr('aria-label', 'Client color legend');
+    seriesList.slice().sort(compareTrendSeriesByClient).forEach(series => {
+        legend.append($('<span />')
+            .addClass('lean-trend-legend-item')
+            .css('--lean-trend-client-color', clientTrendColor(series.client))
+            .append($('<span />').addClass('lean-trend-legend-swatch'))
+            .append($('<span />').text(series.client)));
+    });
+    return legend;
+}
+
+function compareTrendSeriesByClient(a, b) {
+    return a.client.localeCompare(b.client);
+}
+
+function clientTrendColor(client) {
+    const hash = trendColorHash(clientBaseName(client));
+    return trendClientPalette[hash % trendClientPalette.length];
+}
+
+function clientBaseName(client) {
+    const name = (client || '').trim();
+    const match = name.match(/^(.*?)(?:[_-]?devnet[0-9][a-z0-9_-]*)$/i);
+    if (match && match[1]) {
+        return match[1].replace(/[_-]+$/, '').toLowerCase();
+    }
+    return name.toLowerCase();
+}
+
+function hashString(value) {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index++) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+}
+
+function trendColorHash(value) {
+    let hash = (hashString(value) ^ trendColorHashSeed) >>> 0;
+    hash ^= hash >>> 16;
+    hash = Math.imul(hash, 0x85ebca6b);
+    hash ^= hash >>> 13;
+    hash = Math.imul(hash, 0xc2b2ae35);
+    hash ^= hash >>> 16;
+    return hash >>> 0;
 }
 
 function trendPointCoordinates(index, total, percent) {
