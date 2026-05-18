@@ -48,7 +48,7 @@ from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
-from lean_spec.types.aggregation import AggregationBits, ValidatorIndices
+from lean_spec.types.participation import AggregationBits, ValidatorIndices
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
 from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 from lean_spec.types.container import Container
