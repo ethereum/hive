@@ -46,14 +46,14 @@ def json_rpc_config:
     {
       "JsonRpc": {
         "JwtSecretFile": "/jwt.secret",
-        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin"],
+        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin", "Testing"],
         "AdditionalRpcUrls": ["http://0.0.0.0:8550|http;ws|debug;net;eth;subscribe;engine;web3;client;admin|no-auth", "http://0.0.0.0:8551|http;ws|debug;net;eth;subscribe;engine;web3;client;admin"]
       }
     }
   else
     {
       "JsonRpc": {
-        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin"]
+        "EnabledModules": ["Debug", "Eth", "Subscribe", "Trace", "TxPool", "Web3", "Personal", "Proof", "Net", "Parity", "Health", "Admin", "Testing"]
       }
     }
   end
@@ -72,6 +72,18 @@ def txpool_config:
     {
       "TxPool": {
         "BlobsSupport": "StorageWithReorgs"
+      }
+    }
+  else
+    {}
+  end
+;
+
+def blocks_config:
+  if env.HIVE_TARGET_GAS_LIMIT != null then
+    {
+      "Blocks": {
+        "TargetBlockGasLimit": (env.HIVE_TARGET_GAS_LIMIT | tonumber)
       }
     }
   else
@@ -116,4 +128,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config * blocks_config
