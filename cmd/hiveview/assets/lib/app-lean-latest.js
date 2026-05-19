@@ -474,27 +474,84 @@ function buildClientInteropMatrices(entry, suiteData) {
         .map(test => ({
             ...test,
             roles: clientInteropRoles(test.topology),
+            matrixType: clientInteropMatrixType(test),
         }))
         .filter(test => test.roles);
 
-    const clients = collectClients(entry, suiteData, topologyCases);
-    const clientOrder = clientOrderMap(clients);
-    const rows = buildClientInteropRows(topologyCases, 'majority', 'minority', clientOrder, '2 nodes');
+    const matrixSpecs = [
+        {
+            type: 'single-subnet',
+            suiteName: 'client-interop',
+            emptyMessage: 'No client-interop single-subnet topology tests with client results.',
+            rowRoleLabel: '2 nodes',
+            columnRoleLabel: '1 node',
+            sameClientRoleLabel: '3 nodes',
+        },
+        {
+            type: 'two-subnet',
+            suiteName: 'client-interop two-subnet',
+            emptyMessage: 'No client-interop two-subnet topology tests with client results.',
+            rowRoleLabel: '4 nodes',
+            columnRoleLabel: '2 nodes',
+            sameClientRoleLabel: '6 nodes',
+        },
+    ];
+    const availableTypes = new Set(topologyCases.map(test => test.matrixType));
+    const availableMatrices = matrixSpecs.filter(spec => availableTypes.has(spec.type));
+    const availabilityNote = availableMatrices.length === 1
+        ? 'Only one client-interop matrix is available for this run.'
+        : '';
+    const matrices = availableMatrices.map(spec => {
+        const matrixCases = topologyCases.filter(test => test.matrixType === spec.type);
+        return buildClientInteropMatrix(entry, suiteData, suiteName, spec, matrixCases, availabilityNote);
+    });
 
-    return [{
+    if (matrices.length > 0) {
+        return matrices;
+    }
+
+    return [clientInteropEmptyMatrix(entry, suiteData, suiteName, cases)];
+}
+
+function buildClientInteropMatrix(entry, suiteData, linkSuiteName, spec, matrixCases, availabilityNote) {
+    const clients = collectClients(entry, suiteData, matrixCases);
+    const clientOrder = clientOrderMap(clients);
+    const rows = buildClientInteropRows(matrixCases, 'majority', 'minority', clientOrder, spec.rowRoleLabel);
+
+    return {
+        entry,
+        suiteData,
+        suiteName: spec.suiteName,
+        linkSuiteName,
+        clients: roleLabelClients(clients, spec.columnRoleLabel),
+        cases: matrixCases,
+        rowHeaderLabel: '',
+        rowRoleLabel: 'majority',
+        columnRoleLabel: 'minority',
+        sameClientRoleLabel: spec.sameClientRoleLabel,
+        rows,
+        stats: suiteStats(matrixCases, linkSuiteName),
+        emptyMessage: spec.emptyMessage,
+        availabilityNote,
+        collapseKey: spec.suiteName,
+    };
+}
+
+function clientInteropEmptyMatrix(entry, suiteData, suiteName, cases) {
+    return {
         entry,
         suiteData,
         suiteName,
         linkSuiteName: suiteName,
-        clients: roleLabelClients(clients, '1 node'),
+        clients: [],
         cases,
         rowHeaderLabel: '',
         rowRoleLabel: 'majority',
         columnRoleLabel: 'minority',
-        rows,
+        rows: [],
         stats: suiteStats(cases, suiteName),
-        emptyMessage: 'No client-interop topology tests with client results.',
-    }];
+        emptyMessage: 'No client-interop matrix tests with client results.',
+    };
 }
 
 function buildClientInteropRows(cases, rowRole, columnRole, clientOrder, rowRoleLabel) {
@@ -568,6 +625,15 @@ function clientInteropTopology(test) {
         return [];
     }
     return match[1].split(',').map(client => client.trim()).filter(Boolean);
+}
+
+function clientInteropMatrixType(test) {
+    const name = testName(test).toLowerCase();
+    const description = (test.description || '').toLowerCase();
+    if (name.includes('client-interop: two-subnet') || description.includes('across two attestation subnets')) {
+        return 'two-subnet';
+    }
+    return 'single-subnet';
 }
 
 function clientInteropRoles(topology) {
@@ -944,10 +1010,13 @@ async function buildTrendPoints(client, suiteName) {
     const points = [];
     const pointLimit = leanLatestState.trendPointLimit || trendPointLimitOptions[0];
     for (const run of trendCandidateRuns(suiteName)) {
-        const entries = suiteName
-            ? run.entries.filter(entry => entry.name === suiteName)
-            : run.entries;
-        const score = await scoreClientForEntries(entries, client);
+        if (!suiteName && !clientRanInSimLog(run, client)) {
+            continue;
+        }
+
+        const score = suiteName
+            ? await scoreClientForEntries(run.entries.filter(entry => entry.name === suiteName), client)
+            : (await scoreClientsWithFallbackForSimLog(run, [client])).get(client);
         if (score.total === 0) {
             continue;
         }
@@ -965,11 +1034,17 @@ async function buildAllClientTrendData(clients, suiteName) {
     const seriesByClient = new Map(clients.map(client => [client, []]));
     const pointLimit = leanLatestState.trendPointLimit || trendPointLimitOptions[0];
     for (const run of trendCandidateRuns(suiteName)) {
-        const entries = suiteName
-            ? run.entries.filter(entry => entry.name === suiteName)
-            : run.entries;
-        const scores = await scoreClientsForEntries(entries, clients);
-        const scoredClients = clients.filter(client => (scores.get(client)?.total || 0) > 0);
+        const candidateClients = suiteName
+            ? clients
+            : clients.filter(client => clientRanInSimLog(run, client));
+        if (candidateClients.length === 0) {
+            continue;
+        }
+
+        const scores = suiteName
+            ? await scoreClientsForEntries(run.entries.filter(entry => entry.name === suiteName), candidateClients)
+            : await scoreClientsWithFallbackForSimLog(run, candidateClients);
+        const scoredClients = candidateClients.filter(client => (scores.get(client)?.total || 0) > 0);
         if (scoredClients.length === 0) {
             continue;
         }
@@ -995,6 +1070,17 @@ async function buildAllClientTrendData(clients, suiteName) {
             points: seriesByClient.get(client) || [],
         })).filter(series => series.points.length > 0),
     };
+}
+
+function clientRanInSimLog(run, client) {
+    return (run.entries || []).some(entry => clientRanInEntry(entry, client));
+}
+
+function clientRanInEntry(entry, client) {
+    if ((entry.clients || []).includes(client)) {
+        return true;
+    }
+    return Object.prototype.hasOwnProperty.call(entry.versions || {}, client);
 }
 
 function trendCandidateRuns(suiteName) {
@@ -1037,6 +1123,42 @@ async function scoreClientsForEntries(entries, clients) {
             });
         });
     });
+    return scores;
+}
+
+async function scoreClientsWithFallbackForSimLog(simLogRun, clients) {
+    const targetClients = new Set(clients);
+    const scores = new Map(clients.map(client => [client, emptyScore()]));
+    const matrixCache = new Map();
+    const addClient = client => {
+        if (!scores.has(client)) {
+            scores.set(client, emptyScore());
+        }
+    };
+    const scoreFor = (cells, client) => {
+        if (!cells.has(client)) {
+            cells.set(client, emptyScore());
+        }
+        return cells.get(client);
+    };
+
+    for (const [suiteName, runs] of leanLatestState.suiteRuns.entries()) {
+        const row = {
+            suiteName,
+            fileName: '',
+            linkSuiteName: suiteName,
+            cells: new Map(),
+        };
+
+        for (const entry of scoreFallbackRunsForSimLog(runs, simLogRun)) {
+            const matrices = await loadScoreMatrices(entry, matrixCache);
+            addMatrixScoresToRow(row, matrices, addClient, scoreFor, scores, entry, targetClients);
+            if (scoreRowComplete(row, targetClients)) {
+                break;
+            }
+        }
+    }
+
     return scores;
 }
 
@@ -1426,16 +1548,25 @@ async function loadScoreMatrices(entry, matrixCache) {
 }
 
 function scoreFallbackRuns(suiteName, runs) {
+    return scoreFallbackRunsForSelection(runs, selectedRunIndex(suiteName), selectedSimLogRun());
+}
+
+function scoreFallbackRunsForSimLog(runs, simLogRun) {
+    const runIndex = simLogRun
+        ? runs.findIndex(entry => entry.simLog === simLogRun.simLog)
+        : 0;
+    return scoreFallbackRunsForSelection(runs, runIndex === -1 ? runs.length : runIndex, simLogRun);
+}
+
+function scoreFallbackRunsForSelection(runs, runIndex, selectedRun) {
     if (runs.length === 0) {
         return [];
     }
 
-    const runIndex = selectedRunIndex(suiteName);
     if (runIndex < runs.length) {
         return runs.slice(runIndex);
     }
 
-    const selectedRun = selectedSimLogRun();
     if (!selectedRun || !selectedRun.date) {
         return runs.slice(0);
     }
@@ -1677,6 +1808,10 @@ function renderSuiteSection(matrix) {
         return section;
     }
 
+    if (matrix.availabilityNote) {
+        body.append($('<p />').addClass('lean-suite-note text-secondary').text(matrix.availabilityNote));
+    }
+
     const scroll = $('<div />').addClass('lean-grid-scroll');
     const table = $('<table />').addClass('lean-latest-grid');
     const thead = $('<thead />');
@@ -1712,7 +1847,7 @@ function renderSuiteSection(matrix) {
 }
 
 function suiteCollapseKey(matrix) {
-    return matrix.linkSuiteName || matrix.suiteName;
+    return matrix.collapseKey || matrix.suiteName || matrix.linkSuiteName;
 }
 
 function renderCollapseButton(suiteKey, collapsed) {
@@ -1931,7 +2066,7 @@ function rowLabel(row) {
 function resultTitle(matrix, row, client, tests, label) {
     const source = resultSourceSuffix(matrix, tests);
     if (matrix.columnRoleLabel && row.name === client.name) {
-        return `${row.name} (3 nodes): ${label}${source}`;
+        return `${row.name} (${matrix.sameClientRoleLabel || '3 nodes'}): ${label}${source}`;
     }
     if (matrix.columnRoleLabel) {
         const rowRole = matrix.rowRoleLabel || matrix.rowHeaderLabel;

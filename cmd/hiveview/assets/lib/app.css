@@ -962,6 +962,11 @@ kbd {
     flex-shrink: 0;
 }
 
+.lean-suite-note {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+}
+
 .lean-collapse-button {
     display: inline-flex;
     align-items: center;
