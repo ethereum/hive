@@ -57,15 +57,35 @@ fi
 
 materialize_runtime_local_ip
 
-FLAGS=(
-    --custom-network-config-dir "$ASSET_ROOT"
-    --gossipsub-port 9000
-    --http-address 0.0.0.0
-    --api-port 5052
-    --metrics-port 8080
-    --node-key "$ASSET_ROOT/node.key"
-    --node-id "$NODE_ID"
-)
+case "$DEVNET_LABEL" in
+    devnet3)
+        FLAGS=(
+            --custom-network-config-dir "$ASSET_ROOT"
+            --gossipsub-port 9000
+            --http-address 0.0.0.0
+            --api-port 5052
+            --metrics-port 8080
+            --node-key "$ASSET_ROOT/node.key"
+            --node-id "$NODE_ID"
+        )
+        ;;
+    devnet4)
+        FLAGS=(
+            --genesis "$ASSET_ROOT/config.yaml"
+            --validators "$ASSET_ROOT/annotated_validators.yaml"
+            --bootnodes "$ASSET_ROOT/nodes.yaml"
+            --validator-config "$ASSET_ROOT/validator-config.yaml"
+            --hash-sig-keys-dir "$ASSET_ROOT/hash-sig-keys"
+            --gossipsub-port 9000
+            --http-address 0.0.0.0
+            --api-port 5052
+            --metrics-port 8080
+            --node-key "$ASSET_ROOT/node.key"
+            --node-id "$NODE_ID"
+            --data-dir /data
+        )
+        ;;
+esac
 
 if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then
     FLAGS+=(--checkpoint-sync-url "$HIVE_CHECKPOINT_SYNC_URL")

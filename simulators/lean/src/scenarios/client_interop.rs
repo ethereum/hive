@@ -11,6 +11,7 @@ use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
 const BOOTNODES_ENVIRONMENT_VARIABLE: &str = "HIVE_BOOTNODES";
+const AGGREGATE_SUBNET_IDS_ENVIRONMENT_VARIABLE: &str = "HIVE_AGGREGATE_SUBNET_IDS";
 const CLIENT_PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 const IS_AGGREGATOR_ENVIRONMENT_VARIABLE: &str = "HIVE_IS_AGGREGATOR";
 const LEAN_ATTESTATION_COMMITTEE_COUNT_ENVIRONMENT_VARIABLE: &str =
@@ -308,9 +309,11 @@ fn build_two_subnet_interop_nodes(
 
     let topology = [
         (client_a.clone(), vec![0]),
-        (client_b.clone(), vec![2, 4]),
+        (client_b.clone(), vec![2]),
+        (client_b.clone(), vec![4]),
         (client_a.clone(), vec![1]),
-        (client_b.clone(), vec![3, 5]),
+        (client_b.clone(), vec![3]),
+        (client_b.clone(), vec![5]),
     ];
 
     let mut client_kind_counts = HashMap::<String, usize>::new();
@@ -350,7 +353,10 @@ fn assign_aggregator(nodes: &mut [ClientInteropNode]) {
 
 fn assign_two_subnet_aggregators(nodes: &mut [ClientInteropNode]) {
     for node in nodes.iter_mut() {
-        node.is_aggregator = node.validator_indices.len() == 1;
+        node.is_aggregator = node
+            .validator_indices
+            .iter()
+            .any(|index| *index < TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT);
     }
 }
 
@@ -514,9 +520,22 @@ fn client_interop_environment(
             IS_AGGREGATOR_ENVIRONMENT_VARIABLE.to_string(),
             "1".to_string(),
         );
+        if test_data.attestation_committee_count > 1 {
+            environment.insert(
+                AGGREGATE_SUBNET_IDS_ENVIRONMENT_VARIABLE.to_string(),
+                aggregate_subnet_ids_csv(test_data.attestation_committee_count),
+            );
+        }
     }
 
     environment
+}
+
+fn aggregate_subnet_ids_csv(attestation_committee_count: usize) -> String {
+    (0..attestation_committee_count)
+        .map(|index| index.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn validator_indices_csv(indices: &[usize]) -> String {
@@ -750,20 +769,20 @@ mod tests {
                     .iter()
                     .map(|node| node.validator_indices.as_slice())
                     .collect::<Vec<_>>(),
-                vec![&[0][..], &[2, 4][..], &[1][..], &[3, 5][..]]
+                vec![&[0][..], &[2][..], &[4][..], &[1][..], &[3][..], &[5][..]]
             );
             assert_eq!(
                 nodes
                     .iter()
                     .map(|node| node.is_aggregator)
                     .collect::<Vec<_>>(),
-                vec![true, false, true, false]
+                vec![true, false, false, true, false, false]
             );
         }
     }
 
     #[test]
-    fn two_subnet_nodes_use_one_and_two_validator_assignments_per_subnet() {
+    fn two_subnet_nodes_use_one_validator_assignment_per_node() {
         let topology_spec = ClientInteropTopologySpec {
             left_name: "client_a_devnet4".to_string(),
             right_name: "client_b_devnet4".to_string(),
@@ -781,9 +800,11 @@ mod tests {
             assignments,
             vec![
                 ("ream_devnet4", &[0][..]),
-                ("gean_devnet4", &[2, 4][..]),
+                ("gean_devnet4", &[2][..]),
+                ("gean_devnet4", &[4][..]),
                 ("ream_devnet4", &[1][..]),
-                ("gean_devnet4", &[3, 5][..]),
+                ("gean_devnet4", &[3][..]),
+                ("gean_devnet4", &[5][..]),
             ]
         );
         assert_eq!(
@@ -791,12 +812,12 @@ mod tests {
                 .iter()
                 .map(|node| node.is_aggregator)
                 .collect::<Vec<_>>(),
-            vec![true, false, true, false]
+            vec![true, false, false, true, false, false]
         );
     }
 
     #[test]
-    fn two_subnet_environment_passes_committee_and_multi_validator_assignment() {
+    fn two_subnet_environment_passes_committee_and_single_validator_assignment() {
         let topology_spec = ClientInteropTopologySpec {
             left_name: "ream_devnet4".to_string(),
             right_name: "gean_devnet4".to_string(),
@@ -827,9 +848,19 @@ mod tests {
         assert_eq!(environment[LEAN_VALIDATOR_INDEX_ENVIRONMENT_VARIABLE], "2");
         assert_eq!(
             environment[LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE],
-            "2,4"
+            "2"
         );
         assert!(!environment.contains_key(IS_AGGREGATOR_ENVIRONMENT_VARIABLE));
+
+        let aggregator_environment = client_interop_environment(&nodes[0], &[], &test_data);
+        assert_eq!(
+            aggregator_environment[IS_AGGREGATOR_ENVIRONMENT_VARIABLE],
+            "1"
+        );
+        assert_eq!(
+            aggregator_environment[AGGREGATE_SUBNET_IDS_ENVIRONMENT_VARIABLE],
+            "0,1"
+        );
     }
 
     #[test]
@@ -870,7 +901,7 @@ mod tests {
     }
 
     #[test]
-    fn two_subnet_same_client_only_marks_one_validator_nodes_as_aggregators() {
+    fn two_subnet_same_client_marks_one_node_per_subnet_as_aggregator() {
         let topology_spec = ClientInteropTopologySpec {
             left_name: "ream_devnet4".to_string(),
             right_name: "ream_devnet4".to_string(),
@@ -885,7 +916,7 @@ mod tests {
                 .iter()
                 .map(|node| node.is_aggregator)
                 .collect::<Vec<_>>(),
-            vec![true, false, true, false]
+            vec![true, false, false, true, false, false]
         );
     }
 }
