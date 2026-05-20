@@ -165,6 +165,10 @@ fi
 # Configure NAT and disable pruning
 FLAGS="$FLAGS --nat none --block-interval 500000"
 
+if [ "$HIVE_DISCV5" != "" ]; then
+    FLAGS="$FLAGS --discovery.v5.port=30303"
+fi
+
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
 RUST_LOG=info $reth node $FLAGS
