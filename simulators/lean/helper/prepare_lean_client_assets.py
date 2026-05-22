@@ -89,6 +89,13 @@ def genesis_validator_count() -> int:
 
 def load_source_validator(index: int) -> dict[str, str]:
     validator = json.loads((SOURCE_KEYS_DIR / f"{index}.json").read_text(encoding="utf-8"))
+    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
+        return {
+            "attestation_public": validator["attestation_keypair"]["public_key"],
+            "attestation_secret": validator["attestation_keypair"]["secret_key"],
+            "proposal_public": validator["proposal_keypair"]["public_key"],
+            "proposal_secret": validator["proposal_keypair"]["secret_key"],
+        }
     if {
         "attestation_public",
         "attestation_secret",
