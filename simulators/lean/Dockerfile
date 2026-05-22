@@ -143,6 +143,8 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         prod_scheme/1.json \
         prod_scheme/2.json \
         prod_scheme/3.json \
+        prod_scheme/4.json \
+        prod_scheme/5.json \
     && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet3/ \
     && rm -rf /tmp/leansig/prod_scheme \
     && curl -4 -fsSL \
@@ -153,6 +155,8 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         prod_scheme/1.json \
         prod_scheme/2.json \
         prod_scheme/3.json \
+        prod_scheme/4.json \
+        prod_scheme/5.json \
     && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet4/ \
     && DEVNET3_COMMIT="$(cat /app/devnet3/.git-commit)" \
     && DEVNET4_COMMIT="$(cat /app/devnet4/.git-commit)" \

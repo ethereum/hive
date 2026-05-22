@@ -97,6 +97,13 @@ fi
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
+    if [ -n "${HIVE_AGGREGATE_SUBNET_IDS:-}" ]; then
+        FLAGS+=(--aggregate-subnet-ids "$HIVE_AGGREGATE_SUBNET_IDS")
+    fi
+fi
+
+if [ -n "${HIVE_ATTESTATION_COMMITTEE_COUNT:-}" ] && [ "$HIVE_ATTESTATION_COMMITTEE_COUNT" != "1" ]; then
+    FLAGS+=(--attestation-committee-count "$HIVE_ATTESTATION_COMMITTEE_COUNT")
 fi
 
 if [ -n "${HIVE_CLIENT_PRIVATE_KEY:-}" ]; then

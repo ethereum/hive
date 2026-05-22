@@ -65,12 +65,17 @@ FLAGS=(
     --node-id "$CLEAN_NODE_ID" 
     --node-key "$NODE_KEY"
     --listen-addr "/ip4/0.0.0.0/udp/9000/quic-v1" 
+    --bootnodes "$ASSET_ROOT/nodes.yaml"
     --api-host "0.0.0.0" 
     --api-port 5052 
 ) 
 
 if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
+fi
+
+if [ -n "${HIVE_ATTESTATION_COMMITTEE_COUNT:-}" ] && [ "$HIVE_ATTESTATION_COMMITTEE_COUNT" != "1" ]; then
+    FLAGS+=(--attestation-committee-count "$HIVE_ATTESTATION_COMMITTEE_COUNT")
 fi
 
 if [ -n "${HIVE_CHECKPOINT_SYNC_URL:-}" ]; then

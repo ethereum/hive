@@ -74,6 +74,10 @@ if [ "${HIVE_IS_AGGREGATOR:-0}" = "1" ]; then
     FLAGS+=(--is-aggregator)
 fi
 
+if [ -n "${HIVE_ATTESTATION_COMMITTEE_COUNT:-}" ] && [ "$HIVE_ATTESTATION_COMMITTEE_COUNT" != "1" ]; then
+    FLAGS+=(--attestation-committee-count "$HIVE_ATTESTATION_COMMITTEE_COUNT")
+fi
+
 export RUST_LOG="${RUST_LOG:-info}"
 
 exec "$ZEAM_BIN" "${FLAGS[@]}"
