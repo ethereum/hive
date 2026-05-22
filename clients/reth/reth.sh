@@ -163,7 +163,7 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
 fi
 
 # Configure NAT and disable pruning
-FLAGS="$FLAGS --nat none --block-interval 500000"
+FLAGS="$FLAGS --nat none --block-interval 500000 --debug.startup-sync-state-idle"
 
 if [ "$HIVE_DISCV5" != "" ]; then
     FLAGS="$FLAGS --discovery.v5.port=30303"
