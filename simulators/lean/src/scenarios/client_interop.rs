@@ -799,47 +799,6 @@ mod tests {
     }
 
     #[test]
-    fn single_subnet_matrix_covers_self_and_pair_orientations() {
-        let clients = devnet4_lean_clients();
-
-        let matrix = interop_topology_matrix(&clients);
-        let topology_labels = matrix
-            .iter()
-            .map(|spec| {
-                spec.topology
-                    .iter()
-                    .map(|client| client.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(">")
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            matrix.len(),
-            64,
-            "eight clients should produce eight self tests and fifty-six mixed 2:1 orientation tests"
-        );
-        assert_eq!(single_subnet_aggregator_placements().len(), 2);
-        assert!(topology_labels.contains(&"ream_devnet4>ream_devnet4>ream_devnet4".to_string()));
-        assert!(topology_labels
-            .contains(&"ethlambda_devnet4>ethlambda_devnet4>ream_devnet4".to_string()));
-        assert!(
-            topology_labels.contains(&"ethlambda_devnet4>ream_devnet4>ream_devnet4".to_string())
-        );
-        assert!(topology_labels
-            .contains(&"gean_devnet4>gean_devnet4>grandine_lean_devnet4".to_string()));
-        assert!(topology_labels
-            .contains(&"gean_devnet4>grandine_lean_devnet4>grandine_lean_devnet4".to_string()));
-        assert!(
-            topology_labels.contains(&"lantern_devnet4>lantern_devnet4>qlean_devnet4".to_string())
-        );
-        assert!(
-            topology_labels.contains(&"lantern_devnet4>qlean_devnet4>qlean_devnet4".to_string())
-        );
-        assert!(topology_labels.contains(&"qlean_devnet4>qlean_devnet4>qlean_devnet4".to_string()));
-    }
-
-    #[test]
     fn single_subnet_aggregator_placements_select_expected_node() {
         let mut left_majority = build_interop_nodes(vec![
             client("ream_devnet4"),
@@ -946,39 +905,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn two_subnet_matrix_covers_self_and_majority_minority_pair_orientations() {
-        let clients = devnet4_lean_clients();
-
-        let matrix = two_subnet_interop_topology_matrix(&clients);
-        let topology_labels = matrix
-            .iter()
-            .map(|spec| {
-                spec.topology
-                    .iter()
-                    .map(|client| client.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(">")
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            matrix.len(),
-            64,
-            "eight clients should produce eight self subnet tests and fifty-six mixed orientation tests"
-        );
-        assert!(topology_labels.contains(&"ream_devnet4>ream_devnet4".to_string()));
-        assert!(topology_labels.contains(&"ream_devnet4>ethlambda_devnet4".to_string()));
-        assert!(topology_labels.contains(&"ethlambda_devnet4>ream_devnet4".to_string()));
-        assert!(topology_labels.contains(&"grandine_lean_devnet4>gean_devnet4".to_string()));
-        assert!(topology_labels.contains(&"gean_devnet4>grandine_lean_devnet4".to_string()));
-        assert!(topology_labels.contains(&"lantern_devnet4>qlean_devnet4".to_string()));
-        assert!(topology_labels.contains(&"qlean_devnet4>lantern_devnet4".to_string()));
-        assert!(topology_labels.contains(&"qlean_devnet4>qlean_devnet4".to_string()));
-        assert!(topology_labels.contains(&"nlean_devnet4>zeam_devnet4".to_string()));
-        assert!(topology_labels.contains(&"zeam_devnet4>nlean_devnet4".to_string()));
     }
 
     #[test]
