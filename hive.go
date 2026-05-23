@@ -57,6 +57,7 @@ Otherwise, it looks for files in the $HOME directory:
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
+		dockerBuildRetries    = flag.Int("docker.buildretries", 0, "`Number` of times to retry a failed docker image build before giving up.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simTestExact          = flag.Bool("sim.limit.exact", false, "Exact `expression` match for tests/suites (interpreted by simulators).")
@@ -107,6 +108,9 @@ Otherwise, it looks for files in the $HOME directory:
 	if err := os.Setenv("GODEBUG", "multipartmaxparts=20000"); err != nil {
 		fatal(err)
 	}
+	if *dockerBuildRetries < 0 {
+		fatal("--docker.buildretries must be non-negative")
+	}
 	if *simTestLimit > 0 {
 		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
@@ -136,6 +140,7 @@ Otherwise, it looks for files in the $HOME directory:
 	dockerConfig := &libdocker.Config{
 		Inventory:         inv,
 		PullEnabled:       *dockerPull,
+		BuildRetries:      *dockerBuildRetries,
 		UseAuthentication: *dockerAuth || *useCredHelper,
 	}
 	if *dockerNoCache != "" {
