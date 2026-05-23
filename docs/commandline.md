@@ -101,11 +101,6 @@ For example, the following command runs the `devp2p` simulator, limiting the run
 
     ./hive --sim devp2p --sim.limit eth/Large
 
-This command runs the `consensus` simulator and runs only tests from the `stBugs`
-directory (note the first `/`, matching any suite name):
-
-    ./hive --sim ethereum/consensus --sim.limit /stBugs/
-
 `--sim.timelimit <timeout>`: Simulation timeout. Hive aborts the simulator if it exceeds
 this time. There is no default timeout.
 

@@ -6,6 +6,5 @@ use (
 	./common
 	./dencun
 	./engine
-	./testnet
 	./withdrawals
 )
