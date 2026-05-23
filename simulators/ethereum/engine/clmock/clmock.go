@@ -32,8 +32,14 @@ var (
 	DefaultBlockTimestampIncrement         = big.NewInt(1)
 
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
-	// to produce a new Payload
-	DefaultPayloadProductionClientDelay = time.Second
+	// to produce a new Payload. Bumped from 1s to 2s to give the producer's
+	// txpool enough time to surface a transaction submitted in the same
+	// `OnPayloadProducerSelected` callback, otherwise the payload builder may
+	// snapshot an empty pending pool and return a payload with no
+	// transactions, breaking tests like
+	// `Invalid Missing Ancestor Syncing ReOrg, Transaction*`.
+	// See: https://github.com/ethereum/hive/issues/1351
+	DefaultPayloadProductionClientDelay = 2 * time.Second
 )
 
 type ExecutableDataHistory map[uint64]*typ.ExecutableData
