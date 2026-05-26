@@ -746,10 +746,6 @@ def load_validator(index: int) -> dict[str, str]:
         return validator
 
     if {LEGACY_PUBLIC_FIELD, LEGACY_SECRET_FIELD}.issubset(validator):
-        # Latest published devnet4 helper bundles currently expose a single
-        # XMSS keypair per validator. LeanSpec still expects separate
-        # attestation/proposal entries, so we mirror the same key material
-        # into both roles for test-only helper startup compatibility.
         return {
             ATTESTATION_PUBKEY_FIELD: validator[LEGACY_PUBLIC_FIELD],
             ATTESTATION_SECRET_FIELD: validator[LEGACY_SECRET_FIELD],
@@ -765,8 +761,6 @@ def load_validator(index: int) -> dict[str, str]:
 
 
 def decode_secret_key(secret_key_hex: str) -> SecretKey:
-    # Current devnet4 prod keys are large enough that LeanSpec's pydantic-heavy
-    # decode path can trip GC while nested objects are still being built.
     was_gc_enabled = gc.isenabled()
     if was_gc_enabled:
         gc.disable()
