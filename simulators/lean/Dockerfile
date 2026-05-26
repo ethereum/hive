@@ -1,27 +1,16 @@
-FROM rust:1.94.0-bookworm AS rust-builder
+FROM rust:bookworm AS rust-builder
 
 WORKDIR /workspace
 
-ENV CARGO_BUILD_JOBS=1 \
-    CARGO_PROFILE_DEV_CODEGEN_UNITS=1 \
-    CARGO_PROFILE_DEV_DEBUG=0 \
-    CARGO_INCREMENTAL=0 \
-    RUST_MIN_STACK=4294967296
+ENV RUST_MIN_STACK=33554432
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./hivesim-rs ./hivesim-rs
-COPY ./simulators/lean/Cargo.toml ./simulators/lean/
-COPY ./simulators/lean/src ./simulators/lean/src
+COPY ./simulators/lean ./simulators/lean
 
-RUN for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
-        cargo build -p lean-sim --locked \
-        && break; \
-        if [ "$attempt" = "15" ]; then exit 1; fi; \
-        sleep 2; \
-    done \
-    && mv target/debug/lean-sim /lean-sim-bin \
-    && strip /lean-sim-bin || true \
+RUN cargo build -p lean-sim --release --locked \
+    && mv target/release/lean-sim /lean-sim-bin \
     && cargo clean \
     && rm -rf /usr/local/cargo/registry /usr/local/cargo/git
 
@@ -30,54 +19,24 @@ FROM python:3.12-slim-bookworm AS lean-spec-base
 ARG helper_github=leanEthereum/leanSpec
 ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 
-RUN for attempt in 1 2 3; do \
-        rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
-        && apt-get clean \
-        && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
-        && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
-            build-essential \
-            ca-certificates \
-            curl \
-            git \
-            libssl-dev \
-            pkg-config \
-        && break; \
-        if [ "$attempt" = "3" ]; then exit 1; fi; \
-        sleep 2; \
-    done \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    CARGO_BUILD_JOBS=1 \
-    CARGO_INCREMENTAL=0 \
-    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
-    CARGO_PROFILE_RELEASE_LTO=false \
-    CARGO_PROFILE_RELEASE_OPT_LEVEL=1 \
-    RUSTFLAGS="-Cdebuginfo=0" \
-    RUST_MIN_STACK=4294967296 \
     PATH=/usr/local/cargo/bin:$PATH
-
-RUN mkdir -p "${CARGO_HOME}" \
-    && printf '%s\n' \
-        '[profile.release.package."lean_compiler"]' \
-        'opt-level = 0' \
-        'codegen-units = 256' \
-        '' \
-        '[profile.release.package."lean_prover"]' \
-        'codegen-units = 256' \
-        > "${CARGO_HOME}/config.toml"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain ${RUST_NIGHTLY_TOOLCHAIN} \
     && rustup default ${RUST_NIGHTLY_TOOLCHAIN}
-
-RUN printf '%s\n' \
-        '#!/bin/sh' \
-        'export RUST_MIN_STACK="${RUSTC_MIN_STACK:-34359738368}"' \
-        'exec "$@"' \
-        > /usr/local/bin/rustc-stack-wrapper \
-    && chmod +x /usr/local/bin/rustc-stack-wrapper
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -92,15 +51,7 @@ RUN git clone https://github.com/${helper_github} . \
     && git checkout ${devnet3_tag} \
     && git rev-parse HEAD > /app/devnet3/.git-commit
 
-RUN for attempt in 1 2 3 4 5 6 7 8 9 10; do \
-        ulimit -s unlimited \
-        && RUSTC_WRAPPER=/usr/local/bin/rustc-stack-wrapper \
-            RUSTC_MIN_STACK=17179869184 \
-            uv sync --frozen \
-        && break; \
-        if [ "$attempt" = "10" ]; then exit 1; fi; \
-        sleep 2; \
-    done
+RUN uv sync --frozen
 
 FROM lean-spec-base AS builder-devnet4
 
@@ -113,15 +64,7 @@ RUN git clone https://github.com/${helper_github} . \
     && git checkout ${devnet4_tag} \
     && git rev-parse HEAD > /app/devnet4/.git-commit
 
-RUN for attempt in 1 2 3 4 5 6 7 8 9 10; do \
-        ulimit -s unlimited \
-        && RUSTC_WRAPPER=/usr/local/bin/rustc-stack-wrapper \
-            RUSTC_MIN_STACK=17179869184 \
-            uv sync --frozen \
-        && break; \
-        if [ "$attempt" = "10" ]; then exit 1; fi; \
-        sleep 2; \
-    done
+RUN uv sync --frozen
 
 FROM python:3.12-slim-bookworm
 
@@ -135,18 +78,12 @@ ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 ENV LEAN_SPEC_FIXTURES_METADATA_URL=https://api.github.com/repos/${helper_github}/releases/tags/${lean_spec_fixtures_tag}
 ENV LEAN_SPEC_DEVNET4_KEYS_METADATA_URL=https://api.github.com/repos/leanEthereum/leansig-test-keys/releases/tags/${devnet4_keys_tag}
 
-RUN for attempt in 1 2 3; do \
-        rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
-        && apt-get clean \
-        && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
-        && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
-            ca-certificates \
-            curl \
-        && break; \
-        if [ "$attempt" = "3" ]; then exit 1; fi; \
-        sleep 2; \
-    done \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -175,7 +112,7 @@ ENV LEAN_ENV=prod \
     LEAN_SPEC_DEVNET3_KEYS_DIR=/app/hive/prod_scheme_devnet3 \
     LEAN_SPEC_DEVNET4_KEYS_DIR=/app/hive/prod_scheme_devnet4 \
     PYTHONFAULTHANDLER=1 \
-    RUST_MIN_STACK=4294967296
+    RUST_MIN_STACK=33554432
 
 COPY ./simulators/lean/helper/leanspec-client.sh /app/hive/leanspec-client.sh
 COPY ./simulators/lean/helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
@@ -228,66 +165,6 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         "$DEVNET4_COMMIT" \
         "$lean_spec_fixtures_tag" \
         "$RUST_NIGHTLY_TOOLCHAIN" > /version.txt
-
-# Fix missing IdentityKeypair.from_bytes in lean_spec
-RUN <<'EOF'
-python3 -c '
-import sys
-
-filepath = "/app/devnet4/src/lean_spec/subspecs/networking/transport/identity/keypair.py"
-with open(filepath, "r") as f:
-    content = f.read()
-
-old_method = """    @classmethod
-    def generate(cls) -> IdentityKeypair:
-        \"\"\"
-        Generate a new random secp256k1 keypair.
-
-        Returns:
-            A fresh identity keypair.
-        \"\"\"
-        private_key = ec.generate_private_key(ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)"""
-
-new_method = """    @classmethod
-    def generate(cls) -> IdentityKeypair:
-        \"\"\"
-        Generate a new random secp256k1 keypair.
-
-        Returns:
-            A fresh identity keypair.
-        \"\"\"
-        private_key = ec.generate_private_key(ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)
-
-    @classmethod
-    def from_bytes(cls, private_key_bytes: bytes) -> IdentityKeypair:
-        \"\"\"
-        Create an identity keypair from raw private key bytes.
-
-        Args:
-            private_key_bytes: 32-byte secp256k1 private key.
-
-        Returns:
-            Identity keypair derived from the private key.
-        \"\"\"
-        private_value = int.from_bytes(private_key_bytes, "big")
-        private_key = ec.derive_private_key(private_value, ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)"""
-
-if old_method in content:
-    content = content.replace(old_method, new_method)
-    with open(filepath, "w") as f:
-        f.write(content)
-    print("Fixed IdentityKeypair.from_bytes")
-else:
-    print("Could not find method to patch")
-    sys.exit(1)
-'
-EOF
 
 EXPOSE 5052 5053 9001/udp
 
