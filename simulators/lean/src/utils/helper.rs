@@ -260,30 +260,27 @@ impl LocalLeanSpecHelperConfig {
 
     fn mesh_peer(
         mesh_index: usize,
-        genesis_time: u64,
+        source_config: &LocalLeanSpecHelperConfig,
         bootnode: String,
         validator_indices: String,
-        genesis_validator_count: u64,
         disable_validator_service: bool,
-        gossip_fork_digest: String,
-        wire_compat_mode: String,
     ) -> Self {
         let mesh_index = mesh_index as u16;
         let is_aggregator = !disable_validator_service && !validator_indices.is_empty();
         Self {
             node_id: format!("lean_spec_mesh_{mesh_index}"),
             validator_indices,
-            genesis_validator_count,
-            genesis_time,
+            genesis_validator_count: source_config.genesis_validator_count,
+            genesis_time: source_config.genesis_time,
             bootnodes: Some(bootnode),
             is_aggregator,
             disable_validator_service,
-            gossip_fork_digest,
+            gossip_fork_digest: source_config.gossip_fork_digest.clone(),
             p2p_port: DEFAULT_HELPER_P2P_PORT + mesh_index,
             api_port: DEFAULT_HELPER_API_PORT + (mesh_index * 2),
             metadata_port: DEFAULT_HELPER_METADATA_PORT + (mesh_index * 2),
             identity_private_key_hex: Some(format!("{:064x}", mesh_index as u64 + 1)),
-            wire_compat_mode,
+            wire_compat_mode: source_config.wire_compat_mode.clone(),
         }
     }
 }
@@ -714,12 +711,9 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
     let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
         start_mesh_helpers(
             &source_helper,
-            genesis_time,
+            &source_helper_config,
             &helper_validator_assignments[1..],
-            genesis_validator_count,
             false,
-            helper_fork_digest.clone(),
-            source_helper_config.wire_compat_mode.clone(),
         )
         .await
         .unwrap_or_else(|err| panic!("{err}"))
@@ -756,12 +750,9 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
         if source_helper_restarted {
             helpers.mesh_peers = start_mesh_helpers(
                 &helpers.source,
-                genesis_time,
+                &source_helper_config,
                 &helper_validator_assignments[1..],
-                genesis_validator_count,
                 false,
-                helper_fork_digest.clone(),
-                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -879,12 +870,9 @@ pub(crate) async fn start_post_genesis_sync_context(
     let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
         start_mesh_helpers(
             &source_helper,
-            genesis_time,
+            &source_helper_config,
             &helper_validator_assignments[1..],
-            genesis_validator_count,
             passive_validator_mesh,
-            helper_fork_digest.clone(),
-            source_helper_config.wire_compat_mode.clone(),
         )
         .await
         .unwrap_or_else(|err| panic!("{err}"))
@@ -989,12 +977,9 @@ pub(crate) async fn start_post_genesis_sync_context(
             );
             helpers.mesh_peers = start_mesh_helpers(
                 &helpers.source,
-                genesis_time,
+                &source_helper_config,
                 &helper_validator_assignments[1..],
-                genesis_validator_count,
                 passive_validator_mesh,
-                helper_fork_digest.clone(),
-                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -1042,12 +1027,9 @@ pub(crate) async fn start_post_genesis_sync_context(
         if source_helper_restarted {
             helpers.mesh_peers = start_mesh_helpers(
                 &helpers.source,
-                genesis_time,
+                &source_helper_config,
                 &helper_validator_assignments[1..],
-                genesis_validator_count,
                 false,
-                helper_fork_digest.clone(),
-                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -2033,12 +2015,9 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
 
 async fn start_mesh_helpers(
     source_helper: &RunningLocalLeanSpecHelper,
-    genesis_time: u64,
+    source_helper_config: &LocalLeanSpecHelperConfig,
     mesh_validator_indices: &[String],
-    genesis_validator_count: u64,
     disable_validator_service: bool,
-    helper_fork_digest: String,
-    wire_compat_mode: String,
 ) -> Result<Vec<RunningLocalLeanSpecHelper>, String> {
     let mesh_peer_count = mesh_validator_indices.len();
     let mut mesh_helpers = Vec::with_capacity(mesh_peer_count);
@@ -2048,13 +2027,10 @@ async fn start_mesh_helpers(
         let mesh_index = mesh_index + 1;
         let helper_config = LocalLeanSpecHelperConfig::mesh_peer(
             mesh_index,
-            genesis_time,
+            source_helper_config,
             source_bootnode.clone(),
             validator_indices.clone(),
-            genesis_validator_count,
             disable_validator_service,
-            helper_fork_digest.clone(),
-            wire_compat_mode.clone(),
         );
         let (helper, _source_genesis_validator_entries) =
             start_local_lean_spec_helper_with_genesis_metadata(&helper_config).await?;
