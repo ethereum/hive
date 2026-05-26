@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import importlib
 import io
 import ipaddress
@@ -10,7 +11,9 @@ import json
 import logging
 import os
 import shutil
+import sys
 import time
+import types
 from contextlib import suppress
 from pathlib import Path
 from typing import Final
@@ -22,8 +25,33 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import (
     Prehashed,
     decode_dss_signature,
+    encode_dss_signature,
 )
 import yaml
+
+
+def install_numba_njit_stub() -> None:
+    if os.environ.get("HIVE_LEAN_SPEC_USE_NUMBA", "0") == "1" or "numba" in sys.modules:
+        return
+
+    numba_module = types.ModuleType("numba")
+
+    def njit(*args: object, **_: object) -> object:
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+
+        def decorate(func: object) -> object:
+            return func
+
+        return decorate
+
+    numba_module.njit = njit
+    sys.modules["numba"] = numba_module
+
+
+install_numba_njit_stub()
+
+
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.genesis.config import GenesisConfig
@@ -37,6 +65,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import QuicConnecti
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
+from lean_spec.subspecs.xmss import aggregation as xmss_aggregation_module
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
@@ -91,11 +120,21 @@ PROPOSAL_PUBKEY_FIELD: Final = "proposal_public"
 PROPOSAL_SECRET_FIELD: Final = "proposal_secret"
 LEGACY_PUBLIC_FIELD: Final = "public"
 LEGACY_SECRET_FIELD: Final = "secret"
+WIRE_COMPAT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_SPEC_WIRE_COMPAT"
+WIRE_COMPAT_LEGACY: Final = "legacy"
+WIRE_COMPAT_NATIVE: Final = "native"
 
 logger = logging.getLogger("lean_spec_client_runner")
+LEGACY_SIGNATURE_LENGTH: Final = 2536
+SIGNATURE_PATH_OFFSET: Final = 36
+SIGNATURE_HASHES_OFFSET: Final = 1064
+SIGNATURE_PATH_SIBLINGS_OFFSET: Final = 4
 
 _SSZ_FAST_DESERIALIZATION_PATCHED = False
 _SNAPPY_COMPRESS_PATCHED = False
+_SETUP_PROVER_COMPAT_INSTALLED = False
+_LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = False
+_LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED = False
 
 
 def setup_logging() -> None:
@@ -104,6 +143,286 @@ def setup_logging() -> None:
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+
+def _ssz_offset(value: int) -> bytes:
+    return value.to_bytes(OFFSET_BYTE_LENGTH, "little")
+
+
+def canonicalize_der_secp256k1_signature(der_signature: bytes) -> bytes:
+    signature_r, signature_s = decode_dss_signature(der_signature)
+    if signature_s > SECP256K1_ORDER // 2:
+        signature_s = SECP256K1_ORDER - signature_s
+    return encode_dss_signature(signature_r, signature_s)
+
+
+def install_low_s_identity_signature_compatibility() -> None:
+    global _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED
+
+    if _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED:
+        return
+
+    original_sign = IdentityKeypair.sign
+
+    def sign_low_s(self: IdentityKeypair, message: bytes) -> bytes:
+        return canonicalize_der_secp256k1_signature(original_sign(self, message))
+
+    IdentityKeypair.sign = sign_low_s
+    _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED = True
+
+
+def _safe_len(value: object | None) -> int | None:
+    if value is None:
+        return None
+
+    try:
+        return len(value)  # type: ignore[arg-type]
+    except TypeError:
+        return None
+
+
+def legacy_attestation_count(block: object) -> int:
+    body = getattr(block, "body", None)
+    attestations = getattr(body, "attestations", None)
+    if attestations is None:
+        attestations = getattr(block, "attestations", None)
+
+    for candidate in (getattr(attestations, "data", None), attestations):
+        count = _safe_len(candidate)
+        if count is not None:
+            return count
+
+    return 0
+
+
+def _encode_aggregated_signature_proof(
+    participants: bytes = b"\x01",
+    proof_data: bytes = b"",
+) -> bytes:
+    fixed_part_length = OFFSET_BYTE_LENGTH * 2
+    return (
+        _ssz_offset(fixed_part_length)
+        + _ssz_offset(fixed_part_length + len(participants))
+        + participants
+        + proof_data
+    )
+
+
+def _encode_aggregated_signature_proofs(proofs: list[bytes]) -> bytes:
+    offsets = bytearray()
+    offset = OFFSET_BYTE_LENGTH * len(proofs)
+    for proof in proofs:
+        offsets += _ssz_offset(offset)
+        offset += len(proof)
+    return bytes(offsets) + b"".join(proofs)
+
+
+def _encode_placeholder_aggregated_signature_proofs(count: int) -> bytes:
+    return _encode_aggregated_signature_proofs(
+        [_encode_aggregated_signature_proof() for _ in range(count)]
+    )
+
+
+def _encode_blank_xmss_signature() -> bytes:
+    signature = bytearray(LEGACY_SIGNATURE_LENGTH)
+    signature[0:4] = _ssz_offset(SIGNATURE_PATH_OFFSET)
+    signature[32:36] = _ssz_offset(SIGNATURE_HASHES_OFFSET)
+    signature[36:40] = _ssz_offset(SIGNATURE_PATH_SIBLINGS_OFFSET)
+    return bytes(signature)
+
+
+def encode_ssz_bytes(value: object) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+
+    encode_bytes = getattr(value, "encode_bytes", None)
+    if encode_bytes is not None:
+        return encode_bytes()
+
+    return bytes(value)  # type: ignore[arg-type]
+
+
+def extract_proposer_signature_bytes(signed_block: object) -> bytes:
+    signature = getattr(signed_block, "signature", None)
+    proposer_signature = getattr(signature, "proposer_signature", None)
+    if proposer_signature is None:
+        return _encode_blank_xmss_signature()
+
+    try:
+        encoded = encode_ssz_bytes(proposer_signature)
+    except Exception:
+        logger.debug("Unable to encode proposer signature", exc_info=True)
+        return _encode_blank_xmss_signature()
+
+    if len(encoded) != LEGACY_SIGNATURE_LENGTH:
+        logger.debug("Unexpected proposer signature length %d", len(encoded))
+        return _encode_blank_xmss_signature()
+
+    return encoded
+
+
+def extract_attestation_signature_proofs(signed_block: object) -> list[bytes]:
+    signature = getattr(signed_block, "signature", None)
+    attestation_signatures = getattr(signature, "attestation_signatures", None)
+    proof_values = getattr(attestation_signatures, "data", attestation_signatures)
+    if proof_values is None:
+        return []
+
+    proofs = []
+    for proof in proof_values:
+        try:
+            participants = encode_ssz_bytes(getattr(proof, "participants"))
+            proof_data = encode_ssz_bytes(getattr(proof, "proof_data"))
+            proofs.append(_encode_aggregated_signature_proof(participants, proof_data))
+        except Exception:
+            logger.debug("Unable to encode attestation signature proof", exc_info=True)
+            proofs.append(_encode_aggregated_signature_proof())
+
+    return proofs
+
+
+def _encode_legacy_block_signatures(
+    proposer_signature: bytes,
+    attestation_signature_proofs: bytes,
+) -> bytes:
+    fixed_part_length = OFFSET_BYTE_LENGTH + LEGACY_SIGNATURE_LENGTH
+    return (
+        _ssz_offset(fixed_part_length)
+        + proposer_signature
+        + attestation_signature_proofs
+    )
+
+
+def _encode_legacy_signed_block(
+    block_bytes: bytes,
+    proposer_signature: bytes,
+    attestation_signature_proofs: bytes,
+) -> bytes:
+    signatures_bytes = _encode_legacy_block_signatures(
+        proposer_signature,
+        attestation_signature_proofs,
+    )
+    fixed_part_length = OFFSET_BYTE_LENGTH * 2
+    return (
+        _ssz_offset(fixed_part_length)
+        + _ssz_offset(fixed_part_length + len(block_bytes))
+        + block_bytes
+        + signatures_bytes
+    )
+
+
+def encode_legacy_signed_block(signed_block: object) -> bytes:
+    block = extract_inner_block(signed_block)
+    proofs = extract_attestation_signature_proofs(signed_block)
+    if not proofs:
+        proof_bytes = _encode_placeholder_aggregated_signature_proofs(
+            legacy_attestation_count(block)
+        )
+    else:
+        proof_bytes = _encode_aggregated_signature_proofs(proofs)
+    return _encode_legacy_signed_block(
+        block.encode_bytes(),
+        extract_proposer_signature_bytes(signed_block),
+        proof_bytes,
+    )
+
+def install_legacy_signed_block_wire_compatibility() -> None:
+    global _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED
+
+    if _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED:
+        return
+
+    if not legacy_signed_block_compatibility_enabled():
+        _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = True
+        return
+
+    networking_service_module = importlib.import_module(
+        "lean_spec.subspecs.networking.service.service"
+    )
+    reqresp_handler_module = importlib.import_module(
+        "lean_spec.subspecs.networking.reqresp.handler"
+    )
+
+    network_service_cls = networking_service_module.NetworkService
+    request_handler_cls = reqresp_handler_module.RequestHandler
+    response_code_cls = reqresp_handler_module.ResponseCode
+    slot_cls = reqresp_handler_module.Slot
+    uint64_cls = reqresp_handler_module.Uint64
+
+    async def publish_block_with_legacy_signed_block(self: object, block: object) -> None:
+        topic = networking_service_module.GossipTopic.block(self.network_name)
+        compressed = networking_service_module.compress(encode_legacy_signed_block(block))
+        await self.event_source.publish(topic.to_topic_id(), compressed)
+        logger.debug("Published legacy signed block at slot %s", extract_inner_block(block).slot)
+
+    async def handle_blocks_by_root_with_legacy_signed_block(
+        self: object,
+        request: object,
+        response: object,
+    ) -> None:
+        if self.block_lookup is None:
+            logger.warning("BlocksByRoot request received but no block_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Block lookup not available")
+            return
+
+        for root in request.roots.data:
+            try:
+                block = await self.block_lookup(root)
+                if block is not None:
+                    await response.send_success(encode_legacy_signed_block(block))
+            except Exception as err:
+                logger.warning("Error looking up block %s: %s", root.hex()[:8], err)
+
+    async def handle_blocks_by_range_with_legacy_signed_block(
+        self: object,
+        request: object,
+        response: object,
+    ) -> None:
+        if self.block_by_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no block_by_slot_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Block lookup not available")
+            return
+
+        if request.count == uint64_cls(0) or request.count > uint64_cls(
+            reqresp_handler_module.MAX_REQUEST_BLOCKS
+        ):
+            await response.send_error(response_code_cls.INVALID_REQUEST, "Invalid count")
+            return
+
+        if self.current_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no current_slot_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Current slot not available")
+            return
+
+        current_slot = self.current_slot_lookup()
+        window_floor = (
+            current_slot - slot_cls(reqresp_handler_module.MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            if current_slot >= slot_cls(reqresp_handler_module.MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            else slot_cls(0)
+        )
+        if request.start_slot < window_floor:
+            await response.send_error(
+                response_code_cls.RESOURCE_UNAVAILABLE,
+                "Requested slot predates history window",
+            )
+            return
+
+        for index in range(int(request.count)):
+            slot = request.start_slot + slot_cls(index)
+            try:
+                block = await self.block_by_slot_lookup(slot)
+                if block is not None:
+                    await response.send_success(encode_legacy_signed_block(block))
+            except Exception as err:
+                logger.warning("Error looking up block at slot %s: %s", slot, err)
+
+    network_service_cls.publish_block = publish_block_with_legacy_signed_block
+    request_handler_cls.handle_blocks_by_root = handle_blocks_by_root_with_legacy_signed_block
+    request_handler_cls.handle_blocks_by_range = handle_blocks_by_range_with_legacy_signed_block
+    logger.info("Installed LeanSpec signed-block gossip/reqresp compatibility")
+    _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = True
 
 
 def patch_fast_ssz_deserialization() -> None:
@@ -262,11 +581,13 @@ def patch_snappy_compress() -> None:
     if _SNAPPY_COMPRESS_PATCHED:
         return
 
+    snappy_package_module = importlib.import_module("lean_spec.snappy")
     snappy_compress_module = importlib.import_module("lean_spec.snappy.compress")
+    snappy_framing_module = importlib.import_module("lean_spec.snappy.framing")
+    reqresp_codec_module = importlib.import_module("lean_spec.subspecs.networking.reqresp.codec")
     networking_service_module = importlib.import_module(
         "lean_spec.subspecs.networking.service.service"
     )
-    original_compress = snappy_compress_module.compress
 
     def literal_only_compress(data: bytes) -> bytes:
         if not data:
@@ -282,17 +603,74 @@ def patch_snappy_compress() -> None:
         return bytes(output)
 
     def compress_with_fallback(data: bytes) -> bytes:
-        try:
-            return original_compress(data)
-        except IndexError:
-            logger.warning(
-                "Falling back to literal-only Snappy compression after helper compressor bug"
-            )
-            return literal_only_compress(data)
+        return literal_only_compress(data)
+
+    def frame_compress_with_fallback(data: bytes) -> bytes:
+        output = bytearray(snappy_framing_module.STREAM_IDENTIFIER)
+        offset = 0
+        while offset < len(data):
+            chunk_end = min(offset + snappy_framing_module.MAX_UNCOMPRESSED_CHUNK_SIZE, len(data))
+            chunk = data[offset:chunk_end]
+            offset = chunk_end
+            crc = snappy_framing_module._mask_crc(snappy_framing_module._crc32c(chunk))
+            output.append(snappy_framing_module.CHUNK_TYPE_UNCOMPRESSED)
+            output.extend((4 + len(chunk)).to_bytes(3, "little"))
+            output.extend(crc.to_bytes(4, "little"))
+            output.extend(chunk)
+        return bytes(output)
 
     snappy_compress_module.compress = compress_with_fallback
+    snappy_framing_module.frame_compress = frame_compress_with_fallback
+    snappy_package_module.compress = compress_with_fallback
+    snappy_package_module.frame_compress = frame_compress_with_fallback
+    reqresp_codec_module.frame_compress = frame_compress_with_fallback
     networking_service_module.compress = compress_with_fallback
     _SNAPPY_COMPRESS_PATCHED = True
+
+
+def install_setup_prover_compatibility() -> None:
+    global _SETUP_PROVER_COMPAT_INSTALLED
+
+    if _SETUP_PROVER_COMPAT_INSTALLED:
+        return
+
+    original_setup_prover = getattr(xmss_aggregation_module, "setup_prover", None)
+    original_setup_verifier = getattr(xmss_aggregation_module, "setup_verifier", None)
+    if original_setup_prover is None and original_setup_verifier is None:
+        _SETUP_PROVER_COMPAT_INSTALLED = True
+        return
+
+    initialized_prover_modes: set[str] = set()
+    initialized_verifier_modes: set[str] = set()
+    default_mode = getattr(xmss_aggregation_module, "LEAN_ENV", os.environ.get("LEAN_ENV"))
+
+    def setup_once(
+        original_setup: object | None,
+        initialized_modes: set[str],
+        mode: object | None,
+    ) -> None:
+        if original_setup is None:
+            return
+        key = str(mode)
+        if key in initialized_modes:
+            return
+        if mode is None:
+            original_setup()
+        else:
+            original_setup(mode=mode)
+        initialized_modes.add(key)
+
+    def setup_prover_once(*, mode: object | None = None) -> None:
+        setup_once(original_setup_prover, initialized_prover_modes, mode or default_mode)
+
+    def setup_verifier_once(*, mode: object | None = None) -> None:
+        setup_once(original_setup_verifier, initialized_verifier_modes, mode or default_mode)
+
+    if original_setup_prover is not None:
+        xmss_aggregation_module.setup_prover = setup_prover_once
+    if original_setup_verifier is not None:
+        xmss_aggregation_module.setup_verifier = setup_verifier_once
+    _SETUP_PROVER_COMPAT_INSTALLED = True
 
 
 def parse_bootnodes() -> list[str]:
@@ -319,9 +697,34 @@ def uses_latest_leanspec_format() -> bool:
     return devnet_label() == "devnet4"
 
 
+def wire_compat_mode() -> str:
+    mode = os.environ.get(WIRE_COMPAT_ENVIRONMENT_VARIABLE, WIRE_COMPAT_NATIVE).strip().lower()
+    if mode not in {WIRE_COMPAT_LEGACY, WIRE_COMPAT_NATIVE}:
+        logger.warning(
+            "Unknown %s=%r; falling back to %s",
+            WIRE_COMPAT_ENVIRONMENT_VARIABLE,
+            mode,
+            WIRE_COMPAT_NATIVE,
+        )
+        return WIRE_COMPAT_NATIVE
+    return mode
+
+
+def legacy_signed_block_compatibility_enabled() -> bool:
+    return uses_latest_leanspec_format() and wire_compat_mode() == WIRE_COMPAT_LEGACY
+
+
 def load_validator(index: int) -> dict[str, str]:
     with (source_keys_dir() / f"{index}.json").open(encoding="utf-8") as key_file:
         validator = json.load(key_file)
+
+    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
+        return {
+            ATTESTATION_PUBKEY_FIELD: validator["attestation_keypair"]["public_key"],
+            ATTESTATION_SECRET_FIELD: validator["attestation_keypair"]["secret_key"],
+            PROPOSAL_PUBKEY_FIELD: validator["proposal_keypair"]["public_key"],
+            PROPOSAL_SECRET_FIELD: validator["proposal_keypair"]["secret_key"],
+        }
 
     if {
         ATTESTATION_PUBKEY_FIELD,
@@ -345,9 +748,22 @@ def load_validator(index: int) -> dict[str, str]:
 
     raise ValueError(
         f"Unsupported validator key format for validator {index}: "
-        f"expected either split attestation/proposal fields or "
+        f"expected nested keypairs, split attestation/proposal fields, or "
         f"{LEGACY_PUBLIC_FIELD!r}/{LEGACY_SECRET_FIELD!r}"
     )
+
+
+def decode_secret_key(secret_key_hex: str) -> SecretKey:
+    # Current devnet4 prod keys are large enough that LeanSpec's pydantic-heavy
+    # decode path can trip GC while nested objects are still being built.
+    was_gc_enabled = gc.isenabled()
+    if was_gc_enabled:
+        gc.disable()
+    try:
+        return SecretKey.decode_bytes(bytes.fromhex(secret_key_hex))
+    finally:
+        if was_gc_enabled:
+            gc.enable()
 
 
 def source_keys_dir() -> Path:
@@ -569,23 +985,22 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
         # Devnet4's latest SecretKey decoding can also raise during this fast
         # path, so fall back to the manifest loader rather than abort helper
         # startup outright.
+        was_gc_enabled = gc.isenabled()
+        if was_gc_enabled:
+            gc.disable()
         try:
             if uses_latest_leanspec_format():
                 validator_keys = {
                     ValidatorIndex(index): (
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
-                        ),
-                        SecretKey.decode_bytes(
-                            bytes.fromhex(load_validator(index)[PROPOSAL_SECRET_FIELD])
-                        ),
+                        decode_secret_key(load_validator(index)[ATTESTATION_SECRET_FIELD]),
+                        decode_secret_key(load_validator(index)[PROPOSAL_SECRET_FIELD]),
                     )
                     for index in validator_indices
                 }
             else:
                 validator_keys = {
-                    ValidatorIndex(index): SecretKey.decode_bytes(
-                        bytes.fromhex(load_validator(index)[ATTESTATION_SECRET_FIELD])
+                    ValidatorIndex(index): decode_secret_key(
+                        load_validator(index)[ATTESTATION_SECRET_FIELD]
                     )
                     for index in validator_indices
                 }
@@ -596,6 +1011,9 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
                 node_id,
                 err,
             )
+        finally:
+            if was_gc_enabled:
+                gc.enable()
 
     if not VALIDATORS_YAML_PATH.exists() or not VALIDATOR_MANIFEST_PATH.exists():
         return None
@@ -648,6 +1066,9 @@ def refresh_status(event_source: LiveNetworkEventSource, node: Node) -> None:
 def extract_inner_block(signed_block: object) -> object:
     if hasattr(signed_block, "block"):
         return getattr(signed_block, "block")
+
+    if hasattr(signed_block, "slot") and hasattr(signed_block, "parent_root"):
+        return signed_block
 
     message = getattr(signed_block, "message", None)
     if message is not None:
@@ -724,8 +1145,13 @@ async def dial_bootnodes(
 
 async def run() -> None:
     setup_logging()
-    patch_fast_ssz_deserialization()
+    install_low_s_identity_signature_compatibility()
     patch_snappy_compress()
+    install_fast_ssz_deserialization()
+    install_setup_prover_compatibility()
+    logger.info("LeanSpec wire compatibility mode: %s", wire_compat_mode())
+    if legacy_signed_block_compatibility_enabled():
+        install_legacy_signed_block_wire_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -771,10 +1197,10 @@ async def run() -> None:
             fork_digest=GOSSIP_FORK_DIGEST,
         )
     )
-    api_server = ApiServer(
-        config=ApiServerConfig(port=API_PORT),
-        store_getter=lambda: node.sync_service.store,
-    )
+    api_server_kwargs = {
+        "config": ApiServerConfig(port=API_PORT),
+        "store_getter": lambda: node.sync_service.store,
+    }
     metadata_runner = await start_metadata_server(metadata)
     refresh_status(event_source, node)
 
@@ -792,10 +1218,39 @@ async def run() -> None:
     async def lookup_published_block(root: Bytes32) -> object | None:
         return published_blocks.get(root)
 
+    def lookup_published_block_by_slot(slot: object) -> object | None:
+        store = node.sync_service.store
+        root = store.head
+        while root in store.blocks:
+            signed_block = published_blocks.get(root)
+            block = extract_inner_block(signed_block) if signed_block is not None else store.blocks[root]
+            if block.slot == slot:
+                return signed_block
+            if block.slot < slot or block.parent_root == root:
+                break
+            root = block.parent_root
+
+        for signed_block in published_blocks.values():
+            if extract_inner_block(signed_block).slot == slot:
+                return signed_block
+        return None
+
+    async def lookup_published_block_by_slot_async(slot: object) -> object | None:
+        return lookup_published_block_by_slot(slot)
+
+    def current_known_slot() -> object:
+        store = node.sync_service.store
+        return store.blocks[store.head].slot
+
+    if api_server_supports_signed_block_getter():
+        api_server_kwargs["signed_block_getter"] = lambda root: published_blocks.get(root)
+    api_server = ApiServer(**api_server_kwargs)
+
     event_source.set_block_lookup(lookup_published_block)
+    event_source.set_block_by_slot_lookup(lookup_published_block_by_slot_async)
+    event_source.set_current_slot_lookup(current_known_slot)
 
     listener_task = await start_listener_and_gossipsub(event_source)
-    event_source._running = True
     await dial_bootnodes(event_source, bootnodes)
 
     node_task = asyncio.create_task(

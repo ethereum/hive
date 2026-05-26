@@ -35,6 +35,7 @@ const DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_DISABLE_
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_COUNT";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
+const LEAN_SPEC_WIRE_COMPAT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_SPEC_WIRE_COMPAT";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
 const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
@@ -161,6 +162,7 @@ struct LocalLeanSpecHelperConfig {
     api_port: u16,
     metadata_port: u16,
     identity_private_key_hex: Option<String>,
+    wire_compat_mode: String,
 }
 
 struct CheckpointSyncClientStart<'a> {
@@ -252,6 +254,7 @@ impl LocalLeanSpecHelperConfig {
             api_port: DEFAULT_HELPER_API_PORT,
             metadata_port: DEFAULT_HELPER_METADATA_PORT,
             identity_private_key_hex: None,
+            wire_compat_mode: "native".to_string(),
         }
     }
 
@@ -263,6 +266,7 @@ impl LocalLeanSpecHelperConfig {
         genesis_validator_count: u64,
         disable_validator_service: bool,
         gossip_fork_digest: String,
+        wire_compat_mode: String,
     ) -> Self {
         let mesh_index = mesh_index as u16;
         let is_aggregator = !disable_validator_service && !validator_indices.is_empty();
@@ -279,6 +283,7 @@ impl LocalLeanSpecHelperConfig {
             api_port: DEFAULT_HELPER_API_PORT + (mesh_index * 2),
             metadata_port: DEFAULT_HELPER_METADATA_PORT + (mesh_index * 2),
             identity_private_key_hex: Some(format!("{:064x}", mesh_index as u64 + 1)),
+            wire_compat_mode,
         }
     }
 }
@@ -714,6 +719,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
             genesis_validator_count,
             false,
             helper_fork_digest.clone(),
+            source_helper_config.wire_compat_mode.clone(),
         )
         .await
         .unwrap_or_else(|err| panic!("{err}"))
@@ -755,6 +761,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
                 genesis_validator_count,
                 false,
                 helper_fork_digest.clone(),
+                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -877,6 +884,7 @@ pub(crate) async fn start_post_genesis_sync_context(
             genesis_validator_count,
             passive_validator_mesh,
             helper_fork_digest.clone(),
+            source_helper_config.wire_compat_mode.clone(),
         )
         .await
         .unwrap_or_else(|err| panic!("{err}"))
@@ -986,6 +994,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                 genesis_validator_count,
                 passive_validator_mesh,
                 helper_fork_digest.clone(),
+                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -1038,6 +1047,7 @@ pub(crate) async fn start_post_genesis_sync_context(
                 genesis_validator_count,
                 false,
                 helper_fork_digest.clone(),
+                source_helper_config.wire_compat_mode.clone(),
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
@@ -1188,6 +1198,10 @@ fn local_lean_spec_helper_environment(
         LEAN_HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE.to_string(),
         helper_config.metadata_port.to_string(),
     );
+    environment.insert(
+        LEAN_SPEC_WIRE_COMPAT_ENVIRONMENT_VARIABLE.to_string(),
+        helper_config.wire_compat_mode.clone(),
+    );
     if let Some(identity_private_key_hex) = &helper_config.identity_private_key_hex {
         environment.insert(
             LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(),
@@ -1257,9 +1271,7 @@ fn client_under_test_environment(
         );
     }
 
-    if connect_to_lean_spec_mesh
-        || (use_checkpoint_sync && client_type.starts_with("grandine_lean"))
-    {
+    if connect_to_lean_spec_mesh {
         environment.insert(
             BOOTNODES_ENVIRONMENT_VARIABLE.to_string(),
             helpers.bootnodes_for_client(client_type),
@@ -2026,6 +2038,7 @@ async fn start_mesh_helpers(
     genesis_validator_count: u64,
     disable_validator_service: bool,
     helper_fork_digest: String,
+    wire_compat_mode: String,
 ) -> Result<Vec<RunningLocalLeanSpecHelper>, String> {
     let mesh_peer_count = mesh_validator_indices.len();
     let mut mesh_helpers = Vec::with_capacity(mesh_peer_count);
@@ -2041,6 +2054,7 @@ async fn start_mesh_helpers(
             genesis_validator_count,
             disable_validator_service,
             helper_fork_digest.clone(),
+            wire_compat_mode.clone(),
         );
         let (helper, _source_genesis_validator_entries) =
             start_local_lean_spec_helper_with_genesis_metadata(&helper_config).await?;

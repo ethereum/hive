@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import importlib
 import inspect
 import io
@@ -13,9 +14,10 @@ import os
 import shutil
 import sys
 import time
+import types
 from contextlib import suppress
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from aiohttp import web
 from Crypto.Hash import keccak
@@ -24,8 +26,33 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import (
     Prehashed,
     decode_dss_signature,
+    encode_dss_signature,
 )
 import yaml
+
+
+def install_numba_njit_stub() -> None:
+    if os.environ.get("HIVE_LEAN_SPEC_USE_NUMBA", "0") == "1" or "numba" in sys.modules:
+        return
+
+    numba_module = types.ModuleType("numba")
+
+    def njit(*args: object, **_: object) -> object:
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+
+        def decorate(func: object) -> object:
+            return func
+
+        return decorate
+
+    numba_module.njit = njit
+    sys.modules["numba"] = numba_module
+
+
+install_numba_njit_stub()
+
+
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.genesis.config import GenesisConfig
@@ -42,18 +69,27 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicStream,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss import aggregation as xmss_aggregation_module
+try:
+    from lean_spec.subspecs.xmss.aggregation import (
+        AggregatedSignatureProof as TypeOneSignatureProof,
+    )
+except ImportError:
+    from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature as TypeOneSignatureProof
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Bytes32
-from lean_spec.types.participation import AggregationBits, ValidatorIndices
+try:
+    from lean_spec.types.participation import AggregationBits, ValidatorIndices
+except ImportError:
+    from lean_spec.types import AggregationBits, ValidatorIndices
 from lean_spec.types.collections import SSZList, SSZVector, _validate_offsets
 from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZSerializationError, SSZValueError
-from lean_spec.types.uint import Uint32
+from lean_spec.types.uint import Uint32, Uint64
 from lean_spec_runtime import (
     Checkpoint,
     SubnetId,
@@ -110,8 +146,15 @@ PROPOSAL_PUBKEY_FIELD: Final = "proposal_public"
 PROPOSAL_SECRET_FIELD: Final = "proposal_secret"
 LEGACY_PUBLIC_FIELD: Final = "public"
 LEGACY_SECRET_FIELD: Final = "secret"
+WIRE_COMPAT_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_SPEC_WIRE_COMPAT"
+WIRE_COMPAT_LEGACY: Final = "legacy"
+WIRE_COMPAT_NATIVE: Final = "native"
 
 logger = logging.getLogger("lean_spec_client_runner")
+LEGACY_SIGNATURE_LENGTH: Final = 2536
+SIGNATURE_PATH_OFFSET: Final = 36
+SIGNATURE_HASHES_OFFSET: Final = 1064
+SIGNATURE_PATH_SIBLINGS_OFFSET: Final = 4
 
 
 def api_server_supports_signed_block_getter() -> bool:
@@ -134,6 +177,29 @@ def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypa
         public_key=Secp256k1PublicKey(_key=private_key.public_key()),
     )
 
+
+def canonicalize_der_secp256k1_signature(der_signature: bytes) -> bytes:
+    signature_r, signature_s = decode_dss_signature(der_signature)
+    if signature_s > SECP256K1_ORDER // 2:
+        signature_s = SECP256K1_ORDER - signature_s
+    return encode_dss_signature(signature_r, signature_s)
+
+
+def install_low_s_identity_signature_compatibility() -> None:
+    global _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED
+
+    if _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED:
+        return
+
+    original_sign = IdentityKeypair.sign
+
+    def sign_low_s(self: IdentityKeypair, message: bytes) -> bytes:
+        return canonicalize_der_secp256k1_signature(original_sign(self, message))
+
+    IdentityKeypair.sign = sign_low_s
+    _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED = True
+
+
 _QUIC_STREAM_CLOSE_COMPAT_INSTALLED = False
 _SSZ_FAST_DESERIALIZATION_INSTALLED = False
 _SNAPPY_COMPRESS_FALLBACK_INSTALLED = False
@@ -141,6 +207,11 @@ _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED = False
 _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED = False
 _IDENTIFY_PROTOCOL_COMPAT_INSTALLED = False
 _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = False
+_SETUP_PROVER_COMPAT_INSTALLED = False
+_TRUSTED_GOSSIP_ATTESTATION_COMPAT_INSTALLED = False
+_CHECKPOINT_FINALIZATION_COMPAT_INSTALLED = False
+_LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = False
+_LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
@@ -152,6 +223,266 @@ def setup_logging() -> None:
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+
+def _ssz_offset(value: int) -> bytes:
+    return value.to_bytes(OFFSET_BYTE_LENGTH, "little")
+
+
+def _safe_len(value: object | None) -> int | None:
+    if value is None:
+        return None
+
+    try:
+        return len(value)  # type: ignore[arg-type]
+    except TypeError:
+        return None
+
+
+def legacy_attestation_count(block: object) -> int:
+    body = getattr(block, "body", None)
+    attestations = getattr(body, "attestations", None)
+    if attestations is None:
+        attestations = getattr(block, "attestations", None)
+
+    for candidate in (getattr(attestations, "data", None), attestations):
+        count = _safe_len(candidate)
+        if count is not None:
+            return count
+
+    return 0
+
+
+def _encode_aggregated_signature_proof(
+    participants: bytes = b"\x01",
+    proof_data: bytes = b"",
+) -> bytes:
+    fixed_part_length = OFFSET_BYTE_LENGTH * 2
+    return (
+        _ssz_offset(fixed_part_length)
+        + _ssz_offset(fixed_part_length + len(participants))
+        + participants
+        + proof_data
+    )
+
+
+def _encode_aggregated_signature_proofs(proofs: list[bytes]) -> bytes:
+    offsets = bytearray()
+    offset = OFFSET_BYTE_LENGTH * len(proofs)
+    for proof in proofs:
+        offsets += _ssz_offset(offset)
+        offset += len(proof)
+    return bytes(offsets) + b"".join(proofs)
+
+
+def _encode_placeholder_aggregated_signature_proofs(count: int) -> bytes:
+    return _encode_aggregated_signature_proofs(
+        [_encode_aggregated_signature_proof() for _ in range(count)]
+    )
+
+
+def _encode_blank_xmss_signature() -> bytes:
+    signature = bytearray(LEGACY_SIGNATURE_LENGTH)
+    signature[0:4] = _ssz_offset(SIGNATURE_PATH_OFFSET)
+    signature[32:36] = _ssz_offset(SIGNATURE_HASHES_OFFSET)
+    signature[36:40] = _ssz_offset(SIGNATURE_PATH_SIBLINGS_OFFSET)
+    return bytes(signature)
+
+
+def encode_ssz_bytes(value: object) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+
+    encode_bytes = getattr(value, "encode_bytes", None)
+    if encode_bytes is not None:
+        return encode_bytes()
+
+    return bytes(value)  # type: ignore[arg-type]
+
+
+def extract_proposer_signature_bytes(signed_block: object) -> bytes:
+    signature = getattr(signed_block, "signature", None)
+    proposer_signature = getattr(signature, "proposer_signature", None)
+    if proposer_signature is None:
+        return _encode_blank_xmss_signature()
+
+    try:
+        encoded = encode_ssz_bytes(proposer_signature)
+    except Exception:
+        logger.debug("Unable to encode proposer signature", exc_info=True)
+        return _encode_blank_xmss_signature()
+
+    if len(encoded) != LEGACY_SIGNATURE_LENGTH:
+        logger.debug("Unexpected proposer signature length %d", len(encoded))
+        return _encode_blank_xmss_signature()
+
+    return encoded
+
+
+def extract_attestation_signature_proofs(signed_block: object) -> list[bytes]:
+    signature = getattr(signed_block, "signature", None)
+    attestation_signatures = getattr(signature, "attestation_signatures", None)
+    proof_values = getattr(attestation_signatures, "data", attestation_signatures)
+    if proof_values is None:
+        return []
+
+    proofs = []
+    for proof in proof_values:
+        try:
+            participants = encode_ssz_bytes(getattr(proof, "participants"))
+            proof_data = encode_ssz_bytes(getattr(proof, "proof_data"))
+            proofs.append(_encode_aggregated_signature_proof(participants, proof_data))
+        except Exception:
+            logger.debug("Unable to encode attestation signature proof", exc_info=True)
+            proofs.append(_encode_aggregated_signature_proof())
+
+    return proofs
+
+
+def _encode_legacy_block_signatures(
+    proposer_signature: bytes,
+    attestation_signature_proofs: bytes,
+) -> bytes:
+    # Checkpoint clients validate that this list has one placeholder proof per
+    # attestation, but they do not need the proofs to be valid for bootstrapping.
+    fixed_part_length = OFFSET_BYTE_LENGTH + LEGACY_SIGNATURE_LENGTH
+    return (
+        _ssz_offset(fixed_part_length)
+        + proposer_signature
+        + attestation_signature_proofs
+    )
+
+
+def _encode_legacy_signed_block(
+    block_bytes: bytes,
+    proposer_signature: bytes,
+    attestation_signature_proofs: bytes,
+) -> bytes:
+    signatures_bytes = _encode_legacy_block_signatures(
+        proposer_signature,
+        attestation_signature_proofs,
+    )
+    fixed_part_length = OFFSET_BYTE_LENGTH * 2
+    return (
+        _ssz_offset(fixed_part_length)
+        + _ssz_offset(fixed_part_length + len(block_bytes))
+        + block_bytes
+        + signatures_bytes
+    )
+
+
+def encode_legacy_signed_block(signed_block: object) -> bytes:
+    block = extract_inner_block(signed_block)
+    proofs = extract_attestation_signature_proofs(signed_block)
+    if not proofs:
+        proof_bytes = _encode_placeholder_aggregated_signature_proofs(
+            legacy_attestation_count(block)
+        )
+    else:
+        proof_bytes = _encode_aggregated_signature_proofs(proofs)
+    return _encode_legacy_signed_block(
+        block.encode_bytes(),
+        extract_proposer_signature_bytes(signed_block),
+        proof_bytes,
+    )
+
+def install_legacy_signed_block_wire_compatibility() -> None:
+    global _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED
+
+    if _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED:
+        return
+
+    if not legacy_signed_block_compatibility_enabled():
+        _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = True
+        return
+
+    networking_service_module = importlib.import_module(
+        "lean_spec.subspecs.networking.service.service"
+    )
+    reqresp_handler_module = importlib.import_module(
+        "lean_spec.subspecs.networking.reqresp.handler"
+    )
+
+    network_service_cls = networking_service_module.NetworkService
+    request_handler_cls = reqresp_handler_module.RequestHandler
+    response_code_cls = reqresp_handler_module.ResponseCode
+    slot_cls = reqresp_handler_module.Slot
+    uint64_cls = reqresp_handler_module.Uint64
+
+    async def publish_block_with_legacy_signed_block(self: object, block: object) -> None:
+        topic = networking_service_module.GossipTopic.block(self.network_name)
+        compressed = networking_service_module.compress(encode_legacy_signed_block(block))
+        await self.event_source.publish(topic.to_topic_id(), compressed)
+        logger.debug("Published legacy signed block at slot %s", extract_inner_block(block).slot)
+
+    async def handle_blocks_by_root_with_legacy_signed_block(
+        self: object,
+        request: object,
+        response: object,
+    ) -> None:
+        if self.block_lookup is None:
+            logger.warning("BlocksByRoot request received but no block_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Block lookup not available")
+            return
+
+        for root in request.roots.data:
+            try:
+                block = await self.block_lookup(root)
+                if block is not None:
+                    await response.send_success(encode_legacy_signed_block(block))
+            except Exception as err:
+                logger.warning("Error looking up block %s: %s", root.hex()[:8], err)
+
+    async def handle_blocks_by_range_with_legacy_signed_block(
+        self: object,
+        request: object,
+        response: object,
+    ) -> None:
+        if self.block_by_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no block_by_slot_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Block lookup not available")
+            return
+
+        if request.count == uint64_cls(0) or request.count > uint64_cls(
+            reqresp_handler_module.MAX_REQUEST_BLOCKS
+        ):
+            await response.send_error(response_code_cls.INVALID_REQUEST, "Invalid count")
+            return
+
+        if self.current_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no current_slot_lookup configured")
+            await response.send_error(response_code_cls.SERVER_ERROR, "Current slot not available")
+            return
+
+        current_slot = self.current_slot_lookup()
+        window_floor = (
+            current_slot - slot_cls(reqresp_handler_module.MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            if current_slot >= slot_cls(reqresp_handler_module.MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            else slot_cls(0)
+        )
+        if request.start_slot < window_floor:
+            await response.send_error(
+                response_code_cls.RESOURCE_UNAVAILABLE,
+                "Requested slot predates history window",
+            )
+            return
+
+        for index in range(int(request.count)):
+            slot = request.start_slot + slot_cls(index)
+            try:
+                block = await self.block_by_slot_lookup(slot)
+                if block is not None:
+                    await response.send_success(encode_legacy_signed_block(block))
+            except Exception as err:
+                logger.warning("Error looking up block at slot %s: %s", slot, err)
+
+    network_service_cls.publish_block = publish_block_with_legacy_signed_block
+    request_handler_cls.handle_blocks_by_root = handle_blocks_by_root_with_legacy_signed_block
+    request_handler_cls.handle_blocks_by_range = handle_blocks_by_range_with_legacy_signed_block
+    logger.info("Installed LeanSpec signed-block gossip/reqresp compatibility")
+    _LEGACY_SIGNED_BLOCK_WIRE_COMPAT_INSTALLED = True
 
 
 def install_quic_stream_close_reset_tolerance() -> None:
@@ -337,7 +668,10 @@ def install_snappy_compress_fallback() -> None:
     if _SNAPPY_COMPRESS_FALLBACK_INSTALLED:
         return
 
+    snappy_package_module = importlib.import_module("lean_spec.snappy")
     snappy_compress_module = importlib.import_module("lean_spec.snappy.compress")
+    snappy_framing_module = importlib.import_module("lean_spec.snappy.framing")
+    reqresp_codec_module = importlib.import_module("lean_spec.subspecs.networking.reqresp.codec")
     networking_service_module = importlib.import_module(
         "lean_spec.subspecs.networking.service.service"
     )
@@ -358,7 +692,25 @@ def install_snappy_compress_fallback() -> None:
     def compress_with_fallback(data: bytes) -> bytes:
         return literal_only_compress(data)
 
+    def frame_compress_with_fallback(data: bytes) -> bytes:
+        output = bytearray(snappy_framing_module.STREAM_IDENTIFIER)
+        offset = 0
+        while offset < len(data):
+            chunk_end = min(offset + snappy_framing_module.MAX_UNCOMPRESSED_CHUNK_SIZE, len(data))
+            chunk = data[offset:chunk_end]
+            offset = chunk_end
+            crc = snappy_framing_module._mask_crc(snappy_framing_module._crc32c(chunk))
+            output.append(snappy_framing_module.CHUNK_TYPE_UNCOMPRESSED)
+            output.extend((4 + len(chunk)).to_bytes(3, "little"))
+            output.extend(crc.to_bytes(4, "little"))
+            output.extend(chunk)
+        return bytes(output)
+
     snappy_compress_module.compress = compress_with_fallback
+    snappy_framing_module.frame_compress = frame_compress_with_fallback
+    snappy_package_module.compress = compress_with_fallback
+    snappy_package_module.frame_compress = frame_compress_with_fallback
+    reqresp_codec_module.frame_compress = frame_compress_with_fallback
     networking_service_module.compress = compress_with_fallback
     _SNAPPY_COMPRESS_FALLBACK_INSTALLED = True
 
@@ -563,64 +915,20 @@ def install_identify_protocol_compatibility() -> None:
 
     event_source_cls = live_module.LiveNetworkEventSource
 
-    async def setup_gossipsub_stream_with_v11_fallback(
-        self: object,
-        peer_id: object,
-        conn: object,
-    ) -> None:
-        protocol_ids = []
-        for protocol_id in (
-            live_module.GOSSIPSUB_DEFAULT_PROTOCOL_ID,
-            live_module.GOSSIPSUB_PROTOCOL_ID_V12,
-            GOSSIPSUB_V11_PROTOCOL_ID,
-        ):
-            if protocol_id not in protocol_ids:
-                protocol_ids.append(protocol_id)
-
-        last_error = None
-        for protocol_id in protocol_ids:
-            try:
-                stream = await conn.open_stream(protocol_id)
-                logger.info(
-                    "Opened outbound gossipsub stream_id=%d protocol=%s to %s",
-                    stream.stream_id,
-                    protocol_id,
-                    peer_id,
-                )
-
-                wrapper = live_module.QuicStreamAdapter(stream)
-                await self._gossipsub_behavior.add_peer(
-                    peer_id,
-                    wrapper,
-                    inbound=False,
-                )
-
-                logger.info(
-                    "GossipSub outbound stream established with %s using %s (stream_id=%d)",
-                    peer_id,
-                    protocol_id,
-                    stream.stream_id,
-                )
-                return
-            except Exception as err:
-                last_error = err
-                logger.debug(
-                    "Failed to setup outbound gossipsub stream with %s using %s: %s",
-                    peer_id,
-                    protocol_id,
-                    err,
-                )
-
-        logger.warning("Failed to setup gossipsub stream with %s: %s", peer_id, last_error)
-
     async def accept_streams_with_identify(
         self: object,
         peer_id: object,
         conn: object,
     ) -> None:
+        def is_running() -> bool:
+            stop_event = getattr(self, "_stop_event", None)
+            if stop_event is not None:
+                return not stop_event.is_set()
+            return bool(getattr(self, "_running", False))
+
         try:
             logger.info("Stream acceptor started for peer %s", peer_id)
-            while self._running and peer_id in self._connections:
+            while is_running() and peer_id in self._connections:
                 try:
                     stream = await conn.accept_stream()
                 except Exception as err:
@@ -657,7 +965,6 @@ def install_identify_protocol_compatibility() -> None:
         except Exception as err:
             logger.warning("Stream acceptor error for %s: %s", peer_id, err)
 
-    event_source_cls._setup_gossipsub_stream = setup_gossipsub_stream_with_v11_fallback
     event_source_cls._accept_streams = accept_streams_with_identify
     _IDENTIFY_PROTOCOL_COMPAT_INSTALLED = True
 
@@ -669,7 +976,8 @@ def install_child_only_aggregation_compatibility() -> None:
         return
 
     original_to_aggregation_bits = ValidatorIndices.to_aggregation_bits
-    original_aggregate = AggregatedSignatureProof.aggregate.__func__
+    original_aggregate = TypeOneSignatureProof.aggregate
+    aggregate_parameters = inspect.signature(original_aggregate).parameters
 
     def to_aggregation_bits_allowing_empty(
         self: ValidatorIndices,
@@ -678,36 +986,275 @@ def install_child_only_aggregation_compatibility() -> None:
             return AggregationBits(data=[])
         return original_to_aggregation_bits(self)
 
-    @classmethod
-    def aggregate_allowing_child_only_merge(
-        cls: type[AggregatedSignatureProof],
-        xmss_participants: AggregationBits | None,
-        children: object,
-        raw_xmss: object,
-        message: Bytes32,
-        slot: object,
-        mode: object | None = None,
-    ) -> AggregatedSignatureProof:
-        if (
-            not raw_xmss
-            and xmss_participants is not None
-            and not any(bool(bit) for bit in xmss_participants.data)
-        ):
-            xmss_participants = None
+    ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
 
-        return original_aggregate(
-            cls,
-            xmss_participants=xmss_participants,
-            children=children,
-            raw_xmss=raw_xmss,
-            message=message,
-            slot=slot,
-            mode=mode,
+    if {"children", "raw_xmss", "xmss_participants"}.issubset(aggregate_parameters):
+
+        def aggregate_allowing_child_only_merge(
+            children: object,
+            raw_xmss: object,
+            xmss_participants: AggregationBits | None,
+            message: Bytes32,
+            slot: object,
+            mode: object | None = None,
+        ) -> Any:
+            if (
+                not raw_xmss
+                and xmss_participants is not None
+                and not any(bool(bit) for bit in xmss_participants.data)
+            ):
+                xmss_participants = None
+
+            return original_aggregate(
+                children=children,
+                raw_xmss=raw_xmss,
+                xmss_participants=xmss_participants,
+                message=message,
+                slot=slot,
+                mode=mode,
+            )
+
+        TypeOneSignatureProof.aggregate = staticmethod(aggregate_allowing_child_only_merge)
+
+    _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = True
+
+
+def install_setup_prover_compatibility() -> None:
+    global _SETUP_PROVER_COMPAT_INSTALLED
+
+    if _SETUP_PROVER_COMPAT_INSTALLED:
+        return
+
+    original_setup_prover = getattr(xmss_aggregation_module, "setup_prover", None)
+    original_setup_verifier = getattr(xmss_aggregation_module, "setup_verifier", None)
+    if original_setup_prover is None and original_setup_verifier is None:
+        _SETUP_PROVER_COMPAT_INSTALLED = True
+        return
+
+    initialized_prover_modes: set[str] = set()
+    initialized_verifier_modes: set[str] = set()
+    default_mode = getattr(xmss_aggregation_module, "LEAN_ENV", os.environ.get("LEAN_ENV"))
+
+    def setup_once(
+        original_setup: object | None,
+        initialized_modes: set[str],
+        mode: object | None,
+    ) -> None:
+        if original_setup is None:
+            return
+        key = str(mode)
+        if key in initialized_modes:
+            return
+        if mode is None:
+            original_setup()
+        else:
+            original_setup(mode=mode)
+        initialized_modes.add(key)
+
+    def setup_prover_once(*, mode: object | None = None) -> None:
+        setup_once(original_setup_prover, initialized_prover_modes, mode or default_mode)
+
+    def setup_verifier_once(*, mode: object | None = None) -> None:
+        setup_once(original_setup_verifier, initialized_verifier_modes, mode or default_mode)
+
+    if original_setup_prover is not None:
+        xmss_aggregation_module.setup_prover = setup_prover_once
+    if original_setup_verifier is not None:
+        xmss_aggregation_module.setup_verifier = setup_verifier_once
+    _SETUP_PROVER_COMPAT_INSTALLED = True
+
+
+def install_trusted_gossip_attestation_compatibility() -> None:
+    global _TRUSTED_GOSSIP_ATTESTATION_COMPAT_INSTALLED
+
+    if _TRUSTED_GOSSIP_ATTESTATION_COMPAT_INSTALLED:
+        return
+
+    try:
+        from lean_spec.forks.lstar.spec import LstarSpec
+        from lean_spec.forks.lstar.store import AttestationSignatureEntry
+    except ImportError as err:
+        logger.debug("LeanSpec trusted attestation compatibility unavailable: %s", err)
+        return
+
+    def on_gossip_attestation_without_signature_verification(
+        self: Any,
+        store: Any,
+        signed_attestation: Any,
+        is_aggregator: bool = False,
+    ) -> Any:
+        validator_id = signed_attestation.validator_id
+        attestation_data = signed_attestation.data
+        signature = signed_attestation.signature
+
+        self.validate_attestation(store, attestation_data)
+
+        key_state = store.states.get(attestation_data.target.root)
+        assert key_state is not None, (
+            f"No state available to validate attestation for target block "
+            f"{attestation_data.target.root.hex()}"
+        )
+        assert validator_id.is_valid(Uint64(len(key_state.validators))), (
+            f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
         )
 
-    ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
-    AggregatedSignatureProof.aggregate = aggregate_allowing_child_only_merge
-    _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = True
+        if not is_aggregator:
+            return store
+
+        new_committee_sigs = {k: set(v) for k, v in store.attestation_signatures.items()}
+        new_committee_sigs.setdefault(attestation_data, set()).add(
+            AttestationSignatureEntry(validator_id, signature)
+        )
+        return store.model_copy(update={"attestation_signatures": new_committee_sigs})
+
+    LstarSpec.on_gossip_attestation = on_gossip_attestation_without_signature_verification
+    _TRUSTED_GOSSIP_ATTESTATION_COMPAT_INSTALLED = True
+    logger.info("Installed LeanSpec trusted gossip attestation compatibility")
+
+
+def install_checkpoint_finalization_compatibility() -> None:
+    global _CHECKPOINT_FINALIZATION_COMPAT_INSTALLED
+
+    if _CHECKPOINT_FINALIZATION_COMPAT_INSTALLED or not uses_latest_leanspec_format():
+        return
+
+    try:
+        from lean_spec.forks.lstar.spec import LstarSpec
+    except ImportError as err:
+        logger.debug("LeanSpec checkpoint finalization compatibility unavailable: %s", err)
+        return
+
+    try:
+        from lean_spec.subspecs.validator.service import ValidatorService
+    except ImportError:
+        ValidatorService = None
+
+    original_on_block = LstarSpec.on_block
+
+    def checkpoint_from_head(store: Any) -> Any | None:
+        head_block = store.blocks.get(store.head)
+        if head_block is None:
+            return None
+
+        return Checkpoint(root=store.head, slot=head_block.slot)
+
+    def advance_checkpoints_to_head(store: Any) -> Any:
+        head_checkpoint = checkpoint_from_head(store)
+        if head_checkpoint is None:
+            return store
+
+        updates = {}
+        if head_checkpoint.slot > store.latest_justified.slot:
+            updates["latest_justified"] = head_checkpoint
+        if head_checkpoint.slot > store.latest_finalized.slot:
+            updates["latest_finalized"] = head_checkpoint
+
+        if updates:
+            return store.model_copy(update=updates)
+        return store
+
+    def pin_head_to_block(store: Any, block: Any) -> Any:
+        block_root = hash_tree_root(block)
+        if block_root not in store.blocks:
+            return store
+
+        return store.model_copy(
+            update={
+                "head": block_root,
+                "safe_target": block_root,
+            }
+        )
+
+    def aggregate_without_local_multisig_prover(self: Any, store: Any) -> Any:
+        return store.model_copy(
+            update={
+                "attestation_signatures": {},
+                "latest_new_aggregated_payloads": {},
+            }
+        ), []
+
+    def on_gossip_aggregated_attestation_without_verification(
+        self: Any,
+        store: Any,
+        signed_attestation: Any,
+    ) -> Any:
+        data = signed_attestation.data
+        proof = signed_attestation.proof
+
+        self.validate_attestation(store, data)
+
+        new_aggregated_payloads = {
+            k: set(v) for k, v in store.latest_new_aggregated_payloads.items()
+        }
+        new_aggregated_payloads.setdefault(data, set()).add(proof)
+        return store.model_copy(
+            update={"latest_new_aggregated_payloads": new_aggregated_payloads}
+        )
+
+    def on_block_with_justified_checkpoint_finalized(
+        self: Any,
+        store: Any,
+        signed_block: Any,
+    ) -> Any:
+        updated_store = original_on_block(self, store, signed_block)
+        return advance_checkpoints_to_head(
+            pin_head_to_block(updated_store, extract_inner_block(signed_block))
+        )
+
+    def produce_block_with_justified_checkpoint_finalized(
+        self: Any,
+        store: Any,
+        slot: Any = None,
+        validator_index: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        if kwargs:
+            slot = kwargs.get("slot", slot)
+            validator_index = kwargs.get("validator_index", validator_index)
+        if slot is None or validator_index is None:
+            raise TypeError("slot and validator_index are required")
+
+        parent_root = store.head
+        head_state = store.states[parent_root]
+        block = self.block_class(
+            slot=slot,
+            proposer_index=validator_index,
+            parent_root=parent_root,
+            state_root=Bytes32.zero(),
+            body=self.block_body_class(
+                attestations=self.aggregated_attestations_class(data=[]),
+            ),
+        )
+        post_state = self.process_block(self.process_slots(head_state, slot), block)
+        block = block.model_copy(update={"state_root": hash_tree_root(post_state)})
+        block_root = hash_tree_root(block)
+        updated_store = store.model_copy(
+            update={
+                "blocks": store.blocks | {block_root: block},
+                "states": store.states | {block_root: post_state},
+                "head": block_root,
+                "safe_target": block_root,
+            }
+        )
+        return advance_checkpoints_to_head(updated_store), block, []
+
+    async def skip_local_attestation_signing(self: Any, slot: Any) -> None:
+        logger.debug(
+            "Skipping helper-local attestation signing at slot %s; "
+            "checkpoint compatibility finalizes helper-produced blocks directly",
+            slot,
+        )
+
+    LstarSpec.aggregate = aggregate_without_local_multisig_prover
+    LstarSpec.on_gossip_aggregated_attestation = (
+        on_gossip_aggregated_attestation_without_verification
+    )
+    LstarSpec.on_block = on_block_with_justified_checkpoint_finalized
+    LstarSpec.produce_block_with_signatures = produce_block_with_justified_checkpoint_finalized
+    if ValidatorService is not None:
+        ValidatorService._produce_attestations = skip_local_attestation_signing
+    _CHECKPOINT_FINALIZATION_COMPAT_INSTALLED = True
+    logger.info("Installed LeanSpec checkpoint finalization compatibility")
 
 
 def parse_bootnodes() -> list[str]:
@@ -773,9 +1320,34 @@ def uses_latest_leanspec_format() -> bool:
     return devnet_label() == "devnet4"
 
 
+def wire_compat_mode() -> str:
+    mode = os.environ.get(WIRE_COMPAT_ENVIRONMENT_VARIABLE, WIRE_COMPAT_NATIVE).strip().lower()
+    if mode not in {WIRE_COMPAT_LEGACY, WIRE_COMPAT_NATIVE}:
+        logger.warning(
+            "Unknown %s=%r; falling back to %s",
+            WIRE_COMPAT_ENVIRONMENT_VARIABLE,
+            mode,
+            WIRE_COMPAT_NATIVE,
+        )
+        return WIRE_COMPAT_NATIVE
+    return mode
+
+
+def legacy_signed_block_compatibility_enabled() -> bool:
+    return uses_latest_leanspec_format() and wire_compat_mode() == WIRE_COMPAT_LEGACY
+
+
 def load_validator(index: int) -> dict[str, str]:
     with (source_keys_dir() / f"{index}.json").open(encoding="utf-8") as key_file:
         validator = json.load(key_file)
+
+    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
+        return {
+            ATTESTATION_PUBKEY_FIELD: validator["attestation_keypair"]["public_key"],
+            ATTESTATION_SECRET_FIELD: validator["attestation_keypair"]["secret_key"],
+            PROPOSAL_PUBKEY_FIELD: validator["proposal_keypair"]["public_key"],
+            PROPOSAL_SECRET_FIELD: validator["proposal_keypair"]["secret_key"],
+        }
 
     if {
         ATTESTATION_PUBKEY_FIELD,
@@ -799,9 +1371,22 @@ def load_validator(index: int) -> dict[str, str]:
 
     raise ValueError(
         f"Unsupported validator key format for validator {index}: "
-        f"expected either split attestation/proposal fields or "
+        f"expected nested keypairs, split attestation/proposal fields, or "
         f"{LEGACY_PUBLIC_FIELD!r}/{LEGACY_SECRET_FIELD!r}"
     )
+
+
+def decode_secret_key(secret_key_hex: str) -> SecretKey:
+    # Current devnet4 prod keys are large enough that LeanSpec's pydantic-heavy
+    # decode path can trip GC while nested objects are still being built.
+    was_gc_enabled = gc.isenabled()
+    if was_gc_enabled:
+        gc.disable()
+    try:
+        return SecretKey.decode_bytes(bytes.fromhex(secret_key_hex))
+    finally:
+        if was_gc_enabled:
+            gc.enable()
 
 
 def source_keys_dir() -> Path:
@@ -1045,9 +1630,32 @@ def load_genesis() -> GenesisConfig:
 def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
     validator_indices = parse_validator_indices()
     if validator_indices:
+        if uses_latest_leanspec_format():
+            # The devnet4 helper finalization shim below never produces local
+            # attestations, so avoid decoding the large prod attestation keys:
+            # that path currently segfaults in LeanSpec. Proposal keys still
+            # need to be real because checkpoint-sync clients verify block
+            # proposer signatures.
+            registry = ValidatorRegistry()
+            for index in validator_indices:
+                validator = load_validator(index)
+                registry.add(
+                    ValidatorEntry(
+                        index=ValidatorIndex(index),
+                        attestation_secret_key=None,  # type: ignore[arg-type]
+                        proposal_secret_key=decode_secret_key(
+                            validator[PROPOSAL_SECRET_FIELD]
+                        ),
+                    )
+                )
+            return registry
+
         # LeanSpec's ValidatorRegistry.from_yaml path intermittently segfaults
         # while decoding the bundled secret-key files. Decode the already
         # available JSON payloads directly instead for assigned validators.
+        was_gc_enabled = gc.isenabled()
+        if was_gc_enabled:
+            gc.disable()
         try:
             registry = ValidatorRegistry()
             if uses_latest_leanspec_format():
@@ -1056,11 +1664,11 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
                     registry.add(
                         ValidatorEntry(
                             index=ValidatorIndex(index),
-                            attestation_secret_key=SecretKey.decode_bytes(
-                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
+                            attestation_secret_key=decode_secret_key(
+                                validator[ATTESTATION_SECRET_FIELD]
                             ),
-                            proposal_secret_key=SecretKey.decode_bytes(
-                                bytes.fromhex(validator[PROPOSAL_SECRET_FIELD])
+                            proposal_secret_key=decode_secret_key(
+                                validator[PROPOSAL_SECRET_FIELD]
                             ),
                         )
                     )
@@ -1070,9 +1678,7 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
                     registry.add(
                         ValidatorEntry(
                             index=ValidatorIndex(index),
-                            secret_key=SecretKey.decode_bytes(
-                                bytes.fromhex(validator[ATTESTATION_SECRET_FIELD])
-                            ),
+                            secret_key=decode_secret_key(validator[ATTESTATION_SECRET_FIELD]),
                         )
                     )
             return registry
@@ -1082,6 +1688,9 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
                 node_id,
                 err,
             )
+        finally:
+            if was_gc_enabled:
+                gc.enable()
 
     if not VALIDATORS_YAML_PATH.exists() or not VALIDATOR_MANIFEST_PATH.exists():
         return None
@@ -1139,6 +1748,9 @@ def refresh_status(event_source: LiveNetworkEventSource, node: Node) -> None:
 def extract_inner_block(signed_block: object) -> object:
     if hasattr(signed_block, "block"):
         return getattr(signed_block, "block")
+
+    if hasattr(signed_block, "slot") and hasattr(signed_block, "parent_root"):
+        return signed_block
 
     message = getattr(signed_block, "message", None)
     if message is not None:
@@ -1218,12 +1830,20 @@ async def dial_bootnodes(
 
 async def run() -> None:
     setup_logging()
+    install_low_s_identity_signature_compatibility()
     install_quic_stream_close_reset_tolerance()
     install_snappy_compress_fallback()
+    install_fast_ssz_deserialization()
     install_reqresp_block_cache_tracking()
     install_network_service_gossip_tracking()
     install_identify_protocol_compatibility()
+    install_setup_prover_compatibility()
     install_child_only_aggregation_compatibility()
+    install_trusted_gossip_attestation_compatibility()
+    install_checkpoint_finalization_compatibility()
+    logger.info("LeanSpec wire compatibility mode: %s", wire_compat_mode())
+    if legacy_signed_block_compatibility_enabled():
+        install_legacy_signed_block_wire_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -1294,6 +1914,39 @@ async def run() -> None:
     async def lookup_published_block_async(root: Bytes32) -> object | None:
         return lookup_published_block(root)
 
+    def block_for_reqresp(block: object | None) -> object | None:
+        return block
+
+    async def lookup_reqresp_block(root: Bytes32) -> object | None:
+        return block_for_reqresp(lookup_published_block(root))
+
+    def lookup_published_block_by_slot(slot: object) -> object | None:
+        store = node.sync_service.store
+        root = store.head
+        while root in store.blocks:
+            signed_block = published_blocks.get(root)
+            block = extract_inner_block(signed_block) if signed_block is not None else store.blocks[root]
+            if block.slot == slot:
+                return signed_block
+            if block.slot < slot or block.parent_root == root:
+                break
+            root = block.parent_root
+
+        for signed_block in published_blocks.values():
+            if extract_inner_block(signed_block).slot == slot:
+                return signed_block
+        return None
+
+    async def lookup_published_block_by_slot_async(slot: object) -> object | None:
+        return lookup_published_block_by_slot(slot)
+
+    async def lookup_reqresp_block_by_slot(slot: object) -> object | None:
+        return block_for_reqresp(lookup_published_block_by_slot(slot))
+
+    def current_known_slot() -> object:
+        store = node.sync_service.store
+        return store.blocks[store.head].slot
+
     api_server_kwargs = {
         "config": ApiServerConfig(port=helper_api_port()),
         "store_getter": lambda: node.sync_service.store,
@@ -1314,10 +1967,11 @@ async def run() -> None:
 
         node.validator_service.on_block = cache_and_publish_block
 
-    event_source.set_block_lookup(lookup_published_block_async)
+    event_source.set_block_lookup(lookup_reqresp_block)
+    event_source.set_block_by_slot_lookup(lookup_reqresp_block_by_slot)
+    event_source.set_current_slot_lookup(current_known_slot)
 
     listener_task = await start_listener_and_gossipsub(event_source)
-    event_source._running = True
     await dial_bootnodes(event_source, bootnodes)
 
     node_task = asyncio.create_task(

@@ -1,42 +1,83 @@
-FROM rust:bookworm AS rust-builder
+FROM rust:1.94.0-bookworm AS rust-builder
 
 WORKDIR /workspace
 
-ENV RUST_MIN_STACK=33554432
+ENV CARGO_BUILD_JOBS=1 \
+    CARGO_PROFILE_DEV_CODEGEN_UNITS=1 \
+    CARGO_PROFILE_DEV_DEBUG=0 \
+    CARGO_INCREMENTAL=0 \
+    RUST_MIN_STACK=4294967296
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./hivesim-rs ./hivesim-rs
-COPY ./simulators/lean ./simulators/lean
+COPY ./simulators/lean/Cargo.toml ./simulators/lean/
+COPY ./simulators/lean/src ./simulators/lean/src
 
-RUN cargo build -p lean-sim --release --locked \
-    && mv target/release/lean-sim /lean-sim-bin \
+RUN for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+        cargo build -p lean-sim --locked \
+        && break; \
+        if [ "$attempt" = "15" ]; then exit 1; fi; \
+        sleep 2; \
+    done \
+    && mv target/debug/lean-sim /lean-sim-bin \
+    && strip /lean-sim-bin || true \
     && cargo clean \
     && rm -rf /usr/local/cargo/registry /usr/local/cargo/git
 
 FROM python:3.12-slim-bookworm AS lean-spec-base
 
 ARG helper_github=leanEthereum/leanSpec
-ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
+ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 
-RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
-    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
-    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
-    build-essential \
-    ca-certificates \
-    curl \
-    git \
-    libssl-dev \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+RUN for attempt in 1 2 3; do \
+        rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+        && apt-get clean \
+        && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+        && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            curl \
+            git \
+            libssl-dev \
+            pkg-config \
+        && break; \
+        if [ "$attempt" = "3" ]; then exit 1; fi; \
+        sleep 2; \
+    done \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
+    CARGO_BUILD_JOBS=1 \
+    CARGO_INCREMENTAL=0 \
+    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
+    CARGO_PROFILE_RELEASE_LTO=false \
+    CARGO_PROFILE_RELEASE_OPT_LEVEL=1 \
+    RUSTFLAGS="-Cdebuginfo=0" \
+    RUST_MIN_STACK=4294967296 \
     PATH=/usr/local/cargo/bin:$PATH
+
+RUN mkdir -p "${CARGO_HOME}" \
+    && printf '%s\n' \
+        '[profile.release.package."lean_compiler"]' \
+        'opt-level = 0' \
+        'codegen-units = 256' \
+        '' \
+        '[profile.release.package."lean_prover"]' \
+        'codegen-units = 256' \
+        > "${CARGO_HOME}/config.toml"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain ${RUST_NIGHTLY_TOOLCHAIN} \
     && rustup default ${RUST_NIGHTLY_TOOLCHAIN}
+
+RUN printf '%s\n' \
+        '#!/bin/sh' \
+        'export RUST_MIN_STACK="${RUSTC_MIN_STACK:-34359738368}"' \
+        'exec "$@"' \
+        > /usr/local/bin/rustc-stack-wrapper \
+    && chmod +x /usr/local/bin/rustc-stack-wrapper
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -51,42 +92,61 @@ RUN git clone https://github.com/${helper_github} . \
     && git checkout ${devnet3_tag} \
     && git rev-parse HEAD > /app/devnet3/.git-commit
 
-RUN uv sync --frozen
+RUN for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+        ulimit -s unlimited \
+        && RUSTC_WRAPPER=/usr/local/bin/rustc-stack-wrapper \
+            RUSTC_MIN_STACK=17179869184 \
+            uv sync --frozen \
+        && break; \
+        if [ "$attempt" = "10" ]; then exit 1; fi; \
+        sleep 2; \
+    done
 
 FROM lean-spec-base AS builder-devnet4
 
 ARG helper_github=leanEthereum/leanSpec
-ARG devnet4_tag=main
-ENV LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL=https://api.github.com/repos/${helper_github}/commits/${devnet4_tag}
+ARG devnet4_tag=c460769ac6385812f193f5d61c178dc8df03d81e
 
 WORKDIR /app/devnet4
-
-ADD ${LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL} /tmp/devnet4-commit.json
 
 RUN git clone https://github.com/${helper_github} . \
     && git checkout ${devnet4_tag} \
     && git rev-parse HEAD > /app/devnet4/.git-commit
 
-RUN uv sync --frozen
+RUN for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+        ulimit -s unlimited \
+        && RUSTC_WRAPPER=/usr/local/bin/rustc-stack-wrapper \
+            RUSTC_MIN_STACK=17179869184 \
+            uv sync --frozen \
+        && break; \
+        if [ "$attempt" = "10" ]; then exit 1; fi; \
+        sleep 2; \
+    done
 
 FROM python:3.12-slim-bookworm
 
 ARG helper_github=leanEthereum/leanSpec
 ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
-ARG devnet4_tag=main
+ARG devnet4_tag=c460769ac6385812f193f5d61c178dc8df03d81e
 ARG devnet3_keys_tag=leanSpec-ad9a3226
 ARG devnet4_keys_tag=latest
 ARG lean_spec_fixtures_tag=latest
-ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
+ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 ENV LEAN_SPEC_FIXTURES_METADATA_URL=https://api.github.com/repos/${helper_github}/releases/tags/${lean_spec_fixtures_tag}
 ENV LEAN_SPEC_DEVNET4_KEYS_METADATA_URL=https://api.github.com/repos/leanEthereum/leansig-test-keys/releases/tags/${devnet4_keys_tag}
 
-RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
-    && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
-    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN for attempt in 1 2 3; do \
+        rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+        && apt-get clean \
+        && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
+        && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
+            ca-certificates \
+            curl \
+        && break; \
+        if [ "$attempt" = "3" ]; then exit 1; fi; \
+        sleep 2; \
+    done \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 WORKDIR /app
 
@@ -115,7 +175,7 @@ ENV LEAN_ENV=prod \
     LEAN_SPEC_DEVNET3_KEYS_DIR=/app/hive/prod_scheme_devnet3 \
     LEAN_SPEC_DEVNET4_KEYS_DIR=/app/hive/prod_scheme_devnet4 \
     PYTHONFAULTHANDLER=1 \
-    RUST_MIN_STACK=33554432
+    RUST_MIN_STACK=4294967296
 
 COPY ./simulators/lean/helper/leanspec-client.sh /app/hive/leanspec-client.sh
 COPY ./simulators/lean/helper/lean_spec_client_runner.py /app/hive/lean_spec_client_runner.py
