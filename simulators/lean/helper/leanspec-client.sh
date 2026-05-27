@@ -28,6 +28,8 @@ if [ ! -x "${LEAN_SPEC_APP_ROOT}/.venv/bin/python" ]; then
     exit 1
 fi
 
+ulimit -s unlimited 2>/dev/null || ulimit -s 32768 2>/dev/null || true
+
 if ! "${LEAN_SPEC_APP_ROOT}/.venv/bin/python" -c 'import aiohttp, lean_spec' >/dev/null 2>&1; then
     echo "LeanSpec helper runtime in ${LEAN_SPEC_APP_ROOT} is incomplete" >&2
     exit 1
@@ -35,7 +37,6 @@ fi
 
 export VIRTUAL_ENV="${LEAN_SPEC_APP_ROOT}/.venv"
 export PATH="${VIRTUAL_ENV}/bin:${PATH}"
-ulimit -s 32768 2>/dev/null || true
 
 cd "${LEAN_SPEC_APP_ROOT}"
 

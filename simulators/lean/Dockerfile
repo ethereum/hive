@@ -17,7 +17,7 @@ RUN cargo build -p lean-sim --release --locked \
 FROM python:3.12-slim-bookworm AS lean-spec-base
 
 ARG helper_github=leanEthereum/leanSpec
-ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
+ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
     && apt-get update -o Acquire::Retries=3 -o Acquire::By-Hash=force \
@@ -56,12 +56,9 @@ RUN uv sync --frozen
 FROM lean-spec-base AS builder-devnet4
 
 ARG helper_github=leanEthereum/leanSpec
-ARG devnet4_tag=main
-ENV LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL=https://api.github.com/repos/${helper_github}/commits/${devnet4_tag}
+ARG devnet4_tag=c460769ac6385812f193f5d61c178dc8df03d81e
 
 WORKDIR /app/devnet4
-
-ADD ${LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL} /tmp/devnet4-commit.json
 
 RUN git clone https://github.com/${helper_github} . \
     && git checkout ${devnet4_tag} \
@@ -73,11 +70,11 @@ FROM python:3.12-slim-bookworm
 
 ARG helper_github=leanEthereum/leanSpec
 ARG devnet3_tag=be853180d21aa36d6401b8c1541aa6fcaad5008d
-ARG devnet4_tag=main
+ARG devnet4_tag=c460769ac6385812f193f5d61c178dc8df03d81e
 ARG devnet3_keys_tag=leanSpec-ad9a3226
 ARG devnet4_keys_tag=latest
 ARG lean_spec_fixtures_tag=latest
-ARG RUST_NIGHTLY_TOOLCHAIN=nightly-2026-04-12
+ARG RUST_NIGHTLY_TOOLCHAIN=1.95.0
 ENV LEAN_SPEC_FIXTURES_METADATA_URL=https://api.github.com/repos/${helper_github}/releases/tags/${lean_spec_fixtures_tag}
 ENV LEAN_SPEC_DEVNET4_KEYS_METADATA_URL=https://api.github.com/repos/leanEthereum/leansig-test-keys/releases/tags/${devnet4_keys_tag}
 
@@ -168,66 +165,6 @@ RUN mkdir -p /app/hive/prod_scheme_devnet3 /app/hive/prod_scheme_devnet4 /app/hi
         "$DEVNET4_COMMIT" \
         "$lean_spec_fixtures_tag" \
         "$RUST_NIGHTLY_TOOLCHAIN" > /version.txt
-
-# Fix missing IdentityKeypair.from_bytes in lean_spec
-RUN <<'EOF'
-python3 -c '
-import sys
-
-filepath = "/app/devnet4/src/lean_spec/subspecs/networking/transport/identity/keypair.py"
-with open(filepath, "r") as f:
-    content = f.read()
-
-old_method = """    @classmethod
-    def generate(cls) -> IdentityKeypair:
-        \"\"\"
-        Generate a new random secp256k1 keypair.
-
-        Returns:
-            A fresh identity keypair.
-        \"\"\"
-        private_key = ec.generate_private_key(ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)"""
-
-new_method = """    @classmethod
-    def generate(cls) -> IdentityKeypair:
-        \"\"\"
-        Generate a new random secp256k1 keypair.
-
-        Returns:
-            A fresh identity keypair.
-        \"\"\"
-        private_key = ec.generate_private_key(ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)
-
-    @classmethod
-    def from_bytes(cls, private_key_bytes: bytes) -> IdentityKeypair:
-        \"\"\"
-        Create an identity keypair from raw private key bytes.
-
-        Args:
-            private_key_bytes: 32-byte secp256k1 private key.
-
-        Returns:
-            Identity keypair derived from the private key.
-        \"\"\"
-        private_value = int.from_bytes(private_key_bytes, "big")
-        private_key = ec.derive_private_key(private_value, ec.SECP256K1())
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)"""
-
-if old_method in content:
-    content = content.replace(old_method, new_method)
-    with open(filepath, "w") as f:
-        f.write(content)
-    print("Fixed IdentityKeypair.from_bytes")
-else:
-    print("Could not find method to patch")
-    sys.exit(1)
-'
-EOF
 
 EXPOSE 5052 5053 9001/udp
 

@@ -65,6 +65,10 @@ fn client_caught_up_to_source(source: &ForkChoiceResponse, client: &ForkChoiceRe
         || head_slot_is_caught_up(fork_choice_head_slot(client), fork_choice_head_slot(source))
 }
 
+fn source_head_reached_minimum_slot(source: &ForkChoiceResponse, minimum_slot: u64) -> bool {
+    fork_choice_head_slot(source) >= minimum_slot
+}
+
 fn helper_failed_after_test_start_message(client_name: &str, phase: &str, error: &str) -> String {
     format!(
         "Local LeanSpec helper failed after client under test {client_name} was started while {phase}; test result is indeterminate and should not be interpreted as a client failure. Helper failure: {error}"
@@ -73,9 +77,11 @@ fn helper_failed_after_test_start_message(client_name: &str, phase: &str, error:
 
 async fn wait_for_client_to_reach_source_head(
     context: &mut PostGenesisSyncContext,
+    minimum_source_head_slot: u64,
 ) -> (ForkChoiceResponse, ForkChoiceResponse) {
     let client_name = context.client_under_test.kind.clone();
     let mut last_observation = None;
+    let mut last_source_below_minimum = None;
     let deadline = Instant::now() + Duration::from_secs(HEAD_SYNC_TIMEOUT_SECS);
 
     while Instant::now() < deadline {
@@ -92,6 +98,12 @@ async fn wait_for_client_to_reach_source_head(
                     )
                 )
             });
+        if !source_head_reached_minimum_slot(&source_before_fork_choice, minimum_source_head_slot) {
+            last_source_below_minimum = Some(source_before_fork_choice);
+            sleep(Duration::from_secs(1)).await;
+            continue;
+        }
+
         let client_fork_choice = load_fork_choice_response(&context.client_under_test).await;
         if client_caught_up_to_source(&source_before_fork_choice, &client_fork_choice) {
             return (source_before_fork_choice, client_fork_choice);
@@ -110,6 +122,12 @@ async fn wait_for_client_to_reach_source_head(
                     )
                 )
             });
+        if !source_head_reached_minimum_slot(&source_after_fork_choice, minimum_source_head_slot) {
+            last_source_below_minimum = Some(source_after_fork_choice);
+            sleep(Duration::from_secs(1)).await;
+            continue;
+        }
+
         last_observation = Some(capture_head_sync_observation(
             &source_before_fork_choice,
             &client_fork_choice,
@@ -123,6 +141,17 @@ async fn wait_for_client_to_reach_source_head(
     }
 
     let Some(observation) = last_observation else {
+        if let Some(source) = last_source_below_minimum {
+            panic!(
+                "Local LeanSpec helper never exposed a live head at or above required slot {} within {} seconds after client startup (last helper head slot: {}, justified={}, finalized={})",
+                minimum_source_head_slot,
+                HEAD_SYNC_TIMEOUT_SECS,
+                fork_choice_head_slot(&source),
+                source.justified.slot,
+                source.finalized.slot,
+            );
+        }
+
         panic!(
             "Client under test could not be compared with the local LeanSpec helper head within {} seconds",
             HEAD_SYNC_TIMEOUT_SECS
@@ -255,7 +284,6 @@ dyn_async! {
             } else {
                 HelperGossipForkDigestProfile::LegacyDevnet0
             };
-
             run_data_test(
                 test,
                 "sync: checkpoint sync fresh start".to_string(),
@@ -345,7 +373,7 @@ dyn_async! {
             )
         });
 
-        let (source_fork_choice, client_fork_choice) = timeout(
+        let (checkpoint_sync_boundary, source_fork_choice, client_fork_choice) = timeout(
             Duration::from_secs(CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS),
             async {
                 let mut context =
@@ -354,8 +382,16 @@ dyn_async! {
                     context.source_fork_choice.finalized.slot > 0,
                     "helper source should expose a non-genesis finalized checkpoint before checkpoint-syncing the client under test"
                 );
+                let checkpoint_sync_boundary = context.source_fork_choice.finalized.slot;
 
-                wait_for_client_to_reach_source_head(&mut context).await
+                let (source_fork_choice, client_fork_choice) =
+                    wait_for_client_to_reach_source_head(&mut context, checkpoint_sync_boundary)
+                        .await;
+                (
+                    checkpoint_sync_boundary,
+                    source_fork_choice,
+                    client_fork_choice,
+                )
             },
         )
         .await
@@ -365,9 +401,12 @@ dyn_async! {
             )
         });
 
-        let checkpoint_sync_boundary = source_fork_choice.finalized.slot;
         let source_head_slot = fork_choice_head_slot(&source_fork_choice);
-        let client_head_slot = fork_choice_head_slot(&client_fork_choice);
+        let client_head_slot = if client_fork_choice.head == source_fork_choice.head {
+            source_head_slot
+        } else {
+            fork_choice_head_slot(&client_fork_choice)
+        };
 
         assert!(
             source_head_slot >= checkpoint_sync_boundary,
@@ -404,7 +443,7 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head(&mut context).await;
+            wait_for_client_to_reach_source_head(&mut context, 0).await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
         let paused_client_head = client_before_pause.head;
 
@@ -449,7 +488,7 @@ dyn_async! {
         );
 
         let (source_after_recovery, client_after_recovery) =
-            wait_for_client_to_reach_source_head(&mut context).await;
+            wait_for_client_to_reach_source_head(&mut context, 0).await;
         let source_head_slot = fork_choice_head_slot(&source_after_recovery);
         let client_head_slot = fork_choice_head_slot(&client_after_recovery);
 
@@ -488,7 +527,7 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head(&mut context).await;
+            wait_for_client_to_reach_source_head(&mut context, 0).await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
         let paused_client_head = client_before_pause.head;
 
@@ -533,7 +572,7 @@ dyn_async! {
         );
 
         let (source_after_recovery, client_after_recovery) =
-            wait_for_client_to_reach_source_head(&mut context).await;
+            wait_for_client_to_reach_source_head(&mut context, 0).await;
         let source_head_slot = fork_choice_head_slot(&source_after_recovery);
         let client_head_slot = fork_choice_head_slot(&client_after_recovery);
 
