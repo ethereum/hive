@@ -27,7 +27,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 FROM lean-spec-base AS builder-devnet4
 
 ARG github=leanEthereum/leanSpec
-ARG devnet4_tag=main
+ARG devnet4_tag=db21cc24cbeeb78a91c42a713089fe0c845eb648
 ENV LEAN_SPEC_DEVNET4_COMMIT_METADATA_URL=https://api.github.com/repos/${github}/commits/${devnet4_tag}
 
 WORKDIR /app/devnet4
@@ -58,7 +58,7 @@ RUN uv sync --frozen
 
 FROM python:3.12-slim-bookworm
 
-ARG devnet4_tag=main
+ARG devnet4_tag=db21cc24cbeeb78a91c42a713089fe0c845eb648
 ARG devnet5_tag=main
 ARG devnet5_keys_tag=latest
 ARG lean_spec_tests_github=ReamLabs/lean-spec-tests
