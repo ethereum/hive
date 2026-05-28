@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -53,12 +54,17 @@ func runServer(config serverConfig) {
 	// Create handlers.
 	deployFS := newDeployFS(assetFS, &config)
 	logDirFS := os.DirFS(config.logDir)
+	logDirAbs, err := filepath.Abs(config.logDir)
+	if err != nil {
+		logDirAbs = config.logDir
+	}
 	logHandler := http.FileServer(http.FS(logDirFS))
 	listingHandler := serveListing{fsys: logDirFS}
 
 	mux := mux.NewRouter()
 	mux.Handle("/features.json", serveFeatures{enableLeanLatest: config.enableLeanLatest}).Methods("GET")
 	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
+	mux.Handle("/run-status.json", serveRunStatus{fsys: logDirFS, logDir: logDirAbs}).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
 	mux.PathPrefix("/").Handler(serveFiles{
 		fsys: deployFS,

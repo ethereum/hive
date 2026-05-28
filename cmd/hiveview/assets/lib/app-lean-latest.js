@@ -4,6 +4,9 @@ import * as routes from './routes.js';
 import { formatDuration } from './utils.js';
 
 const listingURL = 'listing.jsonl?limit=1000';
+const runStatusURL = 'run-status.json';
+const runStatusPollMs = 10000;
+const runStatusStaleMs = 45000;
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
 const trendPointLimitOptions = [5, 10, 25, 50];
 const trendAllClientsValue = '__all__';
@@ -34,6 +37,7 @@ const leanLatestState = {
     displayPreviousRunsForBlankGrids: true,
     trendClientOptions: [],
     trendRenderID: 0,
+    runStatusTimer: null,
 };
 
 export async function loadLeanLatest(options = {}) {
@@ -42,6 +46,7 @@ export async function loadLeanLatest(options = {}) {
         $('#loading-container').addClass('show');
     }
     $('#lean-latest-error').hide();
+    startRunStatusPolling();
 
     try {
         const listingText = await loadText(listingURL);
@@ -480,9 +485,25 @@ function buildClientInteropMatrices(entry, suiteData) {
 
     const matrixSpecs = [
         {
-            type: 'single-subnet',
+            type: 'single-subnet-minority-aggregator',
+            suiteName: 'client-interop minority aggregator',
+            emptyMessage: 'No client-interop minority-aggregator topology tests with client results.',
+            rowRoleLabel: '2 nodes',
+            columnRoleLabel: '1 node',
+            sameClientRoleLabel: '3 nodes',
+        },
+        {
+            type: 'single-subnet-majority-aggregator',
+            suiteName: 'client-interop majority aggregator',
+            emptyMessage: 'No client-interop majority-aggregator topology tests with client results.',
+            rowRoleLabel: '2 nodes',
+            columnRoleLabel: '1 node',
+            sameClientRoleLabel: '3 nodes',
+        },
+        {
+            type: 'single-subnet-legacy',
             suiteName: 'client-interop',
-            emptyMessage: 'No client-interop single-subnet topology tests with client results.',
+            emptyMessage: 'No client-interop topology tests with client results.',
             rowRoleLabel: '2 nodes',
             columnRoleLabel: '1 node',
             sameClientRoleLabel: '3 nodes',
@@ -633,7 +654,13 @@ function clientInteropMatrixType(test) {
     if (name.includes('client-interop: two-subnet') || description.includes('across two attestation subnets')) {
         return 'two-subnet';
     }
-    return 'single-subnet';
+    if (name.includes('client-interop: minority aggregator') || description.includes('sets the minority node')) {
+        return 'single-subnet-minority-aggregator';
+    }
+    if (name.includes('client-interop: majority aggregator') || description.includes('sets one majority node')) {
+        return 'single-subnet-majority-aggregator';
+    }
+    return 'single-subnet-legacy';
 }
 
 function clientInteropRoles(topology) {
@@ -808,6 +835,116 @@ async function renderLeanLatest(matrices, devnet) {
     matrices.forEach(matrix => {
         content.append(renderSuiteSection(matrix));
     });
+}
+
+function startRunStatusPolling() {
+    if (leanLatestState.runStatusTimer) {
+        window.clearInterval(leanLatestState.runStatusTimer);
+    }
+    void refreshRunStatus();
+    leanLatestState.runStatusTimer = window.setInterval(refreshRunStatus, runStatusPollMs);
+}
+
+async function refreshRunStatus() {
+    try {
+        renderRunStatus(await loadJSON(runStatusURL));
+    } catch (err) {
+        $('#lean-run-status').hide().empty();
+    }
+}
+
+function renderRunStatus(status) {
+    const container = $('#lean-run-status').empty();
+    if (!container.length || !isVisibleRunStatus(status)) {
+        container.hide();
+        return;
+    }
+
+    const finished = status.suites.filter(suite => suite.state === 'finished').length;
+    const total = status.suites.length;
+    const activeSuite = status.suites.find(suite => suite.state === 'in-progress');
+    const title = status.state === 'finished'
+        ? `Run complete: ${finished}/${total} suites`
+        : `Current run: ${finished}/${total} suites finished`;
+    const subtitle = activeSuite
+        ? `In progress: ${activeSuite.name}`
+        : status.state === 'finished' ? 'All planned suites finished.' : 'Waiting for next suite.';
+
+    const heading = $('<div />').addClass('lean-run-status-heading');
+    heading.append($('<span />').addClass('lean-run-status-title').text(title));
+    heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitle));
+
+    const progress = $('<div />').addClass('lean-run-progress');
+    status.suites.forEach(suite => {
+        progress.append($('<span />')
+            .addClass('lean-run-step')
+            .addClass(runStatusStateClass(suite.state))
+            .css('--lean-run-step-progress', `${runStatusProgressPercent(suite)}%`)
+            .attr('title', runStatusSuiteTitle(suite))
+            .text(suite.name));
+    });
+
+    container.append(heading, progress).show();
+}
+
+function isVisibleRunStatus(status) {
+    if (!status || status.state !== 'running' || !Array.isArray(status.suites) || status.suites.length === 0) {
+        return false;
+    }
+    const lastActivity = Date.parse(status.lastActivity || '');
+    return !Number.isFinite(lastActivity) || Date.now() - lastActivity <= runStatusStaleMs;
+}
+
+function runStatusProgressPercent(suite) {
+    const total = Number(suite.total) || 0;
+    if (suite.state === 'finished') {
+        return 100;
+    }
+    if (total <= 0) {
+        return 0;
+    }
+    const finished = Math.max(0, Math.min(Number(suite.finished) || 0, total));
+    return Math.round((finished / total) * 100);
+}
+
+function runStatusSuiteTitle(suite) {
+    const total = Number(suite.total) || 0;
+    const state = runStatusStateLabel(suite.state);
+    if (suite.state !== 'in-progress' && suite.state !== 'finished') {
+        return `${suite.name}: ${state}`;
+    }
+    if (total <= 0) {
+        return `${suite.name}: ${state}`;
+    }
+    const finished = Math.max(0, Math.min(Number(suite.finished) || 0, total));
+    const completePercent = Math.round((finished / total) * 100);
+    const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
+    return `${suite.name}: ${finished}/${total} complete (${completePercent}%)${completion}`;
+}
+
+function runStatusCompletionText(value) {
+    const completedAt = parseDate(value);
+    return completedAt ? `; completed ${completedAt.toLocaleString()}` : '';
+}
+
+function runStatusStateClass(state) {
+    if (state === 'finished') {
+        return 'is-finished';
+    }
+    if (state === 'in-progress') {
+        return 'is-running';
+    }
+    return 'is-pending';
+}
+
+function runStatusStateLabel(state) {
+    if (state === 'finished') {
+        return 'finished';
+    }
+    if (state === 'in-progress') {
+        return 'in progress';
+    }
+    return 'yet to run';
 }
 
 async function renderClientScores(matrices) {
