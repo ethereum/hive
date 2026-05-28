@@ -1,14 +1,14 @@
 # Lean devnet support matrix for clients covered by the lean simulator.
 # The default profile is used when a selected client name does not include
-# an explicit _devnet3 or _devnet4 suffix.
+# an explicit _devnet4 or _devnet5 suffix.
 
-default=devnet3
+default=devnet4
 
-ethlambda=devnet3,devnet4
-gean=devnet3,devnet4
-grandine_lean=devnet3,devnet4
-lantern=devnet3,devnet4
+ethlambda=devnet4,devnet5
+gean=devnet4
+grandine_lean=devnet4
+lantern=devnet4
 nlean=devnet4
-qlean=devnet3,devnet4
-ream=devnet3,devnet4
+qlean=devnet4
+ream=devnet4,devnet5
 zeam=devnet4

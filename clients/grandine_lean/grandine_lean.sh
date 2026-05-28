@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
 NODE_ID="${HIVE_NODE_ID:-grandine_lean_0}"
 ASSET_ROOT="/tmp/grandine_lean-runtime"
 KEY_FILE=""
@@ -10,10 +10,6 @@ NETWORK_CONFIG="${HIVE_LEAN_NETWORK_CONFIG:-$ASSET_ROOT/config.yaml}"
 LEAN_SPEC_SOURCE_PEER_ID="16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3"
 
 case "$DEVNET_LABEL" in
-    devnet3)
-        DEFAULT_LEAN_BIN="/usr/local/bin/lean_client-devnet3"
-        VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/validators.yaml}"
-        ;;
     devnet4)
         DEFAULT_LEAN_BIN="/usr/local/bin/lean_client-devnet4"
         VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/annotated_validators.yaml}"
@@ -25,11 +21,6 @@ case "$DEVNET_LABEL" in
 esac
 
 LEAN_BIN="${LEAN_BIN:-$DEFAULT_LEAN_BIN}"
-
-if [ "$DEVNET_LABEL" = "devnet3" ]; then
-    export HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY="${HIVE_LEAN_GRANDINE_SKIP_XMSS_VERIFY:-1}"
-    export HIVE_LEAN_GRANDINE_REQUIRE_KEYS="${HIVE_LEAN_GRANDINE_REQUIRE_KEYS:-1}"
-fi
 
 cleanup() {
     if [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
@@ -95,10 +86,6 @@ checkpoint_source_host_port() {
 
 normalize_bootnode() {
     local bootnode="$1"
-
-    if [ "$DEVNET_LABEL" = "devnet3" ] && [[ "$bootnode" == enr:* ]]; then
-        checkpoint_bootnode_multiaddr && return 0
-    fi
 
     printf "%s" "$bootnode"
 }

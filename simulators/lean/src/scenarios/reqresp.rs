@@ -12,7 +12,7 @@ use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
     lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
     prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
-    simulator_container_ip, ClientUnderTestRole, LeanDevnet, TimedDataTestSpec,
+    simulator_container_ip, ClientUnderTestRole, TimedDataTestSpec,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
@@ -89,7 +89,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -119,7 +119,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -152,7 +152,7 @@ dyn_async! {
                         ),
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -182,7 +182,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -212,7 +212,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -242,7 +242,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -272,7 +272,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -302,7 +302,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -332,7 +332,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -362,7 +362,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -392,7 +392,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -422,7 +422,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -452,7 +452,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -482,7 +482,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -512,7 +512,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -542,7 +542,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -572,7 +572,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -602,7 +602,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -632,7 +632,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -662,7 +662,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 2,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0
@@ -692,7 +692,7 @@ dyn_async! {
                         source_helper_validator_indices: None,
                         split_helper_validators_across_mesh: false,
                         helper_peer_count: 1,
-                        helper_fork_digest_profile: if selected_lean_devnet() == LeanDevnet::Devnet4 {
+                        helper_fork_digest_profile: if selected_lean_devnet().uses_latest_leanspec_format() {
                             HelperGossipForkDigestProfile::SelectedDevnet
                         } else {
                             HelperGossipForkDigestProfile::LegacyDevnet0

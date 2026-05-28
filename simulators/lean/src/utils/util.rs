@@ -44,18 +44,22 @@ pub(crate) const LEAN_RPC_SERVICE: &str = "lean-rpc-api";
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LeanDevnet {
-    Devnet3,
     Devnet4,
+    Devnet5,
 }
 
 impl LeanDevnet {
-    const DEFAULT: Self = Self::Devnet3;
+    const DEFAULT: Self = Self::Devnet4;
 
     fn as_str(self) -> &'static str {
         match self {
-            Self::Devnet3 => "devnet3",
             Self::Devnet4 => "devnet4",
+            Self::Devnet5 => "devnet5",
         }
+    }
+
+    pub(crate) fn uses_latest_leanspec_format(self) -> bool {
+        matches!(self, Self::Devnet4 | Self::Devnet5)
     }
 }
 
@@ -70,8 +74,8 @@ impl TryFrom<&str> for LeanDevnet {
 
     fn try_from(label: &str) -> Result<Self, Self::Error> {
         match label.trim() {
-            "devnet3" => Ok(Self::Devnet3),
             "devnet4" => Ok(Self::Devnet4),
+            "devnet5" => Ok(Self::Devnet5),
             other => Err(format!("unsupported lean devnet label {other:?}")),
         }
     }
@@ -236,7 +240,7 @@ pub(crate) fn lean_environment() -> HashMap<String, String> {
         (HIVE_LEAN_DEVNET_LABEL.to_string(), devnet_label),
     ]);
 
-    if selected_devnet == LeanDevnet::Devnet4 {
+    if selected_devnet.uses_latest_leanspec_format() {
         environment.insert(
             HIVE_LEAN_FORK_DIGEST.to_string(),
             DEVNET4_HELPER_GOSSIP_FORK_DIGEST.to_string(),

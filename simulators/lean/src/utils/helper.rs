@@ -410,12 +410,14 @@ struct CheckpointSyncForkChoiceSnapshot {
     nodes: Vec<ForkChoiceNodeSlot>,
 }
 
+#[allow(dead_code)]
 pub(crate) struct LiveHelperSingleClientRuntimeSetup {
     pub environment: HashMap<String, String>,
     pub files: HashMap<String, Vec<u8>>,
     _helpers: RunningLocalLeanSpecHelperGroup,
 }
 
+#[allow(dead_code)]
 pub(crate) async fn lean_single_client_runtime_setup_with_live_helper(
     client_type: &str,
     genesis_time: u64,
@@ -568,8 +570,8 @@ fn helper_gossip_fork_digest(profile: HelperGossipForkDigestProfile) -> String {
             DEFAULT_HELPER_GOSSIP_FORK_DIGEST.to_string()
         }
         HelperGossipForkDigestProfile::SelectedDevnet => match selected_lean_devnet() {
-            LeanDevnet::Devnet3 => LeanDevnet::Devnet3.to_string(),
             LeanDevnet::Devnet4 => DEVNET4_HELPER_GOSSIP_FORK_DIGEST.to_string(),
+            LeanDevnet::Devnet5 => DEVNET4_HELPER_GOSSIP_FORK_DIGEST.to_string(),
         },
     }
 }

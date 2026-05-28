@@ -100,7 +100,7 @@ impl BlocksByRangeV1Request {
 
 /// Fixed-size XMSS signature bytes.
 ///
-/// This matches leanSpec's `TARGET_CONFIG.SIGNATURE_LEN_BYTES` for the devnet4
+/// This matches leanSpec's `TARGET_CONFIG.SIGNATURE_LEN_BYTES` for current devnets.
 /// production XMSS parameters:
 /// 32 path siblings * 8 field elements * 4 bytes
 /// + 7 randomness field elements * 4 bytes

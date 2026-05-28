@@ -1,6 +1,6 @@
 use crate::utils::helper::{
-    lean_single_client_runtime_setup_with_live_helper, start_post_genesis_sync_context,
-    HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
+    start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncContext,
+    PostGenesisSyncTestData,
 };
 use crate::utils::libp2p_mock::LeanSignature;
 use crate::utils::util::{
@@ -8,7 +8,7 @@ use crate::utils::util::{
     lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
     load_response_with_retry, prepare_client_runtime_files, run_data_test_with_timeout,
     selected_lean_devnet, CheckpointResponse, ClientUnderTestRole, ForkChoiceResponse,
-    HealthResponse, LeanDevnet, TimedDataTestSpec, HEALTHY_STATUS, LEAN_RPC_SERVICE,
+    HealthResponse, TimedDataTestSpec, HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
 use alloy_primitives::{FixedBytes, B256};
 use hivesim::{
@@ -57,12 +57,6 @@ struct LeanCheckpoint {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
-struct LeanValidatorDevnet3 {
-    public_key: LeanPublicKey,
-    index: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
 struct LeanValidatorDevnet4 {
     attestation_public_key: LeanPublicKey,
     proposal_public_key: LeanPublicKey,
@@ -74,20 +68,6 @@ struct LeanValidator {
     attestation_public_key: LeanPublicKey,
     proposal_public_key: Option<LeanPublicKey>,
     index: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
-struct LeanStateDevnet3 {
-    config: LeanConfig,
-    slot: u64,
-    latest_block_header: LeanBlockHeader,
-    latest_justified: LeanCheckpoint,
-    latest_finalized: LeanCheckpoint,
-    historical_block_hashes: VariableList<B256, U262144>,
-    justified_slots: BitList<U262144>,
-    validators: VariableList<LeanValidatorDevnet3, U4096>,
-    justifications_roots: VariableList<B256, U262144>,
-    justifications_validators: BitList<U1073741824>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
@@ -163,33 +143,6 @@ struct LeanRpcBlockSignatures {
 struct LeanRpcSignedBlock {
     block: LeanRpcBlock,
     signature: LeanRpcBlockSignatures,
-}
-
-impl From<LeanStateDevnet3> for LeanState {
-    fn from(state: LeanStateDevnet3) -> Self {
-        let tree_hash_root = state.tree_hash_root();
-        Self {
-            config: state.config,
-            slot: state.slot,
-            latest_block_header: state.latest_block_header,
-            latest_justified: state.latest_justified,
-            latest_finalized: state.latest_finalized,
-            historical_block_hashes: state.historical_block_hashes,
-            justified_slots: state.justified_slots,
-            validators: state
-                .validators
-                .into_iter()
-                .map(|validator| LeanValidator {
-                    attestation_public_key: validator.public_key,
-                    proposal_public_key: None,
-                    index: validator.index,
-                })
-                .collect(),
-            justifications_roots: state.justifications_roots,
-            justifications_validators: state.justifications_validators,
-            tree_hash_root,
-        }
-    }
 }
 
 impl From<LeanStateDevnet4> for LeanState {
@@ -328,15 +281,9 @@ async fn load_finalized_state_bytes(client: &Client) -> Vec<u8> {
 }
 
 fn decode_finalized_state(ssz_bytes: &[u8]) -> LeanState {
-    if selected_lean_devnet() == LeanDevnet::Devnet4 {
-        LeanStateDevnet4::from_ssz_bytes(ssz_bytes)
-            .map(Into::into)
-            .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized state: {err:?}"))
-    } else {
-        LeanStateDevnet3::from_ssz_bytes(ssz_bytes)
-            .map(Into::into)
-            .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized state: {err:?}"))
-    }
+    LeanStateDevnet4::from_ssz_bytes(ssz_bytes)
+        .map(Into::into)
+        .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized state: {err:?}"))
 }
 
 async fn load_finalized_state(client: &Client) -> LeanState {
@@ -383,11 +330,7 @@ async fn load_post_genesis_state_setup(
 ) -> (PostGenesisSyncContext, LeanState, ForkChoiceResponse) {
     let context = start_post_genesis_sync_context(test, &test_data).await;
     let state = load_finalized_state(&context.client_under_test).await;
-    let fork_choice = if selected_lean_devnet() == LeanDevnet::Devnet4 {
-        load_fork_choice_response(&context.client_under_test).await
-    } else {
-        wait_for_non_genesis_fork_choice_response(&context.client_under_test).await
-    };
+    let fork_choice = load_fork_choice_response(&context.client_under_test).await;
     (context, state, fork_choice)
 }
 
@@ -473,7 +416,9 @@ async fn wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(
 fn helper_fork_digest_profile_for_post_genesis_rpc_compat(
     client_type: &str,
 ) -> HelperGossipForkDigestProfile {
-    if selected_lean_devnet() == LeanDevnet::Devnet4 && client_type.starts_with("grandine_lean") {
+    if selected_lean_devnet().uses_latest_leanspec_format()
+        && client_type.starts_with("grandine_lean")
+    {
         return HelperGossipForkDigestProfile::SelectedDevnet;
     }
 
@@ -762,40 +707,14 @@ dyn_async! {
             .await;
 
             // These finalized-state checks are read-only, so they can share one client.
-            let shared_state_live_helper_runtime =
-                if selected_lean_devnet() == LeanDevnet::Devnet3
-                    && client.name.starts_with("grandine_lean")
-                {
-                    Some(
-                        lean_single_client_runtime_setup_with_live_helper(
-                            &client.name,
-                            default_genesis_time(),
-                            10,
-                            helper_fork_digest_profile_for_post_genesis_rpc_compat(&client.name),
-                            ClientUnderTestRole::Observer,
-                            true,
-                            false,
-                        )
-                        .await,
+            let shared_state_environment = lean_environment();
+            let shared_state_files = prepare_client_runtime_files(&client.name, &shared_state_environment)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Unable to prepare runtime assets for {}: {err}",
+                        client.name
                     )
-                } else {
-                    None
-                };
-
-            let (shared_state_environment, shared_state_files) =
-                if let Some(runtime) = shared_state_live_helper_runtime.as_ref() {
-                    (runtime.environment.clone(), runtime.files.clone())
-                } else {
-                    let environment = lean_environment();
-                    let files = prepare_client_runtime_files(&client.name, &environment)
-                        .unwrap_or_else(|err| {
-                            panic!(
-                                "Unable to prepare runtime assets for {}: {err}",
-                                client.name
-                            )
-                        });
-                    (environment, files)
-                };
+                });
 
             test.run(SharedClientTestSpec {
                 name: "rpc_compat: finalized-state shared-client scenarios".to_string(),
@@ -916,9 +835,6 @@ dyn_async! {
                 ],
             })
             .await;
-
-            drop(shared_state_live_helper_runtime);
-
             let state_finalized_genesis_time = default_genesis_time();
 
             run_data_test_with_timeout(

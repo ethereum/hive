@@ -5,7 +5,7 @@ use crate::utils::helper::{
 };
 use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
-    run_data_test, selected_lean_devnet, ClientUnderTestRole, ForkChoiceResponse, LeanDevnet,
+    run_data_test, selected_lean_devnet, ClientUnderTestRole, ForkChoiceResponse,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
@@ -279,7 +279,7 @@ dyn_async! {
 
         for client in &clients {
             let checkpoint_sync_genesis_time = default_genesis_time();
-            let helper_fork_digest_profile = if selected_lean_devnet() == LeanDevnet::Devnet4 {
+            let helper_fork_digest_profile = if selected_lean_devnet().uses_latest_leanspec_format() {
                 HelperGossipForkDigestProfile::SelectedDevnet
             } else {
                 HelperGossipForkDigestProfile::LegacyDevnet0

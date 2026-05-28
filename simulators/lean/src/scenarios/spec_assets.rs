@@ -6,14 +6,15 @@ use std::{
 
 use crate::utils::util::{
     http_client, lean_api_url, lean_clients, lean_environment, prepare_client_runtime_files,
-    run_data_test_with_timeout, TimedDataTestSpec,
+    run_data_test_with_timeout, selected_lean_devnet, LeanDevnet, TimedDataTestSpec,
 };
 use hivesim::{dyn_async, Client, Test};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-const SPEC_TEST_ROOT: &str = "/app/hive/lean-spec-tests";
+const SPEC_TEST_ROOT_DEVNET4: &str = "/app/hive/lean-spec-tests-devnet4";
+const SPEC_TEST_ROOT_DEVNET5: &str = "/app/hive/lean-spec-tests-devnet5";
 const FORK_CHOICE_FIXTURE_DIR: &str = "consensus/fork_choice/lstar/fc";
 const STATE_TRANSITION_FIXTURE_DIR: &str = "consensus/state_transition/lstar/state_transition";
 const VERIFY_SIGNATURES_FIXTURE_DIR: &str = "consensus/verify_signatures/lstar/verify_signatures";
@@ -129,10 +130,11 @@ async fn run_spec_assets_lean_test_suite_for_kind(test: &mut Test, kind: SpecFix
         panic!("No lean clients were selected for this run");
     }
 
-    let fixtures = filter_fixture_cases(discover_fixture_cases(Path::new(SPEC_TEST_ROOT), kind));
+    let spec_test_root = spec_test_root();
+    let fixtures = filter_fixture_cases(discover_fixture_cases(Path::new(spec_test_root), kind));
     if fixtures.is_empty() {
         panic!(
-            "No Lean {} spec-test fixtures found under {SPEC_TEST_ROOT}",
+            "No Lean {} spec-test fixtures found under {spec_test_root}",
             kind.family()
         );
     }
@@ -176,6 +178,13 @@ dyn_async! {
             SpecFixtureKind::StateTransition => run_state_transition_fixture(&client, &fixture).await,
             SpecFixtureKind::VerifySignatures => run_verify_signatures_fixture(&client, &fixture).await,
         }
+    }
+}
+
+fn spec_test_root() -> &'static str {
+    match selected_lean_devnet() {
+        LeanDevnet::Devnet4 => SPEC_TEST_ROOT_DEVNET4,
+        LeanDevnet::Devnet5 => SPEC_TEST_ROOT_DEVNET5,
     }
 }
 
