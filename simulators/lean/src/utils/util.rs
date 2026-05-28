@@ -584,6 +584,10 @@ pub(crate) async fn run_data_test<T: Send + 'static>(
     test_data: T,
     func: AsyncLeanDataTestFunc<T>,
 ) {
+    if host_test.plan_test(&name, always_run) {
+        return;
+    }
+
     if let Some(test_match) = host_test.sim.test_matcher.clone() {
         if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
             return;
@@ -615,6 +619,7 @@ pub(crate) async fn run_data_test<T: Send + 'static>(
     );
 
     host_test.sim.end_test(suite_id, test_id, test_result).await;
+    host_test.sim.test_progress(&host_test.suite.name);
 }
 
 pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
@@ -630,6 +635,10 @@ pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
         timeout_duration,
         test_data,
     } = spec;
+
+    if host_test.plan_test(&name, always_run) {
+        return;
+    }
 
     if let Some(test_match) = host_test.sim.test_matcher.clone() {
         if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
@@ -677,6 +686,7 @@ pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
     };
 
     host_test.sim.end_test(suite_id, test_id, test_result).await;
+    host_test.sim.test_progress(&host_test.suite.name);
 }
 
 pub(crate) fn default_genesis_time() -> u64 {

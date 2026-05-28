@@ -9,7 +9,7 @@ pub mod utils;
 
 pub use simulation::Simulation;
 pub use testapi::{
-    run_suite, Client, NClientTestSpec, SharedClientScenario, SharedClientTestSpec, Suite, Test,
-    TestSpec,
+    run_suite, Client, NClientTestSpec, PlannedTestSpec, SharedClientScenario,
+    SharedClientTestSpec, Suite, Test, TestSpec,
 };
 pub use testmatch::TestMatcher;
