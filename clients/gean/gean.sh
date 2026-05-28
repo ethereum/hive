@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
 NODE_ID="${HIVE_NODE_ID:-gean_0}"
 BOOTNODES="${HIVE_BOOTNODES:-none}"
 ASSET_ROOT="/tmp/gean-runtime"
@@ -41,9 +41,6 @@ materialize_runtime_local_ip() {
 }
 
 case "$DEVNET_LABEL" in
-    devnet3)
-        DEFAULT_GEAN_BIN="/usr/local/bin/gean-devnet3"
-        ;;
     devnet4)
         DEFAULT_GEAN_BIN="/usr/local/bin/gean-devnet4"
         ;;

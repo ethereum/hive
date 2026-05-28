@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
 NODE_ID="${HIVE_NODE_ID:-lantern_0}"
 ASSET_ROOT="/tmp/lantern-runtime"
 LOCAL_IP_PLACEHOLDER="__HIVE_LOCAL_IP__"
@@ -28,11 +28,6 @@ materialize_runtime_local_ip() {
 }
 
 case "$DEVNET_LABEL" in
-    devnet3)
-        DEFAULT_LANTERN_BIN="/opt/lantern-devnet3/bin/lantern"
-        export LD_LIBRARY_PATH="/opt/lantern-devnet3/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-        DEFAULT_GOSSIP_TOPIC="devnet0"
-        ;;
     devnet4)
         DEFAULT_LANTERN_BIN="/opt/lantern/bin/lantern"
         DEFAULT_GOSSIP_TOPIC="12345678"

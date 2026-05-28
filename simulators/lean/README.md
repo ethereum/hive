@@ -40,14 +40,14 @@ slow Docker build. It is the same `build` target CI exercises through
 Select the Lean devnet profile through the standard Hive client-file config.
 Reusable devnet profiles live in `simulators/lean/clients/`:
 
-`./hive --sim lean --client-file simulators/lean/clients/devnet3.yaml --client ream`
+`./hive --sim lean --client-file simulators/lean/clients/devnet4.yaml --client ream`
 
 or:
 
-`./hive --sim lean --client-file simulators/lean/clients/devnet4.yaml --client ream`
+`./hive --sim lean --client-file simulators/lean/clients/devnet5.yaml --client ream`
 
 The lean simulator resolves the active devnet from the selected client name
-(`ream_devnet4`, `ethlambda_devnet3`, `gean_devnet3`, and so on) and validates
+(`ream_devnet4`, `ethlambda_devnet5`, `gean_devnet4`, and so on) and validates
 it against the central support matrix in
 `simulators/lean/config/lean-devnets.txt`.
 

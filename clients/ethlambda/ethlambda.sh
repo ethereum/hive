@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet3}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
 NODE_ID="${HIVE_NODE_ID:-ethlambda_0}"
 ASSET_ROOT="/tmp/ethlambda-runtime"
 LOCAL_IP_PLACEHOLDER="__HIVE_LOCAL_IP__"
@@ -28,11 +28,11 @@ materialize_runtime_local_ip() {
 }
 
 case "$DEVNET_LABEL" in
-    devnet3)
-        DEFAULT_ETHLAMBDA_BIN="/usr/local/bin/ethlambda-devnet3"
-        ;;
     devnet4)
         DEFAULT_ETHLAMBDA_BIN="/usr/local/bin/ethlambda-devnet4"
+        ;;
+    devnet5)
+        DEFAULT_ETHLAMBDA_BIN="/usr/local/bin/ethlambda-devnet5"
         ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2

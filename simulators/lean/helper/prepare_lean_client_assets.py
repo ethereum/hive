@@ -25,12 +25,10 @@ FALLBACK_BOOTNODES = [
 ]
 
 CLIENT_KIND = os.environ.get("LEAN_CLIENT_KIND", "ethlambda")
-DEVNET_LABEL = os.environ.get("HIVE_LEAN_DEVNET_LABEL", "devnet3")
+DEVNET_LABEL = os.environ.get("HIVE_LEAN_DEVNET_LABEL", "devnet4")
 NODE_ID = os.environ.get("HIVE_NODE_ID", f"{CLIENT_KIND}_0")
 ASSET_ROOT = Path(os.environ.get("LEAN_RUNTIME_ASSET_ROOT", f"/tmp/{CLIENT_KIND}-runtime"))
-SOURCE_KEYS_DIR = Path(
-    "/app/hive/prod_scheme_devnet4" if DEVNET_LABEL == "devnet4" else "/app/hive/prod_scheme_devnet3"
-)
+SOURCE_KEYS_DIR = Path(f"/app/hive/prod_scheme_{DEVNET_LABEL}")
 GENESIS_TIME = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", str(int(time.time()) + 30)))
 BOOTNODE_ENV = os.environ.get("HIVE_BOOTNODES", "")
 LOCAL_IP_PLACEHOLDER = "__HIVE_LOCAL_IP__"
@@ -45,7 +43,7 @@ def validate_client_kind() -> None:
 
 
 def uses_dual_key_genesis() -> bool:
-    return DEVNET_LABEL == "devnet4"
+    return DEVNET_LABEL in {"devnet4", "devnet5"}
 
 
 def trim_hex(value: str) -> str:
@@ -103,6 +101,19 @@ def load_source_validator(index: int) -> dict[str, str]:
         "proposal_secret",
     }.issubset(validator):
         return validator
+    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
+        attestation_keypair = validator["attestation_keypair"]
+        proposal_keypair = validator["proposal_keypair"]
+        if {"public_key", "secret_key"}.issubset(attestation_keypair) and {
+            "public_key",
+            "secret_key",
+        }.issubset(proposal_keypair):
+            return {
+                "attestation_public": attestation_keypair["public_key"],
+                "attestation_secret": attestation_keypair["secret_key"],
+                "proposal_public": proposal_keypair["public_key"],
+                "proposal_secret": proposal_keypair["secret_key"],
+            }
     if {"public", "secret"}.issubset(validator):
         return {
             "attestation_public": validator["public"],

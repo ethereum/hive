@@ -90,8 +90,8 @@ STATUS_REFRESH_INTERVAL_SECS: Final = 1.0
 PREPARED_ASSETS_DIR: Final = Path(
     os.environ.get("LEAN_RUNTIME_ASSET_ROOT", "/tmp/lean-spec-client")
 )
-DEVNET3_SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme_devnet3")
 DEVNET4_SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme_devnet4")
+DEVNET5_SOURCE_KEYS_DIR: Final = Path("/app/hive/prod_scheme_devnet5")
 GENESIS_DIR: Final = PREPARED_ASSETS_DIR / "genesis"
 GENESIS_CONFIG_PATH: Final = PREPARED_ASSETS_DIR / "genesis" / "config.yaml"
 VALIDATOR_KEYS_DIR: Final = PREPARED_ASSETS_DIR / "keys"
@@ -701,11 +701,11 @@ def parse_validator_indices() -> list[int]:
 
 
 def devnet_label() -> str:
-    return os.environ.get("HIVE_LEAN_DEVNET_LABEL", "devnet3")
+    return os.environ.get("HIVE_LEAN_DEVNET_LABEL", "devnet4")
 
 
 def uses_latest_leanspec_format() -> bool:
-    return devnet_label() == "devnet4"
+    return devnet_label() in {"devnet4", "devnet5"}
 
 
 def wire_compat_mode() -> str:
@@ -772,10 +772,12 @@ def decode_secret_key(secret_key_hex: str) -> SecretKey:
 
 
 def source_keys_dir() -> Path:
-    if uses_latest_leanspec_format():
+    if devnet_label() == "devnet5":
+        return DEVNET5_SOURCE_KEYS_DIR
+    if devnet_label() == "devnet4":
         return DEVNET4_SOURCE_KEYS_DIR
 
-    return DEVNET3_SOURCE_KEYS_DIR
+    raise ValueError(f"Unsupported Lean devnet label: {devnet_label()!r}")
 
 
 def prepare_output_dirs() -> None:
