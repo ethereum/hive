@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::env;
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Timeout for short simulator control-plane requests.
@@ -16,6 +17,7 @@ pub struct Simulation {
     pub test_matcher: Option<TestMatcher>,
     /// Shared client for short control-plane requests.
     http_client: reqwest::Client,
+    planned_tests: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl Default for Simulation {
@@ -70,6 +72,7 @@ impl Simulation {
             url,
             test_matcher,
             http_client,
+            planned_tests: None,
         }
     }
 
@@ -84,7 +87,48 @@ impl Simulation {
             url,
             test_matcher: None,
             http_client,
+            planned_tests: None,
         }
+    }
+
+    pub(crate) fn planning_clone(&self) -> Self {
+        Self {
+            url: self.url.clone(),
+            test_matcher: self.test_matcher.clone(),
+            http_client: self.http_client.clone(),
+            planned_tests: Some(Arc::new(Mutex::new(Vec::new()))),
+        }
+    }
+
+    pub(crate) fn is_planning(&self) -> bool {
+        self.planned_tests.is_some()
+    }
+
+    pub(crate) fn record_planned_test(&self, suite: &str, test: &str, always_run: bool) {
+        let Some(planned_tests) = &self.planned_tests else {
+            return;
+        };
+        if let Some(test_matcher) = &self.test_matcher {
+            if !always_run && !test_matcher.match_test(suite, test) {
+                return;
+            }
+        }
+        planned_tests
+            .lock()
+            .expect("planned test collector lock poisoned")
+            .push(test.to_string());
+    }
+
+    pub(crate) fn planned_tests(&self) -> Vec<String> {
+        self.planned_tests
+            .as_ref()
+            .map(|planned_tests| {
+                planned_tests
+                    .lock()
+                    .expect("planned test collector lock poisoned")
+                    .clone()
+            })
+            .unwrap_or_default()
     }
 
     pub async fn start_suite(
@@ -152,6 +196,13 @@ impl Simulation {
             .send()
             .await
             .expect("Failed to send end test request");
+    }
+
+    pub fn test_progress(&self, suite: &str) {
+        println!(
+            "HIVE_SUITE_PROGRESS {}",
+            serde_json::json!({ "suite": suite })
+        );
     }
 
     /// Starts a new node (or other container).
