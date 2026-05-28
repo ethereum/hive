@@ -44,6 +44,9 @@ case "$DEVNET_LABEL" in
     devnet4)
         DEFAULT_GEAN_BIN="/usr/local/bin/gean-devnet4"
         ;;
+    devnet5)
+        DEFAULT_GEAN_BIN="/usr/local/bin/gean-devnet5"
+        ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
         exit 1

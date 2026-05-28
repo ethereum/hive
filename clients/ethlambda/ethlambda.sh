@@ -69,7 +69,7 @@ case "$DEVNET_LABEL" in
             --node-id "$NODE_ID"
         )
         ;;
-    devnet4)
+    devnet4|devnet5)
         FLAGS=(
             --genesis "$ASSET_ROOT/config.yaml"
             --validators "$ASSET_ROOT/annotated_validators.yaml"

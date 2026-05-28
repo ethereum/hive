@@ -32,6 +32,10 @@ case "$DEVNET_LABEL" in
         DEFAULT_LANTERN_BIN="/opt/lantern/bin/lantern"
         DEFAULT_GOSSIP_TOPIC="12345678"
         ;;
+    devnet5)
+        DEFAULT_LANTERN_BIN="/usr/local/bin/lantern-devnet5"
+        DEFAULT_GOSSIP_TOPIC="12345678"
+        ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
         exit 1
