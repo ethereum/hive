@@ -5,10 +5,10 @@
 default=devnet4
 
 ethlambda=devnet4,devnet5
-gean=devnet4
-grandine_lean=devnet4
-lantern=devnet4
-nlean=devnet4
-qlean=devnet4
+gean=devnet4,devnet5
+grandine_lean=devnet4,devnet5
+lantern=devnet4,devnet5
+nlean=devnet4,devnet5
+qlean=devnet4,devnet5
 ream=devnet4,devnet5
-zeam=devnet4
+zeam=devnet4,devnet5

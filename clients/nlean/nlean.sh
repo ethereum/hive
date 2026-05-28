@@ -35,7 +35,10 @@ materialize_runtime_local_ip() {
 
 case "$DEVNET_LABEL" in
     devnet4)
-        DEFAULT_NLEAN_BIN="/app/Lean.Client"
+        DEFAULT_NLEAN_BIN="/app/Lean.Client-devnet4"
+        ;;
+    devnet5)
+        DEFAULT_NLEAN_BIN="/app/Lean.Client-devnet5"
         ;;
     *)
         echo "Unsupported Lean devnet label for nlean: $DEVNET_LABEL" >&2

@@ -33,6 +33,9 @@ case "$DEVNET_LABEL" in
     devnet4)
         DEFAULT_QLEAN_BIN="/usr/local/bin/qlean-devnet4"
         ;;
+    devnet5)
+        DEFAULT_QLEAN_BIN="/usr/local/bin/qlean-devnet5"
+        ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
         exit 1

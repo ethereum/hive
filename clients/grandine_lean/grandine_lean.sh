@@ -14,6 +14,10 @@ case "$DEVNET_LABEL" in
         DEFAULT_LEAN_BIN="/usr/local/bin/lean_client-devnet4"
         VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/annotated_validators.yaml}"
         ;;
+    devnet5)
+        DEFAULT_LEAN_BIN="/usr/local/bin/lean_client-devnet5"
+        VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/annotated_validators.yaml}"
+        ;;
     *)
         echo "Unsupported Lean devnet label: $DEVNET_LABEL" >&2
         exit 1
