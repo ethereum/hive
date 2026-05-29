@@ -149,6 +149,8 @@ RUN mkdir -p \
     && cp /tmp/lean-spec-tests/keys/prod_scheme/1.json /app/hive/prod_scheme_devnet4/ \
     && cp /tmp/lean-spec-tests/keys/prod_scheme/2.json /app/hive/prod_scheme_devnet4/ \
     && cp /tmp/lean-spec-tests/keys/prod_scheme/3.json /app/hive/prod_scheme_devnet4/ \
+    && cp /tmp/lean-spec-tests/keys/prod_scheme/4.json /app/hive/prod_scheme_devnet4/ \
+    && cp /tmp/lean-spec-tests/keys/prod_scheme/5.json /app/hive/prod_scheme_devnet4/ \
     && curl -4 -fsSL \
         https://github.com/${helper_github}/releases/download/${lean_spec_fixtures_tag}/fixtures-prod-scheme.tar.gz \
         -o /tmp/devnet5-lean-spec-fixtures/fixtures-prod-scheme.tar.gz \
@@ -165,6 +167,8 @@ RUN mkdir -p \
         prod_scheme/1.json \
         prod_scheme/2.json \
         prod_scheme/3.json \
+        prod_scheme/4.json \
+        prod_scheme/5.json \
     && cp /tmp/leansig/prod_scheme/*.json /app/hive/prod_scheme_devnet5/ \
     && DEVNET4_COMMIT="$(cat /app/devnet4/.git-commit)" \
     && DEVNET5_COMMIT="$(cat /app/devnet5/.git-commit)" \
