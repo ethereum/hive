@@ -14,6 +14,9 @@ func (g *generator) writeForkEnv() error {
 	env["HIVE_CHAIN_ID"] = fmt.Sprint(cfg.ChainID)
 	env["HIVE_NETWORK_ID"] = fmt.Sprint(cfg.ChainID)
 
+	// system contracts
+	env["HIVE_DEPOSIT_CONTRACT_ADDRESS"] = cfg.DepositContractAddress.Hex()
+
 	// config consensus algorithm
 	if cfg.Clique != nil {
 		env["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(cfg.Clique.Period)
