@@ -6,6 +6,7 @@ import { formatDuration } from './utils.js';
 const listingURL = 'listing.jsonl?limit=1000';
 const runStatusURL = 'run-status.json';
 const runStatusPollMs = 10000;
+const runStatusClockMs = 1000;
 const runStatusStaleMs = 45000;
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
 const trendPointLimitOptions = [5, 10, 25, 50];
@@ -38,7 +39,10 @@ const leanLatestState = {
     trendClientOptions: [],
     trendRenderID: 0,
     runStatusTimer: null,
+    runStatusClockTimer: null,
     runStatusRenderID: 0,
+    lastRunStatus: null,
+    lastRunStatusEstimates: null,
     suiteDurationCache: new Map(),
 };
 
@@ -844,23 +848,59 @@ function startRunStatusPolling() {
     if (leanLatestState.runStatusTimer) {
         window.clearInterval(leanLatestState.runStatusTimer);
     }
+    if (leanLatestState.runStatusClockTimer) {
+        window.clearInterval(leanLatestState.runStatusClockTimer);
+    }
     void refreshRunStatus();
     leanLatestState.runStatusTimer = window.setInterval(refreshRunStatus, runStatusPollMs);
+    leanLatestState.runStatusClockTimer = window.setInterval(renderCachedRunStatus, runStatusClockMs);
 }
 
 async function refreshRunStatus() {
     try {
         const renderID = ++leanLatestState.runStatusRenderID;
-        await renderRunStatus(await loadJSON(runStatusURL), renderID);
+        await prepareRunStatus(await loadJSON(runStatusURL), renderID);
     } catch (err) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
         $('#lean-run-status').hide().empty();
     }
 }
 
-async function renderRunStatus(status, renderID) {
+async function prepareRunStatus(status, renderID) {
     const container = $('#lean-run-status');
     if (!container.length || !isVisibleRunStatus(status)) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
         container.hide();
+        return;
+    }
+
+    const estimates = await runStatusEstimates(status);
+    if (renderID !== leanLatestState.runStatusRenderID) {
+        return;
+    }
+    leanLatestState.lastRunStatus = status;
+    leanLatestState.lastRunStatusEstimates = estimates;
+    renderRunStatus(status, estimates);
+}
+
+function renderCachedRunStatus() {
+    if (!leanLatestState.lastRunStatus || !leanLatestState.lastRunStatusEstimates) {
+        return;
+    }
+    if (!isVisibleRunStatus(leanLatestState.lastRunStatus)) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
+        $('#lean-run-status').hide().empty();
+        return;
+    }
+    renderRunStatus(leanLatestState.lastRunStatus, leanLatestState.lastRunStatusEstimates);
+}
+
+function renderRunStatus(status, estimates) {
+    const container = $('#lean-run-status');
+    if (!container.length) {
         return;
     }
 
@@ -871,15 +911,11 @@ async function renderRunStatus(status, renderID) {
         ? `Run complete: ${finished}/${total} suites`
         : `Current run: ${finished}/${total} suites finished`;
     const activeSuiteProgress = activeSuite ? runStatusProgressText(activeSuite) : '';
-    const estimates = await runStatusEstimates(status);
-    if (renderID !== leanLatestState.runStatusRenderID) {
-        return;
-    }
-    const elapsed = runStatusElapsedText(status, activeSuite, estimates);
     const subtitle = activeSuite
         ? `In progress: ${activeSuite.name}${activeSuiteProgress ? ` - ${activeSuiteProgress}` : ''}`
         : status.state === 'finished' ? 'All planned suites finished.' : 'Waiting for next suite.';
-    const subtitleText = elapsed ? `${subtitle} - ${elapsed}` : subtitle;
+    const timeText = runStatusTimeText(status, activeSuite, estimates);
+    const subtitleText = timeText ? `${subtitle} - ${timeText}` : subtitle;
 
     container.empty();
     const heading = $('<div />').addClass('lean-run-status-heading');
@@ -921,10 +957,6 @@ function runStatusProgressPercent(suite) {
 
 function runStatusSuiteTitle(suite) {
     const state = runStatusStateLabel(suite.state);
-    if (suite.state === 'in-progress') {
-        return `${runStatusProgressPercent(suite)}%`;
-    }
-
     const progress = runStatusProgressText(suite);
     if (progress) {
         const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
@@ -943,27 +975,37 @@ function runStatusProgressText(suite) {
     return `${finished}/${total} complete (${runStatusProgressPercent(suite)}%)`;
 }
 
-function runStatusElapsedText(status, activeSuite, estimates) {
-    const parts = [];
+function runStatusTimeText(status, activeSuite, estimates) {
+    const groups = [];
+
+    const totalParts = [];
     const totalElapsed = runStatusElapsedSince(status.start);
     if (totalElapsed) {
-        parts.push(`total elapsed ${totalElapsed}`);
+        totalParts.push(`elapsed ${totalElapsed}`);
     }
     const totalEta = runStatusTotalEtaText(status, totalElapsed ? estimates : null);
     if (totalEta) {
-        parts.push(totalEta);
+        totalParts.push(totalEta);
+    }
+    if (totalParts.length > 0) {
+        groups.push(`Total: ${totalParts.join(', ')}`);
     }
 
+    const suiteParts = [];
     const suiteStartedAt = activeSuite ? runStatusActiveSuiteStartedAt(status, activeSuite) : null;
     const suiteElapsed = suiteStartedAt ? runStatusElapsedSince(suiteStartedAt) : '';
     if (suiteElapsed) {
-        parts.push(`suite elapsed ${suiteElapsed}`);
+        suiteParts.push(`elapsed ${suiteElapsed}`);
     }
     const suiteEta = activeSuite ? runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) : '';
     if (suiteEta) {
-        parts.push(suiteEta);
+        suiteParts.push(suiteEta);
     }
-    return parts.join('; ');
+    if (suiteParts.length > 0) {
+        groups.push(`Suite: ${suiteParts.join(', ')}`);
+    }
+
+    return groups.join(' - ');
 }
 
 function runStatusActiveSuiteStartedAt(status, activeSuite) {
@@ -1047,7 +1089,7 @@ function runStatusTotalEtaText(status, estimates) {
     for (const suite of suites) {
         const estimate = estimates.suites.get(suite.name);
         if (estimate === null || estimate === undefined) {
-            return 'total ETA unavailable (new suite)';
+            return 'ETA unavailable (different suite count from previous runs)';
         }
         totalEstimate += estimate;
     }
@@ -1056,18 +1098,18 @@ function runStatusTotalEtaText(status, estimates) {
     if (!startedAt) {
         return '';
     }
-    return `total ETA ${runStatusRemainingText(totalEstimate - (Date.now() - startedAt.getTime()))}`;
+    return `ETA: ${runStatusRemainingText(totalEstimate - (Date.now() - startedAt.getTime()))}`;
 }
 
 function runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) {
     const estimate = estimates?.suites.get(activeSuite.name);
     if (estimate === null || estimate === undefined) {
-        return 'suite ETA unavailable (no history)';
+        return 'ETA unavailable (no history)';
     }
     if (!suiteStartedAt) {
         return '';
     }
-    return `suite ETA ${runStatusRemainingText(estimate - (Date.now() - suiteStartedAt.getTime()))}`;
+    return `ETA: ${runStatusRemainingText(estimate - (Date.now() - suiteStartedAt.getTime()))}`;
 }
 
 function runStatusRemainingText(remaining) {
