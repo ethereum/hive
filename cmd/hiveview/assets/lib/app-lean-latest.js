@@ -38,6 +38,8 @@ const leanLatestState = {
     trendClientOptions: [],
     trendRenderID: 0,
     runStatusTimer: null,
+    runStatusRenderID: 0,
+    suiteDurationCache: new Map(),
 };
 
 export async function loadLeanLatest(options = {}) {
@@ -100,6 +102,7 @@ async function renderSelectedRuns() {
             : loadSelectedMatricesForSuite(suiteName, runs);
     }));
     await renderLeanLatest(matrixGroups.flat().filter(Boolean), leanLatestState.selectedDevnet);
+    void refreshRunStatus();
 }
 
 async function loadSelectedMatricesForSuite(suiteName, runs) {
@@ -847,14 +850,15 @@ function startRunStatusPolling() {
 
 async function refreshRunStatus() {
     try {
-        renderRunStatus(await loadJSON(runStatusURL));
+        const renderID = ++leanLatestState.runStatusRenderID;
+        await renderRunStatus(await loadJSON(runStatusURL), renderID);
     } catch (err) {
         $('#lean-run-status').hide().empty();
     }
 }
 
-function renderRunStatus(status) {
-    const container = $('#lean-run-status').empty();
+async function renderRunStatus(status, renderID) {
+    const container = $('#lean-run-status');
     if (!container.length || !isVisibleRunStatus(status)) {
         container.hide();
         return;
@@ -866,13 +870,21 @@ function renderRunStatus(status) {
     const title = status.state === 'finished'
         ? `Run complete: ${finished}/${total} suites`
         : `Current run: ${finished}/${total} suites finished`;
+    const activeSuiteProgress = activeSuite ? runStatusProgressText(activeSuite) : '';
+    const estimates = await runStatusEstimates(status);
+    if (renderID !== leanLatestState.runStatusRenderID) {
+        return;
+    }
+    const elapsed = runStatusElapsedText(status, activeSuite, estimates);
     const subtitle = activeSuite
-        ? `In progress: ${activeSuite.name}`
+        ? `In progress: ${activeSuite.name}${activeSuiteProgress ? ` - ${activeSuiteProgress}` : ''}`
         : status.state === 'finished' ? 'All planned suites finished.' : 'Waiting for next suite.';
+    const subtitleText = elapsed ? `${subtitle} - ${elapsed}` : subtitle;
 
+    container.empty();
     const heading = $('<div />').addClass('lean-run-status-heading');
     heading.append($('<span />').addClass('lean-run-status-title').text(title));
-    heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitle));
+    heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitleText));
 
     const progress = $('<div />').addClass('lean-run-progress');
     status.suites.forEach(suite => {
@@ -908,18 +920,169 @@ function runStatusProgressPercent(suite) {
 }
 
 function runStatusSuiteTitle(suite) {
-    const total = Number(suite.total) || 0;
     const state = runStatusStateLabel(suite.state);
-    if (suite.state !== 'in-progress' && suite.state !== 'finished') {
-        return `${suite.name}: ${state}`;
+    if (suite.state === 'in-progress') {
+        return `${runStatusProgressPercent(suite)}%`;
     }
+
+    const progress = runStatusProgressText(suite);
+    if (progress) {
+        const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
+        return `${suite.name}: ${progress}${completion}`;
+    }
+
+    return `${suite.name}: ${state}`;
+}
+
+function runStatusProgressText(suite) {
+    const total = Number(suite.total) || 0;
     if (total <= 0) {
-        return `${suite.name}: ${state}`;
+        return '';
     }
     const finished = Math.max(0, Math.min(Number(suite.finished) || 0, total));
-    const completePercent = Math.round((finished / total) * 100);
-    const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
-    return `${suite.name}: ${finished}/${total} complete (${completePercent}%)${completion}`;
+    return `${finished}/${total} complete (${runStatusProgressPercent(suite)}%)`;
+}
+
+function runStatusElapsedText(status, activeSuite, estimates) {
+    const parts = [];
+    const totalElapsed = runStatusElapsedSince(status.start);
+    if (totalElapsed) {
+        parts.push(`total elapsed ${totalElapsed}`);
+    }
+    const totalEta = runStatusTotalEtaText(status, totalElapsed ? estimates : null);
+    if (totalEta) {
+        parts.push(totalEta);
+    }
+
+    const suiteStartedAt = activeSuite ? runStatusActiveSuiteStartedAt(status, activeSuite) : null;
+    const suiteElapsed = suiteStartedAt ? runStatusElapsedSince(suiteStartedAt) : '';
+    if (suiteElapsed) {
+        parts.push(`suite elapsed ${suiteElapsed}`);
+    }
+    const suiteEta = activeSuite ? runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) : '';
+    if (suiteEta) {
+        parts.push(suiteEta);
+    }
+    return parts.join('; ');
+}
+
+function runStatusActiveSuiteStartedAt(status, activeSuite) {
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    const activeIndex = suites.indexOf(activeSuite);
+    for (let i = activeIndex - 1; i >= 0; i--) {
+        const completedAt = parseDate(suites[i].completedAt);
+        if (completedAt) {
+            return completedAt;
+        }
+    }
+    return parseDate(status.start);
+}
+
+async function runStatusEstimates(status) {
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    const pairs = await Promise.all(suites.map(async suite => {
+        return [suite.name, await runStatusSuiteAverageDuration(status, suite.name)];
+    }));
+    return {
+        suites: new Map(pairs),
+    };
+}
+
+async function runStatusSuiteAverageDuration(status, suiteName) {
+    const runs = leanLatestState.suiteRuns.get(suiteName) || [];
+    const durations = [];
+    for (const entry of runs) {
+        if (entry.simLog && status.simLog && entry.simLog === status.simLog) {
+            continue;
+        }
+        const duration = await suiteDurationForEntry(entry);
+        if (duration !== null) {
+            durations.push(duration);
+        }
+        if (durations.length >= 5) {
+            break;
+        }
+    }
+    if (durations.length === 0) {
+        return null;
+    }
+    const total = durations.reduce((sum, duration) => sum + duration, 0);
+    return Math.round(total / durations.length);
+}
+
+async function suiteDurationForEntry(entry) {
+    const cacheKey = entry.fileName;
+    if (!cacheKey) {
+        return null;
+    }
+    if (!leanLatestState.suiteDurationCache.has(cacheKey)) {
+        leanLatestState.suiteDurationCache.set(cacheKey, loadSuiteData(entry)
+            .then(suiteData => suiteDuration(entry, suiteData))
+            .catch(() => null));
+    }
+    return leanLatestState.suiteDurationCache.get(cacheKey);
+}
+
+function suiteDuration(entry, suiteData) {
+    const suiteName = suiteData.name || entry.name;
+    const cases = Object.entries(suiteData.testCases || {})
+        .map(([testIndex, test]) => ({
+            ...test,
+            testIndex,
+        }));
+    const duration = suiteStats(cases, suiteName).duration;
+    return duration === null ? null : duration;
+}
+
+function runStatusTotalEtaText(status, estimates) {
+    if (!estimates) {
+        return '';
+    }
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    if (suites.length === 0) {
+        return '';
+    }
+
+    let totalEstimate = 0;
+    for (const suite of suites) {
+        const estimate = estimates.suites.get(suite.name);
+        if (estimate === null || estimate === undefined) {
+            return 'total ETA unavailable (new suite)';
+        }
+        totalEstimate += estimate;
+    }
+
+    const startedAt = parseDate(status.start);
+    if (!startedAt) {
+        return '';
+    }
+    return `total ETA ${runStatusRemainingText(totalEstimate - (Date.now() - startedAt.getTime()))}`;
+}
+
+function runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) {
+    const estimate = estimates?.suites.get(activeSuite.name);
+    if (estimate === null || estimate === undefined) {
+        return 'suite ETA unavailable (no history)';
+    }
+    if (!suiteStartedAt) {
+        return '';
+    }
+    return `suite ETA ${runStatusRemainingText(estimate - (Date.now() - suiteStartedAt.getTime()))}`;
+}
+
+function runStatusRemainingText(remaining) {
+    const sign = remaining < 0 ? '-' : '';
+    const formatted = formatDuration(Math.abs(remaining)).trim() || '0s';
+    return `${sign}${formatted}`;
+}
+
+function runStatusElapsedSince(value) {
+    const startedAt = parseDate(value);
+    if (!startedAt) {
+        return '';
+    }
+    const elapsed = Math.max(0, Date.now() - startedAt.getTime());
+    return formatDuration(elapsed).trim() || '0s';
 }
 
 function runStatusCompletionText(value) {
