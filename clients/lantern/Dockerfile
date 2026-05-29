@@ -1,6 +1,7 @@
 ARG baseimage=piertwo/lantern
 ARG devnet4_tag=v0.0.4
-ARG devnet5_tag=devnet5
+# TODO: this is a placeholder until a devnet5 image is published
+ARG devnet5_tag=v0.0.4
 
 FROM ${baseimage}:${devnet5_tag} AS devnet5
 FROM ${baseimage}:${devnet4_tag}
