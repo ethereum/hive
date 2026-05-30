@@ -6,6 +6,7 @@ import { formatDuration } from './utils.js';
 const listingURL = 'listing.jsonl?limit=1000';
 const runStatusURL = 'run-status.json';
 const runStatusPollMs = 10000;
+const runStatusClockMs = 1000;
 const runStatusStaleMs = 45000;
 const preferredSuiteOrder = ['client-interop', 'rpc-compat', 'sync', 'validation', 'gossip', 'reqresp'];
 const trendPointLimitOptions = [5, 10, 25, 50];
@@ -38,6 +39,11 @@ const leanLatestState = {
     trendClientOptions: [],
     trendRenderID: 0,
     runStatusTimer: null,
+    runStatusClockTimer: null,
+    runStatusRenderID: 0,
+    lastRunStatus: null,
+    lastRunStatusEstimates: null,
+    suiteDurationCache: new Map(),
 };
 
 export async function loadLeanLatest(options = {}) {
@@ -100,6 +106,7 @@ async function renderSelectedRuns() {
             : loadSelectedMatricesForSuite(suiteName, runs);
     }));
     await renderLeanLatest(matrixGroups.flat().filter(Boolean), leanLatestState.selectedDevnet);
+    void refreshRunStatus();
 }
 
 async function loadSelectedMatricesForSuite(suiteName, runs) {
@@ -841,22 +848,59 @@ function startRunStatusPolling() {
     if (leanLatestState.runStatusTimer) {
         window.clearInterval(leanLatestState.runStatusTimer);
     }
+    if (leanLatestState.runStatusClockTimer) {
+        window.clearInterval(leanLatestState.runStatusClockTimer);
+    }
     void refreshRunStatus();
     leanLatestState.runStatusTimer = window.setInterval(refreshRunStatus, runStatusPollMs);
+    leanLatestState.runStatusClockTimer = window.setInterval(renderCachedRunStatus, runStatusClockMs);
 }
 
 async function refreshRunStatus() {
     try {
-        renderRunStatus(await loadJSON(runStatusURL));
+        const renderID = ++leanLatestState.runStatusRenderID;
+        await prepareRunStatus(await loadJSON(runStatusURL), renderID);
     } catch (err) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
         $('#lean-run-status').hide().empty();
     }
 }
 
-function renderRunStatus(status) {
-    const container = $('#lean-run-status').empty();
+async function prepareRunStatus(status, renderID) {
+    const container = $('#lean-run-status');
     if (!container.length || !isVisibleRunStatus(status)) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
         container.hide();
+        return;
+    }
+
+    const estimates = await runStatusEstimates(status);
+    if (renderID !== leanLatestState.runStatusRenderID) {
+        return;
+    }
+    leanLatestState.lastRunStatus = status;
+    leanLatestState.lastRunStatusEstimates = estimates;
+    renderRunStatus(status, estimates);
+}
+
+function renderCachedRunStatus() {
+    if (!leanLatestState.lastRunStatus || !leanLatestState.lastRunStatusEstimates) {
+        return;
+    }
+    if (!isVisibleRunStatus(leanLatestState.lastRunStatus)) {
+        leanLatestState.lastRunStatus = null;
+        leanLatestState.lastRunStatusEstimates = null;
+        $('#lean-run-status').hide().empty();
+        return;
+    }
+    renderRunStatus(leanLatestState.lastRunStatus, leanLatestState.lastRunStatusEstimates);
+}
+
+function renderRunStatus(status, estimates) {
+    const container = $('#lean-run-status');
+    if (!container.length) {
         return;
     }
 
@@ -866,13 +910,17 @@ function renderRunStatus(status) {
     const title = status.state === 'finished'
         ? `Run complete: ${finished}/${total} suites`
         : `Current run: ${finished}/${total} suites finished`;
+    const activeSuiteProgress = activeSuite ? runStatusProgressText(activeSuite) : '';
     const subtitle = activeSuite
-        ? `In progress: ${activeSuite.name}`
+        ? `In progress: ${activeSuite.name}${activeSuiteProgress ? ` - ${activeSuiteProgress}` : ''}`
         : status.state === 'finished' ? 'All planned suites finished.' : 'Waiting for next suite.';
+    const timeText = runStatusTimeText(status, activeSuite, estimates);
+    const subtitleText = timeText ? `${subtitle} - ${timeText}` : subtitle;
 
+    container.empty();
     const heading = $('<div />').addClass('lean-run-status-heading');
     heading.append($('<span />').addClass('lean-run-status-title').text(title));
-    heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitle));
+    heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitleText));
 
     const progress = $('<div />').addClass('lean-run-progress');
     status.suites.forEach(suite => {
@@ -908,18 +956,175 @@ function runStatusProgressPercent(suite) {
 }
 
 function runStatusSuiteTitle(suite) {
-    const total = Number(suite.total) || 0;
     const state = runStatusStateLabel(suite.state);
-    if (suite.state !== 'in-progress' && suite.state !== 'finished') {
-        return `${suite.name}: ${state}`;
+    const progress = runStatusProgressText(suite);
+    if (progress) {
+        const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
+        return `${suite.name}: ${progress}${completion}`;
     }
+
+    return `${suite.name}: ${state}`;
+}
+
+function runStatusProgressText(suite) {
+    const total = Number(suite.total) || 0;
     if (total <= 0) {
-        return `${suite.name}: ${state}`;
+        return '';
     }
     const finished = Math.max(0, Math.min(Number(suite.finished) || 0, total));
-    const completePercent = Math.round((finished / total) * 100);
-    const completion = suite.state === 'finished' ? runStatusCompletionText(suite.completedAt) : '';
-    return `${suite.name}: ${finished}/${total} complete (${completePercent}%)${completion}`;
+    return `${finished}/${total} complete (${runStatusProgressPercent(suite)}%)`;
+}
+
+function runStatusTimeText(status, activeSuite, estimates) {
+    const groups = [];
+
+    const totalParts = [];
+    const totalElapsed = runStatusElapsedSince(status.start);
+    if (totalElapsed) {
+        totalParts.push(`elapsed ${totalElapsed}`);
+    }
+    const totalEta = runStatusTotalEtaText(status, totalElapsed ? estimates : null);
+    if (totalEta) {
+        totalParts.push(totalEta);
+    }
+    if (totalParts.length > 0) {
+        groups.push(`Total: ${totalParts.join(', ')}`);
+    }
+
+    const suiteParts = [];
+    const suiteStartedAt = activeSuite ? runStatusActiveSuiteStartedAt(status, activeSuite) : null;
+    const suiteElapsed = suiteStartedAt ? runStatusElapsedSince(suiteStartedAt) : '';
+    if (suiteElapsed) {
+        suiteParts.push(`elapsed ${suiteElapsed}`);
+    }
+    const suiteEta = activeSuite ? runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) : '';
+    if (suiteEta) {
+        suiteParts.push(suiteEta);
+    }
+    if (suiteParts.length > 0) {
+        groups.push(`Suite: ${suiteParts.join(', ')}`);
+    }
+
+    return groups.join(' - ');
+}
+
+function runStatusActiveSuiteStartedAt(status, activeSuite) {
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    const activeIndex = suites.indexOf(activeSuite);
+    for (let i = activeIndex - 1; i >= 0; i--) {
+        const completedAt = parseDate(suites[i].completedAt);
+        if (completedAt) {
+            return completedAt;
+        }
+    }
+    return parseDate(status.start);
+}
+
+async function runStatusEstimates(status) {
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    const pairs = await Promise.all(suites.map(async suite => {
+        return [suite.name, await runStatusSuiteAverageDuration(status, suite.name)];
+    }));
+    return {
+        suites: new Map(pairs),
+    };
+}
+
+async function runStatusSuiteAverageDuration(status, suiteName) {
+    const runs = leanLatestState.suiteRuns.get(suiteName) || [];
+    const durations = [];
+    for (const entry of runs) {
+        if (entry.simLog && status.simLog && entry.simLog === status.simLog) {
+            continue;
+        }
+        const duration = await suiteDurationForEntry(entry);
+        if (duration !== null) {
+            durations.push(duration);
+        }
+        if (durations.length >= 5) {
+            break;
+        }
+    }
+    if (durations.length === 0) {
+        return null;
+    }
+    const total = durations.reduce((sum, duration) => sum + duration, 0);
+    return Math.round(total / durations.length);
+}
+
+async function suiteDurationForEntry(entry) {
+    const cacheKey = entry.fileName;
+    if (!cacheKey) {
+        return null;
+    }
+    if (!leanLatestState.suiteDurationCache.has(cacheKey)) {
+        leanLatestState.suiteDurationCache.set(cacheKey, loadSuiteData(entry)
+            .then(suiteData => suiteDuration(entry, suiteData))
+            .catch(() => null));
+    }
+    return leanLatestState.suiteDurationCache.get(cacheKey);
+}
+
+function suiteDuration(entry, suiteData) {
+    const suiteName = suiteData.name || entry.name;
+    const cases = Object.entries(suiteData.testCases || {})
+        .map(([testIndex, test]) => ({
+            ...test,
+            testIndex,
+        }));
+    const duration = suiteStats(cases, suiteName).duration;
+    return duration === null ? null : duration;
+}
+
+function runStatusTotalEtaText(status, estimates) {
+    if (!estimates) {
+        return '';
+    }
+    const suites = Array.isArray(status.suites) ? status.suites : [];
+    if (suites.length === 0) {
+        return '';
+    }
+
+    let totalEstimate = 0;
+    for (const suite of suites) {
+        const estimate = estimates.suites.get(suite.name);
+        if (estimate === null || estimate === undefined) {
+            return 'ETA unavailable (different suite count from previous runs)';
+        }
+        totalEstimate += estimate;
+    }
+
+    const startedAt = parseDate(status.start);
+    if (!startedAt) {
+        return '';
+    }
+    return `ETA: ${runStatusRemainingText(totalEstimate - (Date.now() - startedAt.getTime()))}`;
+}
+
+function runStatusSuiteEtaText(activeSuite, suiteStartedAt, estimates) {
+    const estimate = estimates?.suites.get(activeSuite.name);
+    if (estimate === null || estimate === undefined) {
+        return 'ETA unavailable (no history)';
+    }
+    if (!suiteStartedAt) {
+        return '';
+    }
+    return `ETA: ${runStatusRemainingText(estimate - (Date.now() - suiteStartedAt.getTime()))}`;
+}
+
+function runStatusRemainingText(remaining) {
+    const sign = remaining < 0 ? '-' : '';
+    const formatted = formatDuration(Math.abs(remaining)).trim() || '0s';
+    return `${sign}${formatted}`;
+}
+
+function runStatusElapsedSince(value) {
+    const startedAt = parseDate(value);
+    if (!startedAt) {
+        return '';
+    }
+    const elapsed = Math.max(0, Date.now() - startedAt.getTime());
+    return formatDuration(elapsed).trim() || '0s';
 }
 
 function runStatusCompletionText(value) {
