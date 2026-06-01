@@ -516,6 +516,22 @@ function buildClientInteropMatrices(entry, suiteData) {
             sameClientRoleLabel: '3 nodes',
         },
         {
+            type: 'two-subnet-minority-aggregator',
+            suiteName: 'client-interop two-subnet minority aggregator',
+            emptyMessage: 'No client-interop two-subnet minority-aggregator topology tests with client results.',
+            rowRoleLabel: '4 nodes',
+            columnRoleLabel: '2 nodes',
+            sameClientRoleLabel: '6 nodes',
+        },
+        {
+            type: 'two-subnet-majority-aggregator',
+            suiteName: 'client-interop two-subnet majority aggregator',
+            emptyMessage: 'No client-interop two-subnet majority-aggregator topology tests with client results.',
+            rowRoleLabel: '4 nodes',
+            columnRoleLabel: '2 nodes',
+            sameClientRoleLabel: '6 nodes',
+        },
+        {
             type: 'two-subnet',
             suiteName: 'client-interop two-subnet',
             emptyMessage: 'No client-interop two-subnet topology tests with client results.',
@@ -659,6 +675,18 @@ function clientInteropMatrixType(test) {
     const name = testName(test).toLowerCase();
     const description = (test.description || '').toLowerCase();
     if (name.includes('client-interop: two-subnet') || description.includes('across two attestation subnets')) {
+        if (
+            name.includes('client-interop: two-subnet minority aggregator') ||
+            description.includes('sets the minority node in each subnet')
+        ) {
+            return 'two-subnet-minority-aggregator';
+        }
+        if (
+            name.includes('client-interop: two-subnet majority aggregator') ||
+            description.includes('sets one majority node in each subnet')
+        ) {
+            return 'two-subnet-majority-aggregator';
+        }
         return 'two-subnet';
     }
     if (name.includes('client-interop: minority aggregator') || description.includes('sets the minority node')) {
