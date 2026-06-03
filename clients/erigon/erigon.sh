@@ -91,8 +91,6 @@ else
     echo "Warning: chain.rlp not found."
 fi
 
-# Load the remaining blocks in a single erigon process (like geth.sh): a process
-# per block file blows past Hive's container-startup timeout on block-heavy tests.
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
     (cd /blocks && $erigon $FLAGS import $(ls | sort -n))
