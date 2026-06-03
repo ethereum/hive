@@ -91,6 +91,7 @@ else
     echo "Warning: chain.rlp not found."
 fi
 
+# Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
     (cd /blocks && $erigon $FLAGS import $(ls | sort -n))
