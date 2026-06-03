@@ -94,11 +94,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-    echo "Loading remaining individual blocks..."
-    for file in $(ls /blocks | sort -n); do
-        echo "Importing " $file
-        $erigon $FLAGS import /blocks/$file
-    done
+    (cd /blocks && $erigon $FLAGS import $(ls | sort -n))
 else
     echo "Warning: blocks folder not found."
 fi
