@@ -91,13 +91,10 @@ else
     echo "Warning: chain.rlp not found."
 fi
 
-# Load the remainder of the test chain.
-# Import all per-block files in a single erigon process (matching geth.sh):
-# restarting erigon per file makes block-heavy tests (e.g. walletReorganizeOwners,
-# ForkStressTest) blow past Hive's container-startup timeout.
+# Load the remaining blocks in a single erigon process (like geth.sh): a process
+# per block file blows past Hive's container-startup timeout on block-heavy tests.
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-    echo "Loading remaining individual blocks..."
     (cd /blocks && $erigon $FLAGS import $(ls | sort -n))
 else
     echo "Warning: blocks folder not found."
