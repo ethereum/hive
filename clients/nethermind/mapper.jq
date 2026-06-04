@@ -161,7 +161,7 @@ def clique_engine:
     "eip7702TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
     "eip7623TransitionTimestamp": env.HIVE_PRAGUE_TIMESTAMP|to_hex,
 
-    "depositContractAddress": "0x00000000219ab540356cBB839Cbe05303d7705Fa",
+    "depositContractAddress": env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x0000000000000000000000000000000000000000",
 
     # Osaka
     "eip7594TransitionTimestamp": env.HIVE_OSAKA_TIMESTAMP|to_hex,
