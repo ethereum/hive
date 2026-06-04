@@ -295,7 +295,6 @@ pub(crate) fn bootnode_enr_for_client<'a>(
 pub(crate) fn client_uses_enr_bootnodes(client_kind: &str) -> bool {
     client_kind.starts_with("ethlambda")
         || client_kind.starts_with("lantern")
-        || client_kind.starts_with("nlean")
         || client_kind.starts_with("qlean")
         || client_kind.starts_with("zeam")
 }
@@ -713,7 +712,6 @@ pub(crate) fn lean_client_kind(client_type: &str) -> Result<&'static str, String
         "qlean",
         "ream",
         "gean",
-        "nlean",
     ] {
         if client_type.starts_with(candidate) {
             return Ok(candidate);
