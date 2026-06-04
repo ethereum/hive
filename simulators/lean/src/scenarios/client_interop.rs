@@ -824,7 +824,6 @@ mod tests {
             client("gean_devnet4"),
             client("grandine_lean_devnet4"),
             client("lantern_devnet4"),
-            client("nlean_devnet4"),
             client("ream_devnet4"),
             client("zeam_devnet4"),
             client("qlean_devnet4"),
