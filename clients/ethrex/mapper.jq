@@ -107,6 +107,6 @@ def to_bool:
         "baseFeeUpdateFraction": (if env.HIVE_BPO5_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO5_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 8832827 end)
       }
     },
-    "depositContractAddress": env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x0000000000000000000000000000000000000000"
+    "depositContractAddress": (env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x0000000000000000000000000000000000000000")
   }|remove_empty
 }
