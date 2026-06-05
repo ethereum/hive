@@ -127,6 +127,6 @@ def to_bool:
     "bpo3Time": env.HIVE_BPO3_TIMESTAMP|to_int,
     "bpo4Time": env.HIVE_BPO4_TIMESTAMP|to_int,
     "bpo5Time": env.HIVE_BPO5_TIMESTAMP|to_int,
-    "depositContractAddress": env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x0000000000000000000000000000000000000000",
+    "depositContractAddress": (env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x0000000000000000000000000000000000000000"),
   }|remove_empty
 }
