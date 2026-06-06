@@ -761,6 +761,24 @@ kbd {
     border-color: color-mix(in srgb, var(--bs-warning) 65%, var(--bs-border-color));
 }
 
+@media (max-width: 768px) {
+    .lean-run-progress {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0.15rem;
+        scrollbar-gutter: stable;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .lean-run-step {
+        flex: 0 0 auto;
+        max-width: none;
+        overflow-wrap: normal;
+        white-space: nowrap;
+    }
+}
+
 .lean-latest-summary {
     display: flex;
     flex-wrap: wrap;
