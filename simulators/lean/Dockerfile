@@ -1,8 +1,8 @@
-FROM rust:bookworm AS rust-builder
+FROM rust:1.92.0-bookworm AS rust-builder
 
 WORKDIR /workspace
 
-ENV RUST_MIN_STACK=33554432
+ENV RUST_MIN_STACK=67108864
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
