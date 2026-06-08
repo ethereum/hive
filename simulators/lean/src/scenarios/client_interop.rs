@@ -60,24 +60,31 @@ struct ClientInteropTopologySpec {
 }
 
 #[derive(Clone, Copy)]
-enum SingleSubnetAggregatorPlacement {
+enum AggregatorPlacement {
     Majority,
     Minority,
 }
 
-impl SingleSubnetAggregatorPlacement {
+impl AggregatorPlacement {
     fn label(self) -> &'static str {
         match self {
-            SingleSubnetAggregatorPlacement::Majority => "majority aggregator",
-            SingleSubnetAggregatorPlacement::Minority => "minority aggregator",
+            AggregatorPlacement::Majority => "majority aggregator",
+            AggregatorPlacement::Minority => "minority aggregator",
         }
     }
 
-    fn description(self) -> &'static str {
+    fn single_subnet_description(self) -> &'static str {
         match self {
-            SingleSubnetAggregatorPlacement::Majority => "one majority node",
-            SingleSubnetAggregatorPlacement::Minority => {
-                "the minority node, or the first node for self tests"
+            AggregatorPlacement::Majority => "one majority node",
+            AggregatorPlacement::Minority => "the minority node, or the first node for self tests",
+        }
+    }
+
+    fn two_subnet_description(self) -> &'static str {
+        match self {
+            AggregatorPlacement::Majority => "one majority node in each subnet",
+            AggregatorPlacement::Minority => {
+                "the minority node in each subnet, or the first node in each subnet for self tests"
             }
         }
     }
@@ -101,7 +108,7 @@ dyn_async! {
         let clients = lean_clients(test.sim.client_types().await);
         assert!(!clients.is_empty(), "client-interop requires at least one selected lean client, got {}", clients.len());
 
-        for aggregator_placement in single_subnet_aggregator_placements() {
+        for aggregator_placement in aggregator_placements() {
             for topology_spec in interop_topology_matrix(&clients) {
                 let mut nodes = build_interop_nodes(topology_spec.topology);
                 assign_single_subnet_aggregator(&mut nodes, aggregator_placement);
@@ -122,7 +129,7 @@ dyn_async! {
                         name: format!("client-interop: {run_label}"),
                         description: format!(
                             "Starts {topology_label} with a shared genesis, sets {} as aggregator, and checks that all three nodes finalize past genesis at the same checkpoint.",
-                            aggregator_placement.description()
+                            aggregator_placement.single_subnet_description()
                         ),
                         always_run: false,
                         client_name: run_label.clone(),
@@ -146,43 +153,49 @@ dyn_async! {
             }
         }
 
-        for topology_spec in two_subnet_interop_topology_matrix(&clients) {
-            let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
-            assign_two_subnet_aggregators(&mut nodes);
+        for aggregator_placement in aggregator_placements() {
+            for topology_spec in two_subnet_interop_topology_matrix(&clients) {
+                let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
+                assign_two_subnet_aggregators(&mut nodes, aggregator_placement);
 
-            let genesis_time = two_subnet_genesis_time();
-            let topology_label = topology_label(&nodes);
-            let run_label = format!(
-                "two-subnet {} minority and {} majority / {}",
-                topology_spec.left_name, topology_spec.right_name, topology_label
-            );
+                let genesis_time = two_subnet_genesis_time();
+                let topology_label = topology_label(&nodes);
+                let run_label = format!(
+                    "two-subnet {} {} minority and {} majority / {}",
+                    aggregator_placement.label(),
+                    topology_spec.left_name,
+                    topology_spec.right_name,
+                    topology_label
+                );
 
-            run_data_test_with_timeout(
-                test,
-                TimedDataTestSpec {
-                    name: format!("client-interop: {run_label}"),
-                    description: format!(
-                        "Starts {topology_label} across two attestation subnets with a shared genesis and checks that all nodes finalize past genesis at the same checkpoint."
-                    ),
-                    always_run: false,
-                    client_name: run_label.clone(),
-                    timeout_duration: outer_timeout_for_genesis(
-                        genesis_time,
-                        TWO_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS,
-                    ),
-                    test_data: ClientInteropTestData {
-                        run_label,
-                        genesis_validator_count: validator_count_for_nodes(&nodes),
-                        attestation_committee_count: TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT,
-                        finalization_timeout_after_genesis_secs:
+                run_data_test_with_timeout(
+                    test,
+                    TimedDataTestSpec {
+                        name: format!("client-interop: {run_label}"),
+                        description: format!(
+                            "Starts {topology_label} across two attestation subnets with a shared genesis, sets {} as aggregator, and checks that all nodes finalize past genesis at the same checkpoint.",
+                            aggregator_placement.two_subnet_description()
+                        ),
+                        always_run: false,
+                        client_name: run_label.clone(),
+                        timeout_duration: outer_timeout_for_genesis(
+                            genesis_time,
                             TWO_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS,
-                        nodes,
-                        genesis_time,
+                        ),
+                        test_data: ClientInteropTestData {
+                            run_label,
+                            genesis_validator_count: validator_count_for_nodes(&nodes),
+                            attestation_committee_count: TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT,
+                            finalization_timeout_after_genesis_secs:
+                                TWO_SUBNET_FINALIZATION_TIMEOUT_AFTER_GENESIS_SECS,
+                            nodes,
+                            genesis_time,
+                        },
                     },
-                },
-                test_client_interop_finalizes,
-            )
-            .await;
+                    test_client_interop_finalizes,
+                )
+                .await;
+            }
         }
     }
 }
@@ -214,11 +227,8 @@ dyn_async! {
     }
 }
 
-fn single_subnet_aggregator_placements() -> [SingleSubnetAggregatorPlacement; 2] {
-    [
-        SingleSubnetAggregatorPlacement::Majority,
-        SingleSubnetAggregatorPlacement::Minority,
-    ]
+fn aggregator_placements() -> [AggregatorPlacement; 2] {
+    [AggregatorPlacement::Majority, AggregatorPlacement::Minority]
 }
 
 fn interop_topology_matrix(clients: &[ClientDefinition]) -> Vec<ClientInteropTopologySpec> {
@@ -379,55 +389,91 @@ fn build_two_subnet_interop_nodes(
 
 fn assign_single_subnet_aggregator(
     nodes: &mut [ClientInteropNode],
-    placement: SingleSubnetAggregatorPlacement,
+    placement: AggregatorPlacement,
 ) {
-    let aggregator_index = single_subnet_aggregator_index(nodes, placement);
+    let candidate_indices = (0..nodes.len()).collect::<Vec<_>>();
+    let aggregator_index = aggregator_index_by_client_count(nodes, &candidate_indices, placement);
 
     for (index, node) in nodes.iter_mut().enumerate() {
         node.is_aggregator = index == aggregator_index;
     }
 }
 
-fn single_subnet_aggregator_index(
+fn aggregator_index_by_client_count(
     nodes: &[ClientInteropNode],
-    placement: SingleSubnetAggregatorPlacement,
+    candidate_indices: &[usize],
+    placement: AggregatorPlacement,
 ) -> usize {
     assert!(
-        !nodes.is_empty(),
-        "single-subnet client-interop topology must contain at least one node"
+        !candidate_indices.is_empty(),
+        "client-interop aggregator selection requires at least one candidate node"
     );
 
     let mut client_counts = HashMap::<String, usize>::new();
-    for node in nodes {
+    for index in candidate_indices {
+        let node = &nodes[*index];
         *client_counts.entry(node.client.name.clone()).or_insert(0) += 1;
     }
 
     let target_count = match placement {
-        SingleSubnetAggregatorPlacement::Majority => client_counts
+        AggregatorPlacement::Majority => client_counts
             .values()
             .max()
             .copied()
-            .expect("single-subnet topology should have client counts"),
-        SingleSubnetAggregatorPlacement::Minority => client_counts
+            .expect("client-interop topology should have client counts"),
+        AggregatorPlacement::Minority => client_counts
             .values()
             .min()
             .copied()
-            .expect("single-subnet topology should have client counts"),
+            .expect("client-interop topology should have client counts"),
     };
 
-    nodes
+    candidate_indices
         .iter()
-        .position(|node| client_counts[&node.client.name] == target_count)
-        .expect("single-subnet topology should include the target aggregator")
+        .copied()
+        .find(|index| client_counts[&nodes[*index].client.name] == target_count)
+        .expect("client-interop topology should include the target aggregator")
 }
 
-fn assign_two_subnet_aggregators(nodes: &mut [ClientInteropNode]) {
+fn assign_two_subnet_aggregators(nodes: &mut [ClientInteropNode], placement: AggregatorPlacement) {
     for node in nodes.iter_mut() {
-        node.is_aggregator = node
-            .validator_indices
-            .iter()
-            .any(|index| *index < TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT);
+        node.is_aggregator = false;
     }
+
+    for subnet_id in 0..TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT {
+        let candidate_indices = nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| {
+                node_has_validator_in_subnet(
+                    node,
+                    subnet_id,
+                    TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT,
+                )
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let aggregator_index =
+            aggregator_index_by_client_count(nodes, &candidate_indices, placement);
+        nodes[aggregator_index].is_aggregator = true;
+    }
+}
+
+fn subnet_id_for_validator_index(
+    validator_index: usize,
+    attestation_committee_count: usize,
+) -> usize {
+    validator_index % attestation_committee_count
+}
+
+fn node_has_validator_in_subnet(
+    node: &ClientInteropNode,
+    subnet_id: usize,
+    attestation_committee_count: usize,
+) -> bool {
+    node.validator_indices.iter().any(|index| {
+        subnet_id_for_validator_index(*index, attestation_committee_count) == subnet_id
+    })
 }
 
 fn topology_label(nodes: &[ClientInteropNode]) -> String {
@@ -778,7 +824,6 @@ mod tests {
             client("gean_devnet4"),
             client("grandine_lean_devnet4"),
             client("lantern_devnet4"),
-            client("nlean_devnet4"),
             client("ream_devnet4"),
             client("zeam_devnet4"),
             client("qlean_devnet4"),
@@ -805,16 +850,10 @@ mod tests {
             client("ream_devnet4"),
             client("gean_devnet4"),
         ]);
-        assign_single_subnet_aggregator(
-            &mut left_majority,
-            SingleSubnetAggregatorPlacement::Majority,
-        );
+        assign_single_subnet_aggregator(&mut left_majority, AggregatorPlacement::Majority);
         assert_eq!(aggregator_flags(&left_majority), vec![true, false, false]);
 
-        assign_single_subnet_aggregator(
-            &mut left_majority,
-            SingleSubnetAggregatorPlacement::Minority,
-        );
+        assign_single_subnet_aggregator(&mut left_majority, AggregatorPlacement::Minority);
         assert_eq!(aggregator_flags(&left_majority), vec![false, false, true]);
 
         let mut right_majority = build_interop_nodes(vec![
@@ -822,16 +861,10 @@ mod tests {
             client("gean_devnet4"),
             client("gean_devnet4"),
         ]);
-        assign_single_subnet_aggregator(
-            &mut right_majority,
-            SingleSubnetAggregatorPlacement::Majority,
-        );
+        assign_single_subnet_aggregator(&mut right_majority, AggregatorPlacement::Majority);
         assert_eq!(aggregator_flags(&right_majority), vec![false, true, false]);
 
-        assign_single_subnet_aggregator(
-            &mut right_majority,
-            SingleSubnetAggregatorPlacement::Minority,
-        );
+        assign_single_subnet_aggregator(&mut right_majority, AggregatorPlacement::Minority);
         assert_eq!(aggregator_flags(&right_majority), vec![true, false, false]);
 
         let mut self_test = build_interop_nodes(vec![
@@ -839,17 +872,17 @@ mod tests {
             client("ream_devnet4"),
             client("ream_devnet4"),
         ]);
-        assign_single_subnet_aggregator(&mut self_test, SingleSubnetAggregatorPlacement::Majority);
+        assign_single_subnet_aggregator(&mut self_test, AggregatorPlacement::Majority);
         assert_eq!(aggregator_flags(&self_test), vec![true, false, false]);
 
-        assign_single_subnet_aggregator(&mut self_test, SingleSubnetAggregatorPlacement::Minority);
+        assign_single_subnet_aggregator(&mut self_test, AggregatorPlacement::Minority);
         assert_eq!(aggregator_flags(&self_test), vec![true, false, false]);
     }
 
     #[test]
     fn single_subnet_node_builder_accepts_all_devnet4_lean_clients_for_both_placements() {
         for topology_spec in interop_topology_matrix(&devnet4_lean_clients()) {
-            for placement in single_subnet_aggregator_placements() {
+            for placement in aggregator_placements() {
                 let mut nodes = build_interop_nodes(topology_spec.topology.clone());
                 assign_single_subnet_aggregator(&mut nodes, placement);
 
@@ -909,25 +942,49 @@ mod tests {
 
     #[test]
     fn two_subnet_node_builder_accepts_all_devnet4_lean_clients() {
-        for topology_spec in two_subnet_interop_topology_matrix(&devnet4_lean_clients()) {
-            let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
-            assign_two_subnet_aggregators(&mut nodes);
+        assert_eq!(
+            two_subnet_interop_topology_matrix(&devnet4_lean_clients()).len(),
+            64
+        );
+        assert_eq!(aggregator_placements().len(), 2);
 
-            assert_eq!(validator_count_for_nodes(&nodes), 6);
-            assert_eq!(
-                nodes
-                    .iter()
-                    .map(|node| node.validator_indices.as_slice())
-                    .collect::<Vec<_>>(),
-                vec![&[0][..], &[2][..], &[4][..], &[1][..], &[3][..], &[5][..]]
-            );
-            assert_eq!(
-                nodes
-                    .iter()
-                    .map(|node| node.is_aggregator)
-                    .collect::<Vec<_>>(),
-                vec![true, false, false, true, false, false]
-            );
+        for topology_spec in two_subnet_interop_topology_matrix(&devnet4_lean_clients()) {
+            for placement in aggregator_placements() {
+                let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
+                assign_two_subnet_aggregators(&mut nodes, placement);
+
+                assert_eq!(validator_count_for_nodes(&nodes), 6);
+                assert_eq!(
+                    nodes
+                        .iter()
+                        .map(|node| node.validator_indices.as_slice())
+                        .collect::<Vec<_>>(),
+                    vec![&[0][..], &[2][..], &[4][..], &[1][..], &[3][..], &[5][..]]
+                );
+                assert_eq!(
+                    nodes.iter().filter(|node| node.is_aggregator).count(),
+                    TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT,
+                    "two-subnet topology should select one aggregator per subnet"
+                );
+
+                for subnet_id in 0..TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT {
+                    assert_eq!(
+                        nodes
+                            .iter()
+                            .filter(|node| {
+                                node.is_aggregator
+                                    && node_has_validator_in_subnet(
+                                        node,
+                                        subnet_id,
+                                        TWO_SUBNET_ATTESTATION_COMMITTEE_COUNT,
+                                    )
+                            })
+                            .count(),
+                        1,
+                        "two-subnet topology should select exactly one aggregator in subnet {subnet_id}"
+                    );
+                }
+            }
         }
     }
 
@@ -940,7 +997,6 @@ mod tests {
         };
 
         let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
-        assign_two_subnet_aggregators(&mut nodes);
 
         let assignments = nodes
             .iter()
@@ -957,12 +1013,23 @@ mod tests {
                 ("gean_devnet4", &[5][..]),
             ]
         );
+
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Minority);
         assert_eq!(
             nodes
                 .iter()
                 .map(|node| node.is_aggregator)
                 .collect::<Vec<_>>(),
             vec![true, false, false, true, false, false]
+        );
+
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Majority);
+        assert_eq!(
+            nodes
+                .iter()
+                .map(|node| node.is_aggregator)
+                .collect::<Vec<_>>(),
+            vec![false, true, false, false, true, false]
         );
     }
 
@@ -974,7 +1041,7 @@ mod tests {
             topology: vec![client("ream_devnet4"), client("gean_devnet4")],
         };
         let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
-        assign_two_subnet_aggregators(&mut nodes);
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Minority);
         let test_data = ClientInteropTestData {
             run_label: "two-subnet env".to_string(),
             genesis_validator_count: validator_count_for_nodes(&nodes),
@@ -1009,6 +1076,18 @@ mod tests {
         );
         assert_eq!(
             aggregator_environment[AGGREGATE_SUBNET_IDS_ENVIRONMENT_VARIABLE],
+            "0,1"
+        );
+
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Majority);
+        let majority_aggregator_environment =
+            client_interop_environment(&nodes[1], &[], &test_data);
+        assert_eq!(
+            majority_aggregator_environment[IS_AGGREGATOR_ENVIRONMENT_VARIABLE],
+            "1"
+        );
+        assert_eq!(
+            majority_aggregator_environment[AGGREGATE_SUBNET_IDS_ENVIRONMENT_VARIABLE],
             "0,1"
         );
     }
@@ -1059,8 +1138,17 @@ mod tests {
         };
 
         let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
-        assign_two_subnet_aggregators(&mut nodes);
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Minority);
 
+        assert_eq!(
+            nodes
+                .iter()
+                .map(|node| node.is_aggregator)
+                .collect::<Vec<_>>(),
+            vec![true, false, false, true, false, false]
+        );
+
+        assign_two_subnet_aggregators(&mut nodes, AggregatorPlacement::Majority);
         assert_eq!(
             nodes
                 .iter()

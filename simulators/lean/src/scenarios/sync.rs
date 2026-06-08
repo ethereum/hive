@@ -1,7 +1,9 @@
 use crate::utils::helper::{
-    start_checkpoint_sync_client_context, start_checkpoint_sync_helper_mesh,
-    start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncContext,
-    PostGenesisSyncTestData, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
+    start_bad_checkpoint_peer, start_checkpoint_sync_client_context,
+    start_checkpoint_sync_helper_mesh, start_post_genesis_sync_context,
+    start_post_genesis_sync_context_with_extra_bootnodes_after_helper_agreement,
+    HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
+    RunningBadCheckpointPeer, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
@@ -17,6 +19,8 @@ const CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS: u64 = 180;
 const HEAD_SYNC_TIMEOUT_SECS: u64 = CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
 const HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS: u64 = 600;
 const HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS: u64 = 420;
+const BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS: u64 = 120;
+const BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD: u64 = 4;
 const SYNC_HELPER_PEER_COUNT: usize = 2;
 const HEAD_SYNC_MAX_SLOT_LAG: u64 = 2;
 
@@ -223,6 +227,36 @@ async fn wait_for_helper_finalized_above_client_head(
     }
 }
 
+async fn wait_for_honest_helper_finalized_agreement(
+    context: &mut PostGenesisSyncContext,
+    minimum_finalized_slot: u64,
+    phase: &str,
+) -> ForkChoiceResponse {
+    let mut last_error = None;
+    let deadline =
+        Instant::now() + Duration::from_secs(HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS);
+
+    while Instant::now() < deadline {
+        match context
+            .try_load_agreed_helper_fork_choice(minimum_finalized_slot)
+            .await
+        {
+            Ok(fork_choice) => return fork_choice,
+            Err(err) => last_error = Some(err),
+        }
+
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    panic!(
+        "Honest LeanSpec helpers did not agree on a finalized checkpoint at or above slot {} within {} seconds while {}. Last observation: {}",
+        minimum_finalized_slot,
+        HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS,
+        phase,
+        last_error.unwrap_or_else(|| "no helper forkchoice responses were observed".to_string())
+    );
+}
+
 async fn wait_for_helper_justified_above_client_head(
     context: &mut PostGenesisSyncContext,
     client_head_slot: u64,
@@ -267,6 +301,127 @@ async fn wait_for_helper_justified_above_client_head(
             HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS,
             client_head_slot,
         )),
+    }
+}
+
+async fn wait_for_bad_peer_finalized_ahead(
+    bad_peer: &mut RunningBadCheckpointPeer,
+    source: &ForkChoiceResponse,
+) -> ForkChoiceResponse {
+    let source_finalized_slot = source.finalized.slot;
+    let deadline = Instant::now() + Duration::from_secs(BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS);
+    let mut last_bad_fork_choice = None;
+    let mut last_error = None;
+
+    while Instant::now() < deadline {
+        let bad_fork_choice = match bad_peer.try_load_fork_choice().await {
+            Ok(fork_choice) => fork_choice,
+            Err(err) => {
+                last_error = Some(err);
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+        };
+
+        if bad_fork_choice.finalized.slot
+            >= source_finalized_slot.saturating_add(BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD)
+        {
+            return bad_fork_choice;
+        }
+
+        last_bad_fork_choice = Some(bad_fork_choice);
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    match last_bad_fork_choice {
+        Some(last) => {
+            let last_error = last_error
+                .as_deref()
+                .unwrap_or("no adversarial peer forkchoice request errors observed");
+            panic!(
+                "Adversarial peer never stayed at least {} finalized slots ahead of the honest helper network within {} seconds (honest finalized slot: {}, adversarial finalized slot: {}, adversarial head slot: {}, last error: {})",
+                BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD,
+                BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS,
+                source_finalized_slot,
+                last.finalized.slot,
+                fork_choice_head_slot(&last),
+                last_error,
+            );
+        }
+        None => {
+            let last_error = last_error
+                .as_deref()
+                .unwrap_or("no adversarial peer forkchoice request attempted");
+            panic!(
+                "Adversarial peer never produced a forkchoice response while waiting {} seconds for it to stay at least {} finalized slots ahead of the honest helper network (honest finalized slot: {}, last error: {})",
+                BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS,
+                BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD,
+                source_finalized_slot,
+                last_error,
+            );
+        }
+    }
+}
+
+async fn wait_for_bad_peer_fork_choice(
+    bad_peer: &mut RunningBadCheckpointPeer,
+    phase: &str,
+) -> ForkChoiceResponse {
+    let deadline = Instant::now() + Duration::from_secs(BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS);
+    let mut last_error = None;
+
+    while Instant::now() < deadline {
+        match bad_peer.try_load_fork_choice().await {
+            Ok(fork_choice) => return fork_choice,
+            Err(err) => last_error = Some(err),
+        }
+
+        sleep(Duration::from_secs(1)).await;
+    }
+
+    let last_error = last_error
+        .as_deref()
+        .unwrap_or("no adversarial peer forkchoice request attempted");
+    panic!(
+        "Unable to load adversarial peer forkchoice {phase} within {} seconds: {}",
+        BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS, last_error,
+    );
+}
+
+fn assert_client_rejected_bad_checkpoint(
+    phase: &str,
+    source: &ForkChoiceResponse,
+    client: &ForkChoiceResponse,
+    bad_peer: &ForkChoiceResponse,
+) {
+    let source_head_slot = fork_choice_head_slot(source);
+    let client_head_slot = fork_choice_head_slot(client);
+    let bad_head_slot = fork_choice_head_slot(bad_peer);
+
+    if bad_peer.finalized.slot
+        >= source
+            .finalized
+            .slot
+            .saturating_add(BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD)
+    {
+        assert_ne!(
+            (client.finalized.root, client.finalized.slot),
+            (bad_peer.finalized.root, bad_peer.finalized.slot),
+            "{phase}: client finalized the adversarial peer's bad checkpoint at slot {} instead of following the honest helper network finalized slot {}",
+            bad_peer.finalized.slot,
+            source.finalized.slot,
+        );
+    }
+
+    if bad_head_slot >= source_head_slot.saturating_add(BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD) {
+        assert!(
+            !head_slot_is_caught_up(client_head_slot, bad_head_slot),
+            "{phase}: client tracked the adversarial peer head slot {} while the honest helper network head was at slot {} (client head slot: {}, allowed lag: {})",
+            bad_head_slot,
+            source_head_slot,
+            client_head_slot,
+            HEAD_SYNC_MAX_SLOT_LAG,
+        );
     }
 }
 
@@ -328,6 +483,30 @@ dyn_async! {
                     helper_fork_digest_profile,
                 },
                 test_sync_head_behind_finalized_recovery,
+            )
+            .await;
+
+            let bad_checkpoint_rejection_genesis_time = default_genesis_time();
+            run_data_test(
+                test,
+                "sync: head behind finalized rejects ahead bad checkpoint".to_string(),
+                "Starts the client under test alongside two honest local LeanSpec helpers and an isolated adversarial LeanSpec peer whose validly signed chain is artificially ahead, pauses the client until the honest network finalizes beyond its head, unpauses it, and checks that the client follows the agreeing honest peers instead of the bad checkpoint from the single ahead peer.".to_string(),
+                false,
+                PostGenesisSyncTestData {
+                    client_under_test: client.clone(),
+                    genesis_time: bad_checkpoint_rejection_genesis_time,
+                    wait_for_client_justified_checkpoint: false,
+                    use_checkpoint_sync: false,
+                    connect_client_to_lean_spec_mesh: true,
+                    client_role: ClientUnderTestRole::Validator,
+                    source_helper_validator_indices: Some(
+                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                    ),
+                    split_helper_validators_across_mesh: false,
+                    helper_peer_count: SYNC_HELPER_PEER_COUNT,
+                    helper_fork_digest_profile,
+                },
+                test_sync_head_behind_finalized_rejects_ahead_bad_checkpoint,
             )
             .await;
 
@@ -451,30 +630,24 @@ dyn_async! {
             source_before_pause.finalized.slot > 0,
             "helper source should reach a non-genesis finalized checkpoint before pausing the client under test"
         );
-        context
-            .client_under_test
-            .pause()
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Unable to pause client under test {} after reading head {:#x} at slot {}: {}",
-                    client_name, paused_client_head, paused_client_head_slot, err
-                )
-            });
+        if let Err(err) = context.client_under_test.pause().await {
+            let error = err.to_string();
+            panic!(
+                "Unable to pause client under test {} after reading head {:#x} at slot {}: {}",
+                client_name, paused_client_head, paused_client_head_slot, error
+            );
+        }
 
         let helper_justified_above_head =
             wait_for_helper_justified_above_client_head(&mut context, paused_client_head_slot).await;
 
-        context
-            .client_under_test
-            .unpause()
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Unable to unpause client under test {} after pausing at head {:#x} slot {}: {}",
-                    client_name, paused_client_head, paused_client_head_slot, err
-                )
-            });
+        if let Err(err) = context.client_under_test.unpause().await {
+            let error = err.to_string();
+            panic!(
+                "Unable to unpause client under test {} after pausing at head {:#x} slot {}: {}",
+                client_name, paused_client_head, paused_client_head_slot, error
+            );
+        }
 
         let helper_justified_above_head =
             helper_justified_above_head.unwrap_or_else(|err| panic!("{err}"));
@@ -590,6 +763,126 @@ dyn_async! {
             client_head_slot,
             source_head_slot,
             HEAD_SYNC_MAX_SLOT_LAG
+        );
+    }
+}
+
+dyn_async! {
+    async fn test_sync_head_behind_finalized_rejects_ahead_bad_checkpoint<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
+        let client_name = test_data.client_under_test.name.clone();
+        let mut bad_peer = start_bad_checkpoint_peer(&test_data).await;
+        let bad_peer_bootnode = bad_peer.bootnode_for_client(&client_name);
+
+        let mut context = timeout(
+            Duration::from_secs(HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS),
+            start_post_genesis_sync_context_with_extra_bootnodes_after_helper_agreement(
+                test,
+                &test_data,
+                vec![bad_peer_bootnode],
+            ),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "head-behind-finalized bad-checkpoint helper mesh and client startup for {} exceeded {} seconds",
+                client_name, HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS
+            )
+        });
+
+        let honest_helper_agreement_before_pause = wait_for_honest_helper_finalized_agreement(
+            &mut context,
+            1,
+            "preparing the bad-checkpoint rejection test before pausing the client",
+        )
+        .await;
+        let minimum_source_head_slot = fork_choice_head_slot(&honest_helper_agreement_before_pause);
+        let (source_before_pause, client_before_pause) =
+            wait_for_client_to_reach_source_head(&mut context, minimum_source_head_slot).await;
+        let bad_before_pause =
+            wait_for_bad_peer_finalized_ahead(&mut bad_peer, &source_before_pause).await;
+        assert_client_rejected_bad_checkpoint(
+            "before pause",
+            &source_before_pause,
+            &client_before_pause,
+            &bad_before_pause,
+        );
+
+        let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
+        let paused_client_head = client_before_pause.head;
+
+        context
+            .client_under_test
+            .pause()
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Unable to pause client under test {} after reading head {:#x} at slot {}: {}",
+                    client_name, paused_client_head, paused_client_head_slot, err
+                )
+            });
+
+        let helper_finalized_above_head = wait_for_honest_helper_finalized_agreement(
+            &mut context,
+            paused_client_head_slot.saturating_add(1),
+            "waiting for the honest helpers to finalize beyond the paused client head",
+        )
+        .await;
+        let bad_while_paused =
+            wait_for_bad_peer_fork_choice(&mut bad_peer, "while client is paused").await;
+
+        context
+            .client_under_test
+            .unpause()
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Unable to unpause client under test {} after pausing at head {:#x} slot {}: {}",
+                    client_name, paused_client_head, paused_client_head_slot, err
+                )
+            });
+
+        let recovery_finalized_boundary = helper_finalized_above_head.finalized.slot;
+
+        assert!(
+            recovery_finalized_boundary > paused_client_head_slot,
+            "helper finalized slot ({}) should advance beyond paused client head slot ({}) before recovery",
+            recovery_finalized_boundary,
+            paused_client_head_slot
+        );
+        assert_client_rejected_bad_checkpoint(
+            "while paused",
+            &helper_finalized_above_head,
+            &client_before_pause,
+            &bad_while_paused,
+        );
+
+        let (source_after_recovery, client_after_recovery) =
+            wait_for_client_to_reach_source_head(&mut context, 0).await;
+        let bad_after_recovery =
+            wait_for_bad_peer_finalized_ahead(&mut bad_peer, &source_after_recovery).await;
+        let source_head_slot = fork_choice_head_slot(&source_after_recovery);
+        let client_head_slot = fork_choice_head_slot(&client_after_recovery);
+
+        assert!(
+            client_head_slot.saturating_add(HEAD_SYNC_MAX_SLOT_LAG) >= recovery_finalized_boundary,
+            "unpaused client should advance within the allowed lag of the helper finalized boundary that passed its paused head (client slot: {}, helper finalized boundary: {}, paused client slot: {}, allowed lag: {})",
+            client_head_slot,
+            recovery_finalized_boundary,
+            paused_client_head_slot,
+            HEAD_SYNC_MAX_SLOT_LAG
+        );
+        assert!(
+            client_caught_up_to_source(&source_after_recovery, &client_after_recovery),
+            "unpaused client should catch up to the honest helper live head slot (client slot: {}, helper slot: {}, allowed lag: {} slots)",
+            client_head_slot,
+            source_head_slot,
+            HEAD_SYNC_MAX_SLOT_LAG
+        );
+        assert_client_rejected_bad_checkpoint(
+            "after recovery",
+            &source_after_recovery,
+            &client_after_recovery,
+            &bad_after_recovery,
         );
     }
 }
