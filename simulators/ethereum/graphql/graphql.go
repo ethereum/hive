@@ -238,5 +238,6 @@ func getParameters(genesis core.Genesis) hivesim.Params {
 		"HIVE_FORK_LONDON":               genesis.Config.LondonBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": genesis.Config.TerminalTotalDifficulty.String(),
 		"HIVE_SHANGHAI_TIMESTAMP":        fmt.Sprintf("%d", *genesis.Config.ShanghaiTime),
+		"HIVE_CANCUN_TIMESTAMP":          fmt.Sprintf("%d", *genesis.Config.CancunTime),
 	}
 }
