@@ -25,6 +25,12 @@ var (
 		"genesis.json": "./tests/genesis.json",
 		"chain.rlp":    "./tests/chain.rlp",
 	}
+
+	// specMethods holds the OpenRPC result schema for each method, used to
+	// validate "speconly" tests against the spec. It is nil if the spec could
+	// not be loaded, in which case speconly tests fall back to structural
+	// matching.
+	specMethods methodSchemas
 )
 
 func main() {
@@ -33,6 +39,14 @@ func main() {
 	err := common.LoadJSON("tests/forkenv.json", &clientEnv)
 	if err != nil {
 		panic(err)
+	}
+
+	// Load the OpenRPC spec so speconly tests can be validated against the
+	// schema. The spec is shipped alongside the fixtures (see Dockerfile); a
+	// missing spec is not fatal, speconly tests then fall back to structural
+	// matching.
+	if specMethods, err = parseSpec("openrpc.json"); err != nil {
+		fmt.Printf("warning: unable to load openrpc.json, speconly tests fall back to structural matching: %s\n", err)
 	}
 
 	// Run the test suite.
@@ -83,12 +97,14 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 		err       error
 		respBytes []byte
+		method    string
 	)
 
 	for _, msg := range test.messages {
 		if msg.send {
 			// Send request.
 			t.Log(">> ", msg.data)
+			method = gjson.Get(msg.data, "method").String()
 			respBytes, err = postHttp(client, url, strings.NewReader(msg.data))
 			if err != nil {
 				return err
@@ -105,15 +121,27 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, ensure the response type matches the expected type.
+			// For speconly tests, the recorded value is just one valid example;
+			// the response is client- or config-specific and must not be matched
+			// exactly. Validate it against the method's OpenRPC result schema so
+			// any spec-valid response passes regardless of which optional fields
+			// the client includes. Fall back to structural matching only when the
+			// method has no schema in the loaded spec.
 			hasError := gjson.Get(resp, "error").Exists()
 			if !hasError && test.speconly {
-				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
-				if len(errors) > 0 {
-					for _, err := range errors {
-						t.Log(err)
+				if schema := specMethods[method]; schema != nil {
+					if err := validateResult(schema, []byte(gjson.Get(resp, "result").Raw)); err != nil {
+						t.Log(err.Error())
+						return fmt.Errorf("response does not conform to %s result schema: %w", method, err)
 					}
-					return fmt.Errorf("response type does not match expected")
+				} else {
+					errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
+					if len(errors) > 0 {
+						for _, err := range errors {
+							t.Log(err)
+						}
+						return fmt.Errorf("response type does not match expected")
+					}
 				}
 				respBytes = nil
 				continue

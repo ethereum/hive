@@ -1,0 +1,392 @@
+{
+  "openrpc": "1.2.4",
+  "info": {
+    "title": "test",
+    "version": "0"
+  },
+  "methods": [
+    {
+      "description": "Returns information about the data available on this node, including the\ncurrent head block and retention policies for each resource type. This is\nuseful for RPC routers to determine which historical queries a node can serve.\n",
+      "examples": [
+        {
+          "name": "eth_capabilities example",
+          "params": [],
+          "result": {
+            "name": "Capabilities",
+            "value": {
+              "blocks": {
+                "disabled": false,
+                "oldestBlock": "0x0"
+              },
+              "head": {
+                "hash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
+                "number": "0x13f8e3a"
+              },
+              "logs": {
+                "deleteStrategy": {
+                  "retentionBlocks": "0x23dbb0",
+                  "type": "window"
+                },
+                "disabled": false,
+                "oldestBlock": "0x11b340a"
+              },
+              "receipts": {
+                "deleteStrategy": {
+                  "retentionBlocks": "0x23dbb0",
+                  "type": "window"
+                },
+                "disabled": false,
+                "oldestBlock": "0x11b340a"
+              },
+              "state": {
+                "deleteStrategy": {
+                  "retentionBlocks": "0x15f90",
+                  "type": "window"
+                },
+                "disabled": false,
+                "oldestBlock": "0x13e022a"
+              },
+              "stateproofs": {
+                "deleteStrategy": {
+                  "retentionBlocks": "0x15f90",
+                  "type": "window"
+                },
+                "disabled": false,
+                "oldestBlock": "0x13e022a"
+              },
+              "tx": {
+                "deleteStrategy": {
+                  "retentionBlocks": "0x23dbb0",
+                  "type": "window"
+                },
+                "disabled": false,
+                "oldestBlock": "0x11b340a"
+              }
+            }
+          }
+        }
+      ],
+      "name": "eth_capabilities",
+      "params": [],
+      "result": {
+        "name": "Capabilities",
+        "schema": {
+          "additionalProperties": false,
+          "description": "Describes the data available on the node. Each resource reports the oldest available block and the deletion strategy, allowing RPC routers to determine which historical queries a node can serve.",
+          "properties": {
+            "blocks": {
+              "additionalProperties": false,
+              "description": "Block headers and bodies including transactions and uncles. Determines the available range for block retrieval. Affects: eth_getBlockByHash, eth_getBlockByNumber, eth_getBlockTransactionCountByHash, eth_getBlockTransactionCountByNumber, eth_getUncleCountByBlockHash, eth_getUncleCountByBlockNumber.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            },
+            "head": {
+              "additionalProperties": false,
+              "description": "The latest block known to the node, useful for determining sync status.",
+              "properties": {
+                "hash": {
+                  "pattern": "^0x[0-9a-f]{64}$",
+                  "title": "Head block hash",
+                  "type": "string"
+                },
+                "number": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "Head block number",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "number",
+                "hash"
+              ],
+              "title": "Current head block",
+              "type": "object"
+            },
+            "logs": {
+              "additionalProperties": false,
+              "description": "Event logs emitted by smart contracts. Determines the available block range for log queries and filters. Affects: eth_getLogs, eth_getFilterLogs, eth_getFilterChanges, eth_newFilter.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            },
+            "receipts": {
+              "additionalProperties": false,
+              "description": "Transaction execution receipts including status, gas used, and logs bloom. Determines the available range for receipt lookups. Affects: eth_getTransactionReceipt, eth_getBlockReceipts.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            },
+            "state": {
+              "additionalProperties": false,
+              "description": "Account and contract state including balances, nonces, code, and storage. Determines the available range for historical state queries. Affects: eth_getBalance, eth_getCode, eth_getStorageAt, eth_getTransactionCount, eth_call, eth_estimateGas, eth_createAccessList.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            },
+            "stateproofs": {
+              "additionalProperties": false,
+              "description": "Merkle proofs for account and storage state. Determines the available range for proof generation. Affects: eth_getProof.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            },
+            "tx": {
+              "additionalProperties": false,
+              "description": "Transaction data and lookup indices. Determines the available range for transaction lookups by hash or block position. Affects: eth_getTransactionByHash, eth_getTransactionByBlockHashAndIndex, eth_getTransactionByBlockNumberAndIndex.",
+              "properties": {
+                "deleteStrategy": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "retentionBlocks": {
+                          "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                          "title": "hex encoded unsigned integer",
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "window"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "retentionBlocks"
+                      ],
+                      "title": "Sliding window deletion",
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Delete strategy"
+                },
+                "disabled": {
+                  "type": "boolean"
+                },
+                "oldestBlock": {
+                  "pattern": "^0x(0|[1-9a-f][0-9a-f]*)$",
+                  "title": "hex encoded unsigned integer",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "disabled"
+              ],
+              "title": "Effective resource capability",
+              "type": "object"
+            }
+          },
+          "required": [
+            "head",
+            "state",
+            "tx",
+            "logs",
+            "receipts",
+            "blocks",
+            "stateproofs"
+          ],
+          "title": "Effective routing capabilities",
+          "type": "object"
+        }
+      },
+      "summary": "Returns effective capabilities for routing decisions."
+    }
+  ]
+}

@@ -19,6 +19,10 @@ RUN git init /execution-apis && \
 # uncomment the line below
 # ADD tests /execution-apis/tests
 
+# To run against a local spec, copy openrpc.json next to the simulator and
+# uncomment the line below (keep it in sync with the local tests above).
+# ADD openrpc.json /execution-apis/openrpc.json
+
 # Build the simulator executable.
 ADD . /source
 WORKDIR /source
@@ -30,5 +34,6 @@ ADD . /source
 WORKDIR /source
 COPY --from=builder /source/rpc-compat .
 COPY --from=builder /execution-apis/tests ./tests
+COPY --from=builder /execution-apis/openrpc.json ./openrpc.json
 
 ENTRYPOINT ["./rpc-compat"]
