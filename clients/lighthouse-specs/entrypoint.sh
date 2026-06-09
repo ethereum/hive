@@ -156,15 +156,18 @@ TOML
         exit 1
     fi
 )
-run_specs
-SPECS_RC=$?
-
-if [[ $SPECS_RC -eq 0 ]]; then
-    echo "ok" > "${STATUS_FILE}"
-    log "tests complete: ok"
-else
-    echo "failed rc=${SPECS_RC}" > "${STATUS_FILE}"
-    log "tests complete: failed rc=${SPECS_RC}"
-fi
+(
+    run_specs
+    SPECS_RC=$?
+    
+    if [[ $SPECS_RC -eq 0 ]]; then
+        echo "ok" > "${STATUS_FILE}"
+        log "tests complete: ok"
+    else
+        echo "failed rc=${SPECS_RC}" > "${STATUS_FILE}"
+        log "tests complete: failed rc=${SPECS_RC}"
+    fi
+    
+) &
 
 exec /usr/local/bin/cl-specs-serve.sh
