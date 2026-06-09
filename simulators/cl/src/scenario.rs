@@ -263,6 +263,7 @@ async fn poll_status(http: &reqwest::Client, base: &str) -> Result<String, Strin
 fn build_env_for_client() -> HashMap<String, String> {
     let mut env = HashMap::new();
     for (sim_var, hive_var, default) in [
+        ("CL_SPECS_SOURCE_REPO", "HIVE_CL_SOURCE_REPO", ""),
         ("CL_SPECS_SOURCE_REF", "HIVE_CL_SOURCE_REF", ""),
         ("CL_SPECS_TESTS_REF", "HIVE_CONSENSUS_SPEC_TESTS_REF", ""),
         ("CL_SPECS_SCOPE", "HIVE_CL_SPEC_SCOPE", "smoke"),

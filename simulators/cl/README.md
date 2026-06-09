@@ -71,6 +71,7 @@ The simulator reads these once at startup and forwards them to every
 
 | Variable               | Forwarded to                       | Default   |
 |------------------------|------------------------------------|-----------|
+| `CL_SPECS_SOURCE_REPO` | `HIVE_CL_SOURCE_REPO`              | empty (image default per client; e.g. `ChainSafe/lodestar`) |
 | `CL_SPECS_SOURCE_REF`  | `HIVE_CL_SOURCE_REF`               | empty (image default per client)  |
 | `CL_SPECS_TESTS_REF`   | `HIVE_CONSENSUS_SPEC_TESTS_REF`    | empty (per-client pinned version) |
 | `CL_SPECS_SCOPE`       | `HIVE_CL_SPEC_SCOPE` (`smoke`/`full`/per-client) | `smoke` |
