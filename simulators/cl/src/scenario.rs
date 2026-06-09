@@ -275,7 +275,11 @@ fn build_env_for_client() -> HashMap<String, String> {
         ("CL_SPECS_SOURCE_REPO", "HIVE_CL_SOURCE_REPO", ""),
         ("CL_SPECS_SOURCE_REF", "HIVE_CL_SOURCE_REF", ""),
         ("CL_SPECS_TESTS_REF", "HIVE_CONSENSUS_SPEC_TESTS_REF", ""),
-        ("CL_SPECS_SCOPE", "HIVE_CL_SPEC_SCOPE", "smoke"),
+        // Empty default — each `<client>-specs` entrypoint applies its
+        // own native default (e.g. lodestar=minimal, nimbus=minimal,
+        // teku=smoke). Setting CL_SPECS_SCOPE forces all selected
+        // clients to the same value (must be one each entrypoint knows).
+        ("CL_SPECS_SCOPE", "HIVE_CL_SPEC_SCOPE", ""),
         ("CL_SPECS_NETWORK", "HIVE_NETWORK", "unknown"),
     ] {
         let v = env::var(sim_var).unwrap_or_else(|_| default.to_string());

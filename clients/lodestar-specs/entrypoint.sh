@@ -8,7 +8,7 @@
 #   HIVE_CL_SOURCE_REPO           (default: ChainSafe/lodestar)
 #   HIVE_CL_SOURCE_REF            (default: unstable)
 #   HIVE_CONSENSUS_SPEC_TESTS_REF (default: whatever lodestar pins)
-#   HIVE_CL_SPEC_SCOPE            bls|general|minimal|mainnet|full (default: minimal)
+#   HIVE_CL_SPEC_SCOPE            minimal|mainnet (default: minimal)
 #   HIVE_NETWORK                  devnet label, recorded in cl-meta.json
 
 set -uo pipefail
@@ -28,6 +28,8 @@ SCOPE="${HIVE_CL_SPEC_SCOPE:-minimal}"
 mkdir -p "${OUT_DIR}/junit"
 touch "${LOG_FILE}"
 log() { echo "[lodestar-specs] $*" | tee -a "${LOG_FILE}"; }
+
+log "resolved: source=${CL_SOURCE_REPO}@${CL_SOURCE_REF} scope=${SCOPE} spec-tests=${CONSENSUS_SPEC_TESTS_REF:-<pinned>} network=${NETWORK}"
 
 run_specs() (
     set -e
@@ -107,26 +109,14 @@ run_specs() (
     }
 
     case "${SCOPE}" in
-        bls)
-            vitest_run "bls/minimal" "lodestar-bls.xml" spec-minimal minimal "" bls test/spec/bls/
-            ;;
-        general)
-            vitest_run "general/minimal" "lodestar-general.xml" spec-minimal minimal "" ssz_generic test/spec/general/
-            ;;
         minimal)
             vitest_run "presets/minimal" "lodestar-presets-minimal.xml" spec-minimal minimal "" sanity test/spec/presets/
             ;;
         mainnet)
             vitest_run "presets/mainnet" "lodestar-presets-mainnet.xml" spec-mainnet mainnet "" sanity test/spec/presets/ "--max-old-space-size=4096"
             ;;
-        full)
-            vitest_run "bls/minimal" "lodestar-bls.xml" spec-minimal minimal "" bls test/spec/bls/
-            vitest_run "general/minimal" "lodestar-general.xml" spec-minimal minimal "" ssz_generic test/spec/general/
-            vitest_run "presets/minimal" "lodestar-presets-minimal.xml" spec-minimal minimal "" sanity test/spec/presets/
-            vitest_run "presets/mainnet" "lodestar-presets-mainnet.xml" spec-mainnet mainnet "" sanity test/spec/presets/ "--max-old-space-size=4096"
-            ;;
         *)
-            log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
+            log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
 
     jq -n \
@@ -141,6 +131,7 @@ run_specs() (
         '{client:$client, source_repo:$source_repo, source_ref:$source_ref, source_sha:$source_sha,
           client_version:$client_version, consensus_spec_tests_ref:$consensus_spec_tests_ref,
           network:$network, suites:$suites}' > "${META_FILE}"
+    cat "${META_FILE}"
 
     if grep -lE '<(failure|error)\b' "${OUT_DIR}/junit/"*.xml >/dev/null 2>&1; then
         log "ERROR: at least one junit suite reports failures"

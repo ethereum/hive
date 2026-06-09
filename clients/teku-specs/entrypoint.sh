@@ -7,7 +7,7 @@
 #   HIVE_CL_SOURCE_REPO           (default: Consensys/teku)
 #   HIVE_CL_SOURCE_REF            (default: master)
 #   HIVE_CONSENSUS_SPEC_TESTS_REF (optional override; patches build.gradle in place)
-#   HIVE_CL_SPEC_SCOPE            smoke|full (default: smoke)
+#   HIVE_CL_SPEC_SCOPE            minimal|mainnet (default: minimal)
 #   HIVE_NETWORK                  devnet label, recorded in cl-meta.json
 
 set -uo pipefail
@@ -22,11 +22,13 @@ CL_SOURCE_REPO="${HIVE_CL_SOURCE_REPO:-${HIVE_CL_SOURCE_REPO_DEFAULT:-Consensys/
 CL_SOURCE_REF="${HIVE_CL_SOURCE_REF:-${HIVE_CL_SOURCE_REF_DEFAULT:-master}}"
 CONSENSUS_SPEC_TESTS_REF="${HIVE_CONSENSUS_SPEC_TESTS_REF:-}"
 NETWORK="${HIVE_NETWORK:-unknown}"
-SCOPE="${HIVE_CL_SPEC_SCOPE:-smoke}"
+SCOPE="${HIVE_CL_SPEC_SCOPE:-minimal}"
 
 mkdir -p "${OUT_DIR}/junit"
 touch "${LOG_FILE}"
 log() { echo "[teku-specs] $*" | tee -a "${LOG_FILE}"; }
+
+log "resolved: source=${CL_SOURCE_REPO}@${CL_SOURCE_REF} scope=${SCOPE} spec-tests=${CONSENSUS_SPEC_TESTS_REF:-<pinned>} network=${NETWORK}"
 
 run_specs() (
     set -e
@@ -60,12 +62,17 @@ run_specs() (
     fi
     EFFECTIVE_REF="${CONSENSUS_SPEC_TESTS_REF:-$PINNED_REF}"
 
+    # Teku's gradle reference-tests task is not preset-split — it builds
+    # the full reference-tests source tree, which contains both minimal
+    # and mainnet test classes mixed together. We filter test classes by
+    # the `_minimal_` / `_mainnet_` package convention used in the
+    # generated reference-test source; this is a best-effort match.
     GRADLE_TASK=":eth-reference-tests:referenceTest"
     GRADLE_FILTER=()
     case "${SCOPE}" in
-        smoke) GRADLE_FILTER+=(--tests "tech.pegasys.teku.reference.bls_*") ;;
-        full)  : ;;
-        *) log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
+        minimal) GRADLE_FILTER+=(--tests "*minimal*") ;;
+        mainnet) GRADLE_FILTER+=(--tests "*mainnet*") ;;
+        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
 
     # Run expandRefTests then referenceTest separately to keep gradle 9's
@@ -91,16 +98,15 @@ run_specs() (
     done
     log "harvested ${count} JUnit file(s) -> ${HARVEST_DIR}"
 
-    case "${SCOPE}" in
-        smoke) SUITE_CATEGORY="bls" ;;
-        *)     SUITE_CATEGORY="" ;;
-    esac
+    SUITE_PRESET="${SCOPE}"
+    SUITE_CATEGORY=""
     for f in "${HARVEST_DIR}"/*.xml; do
         base=$(basename "${f}")
         SUITES_JSON=$(jq --arg jf "${base}" \
             --arg category "${SUITE_CATEGORY}" \
+            --arg preset "${SUITE_PRESET}" \
             '. + [{junit_file:$jf, project:"eth-reference-tests:referenceTest",
-                   preset:"", fork:"", category:$category, subcategory:null}]' \
+                   preset:$preset, fork:"", category:$category, subcategory:null}]' \
             <<<"${SUITES_JSON}")
     done
     shopt -u globstar nullglob
@@ -117,6 +123,7 @@ run_specs() (
         '{client:$client, source_repo:$source_repo, source_ref:$source_ref, source_sha:$source_sha,
           client_version:$client_version, consensus_spec_tests_ref:$consensus_spec_tests_ref,
           network:$network, suites:$suites}' > "${META_FILE}"
+    cat "${META_FILE}"
 
     if [[ ${rc} -ne 0 ]]; then
         exit ${rc}

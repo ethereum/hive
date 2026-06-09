@@ -77,12 +77,21 @@ The simulator reads these once at startup and forwards them to every
 | `CL_SPECS_SOURCE_REPO` | `HIVE_CL_SOURCE_REPO`              | empty (image default per client)  |
 | `CL_SPECS_SOURCE_REF`  | `HIVE_CL_SOURCE_REF`               | empty (image default per client)  |
 | `CL_SPECS_TESTS_REF`   | `HIVE_CONSENSUS_SPEC_TESTS_REF`    | empty (per-client pinned version) |
-| `CL_SPECS_SCOPE`       | `HIVE_CL_SPEC_SCOPE` (`smoke`/`full`/per-client) | `smoke` |
+| `CL_SPECS_SCOPE`       | `HIVE_CL_SPEC_SCOPE` (`minimal` or `mainnet`)    | empty (each image defaults to `minimal`) |
 | `CL_SPECS_NETWORK`     | `HIVE_NETWORK` (devnet label, recorded only) | `unknown` |
 
-Per-client scope values match each runner's native vocabulary. `smoke` is
-defined by every image; consult the entrypoint script in
-`clients/<client>-specs/` for the full set.
+Every `*-specs` image accepts exactly two scopes: `minimal` and
+`mainnet`. Each image maps them onto whatever its native test runner
+supports (preset-selected test projects for lodestar/nimbus, crypto
+feature toggles for lighthouse, package filter for prysm/grandine,
+class-name filter for teku — the latter two are best-effort because
+those runners don't preset-split natively). Run twice to cover both
+presets:
+
+```sh
+CL_SPECS_SCOPE=minimal ./hive --sim cl ...
+CL_SPECS_SCOPE=mainnet ./hive --sim cl ...
+```
 
 ## Output layout
 

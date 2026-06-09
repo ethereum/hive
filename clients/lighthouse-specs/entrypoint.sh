@@ -8,7 +8,7 @@
 #   HIVE_CL_SOURCE_REPO           (default: sigp/lighthouse)
 #   HIVE_CL_SOURCE_REF            (default: stable)
 #   HIVE_CONSENSUS_SPEC_TESTS_REF (default: whatever lighthouse pins)
-#   HIVE_CL_SPEC_SCOPE            smoke|full (default: smoke)
+#   HIVE_CL_SPEC_SCOPE            minimal|mainnet (default: minimal)
 #   HIVE_NETWORK                  devnet label, recorded in cl-meta.json
 
 set -uo pipefail
@@ -23,12 +23,14 @@ CL_SOURCE_REPO="${HIVE_CL_SOURCE_REPO:-${HIVE_CL_SOURCE_REPO_DEFAULT:-sigp/light
 CL_SOURCE_REF="${HIVE_CL_SOURCE_REF:-${HIVE_CL_SOURCE_REF_DEFAULT:-stable}}"
 CONSENSUS_SPEC_TESTS_REF="${HIVE_CONSENSUS_SPEC_TESTS_REF:-}"
 NETWORK="${HIVE_NETWORK:-unknown}"
-SCOPE="${HIVE_CL_SPEC_SCOPE:-smoke}"
+SCOPE="${HIVE_CL_SPEC_SCOPE:-minimal}"
 
 mkdir -p "${OUT_DIR}/junit"
 touch "${LOG_FILE}"
 
 log() { echo "[lighthouse-specs] $*" | tee -a "${LOG_FILE}"; }
+
+log "resolved: source=${CL_SOURCE_REPO}@${CL_SOURCE_REF} scope=${SCOPE} spec-tests=${CONSENSUS_SPEC_TESTS_REF:-<pinned>} network=${NETWORK}"
 
 run_specs() (
     set -e
@@ -112,25 +114,26 @@ TOML
         fi
     }
 
+    # Lighthouse's ef_tests crate runs every preset that the spec-test
+    # fixtures provide; preset is selected per-fixture rather than
+    # globally. We map the minimal/mainnet scope onto crypto-backend
+    # feature toggles, matching `make run-ef-tests`: minimal runs the
+    # fast `fake_crypto` pass; mainnet runs the real-BLS pass.
     case "${SCOPE}" in
-        smoke)
-            run_nextest "bls/fake_crypto" \
+        minimal)
+            run_nextest "fake_crypto" \
                 "ef_tests,fake_crypto" \
-                "test(/bls/)" \
-                "lighthouse-bls.xml" "" "" "bls" ""
+                "" \
+                "lighthouse-fake_crypto.xml" "minimal" "" "all" ""
             ;;
-        full)
-            run_nextest "all/real_crypto" \
+        mainnet)
+            run_nextest "real_crypto" \
                 "ef_tests" \
                 "" \
-                "lighthouse-real_crypto.xml" "" "" "all" ""
-            run_nextest "all/fake_crypto" \
-                "ef_tests,fake_crypto" \
-                "" \
-                "lighthouse-fake_crypto.xml" "" "" "all" ""
+                "lighthouse-real_crypto.xml" "mainnet" "" "all" ""
             ;;
         *)
-            log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
+            log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
 
     jq -n \
@@ -145,6 +148,7 @@ TOML
         '{client:$client, source_repo:$source_repo, source_ref:$source_ref, source_sha:$source_sha,
           client_version:$client_version, consensus_spec_tests_ref:$consensus_spec_tests_ref,
           network:$network, suites:$suites}' > "${META_FILE}"
+    cat "${META_FILE}"
 
     # Fail the run if any of the JUnit XMLs report failures.
     if grep -lE '<(failure|error)\b' "${OUT_DIR}/junit/"*.xml >/dev/null 2>&1; then

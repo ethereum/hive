@@ -7,7 +7,7 @@
 #   HIVE_CL_SOURCE_REPO           (default: grandinetech/grandine)
 #   HIVE_CL_SOURCE_REF            (default: develop)
 #   HIVE_CONSENSUS_SPEC_TESTS_REF (forwarded as SPEC_VERSION)
-#   HIVE_CL_SPEC_SCOPE            smoke|full (default: smoke)
+#   HIVE_CL_SPEC_SCOPE            minimal|mainnet (default: minimal)
 #   HIVE_NETWORK                  devnet label, recorded in cl-meta.json
 
 set -uo pipefail
@@ -22,11 +22,13 @@ CL_SOURCE_REPO="${HIVE_CL_SOURCE_REPO:-${HIVE_CL_SOURCE_REPO_DEFAULT:-grandinete
 CL_SOURCE_REF="${HIVE_CL_SOURCE_REF:-${HIVE_CL_SOURCE_REF_DEFAULT:-develop}}"
 CONSENSUS_SPEC_TESTS_REF="${HIVE_CONSENSUS_SPEC_TESTS_REF:-}"
 NETWORK="${HIVE_NETWORK:-unknown}"
-SCOPE="${HIVE_CL_SPEC_SCOPE:-smoke}"
+SCOPE="${HIVE_CL_SPEC_SCOPE:-minimal}"
 
 mkdir -p "${OUT_DIR}/junit"
 touch "${LOG_FILE}"
 log() { echo "[grandine-specs] $*" | tee -a "${LOG_FILE}"; }
+
+log "resolved: source=${CL_SOURCE_REPO}@${CL_SOURCE_REF} scope=${SCOPE} spec-tests=${CONSENSUS_SPEC_TESTS_REF:-<pinned>} network=${NETWORK}"
 
 run_specs() (
     set -e
@@ -75,6 +77,11 @@ TOML
         bash scripts/download_spec_tests.sh 2>&1 | tee -a "${LOG_FILE}"
     fi
 
+    # Grandine's cargo workspace test doesn't preset-split at the build
+    # layer — every spec test crate iterates both presets internally.
+    # We restrict the test universe per scope by filtering test-case
+    # names: the consensus-spec-tests fixtures embed the preset in their
+    # path, and nextest's `-E` filter matches against the testcase name.
     NEXTEST_ARGS=(--profile cl-specs --release
                   --no-default-features
                   --features default-networks,arkworks,blst
@@ -82,9 +89,9 @@ TOML
                   --exclude zkvm_host --exclude zkvm_guest_risc0
                   --exclude c_grandine --exclude csharp_grandine)
     case "${SCOPE}" in
-        smoke) NEXTEST_ARGS+=(-E 'package(fork_choice_control)') ;;
-        full)  : ;;
-        *) log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
+        minimal) NEXTEST_ARGS+=(-E 'test(/minimal/)') ;;
+        mainnet) NEXTEST_ARGS+=(-E 'test(/mainnet/)') ;;
+        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
 
     log "cargo nextest run ${NEXTEST_ARGS[*]}"
@@ -99,13 +106,9 @@ TOML
         destination="${HARVEST_DIR}/grandine-spec.xml"
         cp "${GENERATED}" "${destination}"
         log "junit -> ${destination}"
-        case "${SCOPE}" in
-            smoke) SMOKE_CATEGORY="fork_choice" ;;
-            *)     SMOKE_CATEGORY="" ;;
-        esac
-        SUITES_JSON=$(jq -n --arg category "${SMOKE_CATEGORY}" \
+        SUITES_JSON=$(jq -n --arg preset "${SCOPE}" \
             '[{junit_file:"grandine-spec.xml", project:"cargo-nextest:cl-specs",
-               preset:"", fork:"", category:$category, subcategory:null}]')
+               preset:$preset, fork:"", category:"", subcategory:null}]')
     else
         log "WARN: no JUnit produced at ${GENERATED}"
     fi
@@ -126,6 +129,7 @@ TOML
         '{client:$client, source_repo:$source_repo, source_ref:$source_ref, source_sha:$source_sha,
           client_version:$client_version, consensus_spec_tests_ref:$consensus_spec_tests_ref,
           network:$network, suites:$suites}' > "${META_FILE}"
+    cat "${META_FILE}"
 
     if [[ ${rc} -ne 0 ]]; then
         exit ${rc}

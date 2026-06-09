@@ -13,7 +13,7 @@
 #   HIVE_CL_SOURCE_REPO           (default: OffchainLabs/prysm)
 #   HIVE_CL_SOURCE_REF            (default: develop)
 #   HIVE_CONSENSUS_SPEC_TESTS_REF (informational; not honoured)
-#   HIVE_CL_SPEC_SCOPE            smoke|full (default: smoke)
+#   HIVE_CL_SPEC_SCOPE            minimal|mainnet (default: minimal)
 #   HIVE_NETWORK                  devnet label, recorded in cl-meta.json
 
 set -uo pipefail
@@ -28,11 +28,13 @@ CL_SOURCE_REPO="${HIVE_CL_SOURCE_REPO:-${HIVE_CL_SOURCE_REPO_DEFAULT:-OffchainLa
 CL_SOURCE_REF="${HIVE_CL_SOURCE_REF:-${HIVE_CL_SOURCE_REF_DEFAULT:-develop}}"
 CONSENSUS_SPEC_TESTS_REF="${HIVE_CONSENSUS_SPEC_TESTS_REF:-}"
 NETWORK="${HIVE_NETWORK:-unknown}"
-SCOPE="${HIVE_CL_SPEC_SCOPE:-smoke}"
+SCOPE="${HIVE_CL_SPEC_SCOPE:-minimal}"
 
 mkdir -p "${OUT_DIR}/junit"
 touch "${LOG_FILE}"
 log() { echo "[prysm-specs] $*" | tee -a "${LOG_FILE}"; }
+
+log "resolved: source=${CL_SOURCE_REPO}@${CL_SOURCE_REF} scope=${SCOPE} spec-tests=${CONSENSUS_SPEC_TESTS_REF:-<pinned>} network=${NETWORK}"
 
 run_specs() (
     set -e
@@ -57,10 +59,11 @@ run_specs() (
 
     bazel --version 2>&1 | tee -a "${LOG_FILE}" || true
 
+    # Prysm's spectest tree splits at the package level by preset.
     case "${SCOPE}" in
-        smoke) BAZEL_TARGETS="//testing/spectest/general/..." ;;
-        full)  BAZEL_TARGETS="//testing/spectest/..." ;;
-        *) log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
+        minimal) BAZEL_TARGETS="//testing/spectest/minimal/..." ;;
+        mainnet) BAZEL_TARGETS="//testing/spectest/mainnet/..." ;;
+        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
 
     log "bazel test ${BAZEL_TARGETS}"
@@ -121,6 +124,7 @@ run_specs() (
         '{client:$client, source_repo:$source_repo, source_ref:$source_ref, source_sha:$source_sha,
           client_version:$client_version, consensus_spec_tests_ref:$consensus_spec_tests_ref,
           network:$network, suites:$suites}' > "${META_FILE}"
+    cat "${META_FILE}"
 
     if [[ ${rc} -ne 0 ]]; then
         exit ${rc}
