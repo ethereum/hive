@@ -61,7 +61,7 @@ run_specs() (
     log "client_version=${CLIENT_VERSION}"
 
     # Drop a nextest config that emits JUnit. The path 'junit.xml' is relative
-    # to the nextest store root: target/nextest/clive/junit.xml.
+    # to the nextest store root: target/nextest/cl-specs/junit.xml.
     mkdir -p "${SRC_DIR}/.config"
     cat > "${SRC_DIR}/.config/nextest.toml" <<'TOML'
 [profile.cl-specs]
