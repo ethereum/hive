@@ -18,11 +18,13 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        git-lfs \
         jq \
         libpcre3-dev \
         make \
         python3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && git lfs install --system
 
 RUN mkdir -p ${OUT_DIR}/junit /work
 
