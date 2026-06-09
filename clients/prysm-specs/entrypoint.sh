@@ -80,13 +80,29 @@ run_specs() (
     local count=0
     if [[ -e "${TESTLOGS_DIR}" ]]; then
         real_root=$(readlink -f "${TESTLOGS_DIR}" 2>/dev/null || echo "${TESTLOGS_DIR}")
-        while IFS= read -r xml; do
-            rel="${xml#${real_root}/}"
+        # bazel writes two files per target: test.xml (binary-level stub
+        # — reports tests=0 even when hundreds of Go subtests ran) and
+        # test.log (raw `go test -v` stdout). go-junit-report converts
+        # the latter into proper per-testcase JUnit.
+        while IFS= read -r logf; do
+            rel="${logf#${real_root}/}"
             rel="${rel#${TESTLOGS_DIR}/}"
-            flat=$(echo "${rel}" | tr '/' '_')
-            cp "${xml}" "${HARVEST_DIR}/${flat}"
-            count=$((count+1))
-        done < <(find -L "${TESTLOGS_DIR}" -name "test.xml" -type f 2>/dev/null)
+            flat=$(echo "${rel%/test.log}" | tr '/' '_')
+            dest="${HARVEST_DIR}/${flat}.xml"
+            if go-junit-report -in "${logf}" -out "${dest}" -package-name "${flat}" >/dev/null 2>&1 \
+               && [[ -s "${dest}" ]]; then
+                count=$((count+1))
+            else
+                # Fall back to bazel's stub when conversion fails (e.g.
+                # the Go test crashed before producing any output).
+                stub="${logf%/test.log}/test.xml"
+                if [[ -f "${stub}" ]]; then
+                    cp "${stub}" "${dest}"
+                    count=$((count+1))
+                    log "WARN: go-junit-report failed for ${rel}, kept bazel stub"
+                fi
+            fi
+        done < <(find -L "${TESTLOGS_DIR}" -name "test.log" -type f 2>/dev/null)
     fi
     log "harvested ${count} JUnit file(s)"
 

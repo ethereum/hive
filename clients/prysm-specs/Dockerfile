@@ -19,12 +19,22 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        golang-go \
         jq \
         python3 \
         unzip \
         wget \
         zip \
     && rm -rf /var/lib/apt/lists/*
+
+# go-junit-report converts `go test -v` output (which bazel writes to
+# bazel-testlogs/.../test.log) into proper per-testcase JUnit XML. The
+# default bazel test.xml is binary-level only — it reports tests=0 even
+# when hundreds of Go test functions ran inside. We pipe each test.log
+# through this in the entrypoint to get real per-case counts.
+ENV GOPATH=/go PATH=/go/bin:${PATH}
+RUN go install github.com/jstemmer/go-junit-report/v2@latest \
+    && go clean -modcache
 
 RUN ARCH=$(dpkg --print-architecture) \
     && case "${ARCH}" in \

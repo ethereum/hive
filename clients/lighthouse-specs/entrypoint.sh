@@ -114,27 +114,20 @@ TOML
         fi
     }
 
-    # Lighthouse's ef_tests crate runs every preset that the spec-test
-    # fixtures provide; preset is selected per-fixture rather than
-    # globally. We map the minimal/mainnet scope onto crypto-backend
-    # feature toggles, matching `make run-ef-tests`: minimal runs the
-    # fast `fake_crypto` pass; mainnet runs the real-BLS pass.
+    # Lighthouse's ef_tests crate doesn't split presets at the Cargo
+    # feature level — `--features fake_crypto` is a workspace BLS speed
+    # toggle that disables most heavy cases (147 vs ~50k+). Lighthouse's
+    # own CI just runs `cargo nextest run -p ef_tests --features ef_tests`
+    # which covers minimal + mainnet + general fixtures in one pass.
+    # We do the same; SCOPE is recorded as a label only.
     case "${SCOPE}" in
-        minimal)
-            run_nextest "fake_crypto" \
-                "ef_tests,fake_crypto" \
-                "" \
-                "lighthouse-fake_crypto.xml" "minimal" "" "all" ""
-            ;;
-        mainnet)
-            run_nextest "real_crypto" \
-                "ef_tests" \
-                "" \
-                "lighthouse-real_crypto.xml" "mainnet" "" "all" ""
-            ;;
-        *)
-            log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
+        minimal|mainnet) : ;;
+        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
     esac
+    run_nextest "ef_tests" \
+        "ef_tests" \
+        "" \
+        "lighthouse-ef_tests.xml" "${SCOPE}" "" "all" ""
 
     jq -n \
         --arg client lighthouse \
