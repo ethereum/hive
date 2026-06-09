@@ -136,6 +136,9 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
+if [ "$HIVE_TARGET_GAS_LIMIT" != "" ]; then
+    FLAGS="$FLAGS --miner.gaslimit $HIVE_TARGET_GAS_LIMIT"
+fi
 
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,txpool,web3,testing"
