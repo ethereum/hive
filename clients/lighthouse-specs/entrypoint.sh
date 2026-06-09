@@ -156,6 +156,7 @@ TOML
         exit 1
     fi
 )
+run_specs
 SPECS_RC=$?
 
 if [[ $SPECS_RC -eq 0 ]]; then
