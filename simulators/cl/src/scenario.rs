@@ -262,6 +262,15 @@ async fn poll_status(http: &reqwest::Client, base: &str) -> Result<String, Strin
 
 fn build_env_for_client() -> HashMap<String, String> {
     let mut env = HashMap::new();
+    // Tell hive's runner to wait for our results-HTTP port instead of the
+    // default 8545 (EL JSON-RPC). The entrypoint only `exec`s
+    // `python3 -m http.server 5151` after the native test runner finishes,
+    // so this also serves as a "tests are done" signal: when start_client
+    // returns, /status is already written.
+    env.insert(
+        "HIVE_CHECK_LIVE_PORT".to_string(),
+        STATUS_PORT.to_string(),
+    );
     for (sim_var, hive_var, default) in [
         ("CL_SPECS_SOURCE_REPO", "HIVE_CL_SOURCE_REPO", ""),
         ("CL_SPECS_SOURCE_REF", "HIVE_CL_SOURCE_REF", ""),

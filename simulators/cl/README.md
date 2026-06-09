@@ -23,6 +23,9 @@ per client.
 | `prysm-specs`        | `OffchainLabs/prysm`     | `bazel test //testing/spectest/...`       |
 | `teku-specs`         | `Consensys/teku`         | `:eth-reference-tests:referenceTest`      |
 
+The source repo column above is each image's default; override at run
+time via `CL_SPECS_SOURCE_REPO` (e.g. point at a fork).
+
 ## Prerequisites
 
 The simulator is a standalone Rust crate. Cargo isn't required to invoke
@@ -71,7 +74,7 @@ The simulator reads these once at startup and forwards them to every
 
 | Variable               | Forwarded to                       | Default   |
 |------------------------|------------------------------------|-----------|
-| `CL_SPECS_SOURCE_REPO` | `HIVE_CL_SOURCE_REPO`              | empty (image default per client; e.g. `ChainSafe/lodestar`) |
+| `CL_SPECS_SOURCE_REPO` | `HIVE_CL_SOURCE_REPO`              | empty (image default per client)  |
 | `CL_SPECS_SOURCE_REF`  | `HIVE_CL_SOURCE_REF`               | empty (image default per client)  |
 | `CL_SPECS_TESTS_REF`   | `HIVE_CONSENSUS_SPEC_TESTS_REF`    | empty (per-client pinned version) |
 | `CL_SPECS_SCOPE`       | `HIVE_CL_SPEC_SCOPE` (`smoke`/`full`/per-client) | `smoke` |
