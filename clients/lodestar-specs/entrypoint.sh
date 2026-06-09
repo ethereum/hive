@@ -108,16 +108,10 @@ run_specs() (
         fi
     }
 
-    case "${SCOPE}" in
-        minimal)
-            vitest_run "presets/minimal" "lodestar-presets-minimal.xml" spec-minimal minimal "" sanity test/spec/presets/
-            ;;
-        mainnet)
-            vitest_run "presets/mainnet" "lodestar-presets-mainnet.xml" spec-mainnet mainnet "" sanity test/spec/presets/ "--max-old-space-size=4096"
-            ;;
-        *)
-            log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
-    esac
+    # Run both presets — no filter. Each client image is responsible for
+    # whatever native split (or lack thereof) makes sense for its runner.
+    vitest_run "presets/minimal" "lodestar-presets-minimal.xml" spec-minimal minimal "" sanity test/spec/presets/
+    vitest_run "presets/mainnet" "lodestar-presets-mainnet.xml" spec-mainnet mainnet "" sanity test/spec/presets/ "--max-old-space-size=4096"
 
     jq -n \
         --arg client lodestar \

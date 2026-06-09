@@ -71,10 +71,6 @@ run_specs() (
     # SCOPE as a label on the harvested suites.
     GRADLE_TASK=":eth-reference-tests:referenceTest"
     GRADLE_FILTER=()
-    case "${SCOPE}" in
-        minimal|mainnet) : ;;
-        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
-    esac
 
     # Run expandRefTests then referenceTest separately to keep gradle 9's
     # cross-task input validator happy.

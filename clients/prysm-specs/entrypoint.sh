@@ -59,12 +59,10 @@ run_specs() (
 
     bazel --version 2>&1 | tee -a "${LOG_FILE}" || true
 
-    # Prysm's spectest tree splits at the package level by preset.
-    case "${SCOPE}" in
-        minimal) BAZEL_TARGETS="//testing/spectest/minimal/..." ;;
-        mainnet) BAZEL_TARGETS="//testing/spectest/mainnet/..." ;;
-        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
-    esac
+    # Run the full spectest tree (general + minimal + mainnet). Prysm's
+    # bazel layout splits at the package level, but per the consensus
+    # we don't filter — both presets every time.
+    BAZEL_TARGETS="//testing/spectest/..."
 
     log "bazel test ${BAZEL_TARGETS}"
     local rc=0

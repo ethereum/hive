@@ -120,10 +120,6 @@ TOML
     # own CI just runs `cargo nextest run -p ef_tests --features ef_tests`
     # which covers minimal + mainnet + general fixtures in one pass.
     # We do the same; SCOPE is recorded as a label only.
-    case "${SCOPE}" in
-        minimal|mainnet) : ;;
-        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
-    esac
     run_nextest "ef_tests" \
         "ef_tests" \
         "" \

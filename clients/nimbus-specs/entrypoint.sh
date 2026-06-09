@@ -93,16 +93,10 @@ run_specs() (
         fi
     }
 
-    case "${SCOPE}" in
-        minimal) run_preset minimal "nimbus-presets-minimal.xml" ;;
-        mainnet) run_preset mainnet "nimbus-presets-mainnet.xml" ;;
-        full)
-            run_preset minimal "nimbus-presets-minimal.xml"
-            run_preset mainnet "nimbus-presets-mainnet.xml"
-            ;;
-        *)
-            log "ERROR: unknown HIVE_CL_SPEC_SCOPE: ${SCOPE}"; exit 1 ;;
-    esac
+    # Run both presets. SCOPE is not honoured as a filter — nimbus has
+    # one binary per preset and we exercise both.
+    run_preset minimal "nimbus-presets-minimal.xml"
+    run_preset mainnet "nimbus-presets-mainnet.xml"
 
     EFFECTIVE_REF="${CONSENSUS_SPEC_TESTS_REF:-}"
     if [[ -z "${EFFECTIVE_REF}" ]]; then

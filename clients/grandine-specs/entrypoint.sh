@@ -82,17 +82,15 @@ TOML
     # We restrict the test universe per scope by filtering test-case
     # names: the consensus-spec-tests fixtures embed the preset in their
     # path, and nextest's `-E` filter matches against the testcase name.
+    # No preset filter — the workspace nextest run covers all presets
+    # the fixtures provide; preset comes through in test names so the
+    # JUnit consumer can split there if needed.
     NEXTEST_ARGS=(--profile cl-specs --release
                   --no-default-features
                   --features default-networks,arkworks,blst
                   --workspace
                   --exclude zkvm_host --exclude zkvm_guest_risc0
                   --exclude c_grandine --exclude csharp_grandine)
-    case "${SCOPE}" in
-        minimal) NEXTEST_ARGS+=(-E 'test(/minimal/)') ;;
-        mainnet) NEXTEST_ARGS+=(-E 'test(/mainnet/)') ;;
-        *) log "ERROR: unsupported scope '${SCOPE}'; expected 'minimal' or 'mainnet'"; exit 1 ;;
-    esac
 
     log "cargo nextest run ${NEXTEST_ARGS[*]}"
     local rc=0
