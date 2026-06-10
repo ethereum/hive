@@ -9,16 +9,16 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
-// methodSchemas maps a JSON-RPC method name to its result schema, parsed from
-// an OpenRPC document. It is used to validate the responses of "speconly"
-// tests against the spec rather than byte-comparing them to a recorded
-// example, which is necessary for methods whose response is client- or
+// methodSchemas maps a JSON-RPC method name to its compiled result schema,
+// parsed from an OpenRPC document. It is used to validate the responses of
+// "speconly" tests against the spec rather than byte-comparing them to a
+// recorded example, which is necessary for methods whose response is client- or
 // config-specific (e.g. eth_capabilities retention windows).
-type methodSchemas map[string]*openrpc.JSONSchemaObject
+type methodSchemas map[string]*jsonschema.Schema
 
-// parseSpec reads a (dereferenced) OpenRPC document and returns the result
-// schema for each method. Methods without a usable result schema are skipped;
-// callers that don't find a method fall back to structural matching.
+// parseSpec reads a (dereferenced) OpenRPC document and returns the compiled
+// result schema for each method. Each schema is compiled once here and reused
+// for every test.
 func parseSpec(filename string) (methodSchemas, error) {
 	spec, err := os.ReadFile(filename)
 	if err != nil {
@@ -45,17 +45,22 @@ func parseSpec(filename string) (methodSchemas, error) {
 			// No result schema (e.g. reference-only or notification); skip it.
 			continue
 		}
-		schemas[string(*method.Name)] = method.Result.ContentDescriptorObject.Schema.JSONSchemaObject
+		name := string(*method.Name)
+		schema, err := compileSchema(method.Result.ContentDescriptorObject.Schema.JSONSchemaObject)
+		if err != nil {
+			return nil, fmt.Errorf("unable to compile result schema for %s: %w", name, err)
+		}
+		schemas[name] = schema
 	}
 	return schemas, nil
 }
 
-// validateResult validates a JSON-RPC result value against the given result
-// schema. This mirrors the validation done by execution-apis' speccheck tool,
-// so "speconly" tests in hive enforce the same contract: any response that is
+// compileSchema compiles an OpenRPC result schema into a reusable validator.
+// This mirrors the validation done by execution-apis' speccheck tool, so
+// "speconly" tests in hive enforce the same contract: any response that is
 // valid per the OpenRPC schema passes, regardless of which optional fields a
 // particular client or configuration includes.
-func validateResult(schema *openrpc.JSONSchemaObject, result []byte) error {
+func compileSchema(schema *openrpc.JSONSchemaObject) (*jsonschema.Schema, error) {
 	// Set $schema explicitly to force jsonschema to use draft 2019-09, the
 	// draft the execution-apis schemas are written against.
 	draft := openrpc.Schema("https://json-schema.org/draft/2019-09/schema")
@@ -63,15 +68,17 @@ func validateResult(schema *openrpc.JSONSchemaObject, result []byte) error {
 
 	b, err := json.Marshal(schema)
 	if err != nil {
-		return fmt.Errorf("unable to marshal schema to json: %w", err)
+		return nil, fmt.Errorf("unable to marshal schema to json: %w", err)
 	}
-	s, err := jsonschema.CompileString("result", string(b))
-	if err != nil {
-		return fmt.Errorf("unable to compile schema: %w", err)
-	}
+	return jsonschema.CompileString("result", string(b))
+}
+
+// validateResult validates a JSON-RPC result value against a compiled result
+// schema.
+func validateResult(schema *jsonschema.Schema, result []byte) error {
 	var x interface{}
 	if err := json.Unmarshal(result, &x); err != nil {
 		return fmt.Errorf("unable to parse result: %w", err)
 	}
-	return s.Validate(x)
+	return schema.Validate(x)
 }
