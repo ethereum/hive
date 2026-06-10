@@ -10,10 +10,7 @@ import (
 )
 
 // methodSchemas maps a JSON-RPC method name to its compiled result schema,
-// parsed from an OpenRPC document. It is used to validate the responses of
-// "speconly" tests against the spec rather than byte-comparing them to a
-// recorded example, which is necessary for methods whose response is client- or
-// config-specific (e.g. eth_capabilities retention windows).
+// parsed from an OpenRPC document.
 type methodSchemas map[string]*jsonschema.Schema
 
 // parseSpec reads a (dereferenced) OpenRPC document and returns the compiled
@@ -56,10 +53,6 @@ func parseSpec(filename string) (methodSchemas, error) {
 }
 
 // compileSchema compiles an OpenRPC result schema into a reusable validator.
-// This mirrors the validation done by execution-apis' speccheck tool, so
-// "speconly" tests in hive enforce the same contract: any response that is
-// valid per the OpenRPC schema passes, regardless of which optional fields a
-// particular client or configuration includes.
 func compileSchema(schema *openrpc.JSONSchemaObject) (*jsonschema.Schema, error) {
 	// Set $schema explicitly to force jsonschema to use draft 2019-09, the
 	// draft the execution-apis schemas are written against.
