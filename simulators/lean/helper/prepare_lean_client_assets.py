@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shutil
-import sys
 import time
 from pathlib import Path
 
@@ -100,19 +99,6 @@ def load_source_validator(index: int) -> dict[str, str]:
         "proposal_secret",
     }.issubset(validator):
         return validator
-    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
-        attestation_keypair = validator["attestation_keypair"]
-        proposal_keypair = validator["proposal_keypair"]
-        if {"public_key", "secret_key"}.issubset(attestation_keypair) and {
-            "public_key",
-            "secret_key",
-        }.issubset(proposal_keypair):
-            return {
-                "attestation_public": attestation_keypair["public_key"],
-                "attestation_secret": attestation_keypair["secret_key"],
-                "proposal_public": proposal_keypair["public_key"],
-                "proposal_secret": proposal_keypair["secret_key"],
-            }
     if {"public", "secret"}.issubset(validator):
         return {
             "attestation_public": validator["public"],

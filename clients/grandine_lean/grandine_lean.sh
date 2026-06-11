@@ -7,7 +7,6 @@ NODE_ID="${HIVE_NODE_ID:-grandine_lean_0}"
 ASSET_ROOT="/tmp/grandine_lean-runtime"
 KEY_FILE=""
 NETWORK_CONFIG="${HIVE_LEAN_NETWORK_CONFIG:-$ASSET_ROOT/config.yaml}"
-LEAN_SPEC_SOURCE_PEER_ID="16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3"
 
 case "$DEVNET_LABEL" in
     devnet4)
@@ -30,25 +29,6 @@ cleanup() {
     if [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
         rm -f "$KEY_FILE"
     fi
-}
-
-checkpoint_bootnode_multiaddr() {
-    local checkpoint_url host_port host
-
-    checkpoint_url="${HIVE_CHECKPOINT_SYNC_URL:-}"
-    if [ -z "$checkpoint_url" ]; then
-        return 1
-    fi
-
-    host_port="${checkpoint_url#http://}"
-    host_port="${host_port#https://}"
-    host_port="${host_port%%/*}"
-    host="${host_port%%:*}"
-    if [ -z "$host" ]; then
-        return 1
-    fi
-
-    printf "/ip4/%s/udp/9001/quic-v1/p2p/%s" "$host" "$LEAN_SPEC_SOURCE_PEER_ID"
 }
 
 checkpoint_source_host_port() {
