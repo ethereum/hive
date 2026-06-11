@@ -8,6 +8,8 @@ require (
 	github.com/ethereum/go-ethereum v1.14.5
 	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
+	github.com/open-rpc/meta-schema v0.0.0-20210416041958-626a15d0a618
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5
 )
@@ -26,8 +28,6 @@ require (
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/open-rpc/meta-schema v0.0.0-20210416041958-626a15d0a618 // indirect
-	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tidwall/match v1.1.1 // indirect
