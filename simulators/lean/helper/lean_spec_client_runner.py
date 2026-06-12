@@ -30,12 +30,10 @@ from lean_spec_runtime import (
     helper_genesis_metadata,
     identity_keypair_from_private_key_hex,
     install_fast_ssz_deserialization,
-    install_legacy_signed_block_wire_compatibility,
     install_low_s_identity_signature_compatibility,
     install_setup_prover_compatibility,
     install_snappy_compress_fallback,
     keep_status_current,
-    legacy_signed_block_compatibility_enabled,
     load_genesis,
     load_validator,
     load_validator_registry_from_manifest,
@@ -48,7 +46,6 @@ from lean_spec_runtime import (
     start_metadata_server,
     subscribe_gossip_topics,
     uses_latest_leanspec_format,
-    wire_compat_mode,
 )
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
@@ -58,10 +55,8 @@ from lean_spec.subspecs.networking.service.events import GossipBlockEvent
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
-    QuicStream,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.xmss import aggregation as xmss_aggregation_module
 try:
     from lean_spec.subspecs.xmss.aggregation import (
         AggregatedSignatureProof as TypeOneSignatureProof,
@@ -76,7 +71,7 @@ try:
     from lean_spec.types.participation import AggregationBits, ValidatorIndices
 except ImportError:
     from lean_spec.types import AggregationBits, ValidatorIndices
-from lean_spec.types.uint import Uint32, Uint64
+from lean_spec.types.uint import Uint64
 
 DEFAULT_GOSSIP_FORK_DIGEST: Final = "devnet0"
 DEFAULT_LISTEN_PORT: Final = 9001
@@ -104,7 +99,6 @@ DEFAULT_VALIDATOR_COUNT: Final = 3
 logger = logging.getLogger("lean_spec_client_runner")
 
 
-_QUIC_STREAM_CLOSE_COMPAT_INSTALLED = False
 _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED = False
 _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED = False
 _IDENTIFY_PROTOCOL_COMPAT_INSTALLED = False
@@ -114,33 +108,6 @@ _CHECKPOINT_FINALIZATION_COMPAT_INSTALLED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
-
-
-def install_quic_stream_close_reset_tolerance() -> None:
-    global _QUIC_STREAM_CLOSE_COMPAT_INSTALLED
-
-    if _QUIC_STREAM_CLOSE_COMPAT_INSTALLED:
-        return
-
-    original_close = QuicStream.close
-
-    async def close_ignoring_reset(self: QuicStream) -> None:
-        try:
-            await original_close(self)
-        except Exception as err:
-            # grandine_lean opens an identify stream that LeanSpec does not
-            # implement. The peer may reset that stream before LeanSpec can
-            # close it, and aioquic then raises from close(). Swallow the
-            # close error so the helper keeps accepting subsequent req/resp
-            # streams on the same connection.
-            logger.debug(
-                "Ignoring QUIC close failure for stream %d after peer reset: %s",
-                self.stream_id,
-                err,
-            )
-
-    QuicStream.close = close_ignoring_reset
-    _QUIC_STREAM_CLOSE_COMPAT_INSTALLED = True
 
 
 def install_reqresp_block_cache_tracking() -> None:
@@ -760,7 +727,6 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
 async def run() -> None:
     setup_logging()
     install_low_s_identity_signature_compatibility()
-    install_quic_stream_close_reset_tolerance()
     install_snappy_compress_fallback()
     install_fast_ssz_deserialization()
     install_reqresp_block_cache_tracking()
@@ -770,9 +736,6 @@ async def run() -> None:
     install_child_only_aggregation_compatibility()
     install_trusted_gossip_attestation_compatibility()
     install_checkpoint_finalization_compatibility()
-    logger.info("LeanSpec wire compatibility mode: %s", wire_compat_mode())
-    if legacy_signed_block_compatibility_enabled():
-        install_legacy_signed_block_wire_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
