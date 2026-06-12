@@ -24,10 +24,12 @@ use snap::{read::FrameDecoder, write::FrameEncoder};
 use ssz::Encode;
 use ssz_derive::{Decode as SszDecodeDerive, Encode as SszEncodeDerive};
 use ssz_types::{
-    typenum::{U1024, U1048576, U4096},
+    typenum::{U1024, U1048576, U4096, U524288},
     BitList, VariableList,
 };
 use tokio::time::timeout;
+
+use crate::utils::util::selected_lean_devnet;
 
 // Protocol strings for lean reqresp
 pub const LEAN_STATUS_PROTOCOL: &str = "/leanconsensus/req/status/1/ssz_snappy";
@@ -186,20 +188,41 @@ pub struct LeanBlock {
     pub body: LeanBlockBody,
 }
 
+/// Devnet4 per-attestation signature payload on the signed-block envelope.
 #[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
 pub struct LeanBlockSignatures {
     pub attestation_signatures: VariableList<LeanAggregatedSignatureProof, U4096>,
     pub proposer_signature: LeanSignature,
 }
 
+/// Devnet4 signed-block wire shape: block plus per-attestation signatures.
 #[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
-pub struct LeanSignedBlock {
+pub struct LeanSignedBlockDevnet4 {
     pub block: LeanBlock,
     pub signature: LeanBlockSignatures,
 }
 
-impl LeanSignedBlock {
-    /// Build a minimal valid-SSZ signed block for the given slot with the specified parent.
+/// Merged proof covering every attestation in the body plus the proposer
+/// signature over the block root.
+///
+/// Matches leanSpec's `MultiMessageAggregate`: a single ByteList512KiB of
+/// compact public-key-free aggregate proof bytes.
+#[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
+pub struct LeanMultiMessageAggregate {
+    pub proof: VariableList<u8, U524288>,
+}
+
+/// Current signed-block wire shape (devnet5 and later): block plus one merged
+/// multi-message aggregate proof, matching leanSpec's
+/// `SignedBlock { block, proof: MultiMessageAggregate }`.
+#[derive(Debug, Default, Clone, PartialEq, Eq, SszEncodeDerive, SszDecodeDerive)]
+pub struct LeanSignedBlock {
+    pub block: LeanBlock,
+    pub proof: LeanMultiMessageAggregate,
+}
+
+impl LeanBlock {
+    /// Build a minimal valid-SSZ block for the given slot with the specified parent.
     pub fn build_minimal(
         slot: u64,
         proposer_index: u64,
@@ -207,26 +230,53 @@ impl LeanSignedBlock {
         state_root: B256,
     ) -> Self {
         Self {
-            block: LeanBlock {
-                slot,
-                proposer_index,
-                parent_root,
-                state_root,
-                body: LeanBlockBody {
-                    attestations: VariableList::new(vec![]).expect("empty attestation list"),
-                },
+            slot,
+            proposer_index,
+            parent_root,
+            state_root,
+            body: LeanBlockBody {
+                attestations: VariableList::new(vec![]).expect("empty attestation list"),
             },
-            signature: LeanBlockSignatures {
-                attestation_signatures: VariableList::new(vec![]).expect("empty signature list"),
-                proposer_signature: LeanSignature::default(),
-            },
+        }
+    }
+
+    /// Decode the block carried by a signed-block payload, using the wire
+    /// shape of the selected devnet.
+    ///
+    /// The signature payload is validated structurally by the decode and
+    /// then discarded; the mock never verifies proofs.
+    pub fn from_signed_wire_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        if selected_lean_devnet().uses_merged_block_proof() {
+            <LeanSignedBlock as ssz::Decode>::from_ssz_bytes(bytes).map(|signed| signed.block)
+        } else {
+            <LeanSignedBlockDevnet4 as ssz::Decode>::from_ssz_bytes(bytes)
+                .map(|signed| signed.block)
+        }
+    }
+
+    /// Encode the block into a signed-block envelope with an empty proof or
+    /// signature payload, using the wire shape of the selected devnet.
+    pub fn to_signed_wire_ssz_bytes(&self) -> Vec<u8> {
+        if selected_lean_devnet().uses_merged_block_proof() {
+            LeanSignedBlock {
+                block: self.clone(),
+                proof: LeanMultiMessageAggregate::default(),
+            }
+            .as_ssz_bytes()
+        } else {
+            LeanSignedBlockDevnet4 {
+                block: self.clone(),
+                signature: LeanBlockSignatures::default(),
+            }
+            .as_ssz_bytes()
         }
     }
 }
 
-/// Encode data for gossipsub: snappy-compressed SSZ bytes (no varint prefix).
-pub fn encode_gossip_data<T: Encode>(item: &T) -> Vec<u8> {
-    let ssz_bytes = item.as_ssz_bytes();
+/// Encode a block as an unsigned gossip block message using the selected
+/// devnet's wire shape: snappy-compressed SSZ bytes (no varint prefix).
+pub fn encode_gossip_block(block: &LeanBlock) -> Vec<u8> {
+    let ssz_bytes = block.to_signed_wire_ssz_bytes();
     let mut encoder = FrameEncoder::new(Vec::new());
     encoder
         .write_all(&ssz_bytes)

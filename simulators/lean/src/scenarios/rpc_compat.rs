@@ -18,7 +18,7 @@ use reqwest::header::CONTENT_TYPE;
 use ssz::Decode as SszDecode;
 use ssz_derive::Decode;
 use ssz_types::{
-    typenum::{U1073741824, U262144, U4096},
+    typenum::{U1073741824, U262144, U4096, U524288},
     BitList, VariableList,
 };
 use std::time::Duration;
@@ -133,16 +133,34 @@ struct LeanRpcBlock {
     body: LeanRpcBlockBody,
 }
 
+/// Devnet4 per-attestation signature payload on the signed-block envelope.
 #[derive(Debug, Clone, PartialEq, Eq, Decode)]
 struct LeanRpcBlockSignatures {
     attestation_signatures: VariableList<LeanRpcAggregatedSignatureProof, U4096>,
     proposer_signature: LeanSignature,
 }
 
+/// Devnet4 signed-block wire shape: block plus per-attestation signatures.
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanRpcSignedBlockDevnet4 {
+    block: LeanRpcBlock,
+    signature: LeanRpcBlockSignatures,
+}
+
+/// Current signed-block wire shape (devnet5 and later): block plus one merged
+/// multi-message aggregate proof, matching leanSpec's
+/// `SignedBlock { block, proof: MultiMessageAggregate }`.
 #[derive(Debug, Clone, PartialEq, Eq, Decode)]
 struct LeanRpcSignedBlock {
     block: LeanRpcBlock,
-    signature: LeanRpcBlockSignatures,
+    proof: LeanRpcMultiMessageAggregate,
+}
+
+/// Merged proof covering every attestation in the body plus the proposer
+/// signature, matching leanSpec's `MultiMessageAggregate`.
+#[derive(Debug, Clone, PartialEq, Eq, Decode)]
+struct LeanRpcMultiMessageAggregate {
+    proof: VariableList<u8, U524288>,
 }
 
 impl From<LeanStateDevnet4> for LeanState {
@@ -303,12 +321,22 @@ async fn load_finalized_block_bytes(client: &Client) -> Vec<u8> {
         .to_vec()
 }
 
-fn decode_finalized_block(ssz_bytes: &[u8]) -> LeanRpcSignedBlock {
-    LeanRpcSignedBlock::from_ssz_bytes(ssz_bytes)
-        .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized block: {err:?}"))
+/// Decode the block carried by a finalized signed-block payload, using the
+/// wire shape of the selected devnet. The signature payload is validated
+/// structurally by the decode and then discarded.
+fn decode_finalized_block(ssz_bytes: &[u8]) -> LeanRpcBlock {
+    if selected_lean_devnet().uses_merged_block_proof() {
+        LeanRpcSignedBlock::from_ssz_bytes(ssz_bytes)
+            .map(|signed| signed.block)
+            .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized block: {err:?}"))
+    } else {
+        LeanRpcSignedBlockDevnet4::from_ssz_bytes(ssz_bytes)
+            .map(|signed| signed.block)
+            .unwrap_or_else(|err| panic!("Unable to decode SSZ finalized block: {err:?}"))
+    }
 }
 
-async fn load_finalized_block(client: &Client) -> LeanRpcSignedBlock {
+async fn load_finalized_block(client: &Client) -> LeanRpcBlock {
     decode_finalized_block(&load_finalized_block_bytes(client).await)
 }
 
@@ -372,7 +400,7 @@ async fn wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(
     client: &Client,
 ) -> (
     LeanState,
-    LeanRpcSignedBlock,
+    LeanRpcBlock,
     ForkChoiceResponse,
     CheckpointResponse,
 ) {
@@ -388,13 +416,13 @@ async fn wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(
         let current_fork_choice = load_fork_choice_response(client).await;
 
         last_state_slot = Some(state.slot);
-        last_block_slot = Some(block.block.slot);
+        last_block_slot = Some(block.slot);
         last_current_fork_choice_slot = Some(current_fork_choice.finalized.slot);
 
-        let block_root = block.block.tree_hash_root();
+        let block_root = block.tree_hash_root();
         if state.slot >= target_finalized.slot
-            && block.block.slot == state.slot
-            && block.block.state_root == state.tree_hash_root
+            && block.slot == state.slot
+            && block.state_root == state.tree_hash_root
             && block_root == current_fork_choice.finalized.root
         {
             return (state, block, current_fork_choice, target_finalized);
@@ -1351,14 +1379,14 @@ dyn_async! {
 
         let (state, block, fork_choice, observed_finalized) =
             wait_for_finalized_state_and_block_to_reach_observed_finalized_slot(&context.client_under_test).await;
-        let finalized_block_root = block.block.tree_hash_root();
+        let finalized_block_root = block.tree_hash_root();
 
         assert_eq!(
-            block.block.state_root, state.tree_hash_root,
+            block.state_root, state.tree_hash_root,
             "finalized block state_root should match the finalized state tree hash root"
         );
         assert_eq!(
-            block.block.slot, state.slot,
+            block.slot, state.slot,
             "finalized block slot should match the finalized state slot"
         );
         assert_eq!(

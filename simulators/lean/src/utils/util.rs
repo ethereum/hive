@@ -61,6 +61,14 @@ impl LeanDevnet {
     pub(crate) fn uses_latest_leanspec_format(self) -> bool {
         matches!(self, Self::Devnet4 | Self::Devnet5)
     }
+
+    /// Devnet5 replaced the per-attestation signature list on the signed-block
+    /// envelope with a single merged multi-message aggregate proof, matching
+    /// leanSpec's `SignedBlock { block, proof: MultiMessageAggregate }`.
+    /// Devnet4 still ships `SignedBlock { block, signature: BlockSignatures }`.
+    pub(crate) fn uses_merged_block_proof(self) -> bool {
+        matches!(self, Self::Devnet5)
+    }
 }
 
 impl fmt::Display for LeanDevnet {
