@@ -31,6 +31,8 @@ from lean_spec_runtime import (
     identity_keypair_from_private_key_hex,
     import_first_module,
     install_fast_ssz_deserialization,
+    install_finalized_block_api_route,
+    install_inbound_quic_connection_compatibility,
     install_low_s_identity_signature_compatibility,
     install_setup_prover_compatibility,
     install_snappy_compress_fallback,
@@ -791,6 +793,7 @@ async def run() -> None:
     install_reqresp_block_cache_tracking()
     install_network_service_gossip_tracking()
     install_identify_protocol_compatibility()
+    install_inbound_quic_connection_compatibility()
     install_setup_prover_compatibility()
     install_child_only_aggregation_compatibility()
     install_trusted_gossip_attestation_compatibility()
@@ -802,13 +805,6 @@ async def run() -> None:
     prepare_runtime_assets(
         node_id,
         validator_count,
-        genesis_extra_fields={
-            "ATTESTATION_COMMITTEE_COUNT": 1,
-            "MAX_ATTESTATIONS_DATA": 16,
-            "NUM_VALIDATORS": validator_count,
-            "VALIDATOR_COUNT": validator_count,
-            "ACTIVE_EPOCH": 18,
-        },
         validator_count_environment_variable=GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE,
     )
     genesis = load_genesis()
@@ -818,11 +814,14 @@ async def run() -> None:
     )
     identity_key = identity_keypair_from_private_key_hex(identity_private_key_hex)
     metadata = helper_genesis_metadata()
-    validator_registry = load_validator_registry(node_id)
-    bootnodes = parse_bootnodes()
-    is_aggregator = os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
     disable_validator_service = (
         os.environ.get(DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE, "0") == "1"
+    )
+    validator_registry = None if disable_validator_service else load_validator_registry(node_id)
+    bootnodes = parse_bootnodes()
+    is_aggregator = (
+        os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
+        and not disable_validator_service
     )
 
     assigned_validators = (
@@ -905,9 +904,6 @@ async def run() -> None:
                 break
             root = block.parent_root
 
-        for signed_block in published_blocks.values():
-            if extract_inner_block(signed_block).slot == slot:
-                return signed_block
         return None
 
     async def lookup_published_block_by_slot_async(slot: object) -> object | None:
@@ -926,6 +922,8 @@ async def run() -> None:
     }
     if api_server_supports_signed_block_getter(ApiServer):
         api_server_kwargs["signed_block_getter"] = lookup_published_block
+    else:
+        install_finalized_block_api_route(lookup_published_block)
     api_server = ApiServer(**api_server_kwargs)
     metadata_runner = await start_metadata_server(metadata, helper_metadata_port())
     refresh_status(event_source, node)

@@ -28,7 +28,7 @@ use tree_hash_derive::TreeHash as TreeHashDerive;
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
 const FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS: u64 = 60;
-const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]

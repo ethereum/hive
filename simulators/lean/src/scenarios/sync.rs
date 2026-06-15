@@ -6,8 +6,8 @@ use crate::utils::helper::{
     RunningBadCheckpointPeer, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::util::{
-    default_genesis_time, fork_choice_head_slot, lean_clients, load_fork_choice_response,
-    run_data_test, selected_lean_devnet, ClientUnderTestRole, ForkChoiceResponse,
+    default_genesis_time, fork_choice_head_slot, lean_clients, run_data_test, selected_lean_devnet,
+    try_load_fork_choice_response, ClientUnderTestRole, ForkChoiceResponse,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
@@ -23,6 +23,7 @@ const BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS: u64 = 120;
 const BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD: u64 = 4;
 const SYNC_HELPER_PEER_COUNT: usize = 2;
 const HEAD_SYNC_MAX_SLOT_LAG: u64 = 2;
+const PRE_PAUSE_MIN_CLIENT_HEAD_SLOT: u64 = 4;
 
 struct HeadSyncObservation {
     source_before_head: B256,
@@ -79,54 +80,81 @@ fn helper_failed_after_test_start_message(client_name: &str, phase: &str, error:
     )
 }
 
-async fn wait_for_client_to_reach_source_head(
+enum HeadSyncWaitError {
+    RetryableClient(String),
+    NonRetryable(String),
+}
+
+impl HeadSyncWaitError {
+    fn into_message(self) -> String {
+        match self {
+            Self::RetryableClient(message) | Self::NonRetryable(message) => message,
+        }
+    }
+}
+
+async fn try_wait_for_client_to_reach_source_head(
     context: &mut PostGenesisSyncContext,
     minimum_source_head_slot: u64,
-) -> (ForkChoiceResponse, ForkChoiceResponse) {
+    minimum_source_finalized_slot: u64,
+    minimum_client_head_slot: u64,
+) -> Result<(ForkChoiceResponse, ForkChoiceResponse), HeadSyncWaitError> {
     let client_name = context.client_under_test.kind.clone();
     let mut last_observation = None;
     let mut last_source_below_minimum = None;
+    let mut last_client_error = None;
     let deadline = Instant::now() + Duration::from_secs(HEAD_SYNC_TIMEOUT_SECS);
 
     while Instant::now() < deadline {
-        let source_before_fork_choice = context
-            .try_load_live_helper_fork_choice()
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "{}",
-                    helper_failed_after_test_start_message(
+        let source_before_fork_choice =
+            context
+                .try_load_live_helper_fork_choice()
+                .await
+                .map_err(|err| {
+                    HeadSyncWaitError::NonRetryable(helper_failed_after_test_start_message(
                         &client_name,
                         "reading the helper live head before comparing client catch-up",
                         &err,
-                    )
-                )
-            });
-        if !source_head_reached_minimum_slot(&source_before_fork_choice, minimum_source_head_slot) {
+                    ))
+                })?;
+        if !source_head_reached_minimum_slot(&source_before_fork_choice, minimum_source_head_slot)
+            || source_before_fork_choice.finalized.slot < minimum_source_finalized_slot
+        {
             last_source_below_minimum = Some(source_before_fork_choice);
             sleep(Duration::from_secs(1)).await;
             continue;
         }
 
-        let client_fork_choice = load_fork_choice_response(&context.client_under_test).await;
-        if client_caught_up_to_source(&source_before_fork_choice, &client_fork_choice) {
-            return (source_before_fork_choice, client_fork_choice);
+        let client_fork_choice =
+            match try_load_fork_choice_response(&context.client_under_test).await {
+                Ok(fork_choice) => fork_choice,
+                Err(err) => {
+                    last_client_error = Some(err);
+                    sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
+        let client_head_slot = fork_choice_head_slot(&client_fork_choice);
+        if client_head_slot >= minimum_client_head_slot
+            && client_caught_up_to_source(&source_before_fork_choice, &client_fork_choice)
+        {
+            return Ok((source_before_fork_choice, client_fork_choice));
         }
 
-        let source_after_fork_choice = context
-            .try_load_live_helper_fork_choice()
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "{}",
-                    helper_failed_after_test_start_message(
+        let source_after_fork_choice =
+            context
+                .try_load_live_helper_fork_choice()
+                .await
+                .map_err(|err| {
+                    HeadSyncWaitError::NonRetryable(helper_failed_after_test_start_message(
                         &client_name,
                         "reading the helper live head after comparing client catch-up",
                         &err,
-                    )
-                )
-            });
-        if !source_head_reached_minimum_slot(&source_after_fork_choice, minimum_source_head_slot) {
+                    ))
+                })?;
+        if !source_head_reached_minimum_slot(&source_after_fork_choice, minimum_source_head_slot)
+            || source_after_fork_choice.finalized.slot < minimum_source_finalized_slot
+        {
             last_source_below_minimum = Some(source_after_fork_choice);
             sleep(Duration::from_secs(1)).await;
             continue;
@@ -137,8 +165,10 @@ async fn wait_for_client_to_reach_source_head(
             &client_fork_choice,
             &source_after_fork_choice,
         ));
-        if client_caught_up_to_source(&source_after_fork_choice, &client_fork_choice) {
-            return (source_after_fork_choice, client_fork_choice);
+        if client_head_slot >= minimum_client_head_slot
+            && client_caught_up_to_source(&source_after_fork_choice, &client_fork_choice)
+        {
+            return Ok((source_after_fork_choice, client_fork_choice));
         }
 
         sleep(Duration::from_secs(1)).await;
@@ -146,23 +176,32 @@ async fn wait_for_client_to_reach_source_head(
 
     let Some(observation) = last_observation else {
         if let Some(source) = last_source_below_minimum {
-            panic!(
-                "Local LeanSpec helper never exposed a live head at or above required slot {} within {} seconds after client startup (last helper head slot: {}, justified={}, finalized={})",
+            return Err(HeadSyncWaitError::NonRetryable(format!(
+                "Local LeanSpec helper never exposed a live head at or above required slot {} with finalized slot at or above {} within {} seconds after client startup (last helper head slot: {}, justified={}, finalized={})",
                 minimum_source_head_slot,
+                minimum_source_finalized_slot,
                 HEAD_SYNC_TIMEOUT_SECS,
                 fork_choice_head_slot(&source),
                 source.justified.slot,
                 source.finalized.slot,
-            );
+            )));
         }
 
-        panic!(
+        if let Some(err) = last_client_error {
+            return Err(HeadSyncWaitError::RetryableClient(format!(
+                "Client under test fork_choice endpoint never became readable within {} seconds while comparing against the local LeanSpec helper head: {}",
+                HEAD_SYNC_TIMEOUT_SECS, err
+            )));
+        }
+
+        return Err(HeadSyncWaitError::RetryableClient(format!(
             "Client under test could not be compared with the local LeanSpec helper head within {} seconds",
             HEAD_SYNC_TIMEOUT_SECS
-        );
+        )));
     };
-    panic!(
-        "Client under test never caught up to the local LeanSpec helper head slot within {} seconds (allowed lag: {} slots, helper-before head: {:#x} at slot {} [justified={}, finalized={}], client head: {:#x} at slot {} [justified={}, finalized={}], helper-after head: {:#x} at slot {} [justified={}, finalized={}])",
+    Err(HeadSyncWaitError::RetryableClient(format!(
+        "Client under test never reached required head slot {} and caught up to the local LeanSpec helper head slot within {} seconds (allowed lag: {} slots, helper-before head: {:#x} at slot {} [justified={}, finalized={}], client head: {:#x} at slot {} [justified={}, finalized={}], helper-after head: {:#x} at slot {} [justified={}, finalized={}])",
+        minimum_client_head_slot,
         HEAD_SYNC_TIMEOUT_SECS,
         HEAD_SYNC_MAX_SLOT_LAG,
         observation.source_before_head,
@@ -177,7 +216,72 @@ async fn wait_for_client_to_reach_source_head(
         observation.source_after_head_slot,
         observation.source_after_justified_slot,
         observation.source_after_finalized_slot,
-    );
+    )))
+}
+
+async fn wait_for_client_to_reach_source_head(
+    context: &mut PostGenesisSyncContext,
+    minimum_source_head_slot: u64,
+    minimum_source_finalized_slot: u64,
+    minimum_client_head_slot: u64,
+) -> (ForkChoiceResponse, ForkChoiceResponse) {
+    try_wait_for_client_to_reach_source_head(
+        context,
+        minimum_source_head_slot,
+        minimum_source_finalized_slot,
+        minimum_client_head_slot,
+    )
+    .await
+    .unwrap_or_else(|err| panic!("{}", err.into_message()))
+}
+
+async fn wait_for_client_to_reach_source_head_with_client_restart(
+    test: &Test,
+    context: &mut PostGenesisSyncContext,
+    minimum_source_head_slot: u64,
+    minimum_source_finalized_slot: u64,
+    minimum_client_head_slot: u64,
+    phase: &str,
+) -> (ForkChoiceResponse, ForkChoiceResponse) {
+    match try_wait_for_client_to_reach_source_head(
+        context,
+        minimum_source_head_slot,
+        minimum_source_finalized_slot,
+        minimum_client_head_slot,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(HeadSyncWaitError::NonRetryable(message)) => panic!("{message}"),
+        Err(HeadSyncWaitError::RetryableClient(first_error)) => {
+            let client_name = context.client_under_test.kind.clone();
+            eprintln!(
+                "Restarting client under test {client_name} after it failed to catch up during {phase}: {first_error}"
+            );
+            context
+                .restart_client_under_test(test)
+                .await
+                .unwrap_or_else(|restart_err| {
+                    panic!(
+                        "Unable to restart client under test {client_name} after failed {phase}: {restart_err}. Initial catch-up failure: {first_error}"
+                    )
+                });
+
+            try_wait_for_client_to_reach_source_head(
+                context,
+                minimum_source_head_slot,
+                minimum_source_finalized_slot,
+                minimum_client_head_slot,
+            )
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Client under test {client_name} still failed to catch up during {phase} after one restart: {}. Initial catch-up failure before restart: {first_error}",
+                    err.into_message()
+                )
+            })
+        }
+    }
 }
 
 async fn wait_for_helper_finalized_above_client_head(
@@ -317,7 +421,21 @@ async fn wait_for_bad_peer_finalized_ahead(
         let bad_fork_choice = match bad_peer.try_load_fork_choice().await {
             Ok(fork_choice) => fork_choice,
             Err(err) => {
-                last_error = Some(err);
+                match bad_peer.restart_after_retryable_exit(&err).await {
+                    Ok(true) => {
+                        last_error = Some(err);
+                        sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
+                    Ok(false) => {
+                        last_error = Some(err);
+                    }
+                    Err(restart_err) => {
+                        last_error = Some(format!(
+                            "{err}; failed to restart adversarial helper: {restart_err}"
+                        ));
+                    }
+                }
                 sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -564,8 +682,13 @@ dyn_async! {
                 let checkpoint_sync_boundary = context.source_fork_choice.finalized.slot;
 
                 let (source_fork_choice, client_fork_choice) =
-                    wait_for_client_to_reach_source_head(&mut context, checkpoint_sync_boundary)
-                        .await;
+                    wait_for_client_to_reach_source_head(
+                        &mut context,
+                        checkpoint_sync_boundary,
+                        checkpoint_sync_boundary,
+                        0,
+                    )
+                    .await;
                 (
                     checkpoint_sync_boundary,
                     source_fork_choice,
@@ -622,7 +745,15 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head(&mut context, 0).await;
+            wait_for_client_to_reach_source_head_with_client_restart(
+                test,
+                &mut context,
+                0,
+                1,
+                PRE_PAUSE_MIN_CLIENT_HEAD_SLOT,
+                "pre-pause head-recovery catch-up",
+            )
+            .await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
         let paused_client_head = client_before_pause.head;
 
@@ -661,7 +792,7 @@ dyn_async! {
         );
 
         let (source_after_recovery, client_after_recovery) =
-            wait_for_client_to_reach_source_head(&mut context, 0).await;
+            wait_for_client_to_reach_source_head(&mut context, 0, 0, 0).await;
         let source_head_slot = fork_choice_head_slot(&source_after_recovery);
         let client_head_slot = fork_choice_head_slot(&client_after_recovery);
 
@@ -700,7 +831,15 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head(&mut context, 0).await;
+            wait_for_client_to_reach_source_head_with_client_restart(
+                test,
+                &mut context,
+                0,
+                1,
+                PRE_PAUSE_MIN_CLIENT_HEAD_SLOT,
+                "pre-pause finalized-recovery catch-up",
+            )
+            .await;
         let paused_client_head_slot = fork_choice_head_slot(&client_before_pause);
         let paused_client_head = client_before_pause.head;
 
@@ -745,7 +884,7 @@ dyn_async! {
         );
 
         let (source_after_recovery, client_after_recovery) =
-            wait_for_client_to_reach_source_head(&mut context, 0).await;
+            wait_for_client_to_reach_source_head(&mut context, 0, 0, 0).await;
         let source_head_slot = fork_choice_head_slot(&source_after_recovery);
         let client_head_slot = fork_choice_head_slot(&client_after_recovery);
 
@@ -797,7 +936,15 @@ dyn_async! {
         .await;
         let minimum_source_head_slot = fork_choice_head_slot(&honest_helper_agreement_before_pause);
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head(&mut context, minimum_source_head_slot).await;
+            wait_for_client_to_reach_source_head_with_client_restart(
+                test,
+                &mut context,
+                minimum_source_head_slot,
+                1,
+                PRE_PAUSE_MIN_CLIENT_HEAD_SLOT,
+                "pre-pause bad-checkpoint catch-up",
+            )
+            .await;
         let bad_before_pause =
             wait_for_bad_peer_finalized_ahead(&mut bad_peer, &source_before_pause).await;
         assert_client_rejected_bad_checkpoint(
@@ -821,12 +968,15 @@ dyn_async! {
                 )
             });
 
-        let helper_finalized_above_head = wait_for_honest_helper_finalized_agreement(
-            &mut context,
-            paused_client_head_slot.saturating_add(1),
-            "waiting for the honest helpers to finalize beyond the paused client head",
-        )
-        .await;
+        let helper_finalized_above_head =
+            wait_for_helper_finalized_above_client_head(&mut context, paused_client_head_slot)
+                .await
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Unable to observe an honest helper finalizing beyond paused client {} head {:#x} at slot {}: {}",
+                        client_name, paused_client_head, paused_client_head_slot, err,
+                    )
+                });
         let bad_while_paused =
             wait_for_bad_peer_fork_choice(&mut bad_peer, "while client is paused").await;
 
@@ -857,7 +1007,7 @@ dyn_async! {
         );
 
         let (source_after_recovery, client_after_recovery) =
-            wait_for_client_to_reach_source_head(&mut context, 0).await;
+            wait_for_client_to_reach_source_head(&mut context, 0, 0, 0).await;
         let bad_after_recovery =
             wait_for_bad_peer_finalized_ahead(&mut bad_peer, &source_after_recovery).await;
         let source_head_slot = fork_choice_head_slot(&source_after_recovery);

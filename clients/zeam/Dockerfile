@@ -1,6 +1,5 @@
 FROM blockblaz/zeam:devnet4 AS devnet4-binary
-# TODO: this is a placeholder until a devnet5 image is published
-FROM blockblaz/zeam:devnet4 AS devnet5-binary
+FROM blockblaz/zeam:devnet5 AS devnet5-binary
 
 FROM ubuntu:24.04
 

@@ -545,6 +545,27 @@ pub(crate) async fn load_fork_choice_response(client: &Client) -> ForkChoiceResp
     get_json_with_retry(&http, &lean_api_url(client, "/lean/v0/fork_choice")).await
 }
 
+pub(crate) async fn try_load_fork_choice_response(
+    client: &Client,
+) -> Result<ForkChoiceResponse, String> {
+    let http = http_client();
+    let url = lean_api_url(client, "/lean/v0/fork_choice");
+    let response = http
+        .get(&url)
+        .send()
+        .await
+        .map_err(|err| format!("request to {url} failed: {err}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("received HTTP {status} from {url}"));
+    }
+
+    response
+        .json::<ForkChoiceResponse>()
+        .await
+        .map_err(|err| format!("Unable to decode response from {url}: {err}"))
+}
+
 pub(crate) fn expect_single_client(clients: Vec<Client>) -> Client {
     clients
         .into_iter()
@@ -615,7 +636,7 @@ pub(crate) async fn run_data_test<T: Send + 'static>(
 
     let test_result = extract_data_test_result(
         tokio::spawn(async move {
-            let test = &mut Test {
+            let mut test = Test {
                 sim: simulation,
                 test_id,
                 suite,
@@ -624,7 +645,7 @@ pub(crate) async fn run_data_test<T: Send + 'static>(
             };
 
             test.result.pass = true;
-            (func)(test, test_data).await;
+            (func)(&mut test, test_data).await;
         })
         .await,
     );
@@ -666,7 +687,7 @@ pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
     let simulation = host_test.sim.clone();
 
     let mut join_handle = tokio::spawn(async move {
-        let test = &mut Test {
+        let mut test = Test {
             sim: simulation,
             test_id,
             suite,
@@ -675,7 +696,7 @@ pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
         };
 
         test.result.pass = true;
-        (func)(test, test_data).await;
+        (func)(&mut test, test_data).await;
     });
 
     let test_result = match timeout(timeout_duration, &mut join_handle).await {
