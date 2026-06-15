@@ -29,6 +29,7 @@ from lean_spec_runtime import (
     extract_inner_block,
     helper_genesis_metadata,
     identity_keypair_from_private_key_hex,
+    import_first_module,
     install_fast_ssz_deserialization,
     install_low_s_identity_signature_compatibility,
     install_setup_prover_compatibility,
@@ -48,30 +49,58 @@ from lean_spec_runtime import (
     uses_latest_leanspec_format,
 )
 
-from lean_spec.subspecs.api import ApiServer, ApiServerConfig
-from lean_spec.subspecs.metrics import registry as metrics
-from lean_spec.subspecs.networking.client import LiveNetworkEventSource
-from lean_spec.subspecs.networking.service.events import GossipBlockEvent
-from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-from lean_spec.subspecs.networking.transport.quic.connection import (
-    QuicConnectionManager,
-)
-from lean_spec.subspecs.node import Node, NodeConfig
+# leanSpec restructured its packages over time (subspecs/types -> node/spec).
+# The devnet5 helper builds from leanSpec main (new layout) while the devnet4
+# helper stays pinned on the old layout, so every import tries the new
+# location first and falls back to the old ones.
 try:
-    from lean_spec.subspecs.xmss.aggregation import (
-        AggregatedSignatureProof as TypeOneSignatureProof,
+    from lean_spec.node.api import ApiServer, ApiServerConfig
+    from lean_spec.node.metrics import registry as metrics
+    from lean_spec.node.networking.client import LiveNetworkEventSource
+    from lean_spec.node.networking.service.events import GossipBlockEvent
+    from lean_spec.node.networking.transport.identity import IdentityKeypair
+    from lean_spec.node.networking.transport.quic.connection import (
+        QuicConnectionManager,
     )
-except ImportError:
-    from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature as TypeOneSignatureProof
-from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.subspecs.validator.registry import ValidatorEntry
-from lean_spec.types import Bytes32
-try:
-    from lean_spec.types.participation import AggregationBits, ValidatorIndices
-except ImportError:
-    from lean_spec.types import AggregationBits, ValidatorIndices
-from lean_spec.types.uint import Uint64
+    from lean_spec.node.node import Node, NodeConfig
+    from lean_spec.node.validator import ValidatorRegistry
+    from lean_spec.node.validator.registry import ValidatorEntry
+    from lean_spec.spec.crypto.merkleization import hash_tree_root
+    from lean_spec.spec.forks.lstar.containers import (
+        AggregationBits,
+        SingleMessageAggregate as TypeOneSignatureProof,
+        ValidatorIndices,
+    )
+    from lean_spec.spec.ssz import Bytes32, Uint64
+except (ImportError, ModuleNotFoundError):
+    from lean_spec.subspecs.api import ApiServer, ApiServerConfig
+    from lean_spec.subspecs.metrics import registry as metrics
+    from lean_spec.subspecs.networking.client import LiveNetworkEventSource
+    from lean_spec.subspecs.networking.service.events import GossipBlockEvent
+    from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+    from lean_spec.subspecs.networking.transport.quic.connection import (
+        QuicConnectionManager,
+    )
+    from lean_spec.subspecs.node import Node, NodeConfig
+
+    try:
+        from lean_spec.subspecs.xmss.aggregation import (
+            AggregatedSignatureProof as TypeOneSignatureProof,
+        )
+    except ImportError:
+        from lean_spec.subspecs.xmss.aggregation import (
+            TypeOneMultiSignature as TypeOneSignatureProof,
+        )
+    from lean_spec.subspecs.ssz.hash import hash_tree_root
+    from lean_spec.subspecs.validator import ValidatorRegistry
+    from lean_spec.subspecs.validator.registry import ValidatorEntry
+    from lean_spec.types import Bytes32
+
+    try:
+        from lean_spec.types.participation import AggregationBits, ValidatorIndices
+    except ImportError:
+        from lean_spec.types import AggregationBits, ValidatorIndices
+    from lean_spec.types.uint import Uint64
 
 DEFAULT_GOSSIP_FORK_DIGEST: Final = "devnet0"
 DEFAULT_LISTEN_PORT: Final = 9001
@@ -116,8 +145,9 @@ def install_reqresp_block_cache_tracking() -> None:
     if _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED:
         return
 
-    reqresp_client_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.reqresp_client"
+    reqresp_client_module = import_first_module(
+        "lean_spec.node.networking.client.reqresp_client",
+        "lean_spec.subspecs.networking.client.reqresp_client",
     )
     reqresp_client_cls = reqresp_client_module.ReqRespClient
     original_request_blocks_by_root = reqresp_client_cls.request_blocks_by_root
@@ -144,8 +174,9 @@ def install_network_service_gossip_tracking() -> None:
     if _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED:
         return
 
-    networking_service_module = importlib.import_module(
-        "lean_spec.subspecs.networking.service.service"
+    networking_service_module = import_first_module(
+        "lean_spec.node.networking.service.service",
+        "lean_spec.subspecs.networking.service.service",
     )
     network_service_cls = networking_service_module.NetworkService
     original_handle_event = network_service_cls._handle_event
@@ -289,11 +320,13 @@ def install_identify_protocol_compatibility() -> None:
     if _IDENTIFY_PROTOCOL_COMPAT_INSTALLED:
         return
 
-    live_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.event_source.live"
+    live_module = import_first_module(
+        "lean_spec.node.networking.client.event_source.live",
+        "lean_spec.subspecs.networking.client.event_source.live",
     )
-    protocol_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.event_source.protocol"
+    protocol_module = import_first_module(
+        "lean_spec.node.networking.client.event_source.protocol",
+        "lean_spec.subspecs.networking.client.event_source.protocol",
     )
 
     extra_protocols = {
@@ -370,18 +403,25 @@ def install_child_only_aggregation_compatibility() -> None:
     if _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED:
         return
 
-    original_to_aggregation_bits = ValidatorIndices.to_aggregation_bits
-    original_aggregate = TypeOneSignatureProof.aggregate
-    aggregate_parameters = inspect.signature(original_aggregate).parameters
+    # Both patches work around old-layout quirks. Newer leanSpec checkouts
+    # fixed the underlying behavior and dropped or reshaped these methods,
+    # so each patch only installs when its target still exists.
+    original_to_aggregation_bits = getattr(ValidatorIndices, "to_aggregation_bits", None)
+    original_aggregate = getattr(TypeOneSignatureProof, "aggregate", None)
+    aggregate_parameters = (
+        inspect.signature(original_aggregate).parameters if original_aggregate else {}
+    )
 
-    def to_aggregation_bits_allowing_empty(
-        self: ValidatorIndices,
-    ) -> AggregationBits:
-        if not self.data:
-            return AggregationBits(data=[])
-        return original_to_aggregation_bits(self)
+    if original_to_aggregation_bits is not None:
 
-    ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
+        def to_aggregation_bits_allowing_empty(
+            self: ValidatorIndices,
+        ) -> AggregationBits:
+            if not self.data:
+                return AggregationBits(data=[])
+            return original_to_aggregation_bits(self)
+
+        ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
 
     if {"children", "raw_xmss", "xmss_participants"}.issubset(aggregate_parameters):
 
@@ -421,8 +461,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
         return
 
     try:
-        from lean_spec.forks.lstar.spec import LstarSpec
-        from lean_spec.forks.lstar.store import AttestationSignatureEntry
+        try:
+            from lean_spec.spec.forks.lstar.containers import AttestationSignatureEntry
+            from lean_spec.spec.forks.lstar.spec import LstarSpec
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.forks.lstar.spec import LstarSpec
+            from lean_spec.forks.lstar.store import AttestationSignatureEntry
     except ImportError as err:
         logger.debug("LeanSpec trusted attestation compatibility unavailable: %s", err)
         return
@@ -433,7 +477,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
         signed_attestation: Any,
         is_aggregator: bool = False,
     ) -> Any:
-        validator_id = signed_attestation.validator_id
+        # The voter field and the registry-bounds predicate were renamed on
+        # newer leanSpec layouts (validator_id -> validator_index, is_valid ->
+        # is_within_registry); resolve whichever spelling the checkout has.
+        validator_index = getattr(signed_attestation, "validator_index", None)
+        if validator_index is None:
+            validator_index = signed_attestation.validator_id
         attestation_data = signed_attestation.data
         signature = signed_attestation.signature
 
@@ -444,8 +493,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
             f"No state available to validate attestation for target block "
             f"{attestation_data.target.root.hex()}"
         )
-        assert validator_id.is_valid(Uint64(len(key_state.validators))), (
-            f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
+        in_registry = getattr(validator_index, "is_within_registry", None)
+        if in_registry is None:
+            in_registry = validator_index.is_valid
+        assert in_registry(Uint64(len(key_state.validators))), (
+            f"Validator {validator_index} not found in state "
+            f"{attestation_data.target.root.hex()}"
         )
 
         if not is_aggregator:
@@ -453,7 +506,7 @@ def install_trusted_gossip_attestation_compatibility() -> None:
 
         new_committee_sigs = {k: set(v) for k, v in store.attestation_signatures.items()}
         new_committee_sigs.setdefault(attestation_data, set()).add(
-            AttestationSignatureEntry(validator_id, signature)
+            AttestationSignatureEntry(validator_index, signature)
         )
         return store.model_copy(update={"attestation_signatures": new_committee_sigs})
 
@@ -469,13 +522,19 @@ def install_checkpoint_finalization_compatibility() -> None:
         return
 
     try:
-        from lean_spec.forks.lstar.spec import LstarSpec
+        try:
+            from lean_spec.spec.forks.lstar.spec import LstarSpec
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.forks.lstar.spec import LstarSpec
     except ImportError as err:
         logger.debug("LeanSpec checkpoint finalization compatibility unavailable: %s", err)
         return
 
     try:
-        from lean_spec.subspecs.validator.service import ValidatorService
+        try:
+            from lean_spec.node.validator.service import ValidatorService
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.subspecs.validator.service import ValidatorService
     except ImportError:
         ValidatorService = None
 
@@ -882,7 +941,14 @@ async def run() -> None:
         node.validator_service.on_block = cache_and_publish_block
 
     event_source.set_block_lookup(lookup_reqresp_block)
-    event_source.set_block_by_slot_lookup(lookup_reqresp_block_by_slot)
+    # Newer leanSpec checkouts dropped the by-slot convenience setter but
+    # kept the handler field it assigned, so fall back to wiring the field
+    # directly when the setter is gone.
+    set_block_by_slot_lookup = getattr(event_source, "set_block_by_slot_lookup", None)
+    if set_block_by_slot_lookup is not None:
+        set_block_by_slot_lookup(lookup_reqresp_block_by_slot)
+    else:
+        event_source._reqresp_handler.block_by_slot_lookup = lookup_reqresp_block_by_slot
     event_source.set_current_slot_lookup(current_known_slot)
 
     listener_task = await start_listener_and_gossipsub(event_source, listen_addr())
