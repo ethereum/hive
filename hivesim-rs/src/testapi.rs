@@ -617,23 +617,15 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     // The owner test keeps the shared container alive across scenarios.
     let owner_test_id = host.start_test(suite_id, owner_name, owner_desc).await;
 
-    let host_for_start = host.clone();
-    let client_name = client_def.name.clone();
-    let start_result = tokio::spawn(async move {
-        host_for_start
-            .start_client_with_files(suite_id, owner_test_id, client_name, environment, files)
-            .await
-    })
-    .await;
-    let (container_id, ip) = match start_result {
-        Ok(client) => client,
-        Err(err) => {
-            host.end_test(suite_id, owner_test_id, extract_test_results(Err(err)))
-                .await;
-            host.test_progress(&suite.name);
-            return;
-        }
-    };
+    let (container_id, ip) = host
+        .start_client_with_files(
+            suite_id,
+            owner_test_id,
+            client_def.name.clone(),
+            environment,
+            files,
+        )
+        .await;
 
     let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
     guard.arm();

@@ -154,17 +154,12 @@ impl Simulation {
 
     pub async fn end_suite(&self, test_suite: SuiteID) {
         let url = format!("{}/testsuite/{}", self.url, test_suite);
-        let response = self
-            .http_client
+        let client = reqwest::Client::new();
+        client
             .delete(url)
             .send()
             .await
             .expect("Failed to send an end suite request");
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            panic!("Failed to end suite {test_suite}: status={status} body={body}");
-        }
     }
 
     /// Starts a new test case, returning the testcase id as a context identifier
@@ -253,19 +248,12 @@ impl Simulation {
             }
         }
 
-        let response = client
+        let resp = client
             .post(url)
             .multipart(form)
             .send()
             .await
-            .expect("Failed to send start client request");
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            panic!("Failed to start client: status={status} body={body}");
-        }
-
-        let resp = response
+            .expect("Failed to send start client request")
             .json::<StartNodeResponse>()
             .await
             .expect("Failed to convert start node response to json");
