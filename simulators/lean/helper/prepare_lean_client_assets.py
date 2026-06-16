@@ -241,7 +241,6 @@ def render_config(validators: list[dict[str, str]]) -> str:
                     f'    proposal_public_key: "{format_genesis_pubkey(validator["proposal_public"])}"'
                 )
             else:
-                # Non-ream lean clients accept the nested dual-key shape.
                 lines.append(
                     f'  - attestation_pubkey: "{format_genesis_pubkey(validator["attestation_public"])}"'
                 )
