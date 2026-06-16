@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import gc
-import hashlib
 import importlib
 import io
 import inspect
@@ -20,9 +19,7 @@ import types
 from pathlib import Path
 from typing import Any, Final
 
-from cryptography import x509
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import (
     Prehashed,
@@ -156,9 +153,6 @@ SECP256K1_ORDER: Final = int(
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
     16,
 )
-LIBP2P_TLS_EXTENSION_OID: Final = x509.ObjectIdentifier("1.3.6.1.4.1.53594.1.1")
-LIBP2P_TLS_SIGNATURE_PREFIX: Final = b"libp2p-tls-handshake:"
-LIBP2P_SECP256K1_KEY_TYPE: Final = 2
 HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE: Final = "HIVE_LEAN_HELPER_ADVERTISE_IP"
 ATTESTATION_PUBKEY_FIELD: Final = "attestation_public"
 ATTESTATION_SECRET_FIELD: Final = "attestation_secret"
@@ -170,7 +164,6 @@ _LOW_S_IDENTITY_SIGNATURE_COMPAT_INSTALLED = False
 _SSZ_FAST_DESERIALIZATION_INSTALLED = False
 _SNAPPY_COMPRESS_FALLBACK_INSTALLED = False
 _SETUP_PROVER_COMPAT_INSTALLED = False
-_INBOUND_QUIC_COMPAT_INSTALLED = False
 
 
 def setup_logging() -> None:
@@ -183,52 +176,6 @@ def setup_logging() -> None:
 
 def api_server_supports_signed_block_getter(api_server_type: type[Any]) -> bool:
     return "signed_block_getter" in inspect.signature(api_server_type).parameters
-
-
-def install_finalized_block_api_route(signed_block_getter: Any) -> None:
-    try:
-        routes_module = import_first_module(
-            "lean_spec.node.api.routes",
-            "lean_spec.subspecs.api.routes",
-        )
-    except (ImportError, ModuleNotFoundError):
-        return
-    routes = getattr(routes_module, "ROUTES", None)
-    route_type = getattr(routes_module, "Route", None)
-    if routes is None or route_type is None:
-        return
-
-    if any(
-        getattr(route, "method", None) == "GET"
-        and getattr(route, "path", None) == "/lean/v0/blocks/finalized"
-        for route in routes
-    ):
-        return
-
-    async def handle_finalized_block(request: web.Request) -> web.Response:
-        store_getter = request.app.get("store_getter")
-        store = store_getter() if store_getter else None
-        if store is None:
-            raise web.HTTPServiceUnavailable(reason="Store not initialized")
-
-        signed_block = signed_block_getter(store.latest_finalized.root)
-        if inspect.isawaitable(signed_block):
-            signed_block = await signed_block
-        if signed_block is None:
-            raise web.HTTPNotFound(reason="Finalized block not available")
-
-        ssz_bytes = await asyncio.to_thread(signed_block.encode_bytes)
-        return web.Response(body=ssz_bytes, content_type="application/octet-stream")
-
-    routes.append(
-        route_type(
-            "GET",
-            "/lean/v0/blocks/finalized",
-            handle_finalized_block,
-            is_admin=False,
-        )
-    )
-    logger.info("Installed LeanSpec finalized block API route")
 
 
 def canonicalize_der_secp256k1_signature(der_signature: bytes) -> bytes:
@@ -268,290 +215,6 @@ def identity_keypair_from_private_key_hex(private_key_hex: str) -> IdentityKeypa
         private_key=private_key,
         public_key=Secp256k1PublicKey(_key=private_key.public_key()),
     )
-
-
-def _decode_der_length(payload: bytes, offset: int) -> tuple[int, int]:
-    if offset >= len(payload):
-        raise ValueError("DER length truncated")
-
-    first = payload[offset]
-    offset += 1
-    if first < 0x80:
-        return first, offset
-
-    length_size = first & 0x7F
-    if length_size == 0 or length_size > 4:
-        raise ValueError("Unsupported DER length")
-    if offset + length_size > len(payload):
-        raise ValueError("DER long-form length truncated")
-
-    value = int.from_bytes(payload[offset : offset + length_size], "big")
-    return value, offset + length_size
-
-
-def _decode_der_value(payload: bytes, offset: int, expected_tag: int) -> tuple[bytes, int]:
-    if offset >= len(payload):
-        raise ValueError("DER value truncated")
-    if payload[offset] != expected_tag:
-        raise ValueError(f"Expected DER tag 0x{expected_tag:02x}")
-
-    length, value_offset = _decode_der_length(payload, offset + 1)
-    end = value_offset + length
-    if end > len(payload):
-        raise ValueError("DER value truncated")
-    return payload[value_offset:end], end
-
-
-def _decode_libp2p_signed_key(payload: bytes) -> tuple[bytes, bytes]:
-    sequence, offset = _decode_der_value(payload, 0, 0x30)
-    if offset != len(payload):
-        raise ValueError("Trailing bytes after libp2p TLS extension sequence")
-
-    public_key, offset = _decode_der_value(sequence, 0, 0x04)
-    signature, offset = _decode_der_value(sequence, offset, 0x04)
-    if offset != len(sequence):
-        raise ValueError("Trailing bytes after libp2p signed-key payload")
-    return public_key, signature
-
-
-def _decode_unsigned_varint(payload: bytes, offset: int) -> tuple[int, int]:
-    value = 0
-    shift = 0
-    for _ in range(10):
-        if offset >= len(payload):
-            raise ValueError("protobuf varint truncated")
-        byte = payload[offset]
-        offset += 1
-        value |= (byte & 0x7F) << shift
-        if byte & 0x80 == 0:
-            return value, offset
-        shift += 7
-    raise ValueError("protobuf varint is too long")
-
-
-def _decode_libp2p_public_key_protobuf(payload: bytes) -> tuple[int | None, bytes | None]:
-    offset = 0
-    key_type = None
-    key_data = None
-    while offset < len(payload):
-        key, offset = _decode_unsigned_varint(payload, offset)
-        field_number = key >> 3
-        wire_type = key & 0x07
-        if field_number == 1 and wire_type == 0:
-            key_type, offset = _decode_unsigned_varint(payload, offset)
-        elif field_number == 2 and wire_type == 2:
-            length, offset = _decode_unsigned_varint(payload, offset)
-            end = offset + length
-            if end > len(payload):
-                raise ValueError("protobuf public-key data truncated")
-            key_data = payload[offset:end]
-            offset = end
-        elif wire_type == 0:
-            _, offset = _decode_unsigned_varint(payload, offset)
-        elif wire_type == 2:
-            length, offset = _decode_unsigned_varint(payload, offset)
-            offset += length
-            if offset > len(payload):
-                raise ValueError("protobuf length-delimited field truncated")
-        else:
-            raise ValueError(f"Unsupported protobuf wire type: {wire_type}")
-
-    return key_type, key_data
-
-
-def _peer_id_type() -> type[Any]:
-    try:
-        peer_id_module = import_first_module(
-            "lean_spec.node.networking.transport.peer_id",
-            "lean_spec.node.networking.transport",
-            "lean_spec.subspecs.networking.transport.peer_id",
-            "lean_spec.subspecs.networking.transport",
-        )
-    except (ImportError, ModuleNotFoundError) as err:
-        raise ImportError("Unable to import LeanSpec PeerId") from err
-
-    return getattr(peer_id_module, "PeerId")
-
-
-def _peer_id_from_public_key_protobuf(public_key_protobuf: bytes) -> Any:
-    digest = (
-        bytes([0x00, len(public_key_protobuf)]) + public_key_protobuf
-        if len(public_key_protobuf) <= 42
-        else b"\x12\x20" + hashlib.sha256(public_key_protobuf).digest()
-    )
-    return _peer_id_type()(multihash=digest)
-
-
-def _verify_libp2p_tls_identity(
-    certificate: x509.Certificate,
-    public_key_protobuf: bytes,
-    signature: bytes,
-) -> None:
-    key_type, key_data = _decode_libp2p_public_key_protobuf(public_key_protobuf)
-    if key_type != LIBP2P_SECP256K1_KEY_TYPE or key_data is None:
-        logger.debug("Skipping libp2p TLS signature verification for key type %s", key_type)
-        return
-
-    identity_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
-        ec.SECP256K1(),
-        key_data,
-    )
-    tls_public_key_bytes = certificate.public_key().public_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    message = LIBP2P_TLS_SIGNATURE_PREFIX + tls_public_key_bytes
-
-    signature_candidates = [signature]
-    if len(signature) == 64:
-        signature_r = int.from_bytes(signature[:32], "big")
-        signature_s = int.from_bytes(signature[32:], "big")
-        signature_candidates.append(encode_dss_signature(signature_r, signature_s))
-
-    last_error = None
-    for candidate in signature_candidates:
-        try:
-            identity_public_key.verify(candidate, message, ec.ECDSA(hashes.SHA256()))
-            return
-        except Exception as err:
-            last_error = err
-
-    logger.debug("Unable to verify libp2p TLS identity signature: %s", last_error)
-
-
-def _quic_protocol_peer_certificate(protocol_instance: Any) -> x509.Certificate | None:
-    quic = getattr(protocol_instance, "_quic", None)
-    tls_context = getattr(quic, "tls", None)
-    certificate = getattr(tls_context, "_peer_certificate", None)
-    if isinstance(certificate, x509.Certificate):
-        return certificate
-    return None
-
-
-def _peer_id_from_quic_protocol_certificate(protocol_instance: Any) -> Any | None:
-    certificate = _quic_protocol_peer_certificate(protocol_instance)
-    if certificate is None:
-        return None
-
-    try:
-        extension = certificate.extensions.get_extension_for_oid(LIBP2P_TLS_EXTENSION_OID)
-        public_key_protobuf, signature = _decode_libp2p_signed_key(extension.value.value)
-        _verify_libp2p_tls_identity(certificate, public_key_protobuf, signature)
-        return _peer_id_from_public_key_protobuf(public_key_protobuf)
-    except Exception as err:
-        logger.debug("Unable to derive peer ID from libp2p TLS certificate: %s", err)
-        return None
-
-
-def _fallback_peer_id_from_quic_protocol(protocol_instance: Any) -> Any:
-    quic = getattr(protocol_instance, "_quic", None)
-    seed_parts = [
-        b"hive-lean-inbound-quic",
-        str(id(protocol_instance)).encode(),
-    ]
-    for attr_name in ("_peer_cid", "_original_destination_connection_id"):
-        value = getattr(quic, attr_name, None)
-        cid = getattr(value, "cid", value)
-        if isinstance(cid, bytes):
-            seed_parts.append(cid)
-
-    return _peer_id_type()(multihash=b"\x12\x20" + hashlib.sha256(b"|".join(seed_parts)).digest())
-
-
-def install_inbound_quic_connection_compatibility() -> None:
-    global _INBOUND_QUIC_COMPAT_INSTALLED
-
-    if _INBOUND_QUIC_COMPAT_INSTALLED:
-        return
-
-    try:
-        connection_module = import_first_module(
-            "lean_spec.node.networking.transport.quic.connection",
-            "lean_spec.subspecs.networking.transport.quic.connection",
-        )
-    except (ImportError, ModuleNotFoundError) as err:
-        logger.debug("LeanSpec inbound QUIC compatibility unavailable: %s", err)
-        return
-
-    connection_manager_cls = connection_module.QuicConnectionManager
-    original_listen = connection_manager_cls.listen
-    try:
-        original_listen_source = inspect.getsource(original_listen)
-    except (OSError, TypeError):
-        original_listen_source = ""
-    if "peer identity verification from the libp2p certificate is not implemented" not in original_listen_source:
-        _INBOUND_QUIC_COMPAT_INSTALLED = True
-        return
-
-    async def listen_with_certificate_peer_id(
-        self: Any,
-        multiaddr: str,
-        on_connection: Any,
-    ) -> None:
-        host, port, transport, _ = connection_module.parse_multiaddr(multiaddr)
-        if transport != "quic":
-            raise connection_module.QuicTransportError(f"Not a QUIC multiaddr: {multiaddr}")
-
-        server_config = connection_module.QuicConfiguration(
-            alpn_protocols=[connection_module.LIBP2P_ALPN_PROTOCOL],
-            is_client=False,
-            verify_mode=connection_module.ssl.CERT_NONE,
-        )
-        if self._temp_directory:
-            certificate_path = self._temp_directory / "cert.pem"
-            key_path = self._temp_directory / "key.pem"
-            server_config.load_cert_chain(str(certificate_path), str(key_path))
-
-        def handle_handshake(protocol_instance: Any) -> None:
-            peer_id = _peer_id_from_quic_protocol_certificate(protocol_instance)
-            if peer_id is None:
-                peer_id = _fallback_peer_id_from_quic_protocol(protocol_instance)
-                logger.info(
-                    "Accepted inbound QUIC connection without certificate peer ID; "
-                    "using local scoped peer ID %s",
-                    peer_id,
-                )
-
-            connection = connection_module.QuicConnection(
-                _protocol=protocol_instance,
-                _peer_id=peer_id,
-                _remote_address=f"inbound-quic/{peer_id}",
-            )
-            protocol_instance.connection = connection
-            protocol_instance._replay_buffered_events()
-            self._connections[peer_id] = connection
-
-            task = asyncio.create_task(on_connection(connection))
-
-            def log_callback_error(done: asyncio.Task[Any]) -> None:
-                try:
-                    done.result()
-                except asyncio.CancelledError:
-                    pass
-                except Exception as err:
-                    logger.warning("Inbound QUIC connection callback failed: %s", err)
-
-            task.add_done_callback(log_callback_error)
-
-        def create_protocol(*args: Any, **kwargs: Any) -> Any:
-            protocol = connection_module.LibP2PQuicProtocol(*args, **kwargs)
-            tls_context = getattr(getattr(protocol, "_quic", None), "tls", None)
-            if tls_context is not None:
-                tls_context._request_client_certificate = True
-            protocol._on_handshake = handle_handshake
-            return protocol
-
-        await connection_module.quic_serve(
-            host,
-            port,
-            configuration=server_config,
-            create_protocol=create_protocol,
-        )
-        await asyncio.Event().wait()
-
-    connection_manager_cls.listen = listen_with_certificate_peer_id
-    _INBOUND_QUIC_COMPAT_INSTALLED = True
-    logger.info("Installed LeanSpec inbound QUIC certificate peer-id compatibility")
 
 
 def install_fast_ssz_deserialization() -> None:
