@@ -4,16 +4,14 @@ use crate::utils::helper::{
 };
 use crate::utils::libp2p_mock::LeanSignature;
 use crate::utils::util::{
-    default_genesis_time, expect_single_client, get_json_with_retry, http_client, lean_api_url,
-    lean_clients, lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
-    load_response_with_retry, prepare_client_runtime_files, run_data_test_with_timeout,
-    selected_lean_devnet, CheckpointResponse, ClientUnderTestRole, ForkChoiceResponse,
-    HealthResponse, TimedDataTestSpec, HEALTHY_STATUS, LEAN_RPC_SERVICE,
+    default_genesis_time, get_json_with_retry, http_client, lean_api_url, lean_clients,
+    lean_environment, load_fork_choice_response, load_response_with_retry,
+    prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
+    CheckpointResponse, ClientUnderTestRole, ForkChoiceResponse, HealthResponse, TimedDataTestSpec,
+    HEALTHY_STATUS, LEAN_RPC_SERVICE,
 };
 use alloy_primitives::{FixedBytes, B256};
-use hivesim::{
-    dyn_async, Client, NClientTestSpec, SharedClientScenario, SharedClientTestSpec, Test,
-};
+use hivesim::{dyn_async, Client, SharedClientScenario, SharedClientTestSpec, Test};
 use reqwest::header::CONTENT_TYPE;
 use ssz::Decode as SszDecode;
 use ssz_derive::Decode;
@@ -270,10 +268,8 @@ async fn wait_for_post_genesis_fork_choice_response(client: &Client) -> ForkChoi
     );
 }
 
-async fn load_fresh_fork_choice_setup(clients: Vec<Client>) -> (Client, ForkChoiceResponse) {
-    let client = expect_single_client(clients);
-    let fork_choice = load_fork_choice_response(&client).await;
-    (client, fork_choice)
+async fn load_fresh_fork_choice_setup(client: &Client) -> ForkChoiceResponse {
+    load_fork_choice_response(client).await
 }
 
 async fn load_post_genesis_fork_choice_setup(
@@ -461,56 +457,131 @@ dyn_async! {
         }
 
         for client in &clients {
-            let (fresh_client_environments, fresh_client_files) =
-                lean_single_client_runtime_setup(&client.name);
+            let fresh_client_environment = lean_environment();
+            let fresh_client_files = prepare_client_runtime_files(&client.name, &fresh_client_environment)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Unable to prepare runtime assets for {}: {err}",
+                        client.name
+                    )
+                });
 
-            test.run(NClientTestSpec {
-                name: "health healthy".to_string(),
-                description: "rpc_compat: Checks that the health endpoint reports a healthy Lean RPC service."
-                    .to_string(),
-                always_run: false,
-                run: test_health_healthy,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: checkpoints justified root encoding".to_string(),
-                description: "Checks that the justified checkpoint root is hex encoded.".to_string(),
-                always_run: false,
-                run: test_checkpoints_hex_encodes_root,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: checkpoints justified fields".to_string(),
+            test.run(SharedClientTestSpec {
+                name: "rpc_compat: fresh-node shared-client scenarios".to_string(),
                 description:
-                    "Checks that the justified checkpoint endpoint returns the expected fields."
+                    "Starts a single fresh client container and runs the read-only RPC compatibility scenarios against it."
                         .to_string(),
                 always_run: false,
-                run: test_checkpoints_returns_expected_fields,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
+                environment: Some(fresh_client_environment),
+                files: Some(fresh_client_files),
                 test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: checkpoints justified genesis".to_string(),
-                description: "Checks that a fresh Lean node reports the genesis justified checkpoint."
-                    .to_string(),
-                always_run: false,
-                run: test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
+                client: client.clone(),
+                scenarios: vec![
+                    SharedClientScenario {
+                        name: "health healthy".to_string(),
+                        description: "rpc_compat: Checks that the health endpoint reports a healthy Lean RPC service."
+                            .to_string(),
+                        always_run: false,
+                        run: test_health_healthy,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: checkpoints justified root encoding".to_string(),
+                        description: "Checks that the justified checkpoint root is hex encoded.".to_string(),
+                        always_run: false,
+                        run: test_checkpoints_hex_encodes_root,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: checkpoints justified fields".to_string(),
+                        description:
+                            "Checks that the justified checkpoint endpoint returns the expected fields."
+                                .to_string(),
+                        always_run: false,
+                        run: test_checkpoints_returns_expected_fields,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: checkpoints justified genesis".to_string(),
+                        description:
+                            "Checks that a fresh Lean node reports the genesis justified checkpoint."
+                                .to_string(),
+                        always_run: false,
+                        run: test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice no head".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from a fresh node before any non-genesis head advancement."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_no_head,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice no justified".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from a fresh node before any non-genesis justified checkpoint exists."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_no_justified,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice no finalized".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from a fresh node before any non-genesis finalized checkpoint exists."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_no_finalized,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice no nodes".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from a fresh node before any non-genesis nodes are present."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_no_nodes,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice defaults missing weight to zero".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from a fresh node where block weights should still be zero."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_defaults_missing_weight_to_zero,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice zero validator count when head state missing"
+                            .to_string(),
+                        description:
+                            "Loads the forkchoice endpoint from the closest black-box baseline available before a missing head-state hook exists."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_zero_validator_count_when_head_state_missing,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice hex encodes roots".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint to prepare root encoding assertions."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_hex_encodes_roots,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice includes expected node fields".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint to prepare node field assertions."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice_includes_expected_node_fields,
+                    },
+                    SharedClientScenario {
+                        name: "rpc_compat: forkchoice".to_string(),
+                        description:
+                            "Loads the forkchoice endpoint for the baseline RPC compatibility case."
+                                .to_string(),
+                        always_run: false,
+                        run: test_forkchoice,
+                    },
+                ],
+            })
+            .await;
 
             let checkpoint_genesis_time = default_genesis_time();
 
@@ -538,120 +609,6 @@ dyn_async! {
                 test_checkpoints_justified,
             )
             .await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice no head".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from a fresh node before any non-genesis head advancement."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_no_head,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice no justified".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from a fresh node before any non-genesis justified checkpoint exists."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_no_justified,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice no finalized".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from a fresh node before any non-genesis finalized checkpoint exists."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_no_finalized,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice no nodes".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from a fresh node before any non-genesis nodes are present."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_no_nodes,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice defaults missing weight to zero".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from a fresh node where block weights should still be zero."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_defaults_missing_weight_to_zero,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice zero validator count when head state missing".to_string(),
-                description:
-                    "Loads the forkchoice endpoint from the closest black-box baseline available before a missing head-state hook exists."
-                        .to_string(),
-                always_run: false,
-                run: test_forkchoice_zero_validator_count_when_head_state_missing,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice hex encodes roots".to_string(),
-                description: "Loads the forkchoice endpoint to prepare root encoding assertions."
-                    .to_string(),
-                always_run: false,
-                run: test_forkchoice_hex_encodes_roots,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice includes expected node fields".to_string(),
-                description: "Loads the forkchoice endpoint to prepare node field assertions."
-                    .to_string(),
-                always_run: false,
-                run: test_forkchoice_includes_expected_node_fields,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
-
-            test.run(NClientTestSpec {
-                name: "rpc_compat: forkchoice".to_string(),
-                description: "Loads the forkchoice endpoint for the baseline RPC compatibility case."
-                    .to_string(),
-                always_run: false,
-                run: test_forkchoice,
-                environments: fresh_client_environments.clone(),
-                files: fresh_client_files.clone(),
-                test_data: (),
-                clients: vec![client.clone()],
-            }).await;
 
             let finalized_filters_genesis_time = default_genesis_time();
 
@@ -924,8 +881,7 @@ dyn_async! {
 
 // /lean/v0/health
 dyn_async! {
-    async fn test_health_healthy<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_health_healthy<'a>(client: Client, _: ()) {
         let http = http_client();
 
         let health: HealthResponse = get_json_with_retry(
@@ -946,8 +902,7 @@ dyn_async! {
 
 // /lean/v0/checkpoints/justified
 dyn_async! {
-    async fn test_checkpoints_hex_encodes_root<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_checkpoints_hex_encodes_root<'a>(client: Client, _: ()) {
         let http = http_client();
 
         let checkpoint: CheckpointResponse = get_json_with_retry(
@@ -960,8 +915,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_checkpoints_returns_expected_fields<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_checkpoints_returns_expected_fields<'a>(client: Client, _: ()) {
         let http = http_client();
 
         get_json_with_retry::<CheckpointResponse>(
@@ -973,8 +927,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
+    async fn test_checkpoints_returns_genesis_justified_checkpoint_for_fresh_node<'a>(client: Client, _: ()) {
         let http = http_client();
 
         let checkpoint: CheckpointResponse = get_json_with_retry(
@@ -1020,8 +973,8 @@ dyn_async! {
 
 // /lean/v0/fork_choice
 dyn_async! {
-    async fn test_forkchoice_no_head<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_no_head<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.nodes.len(),
             1,
@@ -1039,8 +992,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_no_justified<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_no_justified<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.justified.slot, 0,
             "without a non-genesis justification event, the justified slot should remain at genesis"
@@ -1055,8 +1008,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_no_finalized<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_no_finalized<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.finalized.slot, 0,
             "without a non-genesis finalization event, the finalized slot should remain at genesis"
@@ -1071,8 +1024,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_no_nodes<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_no_nodes<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.nodes.len(),
             1,
@@ -1147,8 +1100,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_defaults_missing_weight_to_zero<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_defaults_missing_weight_to_zero<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert!(
             !fork_choice.nodes.is_empty(),
             "forkchoice should expose at least the genesis node"
@@ -1161,8 +1114,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_zero_validator_count_when_head_state_missing<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_zero_validator_count_when_head_state_missing<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.nodes.len(),
             1,
@@ -1176,8 +1129,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_hex_encodes_roots<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_hex_encodes_roots<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_hex_root(&fork_choice.head, "forkchoice head");
         assert_hex_root(&fork_choice.justified.root, "forkchoice justified root");
         assert_hex_root(&fork_choice.finalized.root, "forkchoice finalized root");
@@ -1224,8 +1177,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice_includes_expected_node_fields<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice_includes_expected_node_fields<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.nodes.len(),
             1,
@@ -1248,8 +1201,8 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_forkchoice<'a>(clients: Vec<Client>, _: ()) {
-        let (_client, fork_choice) = load_fresh_fork_choice_setup(clients).await;
+    async fn test_forkchoice<'a>(client: Client, _: ()) {
+        let fork_choice = load_fresh_fork_choice_setup(&client).await;
         assert_eq!(
             fork_choice.nodes.len(),
             1,

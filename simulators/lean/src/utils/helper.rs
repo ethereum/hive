@@ -1263,21 +1263,12 @@ async fn start_post_genesis_sync_context_inner(
         {
             Ok(source_fork_choice) => source_fork_choice,
             Err(err) => {
-                if client_under_test.is_none() && !helper_startup_error_is_retryable(&err) {
-                    let files = prepare_client_runtime_files(
+                if client_under_test.is_none() {
+                    register_client_under_test_for_failed_setup(
+                        test,
                         &test_data.client_under_test.name,
                         &initial_client_under_test_environment,
-                    )
-                    .unwrap_or_else(|prep_err| {
-                        panic!(
-                            "Unable to prepare runtime assets for {} after checkpoint wait failure: {prep_err}",
-                            test_data.client_under_test.name
-                        )
-                    });
-                    test.start_client_with_files(
-                        test_data.client_under_test.name.clone(),
-                        Some(initial_client_under_test_environment.clone()),
-                        Some(files),
+                        "source helper finalized checkpoint wait failure",
                     )
                     .await;
                 }
@@ -1722,6 +1713,30 @@ async fn start_client_under_test_attempt(
                 "startup attempt exceeded {CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS} seconds"
             ))
         }
+    }
+}
+
+async fn register_client_under_test_for_failed_setup(
+    test: &Test,
+    client_type: &str,
+    environment: &HashMap<String, String>,
+    setup_phase: &str,
+) {
+    let files = prepare_client_runtime_files(client_type, environment).unwrap_or_else(|err| {
+        panic!("Unable to prepare runtime assets for {client_type} after {setup_phase}: {err}")
+    });
+
+    if let Err(err) = start_client_under_test_attempt(
+        test.clone(),
+        client_type.to_string(),
+        environment.clone(),
+        files,
+    )
+    .await
+    {
+        eprintln!(
+            "Unable to register client under test {client_type} after {setup_phase}; preserving original setup failure without client attribution: {err}"
+        );
     }
 }
 
