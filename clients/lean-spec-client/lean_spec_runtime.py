@@ -178,10 +178,6 @@ def api_server_supports_signed_block_getter(api_server_type: type[Any]) -> bool:
     return "signed_block_getter" in inspect.signature(api_server_type).parameters
 
 
-def _ssz_offset(value: int) -> bytes:
-    return value.to_bytes(OFFSET_BYTE_LENGTH, "little")
-
-
 def canonicalize_der_secp256k1_signature(der_signature: bytes) -> bytes:
     signature_r, signature_s = decode_dss_signature(der_signature)
     if signature_s > SECP256K1_ORDER // 2:
@@ -658,12 +654,8 @@ def genesis_validator_pubkey_keys() -> tuple[str, str]:
 def write_genesis_config(
     validators: list[dict[str, str]],
     genesis_time: int,
-    extra_fields: dict[str, object] | None = None,
 ) -> None:
     genesis: dict[str, object] = {"GENESIS_TIME": genesis_time}
-    if extra_fields is not None:
-        genesis.update(extra_fields)
-    genesis.setdefault("NUM_VALIDATORS", len(validators))
 
     if uses_latest_leanspec_format():
         attestation_key, proposal_key = genesis_validator_pubkey_keys()
@@ -687,7 +679,6 @@ def prepare_runtime_assets(
     node_id: str,
     validator_count: int,
     *,
-    genesis_extra_fields: dict[str, object] | None = None,
     validator_count_environment_variable: str | None = None,
 ) -> None:
     genesis_time = int(os.environ.get("HIVE_LEAN_GENESIS_TIME", int(time.time()) + 30))
@@ -702,7 +693,7 @@ def prepare_runtime_assets(
     validators = [load_validator(index) for index in range(validator_count)]
 
     prepare_output_dirs()
-    write_genesis_config(validators, genesis_time, genesis_extra_fields)
+    write_genesis_config(validators, genesis_time)
     write_validator_keys(validators, node_id, validator_indices)
 
 
@@ -862,6 +853,13 @@ def subscribe_gossip_topics(
         for validator_index in validator_registry.indices():
             subscribed_subnets.add(
                 validator_index.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
+            )
+    else:
+        for validator_index in parse_validator_indices():
+            subscribed_subnets.add(
+                ValidatorIndex(validator_index).compute_subnet_id(
+                    ATTESTATION_COMMITTEE_COUNT
+                )
             )
 
     if is_aggregator and not subscribed_subnets:

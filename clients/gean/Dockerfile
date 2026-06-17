@@ -1,8 +1,7 @@
 ARG devnet4_baseimage=ghcr.io/geanlabs/gean
 ARG devnet4_tag=devnet4
 ARG devnet5_baseimage=ghcr.io/geanlabs/gean
-# TODO: this is a placeholder until a devnet5 image is published
-ARG devnet5_tag=devnet4
+ARG devnet5_tag=devnet5
 
 FROM $devnet5_baseimage:$devnet5_tag AS devnet5
 FROM $devnet4_baseimage:$devnet4_tag

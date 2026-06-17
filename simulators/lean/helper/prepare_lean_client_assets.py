@@ -221,11 +221,11 @@ def render_config(validators: list[dict[str, str]]) -> str:
             ]
         )
     else:
+        if CLIENT_KIND != "gean":
+            lines.append("MAX_ATTESTATIONS_DATA: 16")
         lines.extend(
             [
                 f"ATTESTATION_COMMITTEE_COUNT: {committee_count}",
-                "MAX_ATTESTATIONS_DATA: 16",
-                f"NUM_VALIDATORS: {len(validators)}",
                 f"VALIDATOR_COUNT: {len(validators)}",
                 "ACTIVE_EPOCH: 18",
                 "GENESIS_VALIDATORS:",
@@ -241,9 +241,6 @@ def render_config(validators: list[dict[str, str]]) -> str:
                     f'    proposal_public_key: "{format_genesis_pubkey(validator["proposal_public"])}"'
                 )
             else:
-                # ethlambda / lantern / zeam / gean-devnet4 /
-                # grandine_lean-devnet4 / qlean all accept the
-                # attestation_pubkey + proposal_pubkey nested shape.
                 lines.append(
                     f'  - attestation_pubkey: "{format_genesis_pubkey(validator["attestation_public"])}"'
                 )
