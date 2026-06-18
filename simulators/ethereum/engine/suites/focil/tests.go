@@ -28,6 +28,11 @@ var focilGenesisJSON []byte
 const (
 	maxBytesPerInclusionList = 8192
 	rpcTimeout               = 20 * time.Second
+	// targetGasLimit matches the genesis gasLimit (0x8f0d180 = 150M, the value used
+	// by bal-devnet-7) so the build process keeps the same gas target.
+	// PayloadAttributesV5 inherits this required field from Amsterdam's
+	// PayloadAttributesV4.
+	targetGasLimit = 0x8f0d180
 )
 
 var (
@@ -50,6 +55,7 @@ type payloadAttributesV5 struct {
 	Withdrawals               []*types.Withdrawal `json:"withdrawals"`
 	ParentBeaconBlockRoot     common.Hash         `json:"parentBeaconBlockRoot"`
 	SlotNumber                hexutil.Uint64      `json:"slotNumber"`
+	TargetGasLimit            hexutil.Uint64      `json:"targetGasLimit"`
 	InclusionListTransactions []hexutil.Bytes     `json:"inclusionListTransactions"`
 }
 
@@ -397,6 +403,7 @@ func payloadAttributes(timestamp uint64, il []hexutil.Bytes) payloadAttributesV5
 		Withdrawals:               []*types.Withdrawal{},
 		ParentBeaconBlockRoot:     zeroHash,
 		SlotNumber:                hexutil.Uint64(timestamp),
+		TargetGasLimit:            hexutil.Uint64(targetGasLimit),
 		InclusionListTransactions: il,
 	}
 }
