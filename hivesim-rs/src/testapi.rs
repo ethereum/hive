@@ -616,6 +616,8 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
 ) {
     // The owner test keeps the shared container alive across scenarios.
     let owner_test_id = host.start_test(suite_id, owner_name, owner_desc).await;
+    let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
+    guard.arm();
 
     let (container_id, ip) = host
         .start_client_with_files(
@@ -626,9 +628,6 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
             files,
         )
         .await;
-
-    let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
-    guard.arm();
 
     let mut scenarios_run: usize = 0;
     let mut scenarios_passed: usize = 0;
