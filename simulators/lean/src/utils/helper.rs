@@ -1740,7 +1740,7 @@ async fn register_client_under_test_for_failed_setup(
     }
 }
 
-async fn start_client_under_test_with_retry(
+pub(crate) async fn start_client_under_test_with_retry(
     test: &Test,
     client_type: String,
     environment: HashMap<String, String>,

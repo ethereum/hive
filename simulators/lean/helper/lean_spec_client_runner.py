@@ -27,7 +27,7 @@ from lean_spec_runtime import (
     HELPER_ADVERTISE_IP_ENVIRONMENT_VARIABLE,
     PROPOSAL_SECRET_FIELD,
     ValidatorIndex,
-    api_server_supports_signed_block_getter,
+    build_api_server,
     build_helper_bootnode_enr,
     build_node_config,
     cache_signed_block,
@@ -296,52 +296,6 @@ def build_identify_response(identity_key: IdentityKeypair) -> bytes:
     response.extend(protobuf_string_field(5, "ipfs/0.1.0"))
     response.extend(protobuf_string_field(6, "hive-lean-spec-helper/0.1.0"))
     return bytes(response)
-
-
-def install_finalized_block_api_route(signed_block_getter: Any) -> None:
-    try:
-        routes_module = import_first_module(
-            "lean_spec.node.api.routes",
-            "lean_spec.subspecs.api.routes",
-        )
-    except (ImportError, ModuleNotFoundError):
-        return
-    routes = getattr(routes_module, "ROUTES", None)
-    route_type = getattr(routes_module, "Route", None)
-    if routes is None or route_type is None:
-        return
-
-    if any(
-        getattr(route, "method", None) == "GET"
-        and getattr(route, "path", None) == "/lean/v0/blocks/finalized"
-        for route in routes
-    ):
-        return
-
-    async def handle_finalized_block(request: web.Request) -> web.Response:
-        store_getter = request.app.get("store_getter")
-        store = store_getter() if store_getter else None
-        if store is None:
-            raise web.HTTPServiceUnavailable(reason="Store not initialized")
-
-        signed_block = signed_block_getter(store.latest_finalized.root)
-        if inspect.isawaitable(signed_block):
-            signed_block = await signed_block
-        if signed_block is None:
-            raise web.HTTPNotFound(reason="Finalized block not available")
-
-        ssz_bytes = await asyncio.to_thread(signed_block.encode_bytes)
-        return web.Response(body=ssz_bytes, content_type="application/octet-stream")
-
-    routes.append(
-        route_type(
-            "GET",
-            "/lean/v0/blocks/finalized",
-            handle_finalized_block,
-            is_admin=False,
-        )
-    )
-    logger.info("Installed helper finalized block API route")
 
 
 def decode_der_length(payload: bytes, offset: int) -> tuple[int, int]:
@@ -1320,11 +1274,11 @@ async def run() -> None:
         "config": ApiServerConfig(port=helper_api_port()),
         "store_getter": lambda: node.sync_service.store,
     }
-    if api_server_supports_signed_block_getter(ApiServer):
-        api_server_kwargs["signed_block_getter"] = lookup_published_block
-    else:
-        install_finalized_block_api_route(lookup_published_block)
-    api_server = ApiServer(**api_server_kwargs)
+    api_server = build_api_server(
+        ApiServer,
+        api_server_kwargs,
+        lookup_published_block,
+    )
     metadata_runner = await start_metadata_server(metadata, helper_metadata_port())
     refresh_status(event_source, node)
 
