@@ -9,7 +9,8 @@ ARG local_path=reth
 COPY $local_path reth
 
 RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
-    && cd reth && cargo build --release \
+    && cd reth && cargo build --release -p reth --no-default-features \
+        --features jemalloc,otlp,otlp-logs,reth-revm/portable,js-tracer,keccak-cache-global,asm-keccak,min-trace-logs \
     && cp target/release/reth /usr/local/bin/reth
 
 ## Final stage: Sets up the environment for running reth

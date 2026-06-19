@@ -12,7 +12,8 @@ RUN rustup update stable && rustup default stable
 RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
     && echo "Cloning: $github - $tag" \
     && git clone --depth 1 --branch $tag https://github.com/$github reth \
-    && cd reth && cargo build --release \
+    && cd reth && cargo build --release -p reth --no-default-features \
+        --features jemalloc,otlp,otlp-logs,reth-revm/portable,js-tracer,keccak-cache-global,asm-keccak,min-trace-logs \
     && cp target/release/reth /usr/local/bin/reth
 
 ## Final stage: Sets up the environment for running reth
