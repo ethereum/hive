@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shutil
-import sys
 import time
 from pathlib import Path
 
@@ -100,19 +99,6 @@ def load_source_validator(index: int) -> dict[str, str]:
         "proposal_secret",
     }.issubset(validator):
         return validator
-    if {"attestation_keypair", "proposal_keypair"}.issubset(validator):
-        attestation_keypair = validator["attestation_keypair"]
-        proposal_keypair = validator["proposal_keypair"]
-        if {"public_key", "secret_key"}.issubset(attestation_keypair) and {
-            "public_key",
-            "secret_key",
-        }.issubset(proposal_keypair):
-            return {
-                "attestation_public": attestation_keypair["public_key"],
-                "attestation_secret": attestation_keypair["secret_key"],
-                "proposal_public": proposal_keypair["public_key"],
-                "proposal_secret": proposal_keypair["secret_key"],
-            }
     if {"public", "secret"}.issubset(validator):
         return {
             "attestation_public": validator["public"],
@@ -235,11 +221,11 @@ def render_config(validators: list[dict[str, str]]) -> str:
             ]
         )
     else:
+        if CLIENT_KIND != "gean":
+            lines.append("MAX_ATTESTATIONS_DATA: 16")
         lines.extend(
             [
                 f"ATTESTATION_COMMITTEE_COUNT: {committee_count}",
-                "MAX_ATTESTATIONS_DATA: 16",
-                f"NUM_VALIDATORS: {len(validators)}",
                 f"VALIDATOR_COUNT: {len(validators)}",
                 "ACTIVE_EPOCH: 18",
                 "GENESIS_VALIDATORS:",
@@ -255,9 +241,6 @@ def render_config(validators: list[dict[str, str]]) -> str:
                     f'    proposal_public_key: "{format_genesis_pubkey(validator["proposal_public"])}"'
                 )
             else:
-                # ethlambda / lantern / zeam / gean-devnet4 /
-                # grandine_lean-devnet4 / qlean all accept the
-                # attestation_pubkey + proposal_pubkey nested shape.
                 lines.append(
                     f'  - attestation_pubkey: "{format_genesis_pubkey(validator["attestation_public"])}"'
                 )

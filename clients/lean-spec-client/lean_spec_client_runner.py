@@ -25,12 +25,10 @@ from lean_spec_runtime import (
     helper_genesis_metadata,
     identity_keypair_from_private_key_hex,
     install_fast_ssz_deserialization,
-    install_legacy_signed_block_wire_compatibility,
     install_low_s_identity_signature_compatibility,
     install_setup_prover_compatibility,
     install_snappy_compress_fallback,
     keep_status_current,
-    legacy_signed_block_compatibility_enabled,
     load_genesis,
     load_validator,
     load_validator_registry_from_manifest,
@@ -43,7 +41,6 @@ from lean_spec_runtime import (
     start_metadata_server,
     subscribe_gossip_topics,
     uses_latest_leanspec_format,
-    wire_compat_mode,
 )
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
@@ -120,9 +117,6 @@ async def run() -> None:
     install_snappy_compress_fallback()
     install_fast_ssz_deserialization()
     install_setup_prover_compatibility()
-    logger.info("LeanSpec wire compatibility mode: %s", wire_compat_mode())
-    if legacy_signed_block_compatibility_enabled():
-        install_legacy_signed_block_wire_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)

@@ -35,13 +35,11 @@ const DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_DISABLE_
 const LEAN_GENESIS_TIME_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_GENESIS_TIME";
 const LEAN_GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_COUNT";
 const LEAN_VALIDATOR_INDICES_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_VALIDATOR_INDICES";
-const LEAN_SPEC_WIRE_COMPAT_ENVIRONMENT_VARIABLE: &str = "HIVE_LEAN_SPEC_WIRE_COMPAT";
 const LEAN_RUNTIME_ASSET_ROOT_ENVIRONMENT_VARIABLE: &str = "LEAN_RUNTIME_ASSET_ROOT";
 const LEAN_SPEC_SOURCE_NODE_ID: &str = "lean_spec_0";
 const LEAN_SPEC_SOURCE_VALIDATORS: &str = "0,1,2";
 /// Helper validator subset used by tests where the client-under-test owns V0.
 pub(crate) const LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0: &str = "1,2,3";
-const LEAN_SPEC_SOURCE_PEER_ID: &str = "16Uiu2HAmHzBkRq62mG95vsjKMuYQBezZCtjPXYWUoyVxMxi71aB3";
 const DEFAULT_HELPER_GOSSIP_FORK_DIGEST: &str = "devnet0";
 const DEFAULT_HELPER_P2P_PORT: u16 = 9001;
 const DEFAULT_HELPER_API_PORT: u16 = 5052;
@@ -83,7 +81,7 @@ struct HelperGenesisMetadata {
     #[serde(default)]
     bootnode_qlean_enr: Option<String>,
     bootnode_enr: Option<String>,
-    bootnode_multiaddr: Option<String>,
+    bootnode_multiaddr: String,
 }
 
 #[derive(Clone, Copy)]
@@ -109,12 +107,14 @@ pub(crate) struct PostGenesisSyncTestData {
 pub(crate) struct PostGenesisSyncContext {
     _helpers: RunningLocalLeanSpecHelperGroup,
     pub client_under_test: Client,
+    client_under_test_environment: HashMap<String, String>,
     pub source_fork_choice: ForkChoiceSnapshot,
     pub client_checkpoint: Option<CheckpointResponse>,
 }
 
 pub(crate) struct RunningBadCheckpointPeer {
     helper: RunningLocalLeanSpecHelper,
+    helper_config: LocalLeanSpecHelperConfig,
 }
 
 pub(crate) struct CheckpointSyncHelperMesh {
@@ -125,7 +125,34 @@ pub(crate) struct CheckpointSyncHelperMesh {
     genesis_time: u64,
 }
 
+struct StartedLocalHelperMesh {
+    helpers: RunningLocalLeanSpecHelperGroup,
+    source_genesis_validator_entries: Vec<HelperGenesisValidatorEntry>,
+    source_helper_config: LocalLeanSpecHelperConfig,
+    genesis_time: u64,
+    helper_validator_assignments: Vec<String>,
+    helper_peer_count: usize,
+}
+
 impl PostGenesisSyncContext {
+    pub(crate) async fn restart_client_under_test(&mut self, test: &Test) -> Result<(), String> {
+        let client_type = self.client_under_test.kind.clone();
+        let old_container = self.client_under_test.container.clone();
+        self.client_under_test.stop().await.map_err(|err| {
+            format!(
+                "unable to stop client under test {client_type} container {old_container} before restart: {err}"
+            )
+        })?;
+
+        self.client_under_test = start_client_under_test_with_retry(
+            test,
+            client_type,
+            self.client_under_test_environment.clone(),
+        )
+        .await;
+        Ok(())
+    }
+
     pub(crate) async fn try_load_live_helper_fork_choice(
         &mut self,
     ) -> Result<ForkChoiceResponse, String> {
@@ -156,6 +183,27 @@ impl RunningBadCheckpointPeer {
     pub(crate) async fn try_load_fork_choice(&mut self) -> Result<ForkChoiceResponse, String> {
         self.helper.try_load_fork_choice().await
     }
+
+    pub(crate) async fn restart_after_retryable_exit(
+        &mut self,
+        error: &str,
+    ) -> Result<bool, String> {
+        if !helper_exit_error_is_retryable(error) {
+            return Ok(false);
+        }
+
+        eprintln!("Restarting adversarial {LOCAL_HELPER_KIND} after retryable exit: {error}");
+        let (mut helper, _genesis_validator_entries) =
+            start_local_lean_spec_helper_with_genesis_metadata(&self.helper_config).await?;
+        wait_for_checkpoint_slot_with_retry(
+            &mut helper,
+            MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC,
+            &self.helper_config,
+        )
+        .await?;
+        self.helper = helper;
+        Ok(true)
+    }
 }
 
 struct RunningLocalLeanSpecHelper {
@@ -164,7 +212,6 @@ struct RunningLocalLeanSpecHelper {
     expected_genesis_time: u64,
     node_id: String,
     asset_root: PathBuf,
-    p2p_port: u16,
     api_port: u16,
     metadata_port: u16,
     bootnode_qlean_enr: Option<String>,
@@ -174,7 +221,9 @@ struct RunningLocalLeanSpecHelper {
 
 struct RunningLocalLeanSpecHelperGroup {
     source: RunningLocalLeanSpecHelper,
+    source_config: LocalLeanSpecHelperConfig,
     mesh_peers: Vec<RunningLocalLeanSpecHelper>,
+    mesh_configs: Vec<LocalLeanSpecHelperConfig>,
 }
 
 #[derive(Clone)]
@@ -191,7 +240,6 @@ struct LocalLeanSpecHelperConfig {
     api_port: u16,
     metadata_port: u16,
     identity_private_key_hex: Option<String>,
-    wire_compat_mode: String,
 }
 
 struct CheckpointSyncClientStart<'a> {
@@ -202,6 +250,12 @@ struct CheckpointSyncClientStart<'a> {
     client_type: String,
     environment: HashMap<String, String>,
     minimum_slot: u64,
+}
+
+struct HelperForkChoiceObservation {
+    node_id: String,
+    fork_choice: ForkChoiceResponse,
+    requires_minimum_finalized_slot: bool,
 }
 
 impl RunningLocalLeanSpecHelperGroup {
@@ -222,11 +276,29 @@ impl RunningLocalLeanSpecHelperGroup {
 
             match self.source.try_load_fork_choice().await {
                 Ok(fork_choice) => best_fork_choice = Some(fork_choice),
-                Err(err) => attempt_errors.push(err),
+                Err(err) => {
+                    let source_config = self.source_config.clone();
+                    match restart_local_helper_after_retryable_exit(
+                        &mut self.source,
+                        &source_config,
+                        &err,
+                    )
+                    .await
+                    {
+                        Ok(true) => attempt_errors.push(format!(
+                            "{err}; restarted {} `{}`",
+                            LOCAL_HELPER_KIND, self.source.node_id
+                        )),
+                        Ok(false) => attempt_errors.push(err),
+                        Err(restart_err) => {
+                            attempt_errors.push(format!("{err}; restart failed: {restart_err}"))
+                        }
+                    }
+                }
             }
 
-            for helper in &mut self.mesh_peers {
-                match helper.try_load_fork_choice().await {
+            for helper_index in 0..self.mesh_peers.len() {
+                match self.mesh_peers[helper_index].try_load_fork_choice().await {
                     Ok(fork_choice) => {
                         let should_replace = best_fork_choice
                             .as_ref()
@@ -236,7 +308,25 @@ impl RunningLocalLeanSpecHelperGroup {
                             best_fork_choice = Some(fork_choice);
                         }
                     }
-                    Err(err) => attempt_errors.push(err),
+                    Err(err) => {
+                        let helper_config = self.mesh_configs[helper_index].clone();
+                        match restart_local_helper_after_retryable_exit(
+                            &mut self.mesh_peers[helper_index],
+                            &helper_config,
+                            &err,
+                        )
+                        .await
+                        {
+                            Ok(true) => attempt_errors.push(format!(
+                                "{err}; restarted {} `{}`",
+                                LOCAL_HELPER_KIND, self.mesh_peers[helper_index].node_id
+                            )),
+                            Ok(false) => attempt_errors.push(err),
+                            Err(restart_err) => {
+                                attempt_errors.push(format!("{err}; restart failed: {restart_err}"))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -265,61 +355,71 @@ impl RunningLocalLeanSpecHelperGroup {
         &mut self,
         minimum_finalized_slot: u64,
     ) -> Result<ForkChoiceResponse, String> {
-        let source = self.source.try_load_fork_choice().await?;
-        let source_finalized = source.finalized.clone();
-        let mut best_fork_choice = source.clone();
-        let mut observations = vec![format!(
-            "{} finalized {:#x} at slot {}",
-            self.source.node_id, source_finalized.root, source_finalized.slot
-        )];
-        let mut agreement_errors = Vec::new();
+        let mut helper_fork_choices = Vec::new();
+        let mut helper_errors = Vec::new();
 
-        if source_finalized.slot < minimum_finalized_slot {
-            agreement_errors.push(format!(
-                "{} finalized slot {} is below required slot {}",
-                self.source.node_id, source_finalized.slot, minimum_finalized_slot
-            ));
-        }
-
-        for helper in &mut self.mesh_peers {
-            match helper.try_load_fork_choice().await {
-                Ok(fork_choice) => {
-                    observations.push(format!(
-                        "{} finalized {:#x} at slot {}",
-                        helper.node_id, fork_choice.finalized.root, fork_choice.finalized.slot
-                    ));
-
-                    if fork_choice.finalized.slot != source_finalized.slot
-                        || fork_choice.finalized.root != source_finalized.root
-                    {
-                        agreement_errors.push(format!(
-                            "{} finalized {:#x} at slot {}, expected source finalized {:#x} at slot {}",
-                            helper.node_id,
-                            fork_choice.finalized.root,
-                            fork_choice.finalized.slot,
-                            source_finalized.root,
-                            source_finalized.slot
-                        ));
-                    }
-
-                    if is_better_fork_choice(&fork_choice, &best_fork_choice) {
-                        best_fork_choice = fork_choice;
+        match self.source.try_load_fork_choice().await {
+            Ok(fork_choice) => helper_fork_choices.push(HelperForkChoiceObservation {
+                node_id: self.source.node_id.clone(),
+                fork_choice,
+                requires_minimum_finalized_slot: true,
+            }),
+            Err(err) => {
+                let source_config = self.source_config.clone();
+                match restart_local_helper_after_retryable_exit(
+                    &mut self.source,
+                    &source_config,
+                    &err,
+                )
+                .await
+                {
+                    Ok(true) => helper_errors.push(format!(
+                        "{err}; restarted {} `{}`",
+                        LOCAL_HELPER_KIND, self.source.node_id
+                    )),
+                    Ok(false) => helper_errors.push(err),
+                    Err(restart_err) => {
+                        helper_errors.push(format!("{err}; restart failed: {restart_err}"))
                     }
                 }
-                Err(err) => agreement_errors.push(err),
             }
         }
 
-        if agreement_errors.is_empty() {
-            Ok(best_fork_choice)
-        } else {
-            Err(format!(
-                "honest LeanSpec helpers have not agreed on a finalized checkpoint at or above slot {} (observed: {}; issues: {})",
-                minimum_finalized_slot,
-                observations.join(", "),
-                agreement_errors.join(" | ")
-            ))
+        for helper_index in 0..self.mesh_peers.len() {
+            match self.mesh_peers[helper_index].try_load_fork_choice().await {
+                Ok(fork_choice) => helper_fork_choices.push(HelperForkChoiceObservation {
+                    node_id: self.mesh_peers[helper_index].node_id.clone(),
+                    fork_choice,
+                    requires_minimum_finalized_slot: !self.mesh_configs[helper_index]
+                        .disable_validator_service,
+                }),
+                Err(err) => {
+                    let helper_config = self.mesh_configs[helper_index].clone();
+                    match restart_local_helper_after_retryable_exit(
+                        &mut self.mesh_peers[helper_index],
+                        &helper_config,
+                        &err,
+                    )
+                    .await
+                    {
+                        Ok(true) => helper_errors.push(format!(
+                            "{err}; restarted {} `{}`",
+                            LOCAL_HELPER_KIND, self.mesh_peers[helper_index].node_id
+                        )),
+                        Ok(false) => helper_errors.push(err),
+                        Err(restart_err) => {
+                            helper_errors.push(format!("{err}; restart failed: {restart_err}"))
+                        }
+                    }
+                }
+            }
         }
+
+        select_compatible_helper_agreement(
+            &helper_fork_choices,
+            &helper_errors,
+            minimum_finalized_slot,
+        )
     }
 }
 
@@ -344,7 +444,6 @@ impl LocalLeanSpecHelperConfig {
             api_port: DEFAULT_HELPER_API_PORT,
             metadata_port: DEFAULT_HELPER_METADATA_PORT,
             identity_private_key_hex: None,
-            wire_compat_mode: "native".to_string(),
         }
     }
 
@@ -370,7 +469,6 @@ impl LocalLeanSpecHelperConfig {
             api_port: DEFAULT_HELPER_API_PORT + (mesh_index * 2),
             metadata_port: DEFAULT_HELPER_METADATA_PORT + (mesh_index * 2),
             identity_private_key_hex: Some(format!("{:064x}", mesh_index as u64 + 1)),
-            wire_compat_mode: source_config.wire_compat_mode.clone(),
         }
     }
 }
@@ -398,17 +496,10 @@ impl RunningLocalLeanSpecHelper {
         )
     }
 
-    fn fallback_bootnode_multiaddr(&self) -> String {
-        format!(
-            "/ip4/{}/udp/{}/quic-v1/p2p/{}",
-            self.ip, self.p2p_port, LEAN_SPEC_SOURCE_PEER_ID
-        )
-    }
-
-    fn bootnode_multiaddr(&self) -> String {
+    fn bootnode_multiaddr(&self) -> &str {
         self.bootnode_multiaddr
-            .clone()
-            .unwrap_or_else(|| self.fallback_bootnode_multiaddr())
+            .as_deref()
+            .expect("local LeanSpec helper should advertise bootnode_multiaddr metadata")
     }
 
     fn bootnode_for_client(&self, client_type: &str) -> String {
@@ -421,10 +512,10 @@ impl RunningLocalLeanSpecHelper {
                 return enr.to_string();
             }
 
-            return self.bootnode_multiaddr();
+            return self.bootnode_multiaddr().to_string();
         }
 
-        self.bootnode_multiaddr()
+        self.bootnode_multiaddr().to_string()
     }
 
     async fn try_load_fork_choice(&mut self) -> Result<ForkChoiceResponse, String> {
@@ -472,19 +563,172 @@ impl Drop for RunningLocalLeanSpecHelper {
     }
 }
 
+async fn restart_local_helper_after_retryable_exit(
+    helper: &mut RunningLocalLeanSpecHelper,
+    helper_config: &LocalLeanSpecHelperConfig,
+    error: &str,
+) -> Result<bool, String> {
+    if !helper_exit_error_is_retryable(error) {
+        return Ok(false);
+    }
+
+    eprintln!(
+        "Restarting {LOCAL_HELPER_KIND} `{}` after retryable exit: {error}",
+        helper.node_id
+    );
+    let (restarted_helper, _genesis_validator_entries) =
+        start_local_lean_spec_helper_with_genesis_metadata(helper_config).await?;
+    *helper = restarted_helper;
+    Ok(true)
+}
+
 fn is_better_fork_choice(candidate: &ForkChoiceResponse, current: &ForkChoiceResponse) -> bool {
     let candidate_key = (
-        fork_choice_head_slot(candidate),
         candidate.finalized.slot,
         candidate.justified.slot,
+        fork_choice_head_slot(candidate),
     );
     let current_key = (
-        fork_choice_head_slot(current),
         current.finalized.slot,
         current.justified.slot,
+        fork_choice_head_slot(current),
     );
 
     candidate_key > current_key
+}
+
+fn select_compatible_helper_agreement(
+    helper_fork_choices: &[HelperForkChoiceObservation],
+    helper_errors: &[String],
+    minimum_finalized_slot: u64,
+) -> Result<ForkChoiceResponse, String> {
+    if helper_fork_choices.is_empty() {
+        return Err(format!(
+            "no {LOCAL_HELPER_KIND} forkchoice responses were observed{}",
+            if helper_errors.is_empty() {
+                String::new()
+            } else {
+                format!(": {}", helper_errors.join(" | "))
+            }
+        ));
+    }
+
+    let mut best_fork_choice = helper_fork_choices[0].fork_choice.clone();
+    for observation in helper_fork_choices.iter().skip(1) {
+        if is_better_fork_choice(&observation.fork_choice, &best_fork_choice) {
+            best_fork_choice = observation.fork_choice.clone();
+        }
+    }
+
+    let mut observations = helper_errors
+        .iter()
+        .map(|error| format!("unavailable helper: {error}"))
+        .collect::<Vec<_>>();
+    let mut agreement_errors = Vec::new();
+    let mut ready_progress_helper_count = 0;
+
+    if !helper_errors.is_empty() {
+        agreement_errors.push(format!(
+            "{} helper(s) were unavailable during this agreement attempt",
+            helper_errors.len()
+        ));
+    }
+
+    for HelperForkChoiceObservation {
+        node_id,
+        fork_choice,
+        requires_minimum_finalized_slot,
+    } in helper_fork_choices
+    {
+        observations.push(format!(
+            "{} finalized {:#x} at slot {}",
+            node_id, fork_choice.finalized.root, fork_choice.finalized.slot
+        ));
+
+        if !finalized_checkpoint_is_compatible_with_anchor(
+            &best_fork_choice,
+            &fork_choice.finalized,
+        ) {
+            agreement_errors.push(format!(
+                "{} finalized {:#x} at slot {}, which is not compatible with best helper finalized {:#x} at slot {}",
+                node_id,
+                fork_choice.finalized.root,
+                fork_choice.finalized.slot,
+                best_fork_choice.finalized.root,
+                best_fork_choice.finalized.slot
+            ));
+            continue;
+        }
+
+        if *requires_minimum_finalized_slot {
+            if fork_choice.finalized.slot >= minimum_finalized_slot {
+                ready_progress_helper_count += 1;
+            } else {
+                agreement_errors.push(format!(
+                    "{} finalized slot {} below required slot {}",
+                    node_id, fork_choice.finalized.slot, minimum_finalized_slot
+                ));
+            }
+        }
+    }
+
+    if ready_progress_helper_count == 0 {
+        agreement_errors.push(format!(
+            "no compatible validator-producing helper finalized at or above required slot {} (best finalized slot: {})",
+            minimum_finalized_slot, best_fork_choice.finalized.slot
+        ));
+    }
+
+    if agreement_errors.is_empty() {
+        Ok(best_fork_choice)
+    } else {
+        Err(format!(
+            "honest LeanSpec helpers have not produced a compatible finalized checkpoint at or above slot {} (observed: {}; issues: {})",
+            minimum_finalized_slot,
+            observations.join(", "),
+            agreement_errors.join(" | ")
+        ))
+    }
+}
+
+fn finalized_checkpoint_is_compatible_with_anchor(
+    anchor: &ForkChoiceResponse,
+    checkpoint: &CheckpointResponse,
+) -> bool {
+    if checkpoint.slot > anchor.finalized.slot {
+        return false;
+    }
+
+    match finalized_checkpoint_matches_exposed_head_chain(anchor, checkpoint) {
+        Some(matches) => matches,
+        None => checkpoint.slot < anchor.finalized.slot,
+    }
+}
+
+fn finalized_checkpoint_matches_exposed_head_chain(
+    source: &ForkChoiceResponse,
+    checkpoint: &CheckpointResponse,
+) -> Option<bool> {
+    if source.finalized.slot == checkpoint.slot {
+        return Some(source.finalized.root == checkpoint.root);
+    }
+
+    let mut root = source.head;
+    for _ in 0..=source.nodes.len() {
+        let node = source.nodes.iter().find(|node| node.root == root)?;
+
+        if node.slot == checkpoint.slot {
+            return Some(node.root == checkpoint.root);
+        }
+
+        if node.slot < checkpoint.slot || node.parent_root == node.root {
+            return None;
+        }
+
+        root = node.parent_root;
+    }
+
+    None
 }
 
 #[derive(Debug, Deserialize)]
@@ -498,71 +742,6 @@ struct CheckpointSyncForkChoiceSnapshot {
     finalized: CheckpointResponse,
     #[serde(default)]
     nodes: Vec<ForkChoiceNodeSlot>,
-}
-
-#[allow(dead_code)]
-pub(crate) struct LiveHelperSingleClientRuntimeSetup {
-    pub environment: HashMap<String, String>,
-    pub files: HashMap<String, Vec<u8>>,
-    _helpers: RunningLocalLeanSpecHelperGroup,
-}
-
-#[allow(dead_code)]
-pub(crate) async fn lean_single_client_runtime_setup_with_live_helper(
-    client_type: &str,
-    genesis_time: u64,
-    minimum_source_slot: u64,
-    helper_fork_digest_profile: HelperGossipForkDigestProfile,
-    client_role: ClientUnderTestRole,
-    use_checkpoint_sync: bool,
-    connect_to_lean_spec_mesh: bool,
-) -> LiveHelperSingleClientRuntimeSetup {
-    let helper_fork_digest = helper_gossip_fork_digest(helper_fork_digest_profile);
-    let genesis_validator_count = validator_count_for_indices(LEAN_SPEC_SOURCE_VALIDATORS);
-    let source_helper_config = LocalLeanSpecHelperConfig::source(
-        genesis_time,
-        helper_fork_digest,
-        None,
-        genesis_validator_count,
-    );
-    let (source_helper, source_genesis_validator_entries) =
-        start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
-                )
-            });
-    let mut helpers = RunningLocalLeanSpecHelperGroup {
-        source: source_helper,
-        mesh_peers: Vec::new(),
-    };
-
-    wait_for_checkpoint_slot_with_retry(
-        &mut helpers.source,
-        minimum_source_slot,
-        &source_helper_config,
-    )
-    .await
-    .unwrap_or_else(|err| panic!("{err}"));
-
-    let environment = client_under_test_environment(
-        &helpers,
-        client_type,
-        genesis_time,
-        &source_genesis_validator_entries,
-        use_checkpoint_sync,
-        connect_to_lean_spec_mesh,
-        client_role,
-    );
-    let files = prepare_client_runtime_files(client_type, &environment)
-        .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
-
-    LiveHelperSingleClientRuntimeSetup {
-        environment,
-        files,
-        _helpers: helpers,
-    }
 }
 
 fn adjusted_genesis_time_for_helper_mesh(
@@ -753,14 +932,10 @@ fn should_start_passive_validator_mesh(
         && helper_peer_count > 1
 }
 
-pub(crate) async fn start_checkpoint_sync_helper_mesh(
+async fn start_local_helper_mesh_for_test(
     test_data: &PostGenesisSyncTestData,
-) -> CheckpointSyncHelperMesh {
-    assert!(
-        test_data.use_checkpoint_sync,
-        "checkpoint-sync helper mesh setup requires checkpoint sync test data"
-    );
-
+    disable_mesh_validator_service: bool,
+) -> StartedLocalHelperMesh {
     let helper_peer_count = test_data.helper_peer_count.max(1);
     let genesis_time = adjusted_genesis_time_for_helper_mesh(
         test_data.genesis_time,
@@ -773,7 +948,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
         helper_mesh_validator_assignments(test_data, helper_peer_count);
     let mut source_helper_config = LocalLeanSpecHelperConfig::source(
         genesis_time,
-        helper_fork_digest.clone(),
+        helper_fork_digest,
         Some(helper_validator_assignments[0].clone()),
         genesis_validator_count,
     );
@@ -800,22 +975,51 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
             )
         });
     let genesis_time = source_helper_config.genesis_time;
-    let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
-        start_mesh_helpers(
-            &source_helper,
-            &source_helper_config,
-            &helper_validator_assignments[1..],
-            false,
-        )
-        .await
-        .unwrap_or_else(|err| panic!("{err}"))
-    } else {
-        Vec::new()
-    };
-    let mut helpers = RunningLocalLeanSpecHelperGroup {
-        source: source_helper,
-        mesh_peers,
-    };
+    let (mesh_peers, mesh_configs) =
+        if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
+            start_mesh_helpers(
+                &source_helper,
+                &source_helper_config,
+                &helper_validator_assignments[1..],
+                disable_mesh_validator_service,
+            )
+            .await
+            .unwrap_or_else(|err| panic!("{err}"))
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
+    StartedLocalHelperMesh {
+        helpers: RunningLocalLeanSpecHelperGroup {
+            source: source_helper,
+            source_config: source_helper_config.clone(),
+            mesh_peers,
+            mesh_configs,
+        },
+        source_genesis_validator_entries,
+        source_helper_config,
+        genesis_time,
+        helper_validator_assignments,
+        helper_peer_count,
+    }
+}
+
+pub(crate) async fn start_checkpoint_sync_helper_mesh(
+    test_data: &PostGenesisSyncTestData,
+) -> CheckpointSyncHelperMesh {
+    assert!(
+        test_data.use_checkpoint_sync,
+        "checkpoint-sync helper mesh setup requires checkpoint sync test data"
+    );
+
+    let StartedLocalHelperMesh {
+        mut helpers,
+        source_genesis_validator_entries,
+        source_helper_config,
+        genesis_time,
+        helper_validator_assignments,
+        helper_peer_count,
+    } = start_local_helper_mesh_for_test(test_data, false).await;
 
     let (mut source_fork_choice, mut source_helper_restarted) =
         match wait_for_checkpoint_slot_with_retry(
@@ -840,7 +1044,7 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
 
     if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
         if source_helper_restarted {
-            helpers.mesh_peers = start_mesh_helpers(
+            let (mesh_peers, mesh_configs) = start_mesh_helpers(
                 &helpers.source,
                 &source_helper_config,
                 &helper_validator_assignments[1..],
@@ -848,6 +1052,8 @@ pub(crate) async fn start_checkpoint_sync_helper_mesh(
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
+            helpers.mesh_peers = mesh_peers;
+            helpers.mesh_configs = mesh_configs;
         }
 
         if let Err(err) =
@@ -892,7 +1098,7 @@ pub(crate) async fn start_checkpoint_sync_client_context(
             source_fork_choice: &mut helper_mesh.source_fork_choice,
             helper_config: helper_mesh.source_helper_config.clone(),
             client_type: test_data.client_under_test.name.clone(),
-            environment: checkpoint_sync_client_environment,
+            environment: checkpoint_sync_client_environment.clone(),
             minimum_slot: minimum_source_checkpoint_slot(test_data),
         })
         .await;
@@ -910,6 +1116,7 @@ pub(crate) async fn start_checkpoint_sync_client_context(
     PostGenesisSyncContext {
         _helpers: helper_mesh.helpers,
         client_under_test,
+        client_under_test_environment: checkpoint_sync_client_environment,
         source_fork_choice: helper_mesh.source_fork_choice,
         client_checkpoint,
     }
@@ -955,7 +1162,10 @@ pub(crate) async fn start_bad_checkpoint_peer(
         )
     });
 
-    RunningBadCheckpointPeer { helper }
+    RunningBadCheckpointPeer {
+        helper,
+        helper_config,
+    }
 }
 
 pub(crate) async fn start_post_genesis_sync_context(
@@ -988,61 +1198,15 @@ async fn start_post_genesis_sync_context_inner(
     wait_for_helper_agreement_before_client_start: bool,
 ) -> PostGenesisSyncContext {
     let helper_peer_count = test_data.helper_peer_count.max(1);
-    let genesis_time = adjusted_genesis_time_for_helper_mesh(
-        test_data.genesis_time,
-        helper_peer_count,
-        test_data.connect_client_to_lean_spec_mesh,
-    );
-    let helper_fork_digest = helper_gossip_fork_digest(test_data.helper_fork_digest_profile);
     let passive_validator_mesh = should_start_passive_validator_mesh(test_data, helper_peer_count);
-    let genesis_validator_count = helper_genesis_validator_count(test_data);
-    let helper_validator_assignments =
-        helper_mesh_validator_assignments(test_data, helper_peer_count);
-    let mut source_helper_config = LocalLeanSpecHelperConfig::source(
+    let StartedLocalHelperMesh {
+        mut helpers,
+        source_genesis_validator_entries,
+        source_helper_config,
         genesis_time,
-        helper_fork_digest.clone(),
-        Some(helper_validator_assignments[0].clone()),
-        genesis_validator_count,
-    );
-    let (source_helper, source_genesis_validator_entries) =
-        start_local_lean_spec_helper_with_genesis_metadata(&source_helper_config)
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Unable to load finalized genesis validators from {LOCAL_HELPER_KIND}: {err}"
-                )
-            });
-    let (source_helper, source_genesis_validator_entries) =
-        refresh_source_helper_for_mesh_launch_window(
-            source_helper,
-            source_genesis_validator_entries,
-            &mut source_helper_config,
-            helper_peer_count,
-            test_data.connect_client_to_lean_spec_mesh,
-        )
-        .await
-        .unwrap_or_else(|err| {
-            panic!(
-                "Unable to refresh {LOCAL_HELPER_KIND} genesis before post-genesis helper mesh startup: {err}"
-            )
-        });
-    let genesis_time = source_helper_config.genesis_time;
-    let mesh_peers = if test_data.connect_client_to_lean_spec_mesh && helper_peer_count > 1 {
-        start_mesh_helpers(
-            &source_helper,
-            &source_helper_config,
-            &helper_validator_assignments[1..],
-            passive_validator_mesh,
-        )
-        .await
-        .unwrap_or_else(|err| panic!("{err}"))
-    } else {
-        Vec::new()
-    };
-    let mut helpers = RunningLocalLeanSpecHelperGroup {
-        source: source_helper,
-        mesh_peers,
-    };
+        helper_validator_assignments,
+        helper_peer_count,
+    } = start_local_helper_mesh_for_test(test_data, passive_validator_mesh).await;
     let should_start_client_early = !wait_for_helper_agreement_before_client_start
         && !test_data.use_checkpoint_sync
         && test_data.connect_client_to_lean_spec_mesh;
@@ -1099,21 +1263,12 @@ async fn start_post_genesis_sync_context_inner(
         {
             Ok(source_fork_choice) => source_fork_choice,
             Err(err) => {
-                if client_under_test.is_none() && !helper_startup_error_is_retryable(&err) {
-                    let files = prepare_client_runtime_files(
+                if client_under_test.is_none() {
+                    register_client_under_test_for_failed_setup(
+                        test,
                         &test_data.client_under_test.name,
                         &initial_client_under_test_environment,
-                    )
-                    .unwrap_or_else(|prep_err| {
-                        panic!(
-                            "Unable to prepare runtime assets for {} after checkpoint wait failure: {prep_err}",
-                            test_data.client_under_test.name
-                        )
-                    });
-                    test.start_client_with_files(
-                        test_data.client_under_test.name.clone(),
-                        Some(initial_client_under_test_environment.clone()),
-                        Some(files),
+                        "source helper finalized checkpoint wait failure",
                     )
                     .await;
                 }
@@ -1139,7 +1294,7 @@ async fn start_post_genesis_sync_context_inner(
             eprintln!(
                 "Restarting post-genesis helper mesh after {LOCAL_HELPER_KIND} was refreshed during source finalization wait"
             );
-            helpers.mesh_peers = start_mesh_helpers(
+            let (mesh_peers, mesh_configs) = start_mesh_helpers(
                 &helpers.source,
                 &source_helper_config,
                 &helper_validator_assignments[1..],
@@ -1147,6 +1302,8 @@ async fn start_post_genesis_sync_context_inner(
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
+            helpers.mesh_peers = mesh_peers;
+            helpers.mesh_configs = mesh_configs;
         }
 
         if client_under_test.is_some() {
@@ -1161,7 +1318,7 @@ async fn start_post_genesis_sync_context_inner(
         }
     }
 
-    if !test_data.use_checkpoint_sync && !helpers.mesh_peers.is_empty() {
+    if !test_data.use_checkpoint_sync && !passive_validator_mesh && !helpers.mesh_peers.is_empty() {
         match wait_for_all_mesh_helpers_to_reach_post_genesis(&mut helpers.mesh_peers).await {
             Ok(()) => {}
             Err(error)
@@ -1196,7 +1353,7 @@ async fn start_post_genesis_sync_context_inner(
         && helper_peer_count > 1
     {
         if source_helper_restarted {
-            helpers.mesh_peers = start_mesh_helpers(
+            let (mesh_peers, mesh_configs) = start_mesh_helpers(
                 &helpers.source,
                 &source_helper_config,
                 &helper_validator_assignments[1..],
@@ -1204,6 +1361,8 @@ async fn start_post_genesis_sync_context_inner(
             )
             .await
             .unwrap_or_else(|err| panic!("{err}"));
+            helpers.mesh_peers = mesh_peers;
+            helpers.mesh_configs = mesh_configs;
         }
 
         if let Err(err) =
@@ -1242,8 +1401,8 @@ async fn start_post_genesis_sync_context_inner(
         };
     }
 
-    let client_under_test = match client_under_test {
-        Some(client_under_test) => client_under_test,
+    let (client_under_test, client_under_test_environment) = match client_under_test {
+        Some(client_under_test) => (client_under_test, initial_client_under_test_environment),
         None if test_data.use_checkpoint_sync => {
             let checkpoint_sync_client_environment = client_under_test_environment(
                 &helpers,
@@ -1256,24 +1415,27 @@ async fn start_post_genesis_sync_context_inner(
             );
             let checkpoint_sync_client_environment =
                 with_extra_bootnodes(checkpoint_sync_client_environment, &extra_bootnodes);
-            start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
-                test,
-                helper: &mut helpers.source,
-                source_fork_choice: &mut source_fork_choice,
-                helper_config: source_helper_config.clone(),
-                client_type: test_data.client_under_test.name.clone(),
-                environment: checkpoint_sync_client_environment,
-                minimum_slot: minimum_source_checkpoint_slot(test_data),
-            })
-            .await
+            let client_under_test =
+                start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
+                    test,
+                    helper: &mut helpers.source,
+                    source_fork_choice: &mut source_fork_choice,
+                    helper_config: source_helper_config.clone(),
+                    client_type: test_data.client_under_test.name.clone(),
+                    environment: checkpoint_sync_client_environment.clone(),
+                    minimum_slot: minimum_source_checkpoint_slot(test_data),
+                })
+                .await;
+            (client_under_test, checkpoint_sync_client_environment)
         }
         None => {
-            start_client_under_test_with_retry(
+            let client_under_test = start_client_under_test_with_retry(
                 test,
                 test_data.client_under_test.name.clone(),
-                delayed_client_under_test_environment,
+                delayed_client_under_test_environment.clone(),
             )
-            .await
+            .await;
+            (client_under_test, delayed_client_under_test_environment)
         }
     };
 
@@ -1290,6 +1452,7 @@ async fn start_post_genesis_sync_context_inner(
     PostGenesisSyncContext {
         _helpers: helpers,
         client_under_test,
+        client_under_test_environment,
         source_fork_choice,
         client_checkpoint,
     }
@@ -1382,10 +1545,6 @@ fn local_lean_spec_helper_environment(
         LEAN_HELPER_METADATA_PORT_ENVIRONMENT_VARIABLE.to_string(),
         helper_config.metadata_port.to_string(),
     );
-    environment.insert(
-        LEAN_SPEC_WIRE_COMPAT_ENVIRONMENT_VARIABLE.to_string(),
-        helper_config.wire_compat_mode.clone(),
-    );
     if let Some(identity_private_key_hex) = &helper_config.identity_private_key_hex {
         environment.insert(
             LEAN_HELPER_IDENTITY_PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(),
@@ -1455,16 +1614,31 @@ fn client_under_test_environment(
         );
     }
 
-    if connect_to_lean_spec_mesh {
-        environment.insert(
-            BOOTNODES_ENVIRONMENT_VARIABLE.to_string(),
-            helpers.bootnodes_for_client(client_type),
-        );
+    if let Some(bootnodes) = client_under_test_bootnodes(
+        helpers,
+        client_type,
+        use_checkpoint_sync,
+        connect_to_lean_spec_mesh,
+    ) {
+        environment.insert(BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), bootnodes);
     }
 
     client_role.apply_to_environment(&mut environment);
 
     environment
+}
+
+fn client_under_test_bootnodes(
+    helpers: &RunningLocalLeanSpecHelperGroup,
+    client_type: &str,
+    use_checkpoint_sync: bool,
+    connect_to_lean_spec_mesh: bool,
+) -> Option<String> {
+    if connect_to_lean_spec_mesh {
+        return Some(helpers.bootnodes_for_client(client_type));
+    }
+
+    use_checkpoint_sync.then(|| helpers.source.bootnode_for_client(client_type))
 }
 
 fn with_extra_bootnodes(
@@ -1539,6 +1713,30 @@ async fn start_client_under_test_attempt(
                 "startup attempt exceeded {CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS} seconds"
             ))
         }
+    }
+}
+
+async fn register_client_under_test_for_failed_setup(
+    test: &Test,
+    client_type: &str,
+    environment: &HashMap<String, String>,
+    setup_phase: &str,
+) {
+    let files = prepare_client_runtime_files(client_type, environment).unwrap_or_else(|err| {
+        panic!("Unable to prepare runtime assets for {client_type} after {setup_phase}: {err}")
+    });
+
+    if let Err(err) = start_client_under_test_attempt(
+        test.clone(),
+        client_type.to_string(),
+        environment.clone(),
+        files,
+    )
+    .await
+    {
+        eprintln!(
+            "Unable to register client under test {client_type} after {setup_phase}; preserving original setup failure without client attribution: {err}"
+        );
     }
 }
 
@@ -2217,6 +2415,7 @@ async fn load_helper_genesis_metadata(
 fn helper_startup_error_is_retryable(error: &str) -> bool {
     error.contains("exited before the test completed")
         || error.contains("Unable to load helper genesis metadata")
+        || error.contains("error sending request for url")
         || error.contains("SIGSEGV")
         || error.contains("signal: 11")
         || error.contains("SIGABRT")
@@ -2225,6 +2424,10 @@ fn helper_startup_error_is_retryable(error: &str) -> bool {
         || error.contains("signal: 8")
         || error.contains("exit status: 134")
         || error.contains("exit status: 136")
+}
+
+fn helper_exit_error_is_retryable(error: &str) -> bool {
+    error.contains("exited before the test completed") && helper_startup_error_is_retryable(error)
 }
 
 async fn start_local_lean_spec_helper_with_genesis_metadata(
@@ -2238,7 +2441,7 @@ async fn start_local_lean_spec_helper_with_genesis_metadata(
             Ok(metadata) => {
                 helper.bootnode_qlean_enr = metadata.bootnode_qlean_enr.clone();
                 helper.bootnode_enr = metadata.bootnode_enr.clone();
-                helper.bootnode_multiaddr = metadata.bootnode_multiaddr.clone();
+                helper.bootnode_multiaddr = Some(metadata.bootnode_multiaddr.clone());
                 return Ok((helper, metadata.genesis_validator_entries));
             }
             Err(error)
@@ -2270,10 +2473,17 @@ async fn start_mesh_helpers(
     source_helper_config: &LocalLeanSpecHelperConfig,
     mesh_validator_indices: &[String],
     disable_validator_service: bool,
-) -> Result<Vec<RunningLocalLeanSpecHelper>, String> {
+) -> Result<
+    (
+        Vec<RunningLocalLeanSpecHelper>,
+        Vec<LocalLeanSpecHelperConfig>,
+    ),
+    String,
+> {
     let mesh_peer_count = mesh_validator_indices.len();
     let mut mesh_helpers = Vec::with_capacity(mesh_peer_count);
-    let source_bootnode = source_helper.bootnode_multiaddr();
+    let mut mesh_configs = Vec::with_capacity(mesh_peer_count);
+    let source_bootnode = source_helper.bootnode_multiaddr().to_string();
 
     for (mesh_index, validator_indices) in mesh_validator_indices.iter().enumerate() {
         let mesh_index = mesh_index + 1;
@@ -2286,10 +2496,11 @@ async fn start_mesh_helpers(
         );
         let (helper, _source_genesis_validator_entries) =
             start_local_lean_spec_helper_with_genesis_metadata(&helper_config).await?;
+        mesh_configs.push(helper_config);
         mesh_helpers.push(helper);
     }
 
-    Ok(mesh_helpers)
+    Ok((mesh_helpers, mesh_configs))
 }
 
 fn start_local_lean_spec_helper(
@@ -2320,7 +2531,6 @@ fn start_local_lean_spec_helper(
         expected_genesis_time: helper_config.genesis_time,
         node_id: helper_config.node_id.clone(),
         asset_root,
-        p2p_port: helper_config.p2p_port,
         api_port: helper_config.api_port,
         metadata_port: helper_config.metadata_port,
         bootnode_qlean_enr: None,
@@ -2332,6 +2542,7 @@ fn start_local_lean_spec_helper(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::util::ForkChoiceNodeResponse;
     use std::io::{Read, Write};
     use std::net::{Ipv4Addr, TcpListener};
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -2365,7 +2576,7 @@ mod tests {
                         }
 
                         let body = format!(
-                            "{{\"genesis_time\":{},\"genesis_validator_entries\":[{{\"attestation_public_key\":\"0xabc\",\"proposal_public_key\":null}}]}}",
+                            "{{\"genesis_time\":{},\"genesis_validator_entries\":[{{\"attestation_public_key\":\"0xabc\",\"proposal_public_key\":null}}],\"bootnode_multiaddr\":\"/ip4/127.0.0.1/udp/9001/quic-v1/p2p/test\"}}",
                             genesis_time.load(Ordering::SeqCst)
                         );
                         let response = format!(
@@ -2386,6 +2597,81 @@ mod tests {
         })
     }
 
+    fn test_root(value: u8) -> alloy_primitives::B256 {
+        alloy_primitives::B256::from([value; 32])
+    }
+
+    fn test_fork_choice(
+        finalized_slot: u64,
+        finalized_root: alloy_primitives::B256,
+    ) -> ForkChoiceResponse {
+        ForkChoiceResponse {
+            nodes: vec![ForkChoiceNodeResponse {
+                root: finalized_root,
+                slot: finalized_slot,
+                parent_root: if finalized_slot == 0 {
+                    finalized_root
+                } else {
+                    test_root(0)
+                },
+                proposer_index: 0,
+                weight: 0,
+            }],
+            head: finalized_root,
+            justified: CheckpointResponse {
+                slot: finalized_slot,
+                root: finalized_root,
+            },
+            finalized: CheckpointResponse {
+                slot: finalized_slot,
+                root: finalized_root,
+            },
+            safe_target: test_root(0),
+            validator_count: 0,
+        }
+    }
+
+    fn required_helper(
+        node_id: &str,
+        fork_choice: ForkChoiceResponse,
+    ) -> HelperForkChoiceObservation {
+        HelperForkChoiceObservation {
+            node_id: node_id.to_string(),
+            fork_choice,
+            requires_minimum_finalized_slot: true,
+        }
+    }
+
+    fn passive_helper(
+        node_id: &str,
+        fork_choice: ForkChoiceResponse,
+    ) -> HelperForkChoiceObservation {
+        HelperForkChoiceObservation {
+            node_id: node_id.to_string(),
+            fork_choice,
+            requires_minimum_finalized_slot: false,
+        }
+    }
+
+    fn test_post_genesis_sync_data() -> PostGenesisSyncTestData {
+        PostGenesisSyncTestData {
+            client_under_test: ClientDefinition {
+                name: "ream_devnet4".to_string(),
+                version: "test".to_string(),
+                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
+            },
+            genesis_time: 1,
+            wait_for_client_justified_checkpoint: false,
+            use_checkpoint_sync: false,
+            connect_client_to_lean_spec_mesh: true,
+            client_role: ClientUnderTestRole::Validator,
+            source_helper_validator_indices: None,
+            split_helper_validators_across_mesh: false,
+            helper_peer_count: 3,
+            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
+        }
+    }
+
     #[tokio::test]
     async fn load_helper_genesis_metadata_waits_for_expected_genesis_time() {
         let observed_genesis_time = Arc::new(AtomicU64::new(111));
@@ -2401,7 +2687,6 @@ mod tests {
             expected_genesis_time: 222,
             node_id: "test-helper".to_string(),
             asset_root: env::temp_dir().join("test-helper-assets"),
-            p2p_port: DEFAULT_HELPER_P2P_PORT,
             api_port: DEFAULT_HELPER_API_PORT,
             metadata_port: DEFAULT_HELPER_METADATA_PORT,
             bootnode_qlean_enr: None,
@@ -2464,23 +2749,161 @@ mod tests {
     }
 
     #[test]
-    fn helper_mesh_validator_assignments_repeat_source_for_passive_mesh() {
-        let mut test_data = PostGenesisSyncTestData {
-            client_under_test: ClientDefinition {
-                name: "ream_devnet4".to_string(),
-                version: "test".to_string(),
-                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
+    fn helper_startup_error_is_retryable_for_http_request_failure() {
+        assert!(helper_startup_error_is_retryable(
+            "lean_spec_0 http://172.17.0.3:5052/lean/v0/fork_choice request failed: error sending request for url"
+        ));
+    }
+
+    #[test]
+    fn helper_agreement_accepts_compatible_ready_auxiliary() {
+        let source = test_fork_choice(12, test_root(12));
+        let auxiliary = test_fork_choice(10, test_root(10));
+        let helpers = vec![
+            required_helper("lean_spec_0", source),
+            required_helper("lean_spec_mesh_1", auxiliary),
+        ];
+
+        let agreed = select_compatible_helper_agreement(&helpers, &[], 10)
+            .expect("compatible auxiliary helper at the required slot should not block agreement");
+
+        assert_eq!(agreed.finalized.slot, 12);
+        assert_eq!(agreed.finalized.root, test_root(12));
+    }
+
+    #[test]
+    fn helper_agreement_accepts_compatible_passive_lagging_auxiliary() {
+        let source = test_fork_choice(12, test_root(12));
+        let auxiliary = test_fork_choice(0, test_root(0));
+        let helpers = vec![
+            required_helper("lean_spec_0", source),
+            passive_helper("lean_spec_mesh_1", auxiliary),
+        ];
+
+        let agreed = select_compatible_helper_agreement(&helpers, &[], 10)
+            .expect("compatible passive helper should not be required to advance finality");
+
+        assert_eq!(agreed.finalized.slot, 12);
+        assert_eq!(agreed.finalized.root, test_root(12));
+    }
+
+    #[test]
+    fn helper_agreement_waits_for_compatible_lagging_auxiliary() {
+        let source = test_fork_choice(12, test_root(12));
+        let auxiliary = test_fork_choice(0, test_root(0));
+        let helpers = vec![
+            required_helper("lean_spec_0", source),
+            required_helper("lean_spec_mesh_1", auxiliary),
+        ];
+
+        let error = select_compatible_helper_agreement(&helpers, &[], 10)
+            .expect_err("lagging compatible auxiliary helper should block agreement");
+
+        assert!(error.contains("lean_spec_mesh_1 finalized slot 0 below required slot 10"));
+    }
+
+    #[test]
+    fn helper_agreement_waits_when_helper_is_unavailable() {
+        let source = test_fork_choice(12, test_root(12));
+        let helpers = vec![required_helper("lean_spec_0", source)];
+        let errors = vec!["lean_spec_mesh_1 request failed".to_string()];
+
+        let error = select_compatible_helper_agreement(&helpers, &errors, 10)
+            .expect_err("unavailable helper should block agreement");
+
+        assert!(error.contains("1 helper(s) were unavailable"));
+    }
+
+    #[test]
+    fn helper_agreement_rejects_conflicting_ready_auxiliary() {
+        let source = test_fork_choice(12, test_root(12));
+        let auxiliary = test_fork_choice(12, test_root(99));
+        let helpers = vec![
+            required_helper("lean_spec_0", source),
+            required_helper("lean_spec_mesh_1", auxiliary),
+        ];
+
+        let error = select_compatible_helper_agreement(&helpers, &[], 10)
+            .expect_err("conflicting finalized roots at the same slot should fail agreement");
+
+        assert!(error.contains("not compatible"));
+    }
+
+    #[test]
+    fn helper_agreement_waits_when_no_helper_reaches_required_slot() {
+        let source = test_fork_choice(1, test_root(1));
+        let auxiliary = test_fork_choice(0, test_root(0));
+        let helpers = vec![
+            required_helper("lean_spec_0", source),
+            required_helper("lean_spec_mesh_1", auxiliary),
+        ];
+
+        let error = select_compatible_helper_agreement(&helpers, &[], 10)
+            .expect_err("agreement should wait until a compatible helper reaches the minimum slot");
+
+        assert!(error.contains(
+            "no compatible validator-producing helper finalized at or above required slot 10"
+        ));
+    }
+
+    #[test]
+    fn finalized_checkpoint_compatibility_accepts_pruned_lagging_checkpoint() {
+        let anchor = ForkChoiceResponse {
+            nodes: vec![
+                ForkChoiceNodeResponse {
+                    root: test_root(42),
+                    slot: 42,
+                    parent_root: test_root(33),
+                    proposer_index: 0,
+                    weight: 0,
+                },
+                ForkChoiceNodeResponse {
+                    root: test_root(33),
+                    slot: 33,
+                    parent_root: test_root(29),
+                    proposer_index: 0,
+                    weight: 0,
+                },
+            ],
+            head: test_root(42),
+            justified: CheckpointResponse {
+                slot: 33,
+                root: test_root(33),
             },
-            genesis_time: 1,
-            wait_for_client_justified_checkpoint: false,
-            use_checkpoint_sync: false,
-            connect_client_to_lean_spec_mesh: true,
-            client_role: ClientUnderTestRole::Validator,
-            source_helper_validator_indices: None,
-            split_helper_validators_across_mesh: false,
-            helper_peer_count: 3,
-            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
+            finalized: CheckpointResponse {
+                slot: 33,
+                root: test_root(33),
+            },
+            safe_target: test_root(0),
+            validator_count: 0,
         };
+
+        assert!(finalized_checkpoint_is_compatible_with_anchor(
+            &anchor,
+            &CheckpointResponse {
+                slot: 11,
+                root: test_root(11),
+            }
+        ));
+        assert!(!finalized_checkpoint_is_compatible_with_anchor(
+            &anchor,
+            &CheckpointResponse {
+                slot: 33,
+                root: test_root(99),
+            }
+        ));
+        assert!(!finalized_checkpoint_is_compatible_with_anchor(
+            &anchor,
+            &CheckpointResponse {
+                slot: 34,
+                root: test_root(34),
+            }
+        ));
+    }
+
+    #[test]
+    fn helper_mesh_validator_assignments_repeat_source_for_passive_mesh() {
+        let mut test_data = test_post_genesis_sync_data();
 
         assert_eq!(
             helper_mesh_validator_assignments(&test_data, 3),
@@ -2500,22 +2923,8 @@ mod tests {
 
     #[test]
     fn helper_mesh_validator_assignments_split_validators_across_mesh() {
-        let test_data = PostGenesisSyncTestData {
-            client_under_test: ClientDefinition {
-                name: "ream_devnet4".to_string(),
-                version: "test".to_string(),
-                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
-            },
-            genesis_time: 1,
-            wait_for_client_justified_checkpoint: false,
-            use_checkpoint_sync: false,
-            connect_client_to_lean_spec_mesh: true,
-            client_role: ClientUnderTestRole::Validator,
-            source_helper_validator_indices: None,
-            split_helper_validators_across_mesh: true,
-            helper_peer_count: 3,
-            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
-        };
+        let mut test_data = test_post_genesis_sync_data();
+        test_data.split_helper_validators_across_mesh = true;
 
         assert_eq!(
             helper_mesh_validator_assignments(&test_data, 3),
@@ -2526,24 +2935,10 @@ mod tests {
 
     #[test]
     fn helper_mesh_validator_assignments_split_client_excluding_validators() {
-        let test_data = PostGenesisSyncTestData {
-            client_under_test: ClientDefinition {
-                name: "ream_devnet4".to_string(),
-                version: "test".to_string(),
-                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
-            },
-            genesis_time: 1,
-            wait_for_client_justified_checkpoint: false,
-            use_checkpoint_sync: false,
-            connect_client_to_lean_spec_mesh: true,
-            client_role: ClientUnderTestRole::Validator,
-            source_helper_validator_indices: Some(
-                LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-            ),
-            split_helper_validators_across_mesh: true,
-            helper_peer_count: 3,
-            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
-        };
+        let mut test_data = test_post_genesis_sync_data();
+        test_data.source_helper_validator_indices =
+            Some(LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string());
+        test_data.split_helper_validators_across_mesh = true;
 
         assert_eq!(
             helper_mesh_validator_assignments(&test_data, 3),
@@ -2554,24 +2949,11 @@ mod tests {
 
     #[test]
     fn helper_mesh_validator_assignments_split_client_excluding_validators_across_two_helpers() {
-        let test_data = PostGenesisSyncTestData {
-            client_under_test: ClientDefinition {
-                name: "ream_devnet4".to_string(),
-                version: "test".to_string(),
-                meta: hivesim::types::ClientMetadata { roles: Vec::new() },
-            },
-            genesis_time: 1,
-            wait_for_client_justified_checkpoint: false,
-            use_checkpoint_sync: false,
-            connect_client_to_lean_spec_mesh: true,
-            client_role: ClientUnderTestRole::Validator,
-            source_helper_validator_indices: Some(
-                LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-            ),
-            split_helper_validators_across_mesh: true,
-            helper_peer_count: 2,
-            helper_fork_digest_profile: HelperGossipForkDigestProfile::SelectedDevnet,
-        };
+        let mut test_data = test_post_genesis_sync_data();
+        test_data.source_helper_validator_indices =
+            Some(LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string());
+        test_data.split_helper_validators_across_mesh = true;
+        test_data.helper_peer_count = 2;
 
         assert_eq!(
             helper_mesh_validator_assignments(&test_data, 2),

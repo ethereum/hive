@@ -1,6 +1,6 @@
 ARG baseimage=piertwo/lantern
 ARG devnet4_tag=v0.0.4
-ARG devnet5_tag=devnet5
+ARG devnet5_tag=devnet-5
 
 FROM ${baseimage}:${devnet5_tag} AS devnet5
 FROM ${baseimage}:${devnet4_tag}

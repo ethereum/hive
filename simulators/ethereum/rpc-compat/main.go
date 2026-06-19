@@ -25,6 +25,10 @@ var (
 		"genesis.json": "./tests/genesis.json",
 		"chain.rlp":    "./tests/chain.rlp",
 	}
+
+	// specMethods holds the compiled OpenRPC result schema for each method,
+	// used to validate "speconly" tests against the spec.
+	specMethods methodSchemas
 )
 
 func main() {
@@ -33,6 +37,12 @@ func main() {
 	err := common.LoadJSON("tests/forkenv.json", &clientEnv)
 	if err != nil {
 		panic(err)
+	}
+
+	// Load the OpenRPC spec so speconly tests can be validated against the
+	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
+	if specMethods, err = parseSpec("openrpc.json"); err != nil {
+		panic(fmt.Errorf("unable to load openrpc.json: %w", err))
 	}
 
 	// Run the test suite.
@@ -83,12 +93,14 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 		err       error
 		respBytes []byte
+		method    string
 	)
 
 	for _, msg := range test.messages {
 		if msg.send {
 			// Send request.
 			t.Log(">> ", msg.data)
+			method = gjson.Get(msg.data, "method").String()
 			respBytes, err = postHttp(client, url, strings.NewReader(msg.data))
 			if err != nil {
 				return err
@@ -105,15 +117,20 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, ensure the response type matches the expected type.
+			// For speconly tests, the recorded value is just one valid example;
+			// the response is client- or config-specific and must not be matched
+			// exactly. Validate it against the method's OpenRPC result schema so
+			// any spec-valid response passes regardless of which optional fields
+			// the client includes.
 			hasError := gjson.Get(resp, "error").Exists()
 			if !hasError && test.speconly {
-				errors := checkJSONStructure(gjson.Parse(msg.data), gjson.Parse(resp), ".")
-				if len(errors) > 0 {
-					for _, err := range errors {
-						t.Log(err)
-					}
-					return fmt.Errorf("response type does not match expected")
+				schema := specMethods[method]
+				if schema == nil {
+					return fmt.Errorf("no result schema for speconly method %s in spec", method)
+				}
+				if err := validateResult(schema, []byte(gjson.Get(resp, "result").Raw)); err != nil {
+					t.Log(err.Error())
+					return fmt.Errorf("response does not conform to %s result schema: %w", method, err)
 				}
 				respBytes = nil
 				continue
@@ -221,64 +238,6 @@ func joinPath(parent, child string) string {
 		return child
 	}
 	return parent + "." + child
-}
-
-// checkJSONStructure checks whether the `actual` value matches the type structure
-// of the `expected` value.
-func checkJSONStructure(expected, actual gjson.Result, path string) []string {
-	var errors []string
-
-	buildPath := func(key string) string {
-		if path != "." {
-			return path + "." + key
-		}
-		return "." + key
-	}
-
-	if expected.Type != gjson.JSON {
-		return errors
-	}
-
-	if expected.IsArray() {
-		if !actual.IsArray() {
-			errors = append(errors, fmt.Sprintf("%s: expected array but got %s", path, actual.Type))
-		}
-		return errors
-	}
-
-	// Check all expected keys exist with correct types
-	expected.ForEach(func(key, value gjson.Result) bool {
-		keyPath := buildPath(key.String())
-		actualValue := actual.Get(key.String())
-
-		if !actualValue.Exists() {
-			errors = append(errors, fmt.Sprintf("%s: missing key", keyPath))
-			return true
-		}
-
-		if value.Type != actualValue.Type && !(value.Type == gjson.JSON && actualValue.Type == gjson.JSON) {
-			errors = append(errors, fmt.Sprintf("%s: type mismatch (expected %s, got %s)",
-				keyPath, value.Type, actualValue.Type))
-			return true
-		}
-
-		if value.IsObject() || value.IsArray() {
-			errors = append(errors, checkJSONStructure(value, actualValue, keyPath)...)
-		}
-		return true
-	})
-
-	// Check for unexpected keys
-	if actual.IsObject() {
-		actual.ForEach(func(key, value gjson.Result) bool {
-			if !expected.Get(key.String()).Exists() {
-				errors = append(errors, fmt.Sprintf("%s: unexpected key in response", buildPath(key.String())))
-			}
-			return true
-		})
-	}
-
-	return errors
 }
 
 func numbersEqual(a, b json.Number) bool {

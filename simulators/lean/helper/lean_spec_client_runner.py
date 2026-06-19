@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import gc
+import hashlib
 import importlib
 import inspect
 import json
@@ -12,6 +13,13 @@ import os
 import sys
 from contextlib import suppress
 from typing import Any, Final
+
+from aiohttp import web
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 from lean_spec_runtime import (
     ATTESTATION_SECRET_FIELD,
@@ -28,14 +36,14 @@ from lean_spec_runtime import (
     dial_bootnodes,
     extract_inner_block,
     helper_genesis_metadata,
+    hash_tree_root,
     identity_keypair_from_private_key_hex,
+    import_first_module,
     install_fast_ssz_deserialization,
-    install_legacy_signed_block_wire_compatibility,
     install_low_s_identity_signature_compatibility,
     install_setup_prover_compatibility,
     install_snappy_compress_fallback,
     keep_status_current,
-    legacy_signed_block_compatibility_enabled,
     load_genesis,
     load_validator,
     load_validator_registry_from_manifest,
@@ -48,35 +56,60 @@ from lean_spec_runtime import (
     start_metadata_server,
     subscribe_gossip_topics,
     uses_latest_leanspec_format,
-    wire_compat_mode,
 )
 
-from lean_spec.subspecs.api import ApiServer, ApiServerConfig
-from lean_spec.subspecs.metrics import registry as metrics
-from lean_spec.subspecs.networking.client import LiveNetworkEventSource
-from lean_spec.subspecs.networking.service.events import GossipBlockEvent
-from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-from lean_spec.subspecs.networking.transport.quic.connection import (
-    QuicConnectionManager,
-    QuicStream,
-)
-from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.xmss import aggregation as xmss_aggregation_module
+# leanSpec restructured its packages over time (subspecs/types -> node/spec).
+# The devnet5 helper builds from leanSpec main (new layout) while the devnet4
+# helper stays pinned on the old layout, so every import tries the new
+# location first and falls back to the old ones.
 try:
-    from lean_spec.subspecs.xmss.aggregation import (
-        AggregatedSignatureProof as TypeOneSignatureProof,
+    from lean_spec.node.api import ApiServer, ApiServerConfig
+    from lean_spec.node.metrics import registry as metrics
+    from lean_spec.node.networking.client import LiveNetworkEventSource
+    from lean_spec.node.networking.service.events import GossipBlockEvent
+    from lean_spec.node.networking.transport.identity import IdentityKeypair
+    from lean_spec.node.networking.transport.quic.connection import (
+        QuicConnectionManager,
     )
-except ImportError:
-    from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature as TypeOneSignatureProof
-from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.subspecs.validator.registry import ValidatorEntry
-from lean_spec.types import Bytes32
-try:
-    from lean_spec.types.participation import AggregationBits, ValidatorIndices
-except ImportError:
-    from lean_spec.types import AggregationBits, ValidatorIndices
-from lean_spec.types.uint import Uint32, Uint64
+    from lean_spec.node.node import Node, NodeConfig
+    from lean_spec.node.validator import ValidatorRegistry
+    from lean_spec.node.validator.registry import ValidatorEntry
+    from lean_spec.spec.crypto.merkleization import hash_tree_root
+    from lean_spec.spec.forks.lstar.containers import (
+        AggregationBits,
+        SingleMessageAggregate as TypeOneSignatureProof,
+        ValidatorIndices,
+    )
+    from lean_spec.spec.ssz import Bytes32, Uint64
+except (ImportError, ModuleNotFoundError):
+    from lean_spec.subspecs.api import ApiServer, ApiServerConfig
+    from lean_spec.subspecs.metrics import registry as metrics
+    from lean_spec.subspecs.networking.client import LiveNetworkEventSource
+    from lean_spec.subspecs.networking.service.events import GossipBlockEvent
+    from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+    from lean_spec.subspecs.networking.transport.quic.connection import (
+        QuicConnectionManager,
+    )
+    from lean_spec.subspecs.node import Node, NodeConfig
+
+    try:
+        from lean_spec.subspecs.xmss.aggregation import (
+            AggregatedSignatureProof as TypeOneSignatureProof,
+        )
+    except ImportError:
+        from lean_spec.subspecs.xmss.aggregation import (
+            TypeOneMultiSignature as TypeOneSignatureProof,
+        )
+    from lean_spec.subspecs.ssz.hash import hash_tree_root
+    from lean_spec.subspecs.validator import ValidatorRegistry
+    from lean_spec.subspecs.validator.registry import ValidatorEntry
+    from lean_spec.types import Bytes32
+
+    try:
+        from lean_spec.types.participation import AggregationBits, ValidatorIndices
+    except ImportError:
+        from lean_spec.types import AggregationBits, ValidatorIndices
+    from lean_spec.types.uint import Uint64
 
 DEFAULT_GOSSIP_FORK_DIGEST: Final = "devnet0"
 DEFAULT_LISTEN_PORT: Final = 9001
@@ -99,48 +132,40 @@ GOSSIPSUB_V11_PROTOCOL_ID: Final = "/meshsub/1.1.0"
 IDENTIFY_PROTOCOL_ID: Final = "/ipfs/id/1.0.0"
 IDENTIFY_PUSH_PROTOCOL_ID: Final = "/ipfs/id/push/1.0.0"
 LIBP2P_SECP256K1_PUBLIC_KEY_TYPE: Final = 2
+LIBP2P_TLS_EXTENSION_OID: Final = x509.ObjectIdentifier("1.3.6.1.4.1.53594.1.1")
+LIBP2P_TLS_SIGNATURE_PREFIX: Final = b"libp2p-tls-handshake:"
 DEFAULT_VALIDATOR_COUNT: Final = 3
 
 logger = logging.getLogger("lean_spec_client_runner")
 
 
-_QUIC_STREAM_CLOSE_COMPAT_INSTALLED = False
 _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED = False
 _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED = False
 _IDENTIFY_PROTOCOL_COMPAT_INSTALLED = False
 _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED = False
 _TRUSTED_GOSSIP_ATTESTATION_COMPAT_INSTALLED = False
 _CHECKPOINT_FINALIZATION_COMPAT_INSTALLED = False
+_INBOUND_QUIC_COMPAT_INSTALLED = False
 _BLOCK_CACHE_BY_REQRESP_CLIENT: dict[int, dict[Bytes32, object]] = {}
 _BLOCK_CACHE_BY_SYNC_SERVICE: dict[int, dict[Bytes32, object]] = {}
+_BLOCK_SLOT_CACHE_BY_REQRESP_CLIENT: dict[int, dict[int, object]] = {}
+_BLOCK_SLOT_CACHE_BY_SYNC_SERVICE: dict[int, dict[int, object]] = {}
 _SYNC_EVENT_CONTEXT: dict[int, tuple[LiveNetworkEventSource, Node]] = {}
 
 
-def install_quic_stream_close_reset_tolerance() -> None:
-    global _QUIC_STREAM_CLOSE_COMPAT_INSTALLED
+def slot_key(slot: object) -> int:
+    return int(slot)
 
-    if _QUIC_STREAM_CLOSE_COMPAT_INSTALLED:
-        return
 
-    original_close = QuicStream.close
-
-    async def close_ignoring_reset(self: QuicStream) -> None:
-        try:
-            await original_close(self)
-        except Exception as err:
-            # grandine_lean opens an identify stream that LeanSpec does not
-            # implement. The peer may reset that stream before LeanSpec can
-            # close it, and aioquic then raises from close(). Swallow the
-            # close error so the helper keeps accepting subsequent req/resp
-            # streams on the same connection.
-            logger.debug(
-                "Ignoring QUIC close failure for stream %d after peer reset: %s",
-                self.stream_id,
-                err,
-            )
-
-    QuicStream.close = close_ignoring_reset
-    _QUIC_STREAM_CLOSE_COMPAT_INSTALLED = True
+def cache_helper_signed_block(
+    block_cache: dict[Bytes32, object],
+    signed_block: object,
+    slot_cache: dict[int, object] | None = None,
+) -> Bytes32:
+    block_root = cache_signed_block(block_cache, signed_block)
+    if slot_cache is not None:
+        slot_cache[slot_key(extract_inner_block(signed_block).slot)] = signed_block
+    return block_root
 
 
 def install_reqresp_block_cache_tracking() -> None:
@@ -149,8 +174,9 @@ def install_reqresp_block_cache_tracking() -> None:
     if _REQRESP_BLOCK_CACHE_TRACKING_INSTALLED:
         return
 
-    reqresp_client_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.reqresp_client"
+    reqresp_client_module = import_first_module(
+        "lean_spec.node.networking.client.reqresp_client",
+        "lean_spec.subspecs.networking.client.reqresp_client",
     )
     reqresp_client_cls = reqresp_client_module.ReqRespClient
     original_request_blocks_by_root = reqresp_client_cls.request_blocks_by_root
@@ -162,9 +188,10 @@ def install_reqresp_block_cache_tracking() -> None:
     ) -> list[object]:
         signed_blocks = await original_request_blocks_by_root(self, peer_id, roots)
         block_cache = _BLOCK_CACHE_BY_REQRESP_CLIENT.get(id(self))
+        slot_cache = _BLOCK_SLOT_CACHE_BY_REQRESP_CLIENT.get(id(self))
         if block_cache is not None:
             for signed_block in signed_blocks:
-                cache_signed_block(block_cache, signed_block)
+                cache_helper_signed_block(block_cache, signed_block, slot_cache)
         return signed_blocks
 
     reqresp_client_cls.request_blocks_by_root = request_blocks_by_root_with_cache
@@ -177,8 +204,9 @@ def install_network_service_gossip_tracking() -> None:
     if _NETWORK_SERVICE_GOSSIP_TRACKING_INSTALLED:
         return
 
-    networking_service_module = importlib.import_module(
-        "lean_spec.subspecs.networking.service.service"
+    networking_service_module = import_first_module(
+        "lean_spec.node.networking.service.service",
+        "lean_spec.subspecs.networking.service.service",
     )
     network_service_cls = networking_service_module.NetworkService
     original_handle_event = network_service_cls._handle_event
@@ -186,8 +214,9 @@ def install_network_service_gossip_tracking() -> None:
     async def handle_event_with_helper_backfill(self: object, event: object) -> None:
         if isinstance(event, GossipBlockEvent):
             block_cache = _BLOCK_CACHE_BY_SYNC_SERVICE.get(id(self.sync_service))
+            slot_cache = _BLOCK_SLOT_CACHE_BY_SYNC_SERVICE.get(id(self.sync_service))
             if block_cache is not None:
-                cache_signed_block(block_cache, event.block)
+                cache_helper_signed_block(block_cache, event.block, slot_cache)
 
         await original_handle_event(self, event)
 
@@ -269,6 +298,336 @@ def build_identify_response(identity_key: IdentityKeypair) -> bytes:
     return bytes(response)
 
 
+def install_finalized_block_api_route(signed_block_getter: Any) -> None:
+    try:
+        routes_module = import_first_module(
+            "lean_spec.node.api.routes",
+            "lean_spec.subspecs.api.routes",
+        )
+    except (ImportError, ModuleNotFoundError):
+        return
+    routes = getattr(routes_module, "ROUTES", None)
+    route_type = getattr(routes_module, "Route", None)
+    if routes is None or route_type is None:
+        return
+
+    if any(
+        getattr(route, "method", None) == "GET"
+        and getattr(route, "path", None) == "/lean/v0/blocks/finalized"
+        for route in routes
+    ):
+        return
+
+    async def handle_finalized_block(request: web.Request) -> web.Response:
+        store_getter = request.app.get("store_getter")
+        store = store_getter() if store_getter else None
+        if store is None:
+            raise web.HTTPServiceUnavailable(reason="Store not initialized")
+
+        signed_block = signed_block_getter(store.latest_finalized.root)
+        if inspect.isawaitable(signed_block):
+            signed_block = await signed_block
+        if signed_block is None:
+            raise web.HTTPNotFound(reason="Finalized block not available")
+
+        ssz_bytes = await asyncio.to_thread(signed_block.encode_bytes)
+        return web.Response(body=ssz_bytes, content_type="application/octet-stream")
+
+    routes.append(
+        route_type(
+            "GET",
+            "/lean/v0/blocks/finalized",
+            handle_finalized_block,
+            is_admin=False,
+        )
+    )
+    logger.info("Installed helper finalized block API route")
+
+
+def decode_der_length(payload: bytes, offset: int) -> tuple[int, int]:
+    if offset >= len(payload):
+        raise ValueError("DER length truncated")
+
+    first = payload[offset]
+    offset += 1
+    if first < 0x80:
+        return first, offset
+
+    length_size = first & 0x7F
+    if length_size == 0 or length_size > 4:
+        raise ValueError("Unsupported DER length")
+    if offset + length_size > len(payload):
+        raise ValueError("DER long-form length truncated")
+
+    value = int.from_bytes(payload[offset : offset + length_size], "big")
+    return value, offset + length_size
+
+
+def decode_der_value(payload: bytes, offset: int, expected_tag: int) -> tuple[bytes, int]:
+    if offset >= len(payload):
+        raise ValueError("DER value truncated")
+    if payload[offset] != expected_tag:
+        raise ValueError(f"Expected DER tag 0x{expected_tag:02x}")
+
+    length, value_offset = decode_der_length(payload, offset + 1)
+    end = value_offset + length
+    if end > len(payload):
+        raise ValueError("DER value truncated")
+    return payload[value_offset:end], end
+
+
+def decode_libp2p_signed_key(payload: bytes) -> tuple[bytes, bytes]:
+    sequence, offset = decode_der_value(payload, 0, 0x30)
+    if offset != len(payload):
+        raise ValueError("Trailing bytes after libp2p TLS extension sequence")
+
+    public_key, offset = decode_der_value(sequence, 0, 0x04)
+    signature, offset = decode_der_value(sequence, offset, 0x04)
+    if offset != len(sequence):
+        raise ValueError("Trailing bytes after libp2p signed-key payload")
+    return public_key, signature
+
+
+def decode_unsigned_varint(payload: bytes, offset: int) -> tuple[int, int]:
+    value = 0
+    shift = 0
+    for _ in range(10):
+        if offset >= len(payload):
+            raise ValueError("protobuf varint truncated")
+        byte = payload[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        if byte & 0x80 == 0:
+            return value, offset
+        shift += 7
+    raise ValueError("protobuf varint is too long")
+
+
+def decode_libp2p_public_key(payload: bytes) -> tuple[int | None, bytes | None]:
+    offset = 0
+    key_type = None
+    key_data = None
+    while offset < len(payload):
+        key, offset = decode_unsigned_varint(payload, offset)
+        field_number = key >> 3
+        wire_type = key & 0x07
+        if field_number == 1 and wire_type == 0:
+            key_type, offset = decode_unsigned_varint(payload, offset)
+        elif field_number == 2 and wire_type == 2:
+            length, offset = decode_unsigned_varint(payload, offset)
+            end = offset + length
+            if end > len(payload):
+                raise ValueError("protobuf public-key data truncated")
+            key_data = payload[offset:end]
+            offset = end
+        elif wire_type == 0:
+            _, offset = decode_unsigned_varint(payload, offset)
+        elif wire_type == 2:
+            length, offset = decode_unsigned_varint(payload, offset)
+            offset += length
+            if offset > len(payload):
+                raise ValueError("protobuf length-delimited field truncated")
+        else:
+            raise ValueError(f"Unsupported protobuf wire type: {wire_type}")
+
+    return key_type, key_data
+
+
+def peer_id_type() -> type[Any]:
+    try:
+        peer_id_module = import_first_module(
+            "lean_spec.node.networking.transport.peer_id",
+            "lean_spec.node.networking.transport",
+            "lean_spec.subspecs.networking.transport.peer_id",
+            "lean_spec.subspecs.networking.transport",
+        )
+    except (ImportError, ModuleNotFoundError) as err:
+        raise ImportError("Unable to import LeanSpec PeerId") from err
+
+    return getattr(peer_id_module, "PeerId")
+
+
+def peer_id_from_public_key(public_key_protobuf: bytes) -> Any:
+    digest = (
+        bytes([0x00, len(public_key_protobuf)]) + public_key_protobuf
+        if len(public_key_protobuf) <= 42
+        else b"\x12\x20" + hashlib.sha256(public_key_protobuf).digest()
+    )
+    return peer_id_type()(multihash=digest)
+
+
+def verify_libp2p_tls_identity(
+    certificate: x509.Certificate,
+    public_key_protobuf: bytes,
+    signature: bytes,
+) -> None:
+    key_type, key_data = decode_libp2p_public_key(public_key_protobuf)
+    if key_type != LIBP2P_SECP256K1_PUBLIC_KEY_TYPE or key_data is None:
+        logger.debug("Skipping libp2p TLS signature verification for key type %s", key_type)
+        return
+
+    identity_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+        ec.SECP256K1(),
+        key_data,
+    )
+    tls_public_key_bytes = certificate.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    message = LIBP2P_TLS_SIGNATURE_PREFIX + tls_public_key_bytes
+
+    signature_candidates = [signature]
+    if len(signature) == 64:
+        signature_r = int.from_bytes(signature[:32], "big")
+        signature_s = int.from_bytes(signature[32:], "big")
+        signature_candidates.append(encode_dss_signature(signature_r, signature_s))
+
+    last_error = None
+    for candidate in signature_candidates:
+        try:
+            identity_public_key.verify(candidate, message, ec.ECDSA(hashes.SHA256()))
+            return
+        except Exception as err:
+            last_error = err
+
+    logger.debug("Unable to verify libp2p TLS identity signature: %s", last_error)
+
+
+def quic_protocol_peer_certificate(protocol_instance: Any) -> x509.Certificate | None:
+    quic = getattr(protocol_instance, "_quic", None)
+    tls_context = getattr(quic, "tls", None)
+    certificate = getattr(tls_context, "_peer_certificate", None)
+    if isinstance(certificate, x509.Certificate):
+        return certificate
+    return None
+
+
+def peer_id_from_quic_protocol_certificate(protocol_instance: Any) -> Any | None:
+    certificate = quic_protocol_peer_certificate(protocol_instance)
+    if certificate is None:
+        return None
+
+    try:
+        extension = certificate.extensions.get_extension_for_oid(LIBP2P_TLS_EXTENSION_OID)
+        public_key_protobuf, signature = decode_libp2p_signed_key(extension.value.value)
+        verify_libp2p_tls_identity(certificate, public_key_protobuf, signature)
+        return peer_id_from_public_key(public_key_protobuf)
+    except Exception as err:
+        logger.debug("Unable to derive peer ID from libp2p TLS certificate: %s", err)
+        return None
+
+
+def fallback_peer_id_from_quic_protocol(protocol_instance: Any) -> Any:
+    quic = getattr(protocol_instance, "_quic", None)
+    seed_parts = [
+        b"hive-lean-inbound-quic",
+        str(id(protocol_instance)).encode(),
+    ]
+    for attr_name in ("_peer_cid", "_original_destination_connection_id"):
+        value = getattr(quic, attr_name, None)
+        cid = getattr(value, "cid", value)
+        if isinstance(cid, bytes):
+            seed_parts.append(cid)
+
+    return peer_id_type()(multihash=b"\x12\x20" + hashlib.sha256(b"|".join(seed_parts)).digest())
+
+
+def install_inbound_quic_connection_compatibility() -> None:
+    global _INBOUND_QUIC_COMPAT_INSTALLED
+
+    if _INBOUND_QUIC_COMPAT_INSTALLED:
+        return
+
+    try:
+        connection_module = import_first_module(
+            "lean_spec.node.networking.transport.quic.connection",
+            "lean_spec.subspecs.networking.transport.quic.connection",
+        )
+    except (ImportError, ModuleNotFoundError) as err:
+        logger.debug("LeanSpec inbound QUIC compatibility unavailable: %s", err)
+        return
+
+    connection_manager_cls = connection_module.QuicConnectionManager
+    original_listen = connection_manager_cls.listen
+    try:
+        original_listen_source = inspect.getsource(original_listen)
+    except (OSError, TypeError):
+        original_listen_source = ""
+    if "peer identity verification from the libp2p certificate is not implemented" not in original_listen_source:
+        _INBOUND_QUIC_COMPAT_INSTALLED = True
+        return
+
+    async def listen_with_certificate_peer_id(
+        self: Any,
+        multiaddr: str,
+        on_connection: Any,
+    ) -> None:
+        host, port, transport, _ = connection_module.parse_multiaddr(multiaddr)
+        if transport != "quic":
+            raise connection_module.QuicTransportError(f"Not a QUIC multiaddr: {multiaddr}")
+
+        server_config = connection_module.QuicConfiguration(
+            alpn_protocols=[connection_module.LIBP2P_ALPN_PROTOCOL],
+            is_client=False,
+            verify_mode=connection_module.ssl.CERT_NONE,
+        )
+        if self._temp_directory:
+            certificate_path = self._temp_directory / "cert.pem"
+            key_path = self._temp_directory / "key.pem"
+            server_config.load_cert_chain(str(certificate_path), str(key_path))
+
+        def handle_handshake(protocol_instance: Any) -> None:
+            peer_id = peer_id_from_quic_protocol_certificate(protocol_instance)
+            if peer_id is None:
+                peer_id = fallback_peer_id_from_quic_protocol(protocol_instance)
+                logger.info(
+                    "Accepted inbound QUIC connection without certificate peer ID; "
+                    "using local scoped peer ID %s",
+                    peer_id,
+                )
+
+            connection = connection_module.QuicConnection(
+                _protocol=protocol_instance,
+                _peer_id=peer_id,
+                _remote_address=f"inbound-quic/{peer_id}",
+            )
+            protocol_instance.connection = connection
+            protocol_instance._replay_buffered_events()
+            self._connections[peer_id] = connection
+
+            task = asyncio.create_task(on_connection(connection))
+
+            def log_callback_error(done: asyncio.Task[Any]) -> None:
+                try:
+                    done.result()
+                except asyncio.CancelledError:
+                    pass
+                except Exception as err:
+                    logger.warning("Inbound QUIC connection callback failed: %s", err)
+
+            task.add_done_callback(log_callback_error)
+
+        def create_protocol(*args: Any, **kwargs: Any) -> Any:
+            protocol = connection_module.LibP2PQuicProtocol(*args, **kwargs)
+            tls_context = getattr(getattr(protocol, "_quic", None), "tls", None)
+            if tls_context is not None:
+                tls_context._request_client_certificate = True
+            protocol._on_handshake = handle_handshake
+            return protocol
+
+        await connection_module.quic_serve(
+            host,
+            port,
+            configuration=server_config,
+            create_protocol=create_protocol,
+        )
+        await asyncio.Event().wait()
+
+    connection_manager_cls.listen = listen_with_certificate_peer_id
+    _INBOUND_QUIC_COMPAT_INSTALLED = True
+    logger.info("Installed helper inbound QUIC certificate peer-id compatibility")
+
+
 async def read_delimited_identify_message(wrapper: object) -> bytes:
     length = 0
     shift = 0
@@ -322,11 +681,13 @@ def install_identify_protocol_compatibility() -> None:
     if _IDENTIFY_PROTOCOL_COMPAT_INSTALLED:
         return
 
-    live_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.event_source.live"
+    live_module = import_first_module(
+        "lean_spec.node.networking.client.event_source.live",
+        "lean_spec.subspecs.networking.client.event_source.live",
     )
-    protocol_module = importlib.import_module(
-        "lean_spec.subspecs.networking.client.event_source.protocol"
+    protocol_module = import_first_module(
+        "lean_spec.node.networking.client.event_source.protocol",
+        "lean_spec.subspecs.networking.client.event_source.protocol",
     )
 
     extra_protocols = {
@@ -403,18 +764,25 @@ def install_child_only_aggregation_compatibility() -> None:
     if _CHILD_ONLY_AGGREGATION_COMPAT_INSTALLED:
         return
 
-    original_to_aggregation_bits = ValidatorIndices.to_aggregation_bits
-    original_aggregate = TypeOneSignatureProof.aggregate
-    aggregate_parameters = inspect.signature(original_aggregate).parameters
+    # Both patches work around old-layout quirks. Newer leanSpec checkouts
+    # fixed the underlying behavior and dropped or reshaped these methods,
+    # so each patch only installs when its target still exists.
+    original_to_aggregation_bits = getattr(ValidatorIndices, "to_aggregation_bits", None)
+    original_aggregate = getattr(TypeOneSignatureProof, "aggregate", None)
+    aggregate_parameters = (
+        inspect.signature(original_aggregate).parameters if original_aggregate else {}
+    )
 
-    def to_aggregation_bits_allowing_empty(
-        self: ValidatorIndices,
-    ) -> AggregationBits:
-        if not self.data:
-            return AggregationBits(data=[])
-        return original_to_aggregation_bits(self)
+    if original_to_aggregation_bits is not None:
 
-    ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
+        def to_aggregation_bits_allowing_empty(
+            self: ValidatorIndices,
+        ) -> AggregationBits:
+            if not self.data:
+                return AggregationBits(data=[])
+            return original_to_aggregation_bits(self)
+
+        ValidatorIndices.to_aggregation_bits = to_aggregation_bits_allowing_empty
 
     if {"children", "raw_xmss", "xmss_participants"}.issubset(aggregate_parameters):
 
@@ -454,8 +822,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
         return
 
     try:
-        from lean_spec.forks.lstar.spec import LstarSpec
-        from lean_spec.forks.lstar.store import AttestationSignatureEntry
+        try:
+            from lean_spec.spec.forks.lstar.containers import AttestationSignatureEntry
+            from lean_spec.spec.forks.lstar.spec import LstarSpec
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.forks.lstar.spec import LstarSpec
+            from lean_spec.forks.lstar.store import AttestationSignatureEntry
     except ImportError as err:
         logger.debug("LeanSpec trusted attestation compatibility unavailable: %s", err)
         return
@@ -466,7 +838,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
         signed_attestation: Any,
         is_aggregator: bool = False,
     ) -> Any:
-        validator_id = signed_attestation.validator_id
+        # The voter field and the registry-bounds predicate were renamed on
+        # newer leanSpec layouts (validator_id -> validator_index, is_valid ->
+        # is_within_registry); resolve whichever spelling the checkout has.
+        validator_index = getattr(signed_attestation, "validator_index", None)
+        if validator_index is None:
+            validator_index = signed_attestation.validator_id
         attestation_data = signed_attestation.data
         signature = signed_attestation.signature
 
@@ -477,8 +854,12 @@ def install_trusted_gossip_attestation_compatibility() -> None:
             f"No state available to validate attestation for target block "
             f"{attestation_data.target.root.hex()}"
         )
-        assert validator_id.is_valid(Uint64(len(key_state.validators))), (
-            f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
+        in_registry = getattr(validator_index, "is_within_registry", None)
+        if in_registry is None:
+            in_registry = validator_index.is_valid
+        assert in_registry(Uint64(len(key_state.validators))), (
+            f"Validator {validator_index} not found in state "
+            f"{attestation_data.target.root.hex()}"
         )
 
         if not is_aggregator:
@@ -486,7 +867,7 @@ def install_trusted_gossip_attestation_compatibility() -> None:
 
         new_committee_sigs = {k: set(v) for k, v in store.attestation_signatures.items()}
         new_committee_sigs.setdefault(attestation_data, set()).add(
-            AttestationSignatureEntry(validator_id, signature)
+            AttestationSignatureEntry(validator_index, signature)
         )
         return store.model_copy(update={"attestation_signatures": new_committee_sigs})
 
@@ -502,17 +883,24 @@ def install_checkpoint_finalization_compatibility() -> None:
         return
 
     try:
-        from lean_spec.forks.lstar.spec import LstarSpec
+        try:
+            from lean_spec.spec.forks.lstar.spec import LstarSpec
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.forks.lstar.spec import LstarSpec
     except ImportError as err:
         logger.debug("LeanSpec checkpoint finalization compatibility unavailable: %s", err)
         return
 
     try:
-        from lean_spec.subspecs.validator.service import ValidatorService
+        try:
+            from lean_spec.node.validator.service import ValidatorService
+        except (ImportError, ModuleNotFoundError):
+            from lean_spec.subspecs.validator.service import ValidatorService
     except ImportError:
         ValidatorService = None
 
     original_on_block = LstarSpec.on_block
+    original_update_head = LstarSpec.update_head
 
     def checkpoint_from_head(store: Any) -> Any | None:
         head_block = store.blocks.get(store.head)
@@ -584,6 +972,14 @@ def install_checkpoint_finalization_compatibility() -> None:
             pin_head_to_block(updated_store, extract_inner_block(signed_block))
         )
 
+    def update_head_preserving_helper_finalization(self: Any, store: Any) -> Any:
+        updated_store = original_update_head(self, store)
+        if store.latest_finalized.slot > updated_store.latest_finalized.slot:
+            return updated_store.model_copy(
+                update={"latest_finalized": store.latest_finalized}
+            )
+        return updated_store
+
     def produce_block_with_justified_checkpoint_finalized(
         self: Any,
         store: Any,
@@ -633,6 +1029,7 @@ def install_checkpoint_finalization_compatibility() -> None:
         on_gossip_aggregated_attestation_without_verification
     )
     LstarSpec.on_block = on_block_with_justified_checkpoint_finalized
+    LstarSpec.update_head = update_head_preserving_helper_finalization
     LstarSpec.produce_block_with_signatures = produce_block_with_justified_checkpoint_finalized
     if ValidatorService is not None:
         ValidatorService._produce_attestations = skip_local_attestation_signing
@@ -760,19 +1157,16 @@ def load_validator_registry(node_id: str) -> ValidatorRegistry | None:
 async def run() -> None:
     setup_logging()
     install_low_s_identity_signature_compatibility()
-    install_quic_stream_close_reset_tolerance()
     install_snappy_compress_fallback()
     install_fast_ssz_deserialization()
     install_reqresp_block_cache_tracking()
     install_network_service_gossip_tracking()
     install_identify_protocol_compatibility()
+    install_inbound_quic_connection_compatibility()
     install_setup_prover_compatibility()
     install_child_only_aggregation_compatibility()
     install_trusted_gossip_attestation_compatibility()
     install_checkpoint_finalization_compatibility()
-    logger.info("LeanSpec wire compatibility mode: %s", wire_compat_mode())
-    if legacy_signed_block_compatibility_enabled():
-        install_legacy_signed_block_wire_compatibility()
     metrics.init(name="lean-spec-client", version="0.0.1")
 
     node_id = os.environ.get("HIVE_NODE_ID", DEFAULT_NODE_ID)
@@ -780,13 +1174,6 @@ async def run() -> None:
     prepare_runtime_assets(
         node_id,
         validator_count,
-        genesis_extra_fields={
-            "ATTESTATION_COMMITTEE_COUNT": 1,
-            "MAX_ATTESTATIONS_DATA": 16,
-            "NUM_VALIDATORS": validator_count,
-            "VALIDATOR_COUNT": validator_count,
-            "ACTIVE_EPOCH": 18,
-        },
         validator_count_environment_variable=GENESIS_VALIDATOR_COUNT_ENVIRONMENT_VARIABLE,
     )
     genesis = load_genesis()
@@ -796,11 +1183,14 @@ async def run() -> None:
     )
     identity_key = identity_keypair_from_private_key_hex(identity_private_key_hex)
     metadata = helper_genesis_metadata()
-    validator_registry = load_validator_registry(node_id)
-    bootnodes = parse_bootnodes()
-    is_aggregator = os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
     disable_validator_service = (
         os.environ.get(DISABLE_VALIDATOR_SERVICE_ENVIRONMENT_VARIABLE, "0") == "1"
+    )
+    validator_registry = None if disable_validator_service else load_validator_registry(node_id)
+    bootnodes = parse_bootnodes()
+    is_aggregator = (
+        os.environ.get("HIVE_IS_AGGREGATOR", "0") == "1"
+        and not disable_validator_service
     )
 
     assigned_validators = (
@@ -855,12 +1245,39 @@ async def run() -> None:
         node.validator_service = None
 
     published_blocks: dict[Bytes32, object] = {}
+    published_blocks_by_slot: dict[int, object] = {}
     _BLOCK_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks
+    _BLOCK_SLOT_CACHE_BY_SYNC_SERVICE[id(node.sync_service)] = published_blocks_by_slot
     _SYNC_EVENT_CONTEXT[id(node.sync_service)] = (event_source, node)
     _BLOCK_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = published_blocks
+    _BLOCK_SLOT_CACHE_BY_REQRESP_CLIENT[id(event_source.reqresp_client)] = (
+        published_blocks_by_slot
+    )
 
     def lookup_published_block(root: Bytes32) -> object | None:
-        return published_blocks.get(root)
+        signed_block = published_blocks.get(root)
+        if signed_block is not None:
+            return signed_block
+
+        block = node.sync_service.store.blocks.get(root)
+        if block is None:
+            return None
+
+        signed_block = published_blocks_by_slot.get(slot_key(block.slot))
+        if signed_block is None:
+            return None
+
+        cached_root = hash_tree_root(extract_inner_block(signed_block))
+        if cached_root != root:
+            logger.debug(
+                "Ignoring finalized block slot-cache fallback for slot=%s because root %s != %s",
+                block.slot,
+                cached_root,
+                root,
+            )
+            return None
+
+        return signed_block
 
     async def lookup_published_block_async(root: Bytes32) -> object | None:
         return lookup_published_block(root)
@@ -872,6 +1289,10 @@ async def run() -> None:
         return block_for_reqresp(lookup_published_block(root))
 
     def lookup_published_block_by_slot(slot: object) -> object | None:
+        signed_block = published_blocks_by_slot.get(slot_key(slot))
+        if signed_block is not None:
+            return signed_block
+
         store = node.sync_service.store
         root = store.head
         while root in store.blocks:
@@ -883,9 +1304,6 @@ async def run() -> None:
                 break
             root = block.parent_root
 
-        for signed_block in published_blocks.values():
-            if extract_inner_block(signed_block).slot == slot:
-                return signed_block
         return None
 
     async def lookup_published_block_by_slot_async(slot: object) -> object | None:
@@ -904,6 +1322,8 @@ async def run() -> None:
     }
     if api_server_supports_signed_block_getter(ApiServer):
         api_server_kwargs["signed_block_getter"] = lookup_published_block
+    else:
+        install_finalized_block_api_route(lookup_published_block)
     api_server = ApiServer(**api_server_kwargs)
     metadata_runner = await start_metadata_server(metadata, helper_metadata_port())
     refresh_status(event_source, node)
@@ -912,14 +1332,25 @@ async def run() -> None:
         original_on_block = node.validator_service.on_block
 
         async def cache_and_publish_block(signed_block: object) -> None:
-            cache_signed_block(published_blocks, signed_block)
+            cache_helper_signed_block(
+                published_blocks,
+                signed_block,
+                published_blocks_by_slot,
+            )
             await original_on_block(signed_block)
             refresh_status(event_source, node)
 
         node.validator_service.on_block = cache_and_publish_block
 
     event_source.set_block_lookup(lookup_reqresp_block)
-    event_source.set_block_by_slot_lookup(lookup_reqresp_block_by_slot)
+    # Newer leanSpec checkouts dropped the by-slot convenience setter but
+    # kept the handler field it assigned, so fall back to wiring the field
+    # directly when the setter is gone.
+    set_block_by_slot_lookup = getattr(event_source, "set_block_by_slot_lookup", None)
+    if set_block_by_slot_lookup is not None:
+        set_block_by_slot_lookup(lookup_reqresp_block_by_slot)
+    else:
+        event_source._reqresp_handler.block_by_slot_lookup = lookup_reqresp_block_by_slot
     event_source.set_current_slot_lookup(current_known_slot)
 
     listener_task = await start_listener_and_gossipsub(event_source, listen_addr())
@@ -961,8 +1392,10 @@ async def run() -> None:
         with suppress(asyncio.CancelledError):
             await status_task
         _BLOCK_CACHE_BY_SYNC_SERVICE.pop(id(node.sync_service), None)
+        _BLOCK_SLOT_CACHE_BY_SYNC_SERVICE.pop(id(node.sync_service), None)
         _SYNC_EVENT_CONTEXT.pop(id(node.sync_service), None)
         _BLOCK_CACHE_BY_REQRESP_CLIENT.pop(id(event_source.reqresp_client), None)
+        _BLOCK_SLOT_CACHE_BY_REQRESP_CLIENT.pop(id(event_source.reqresp_client), None)
 
 
 async def print_bootnode_metadata() -> None:

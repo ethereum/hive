@@ -1,6 +1,6 @@
 use crate::utils::libp2p_mock::{
-    decode_request, encode_gossip_data, extract_ip_port, lean_block_topic, replace_multiaddr_ip,
-    LeanSignedBlock, MockBehaviourEvent, MockNode, Status, RESPONSE_CODE_SUCCESS,
+    decode_request, encode_gossip_block, extract_ip_port, lean_block_topic, replace_multiaddr_ip,
+    LeanBlock, MockBehaviourEvent, MockNode, Status, RESPONSE_CODE_SUCCESS,
 };
 use crate::utils::util::{
     expect_single_client, lean_clients, lean_environment, lean_single_client_runtime_setup,
@@ -222,8 +222,8 @@ dyn_async! {
         mock.subscribe(&wrong_topic)
             .expect("mock should subscribe to wrong-fork topic");
 
-        let block = LeanSignedBlock::build_minimal(1, 0, B256::ZERO, B256::ZERO);
-        let block_bytes = encode_gossip_data(&block);
+        let block = LeanBlock::build_minimal(1, 0, B256::ZERO, B256::ZERO);
+        let block_bytes = encode_gossip_block(&block);
         if let Err(e) = mock.publish(wrong_topic, block_bytes) {
             // If there are no peers subscribed to the wrong topic, the publish
             // will fail. This is expected because the client only subscribes to
@@ -274,15 +274,15 @@ dyn_async! {
 
         let block_topic = lean_block_topic(&fork_digest);
 
-        let parent_block = LeanSignedBlock::build_minimal(1, 0, B256::ZERO, B256::ZERO);
+        let parent_block = LeanBlock::build_minimal(1, 0, B256::ZERO, B256::ZERO);
         let parent_root = B256::from_slice(&[0xca; 32]);
 
-        let child_block = LeanSignedBlock::build_minimal(2, 0, parent_root, B256::ZERO);
+        let child_block = LeanBlock::build_minimal(2, 0, parent_root, B256::ZERO);
 
         let fork_choice_before = load_fork_choice_response(&client).await;
         let block_count_before = fork_choice_before.nodes.len();
 
-        let child_bytes = encode_gossip_data(&child_block);
+        let child_bytes = encode_gossip_block(&child_block);
         mock.publish(block_topic.clone(), child_bytes)
             .expect("should publish orphan child block");
 
@@ -295,7 +295,7 @@ dyn_async! {
             "client should not process orphan block"
         );
 
-        let parent_bytes = encode_gossip_data(&parent_block);
+        let parent_bytes = encode_gossip_block(&parent_block);
         mock.publish(block_topic, parent_bytes)
             .expect("should publish parent block");
 
@@ -319,8 +319,8 @@ dyn_async! {
         mock.process_events_for(Duration::from_secs(3)).await;
 
         let block_topic = lean_block_topic(&fork_digest);
-        let invalid_block = LeanSignedBlock::build_minimal(1, 9999, B256::ZERO, B256::ZERO);
-        let block_bytes = encode_gossip_data(&invalid_block);
+        let invalid_block = LeanBlock::build_minimal(1, 9999, B256::ZERO, B256::ZERO);
+        let block_bytes = encode_gossip_block(&invalid_block);
 
         let fork_choice_before = load_fork_choice_response(&client).await;
         let block_count_before = fork_choice_before.nodes.len();
