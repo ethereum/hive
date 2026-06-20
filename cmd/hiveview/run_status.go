@@ -19,7 +19,6 @@ import (
 
 const suitePlanMarker = "HIVE_SUITE_PLAN "
 const suiteProgressMarker = "HIVE_SUITE_PROGRESS "
-const runDevnetMarker = "HIVE_RUN_DEVNET "
 const runHeartbeatMarker = "HIVE_RUN_HEARTBEAT "
 const runCompleteMarker = "HIVE_RUN_COMPLETE "
 const runInterruptedMarker = "HIVE_RUN_INTERRUPTED "
@@ -271,12 +270,6 @@ func readRunDigest(fsys fs.FS, simLog string) (runDigest, error) {
 			}
 			continue
 		}
-		if rawDevnet, ok := strings.CutPrefix(line, runDevnetMarker); ok {
-			if devnet := runStatusDevnetFromMarker(rawDevnet); devnet != "" {
-				digest.Devnet = devnet
-			}
-			continue
-		}
 		if rawProgress, ok := strings.CutPrefix(line, suiteProgressMarker); ok {
 			var progress suiteProgress
 			if err := json.Unmarshal([]byte(rawProgress), &progress); err == nil && progress.Suite != "" {
@@ -303,18 +296,6 @@ func readRunDigest(fsys fs.FS, simLog string) (runDigest, error) {
 		return runDigest{}, err
 	}
 	return digest, nil
-}
-
-func runStatusDevnetFromMarker(raw string) string {
-	var marker struct {
-		Devnet string `json:"devnet"`
-	}
-	if err := json.Unmarshal([]byte(raw), &marker); err == nil {
-		if devnet := runStatusDevnetFromString(marker.Devnet); devnet != "" {
-			return devnet
-		}
-	}
-	return runStatusDevnetFromString(raw)
 }
 
 func runStatusDevnetFromString(value string) string {

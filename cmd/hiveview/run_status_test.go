@@ -12,8 +12,7 @@ func TestBuildRunStatusFromSuitePlanBeforeSuitesFinish(t *testing.T) {
 	fsys := fstest.MapFS{
 		simLog: {
 			Data: []byte(
-				`HIVE_RUN_DEVNET {"devnet":"devnet5"}` + "\n" +
-					`HIVE_SUITE_PLAN {"suites":[{"name":"rpc-compat","tests":64},{"name":"sync","tests":2},{"name":"client-interop","tests":2}]}` + "\n" +
+				`HIVE_SUITE_PLAN {"devnet":"devnet5","suites":[{"name":"rpc-compat","tests":64},{"name":"sync","tests":2},{"name":"client-interop","tests":2}]}` + "\n" +
 					`HIVE_RUN_HEARTBEAT {}` + "\n",
 			),
 			ModTime: time.Unix(1770000005, 0),
