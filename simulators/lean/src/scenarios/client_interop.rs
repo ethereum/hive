@@ -942,13 +942,15 @@ mod tests {
 
     #[test]
     fn two_subnet_node_builder_accepts_all_devnet4_lean_clients() {
+        let clients = devnet4_lean_clients();
+        let expected_topology_count = clients.len() + clients.len() * (clients.len() - 1);
         assert_eq!(
-            two_subnet_interop_topology_matrix(&devnet4_lean_clients()).len(),
-            64
+            two_subnet_interop_topology_matrix(&clients).len(),
+            expected_topology_count
         );
         assert_eq!(aggregator_placements().len(), 2);
 
-        for topology_spec in two_subnet_interop_topology_matrix(&devnet4_lean_clients()) {
+        for topology_spec in two_subnet_interop_topology_matrix(&clients) {
             for placement in aggregator_placements() {
                 let mut nodes = build_two_subnet_interop_nodes(&topology_spec);
                 assign_two_subnet_aggregators(&mut nodes, placement);

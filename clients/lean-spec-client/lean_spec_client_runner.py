@@ -14,7 +14,7 @@ from lean_spec_runtime import (
     ATTESTATION_SECRET_FIELD,
     PROPOSAL_SECRET_FIELD,
     ValidatorIndex,
-    api_server_supports_signed_block_getter,
+    build_api_server,
     build_helper_bootnode_enr,
     build_node_config,
     cache_signed_block,
@@ -43,13 +43,24 @@ from lean_spec_runtime import (
     uses_latest_leanspec_format,
 )
 
-from lean_spec.subspecs.api import ApiServer, ApiServerConfig
-from lean_spec.subspecs.metrics import registry as metrics
-from lean_spec.subspecs.networking.client import LiveNetworkEventSource
-from lean_spec.subspecs.networking.transport.quic.connection import QuicConnectionManager
-from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.types import Bytes32
+try:
+    from lean_spec.node.api import ApiServer, ApiServerConfig
+    from lean_spec.node.metrics import registry as metrics
+    from lean_spec.node.networking.client import LiveNetworkEventSource
+    from lean_spec.node.networking.transport.quic.connection import QuicConnectionManager
+    from lean_spec.node.node import Node, NodeConfig
+    from lean_spec.node.validator import ValidatorRegistry
+    from lean_spec.spec.ssz import Bytes32
+except (ImportError, ModuleNotFoundError):
+    from lean_spec.subspecs.api import ApiServer, ApiServerConfig
+    from lean_spec.subspecs.metrics import registry as metrics
+    from lean_spec.subspecs.networking.client import LiveNetworkEventSource
+    from lean_spec.subspecs.networking.transport.quic.connection import (
+        QuicConnectionManager,
+    )
+    from lean_spec.subspecs.node import Node, NodeConfig
+    from lean_spec.subspecs.validator import ValidatorRegistry
+    from lean_spec.types import Bytes32
 
 GOSSIP_FORK_DIGEST: Final = "devnet0"
 LISTEN_ADDR: Final = "/ip4/0.0.0.0/udp/9001/quic-v1"
@@ -210,9 +221,11 @@ async def run() -> None:
         store = node.sync_service.store
         return store.blocks[store.head].slot
 
-    if api_server_supports_signed_block_getter(ApiServer):
-        api_server_kwargs["signed_block_getter"] = lambda root: published_blocks.get(root)
-    api_server = ApiServer(**api_server_kwargs)
+    api_server = build_api_server(
+        ApiServer,
+        api_server_kwargs,
+        lookup_published_block,
+    )
 
     event_source.set_block_lookup(lookup_published_block)
     event_source.set_block_by_slot_lookup(lookup_published_block_by_slot_async)

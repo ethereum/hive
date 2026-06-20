@@ -178,6 +178,125 @@ def api_server_supports_signed_block_getter(api_server_type: type[Any]) -> bool:
     return "signed_block_getter" in inspect.signature(api_server_type).parameters
 
 
+async def finalized_block_response(
+    store: Any | None,
+    signed_block_getter: Any,
+) -> web.Response:
+    if store is None:
+        raise web.HTTPServiceUnavailable(reason="Store not initialized")
+
+    signed_block = signed_block_getter(store.latest_finalized.root)
+    if inspect.isawaitable(signed_block):
+        signed_block = await signed_block
+    if signed_block is None:
+        raise web.HTTPNotFound(reason="Finalized block not available")
+
+    ssz_bytes = await asyncio.to_thread(signed_block.encode_bytes)
+    return web.Response(body=ssz_bytes, content_type="application/octet-stream")
+
+
+class FinalizedBlockApiServer:
+    """API-server adapter for leanSpec versions without finalized-block support."""
+
+    def __init__(self, base_api_server: Any, signed_block_getter: Any) -> None:
+        self._base_api_server = base_api_server
+        self._signed_block_getter = signed_block_getter
+        self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
+        self._stop_event = asyncio.Event()
+
+    async def start(self) -> None:
+        api_context_module = import_first_module(
+            "lean_spec.node.api.context",
+            "lean_spec.subspecs.api.context",
+        )
+        api_handlers_module = import_first_module(
+            "lean_spec.node.api.handlers",
+            "lean_spec.subspecs.api.handlers",
+        )
+        ApiContext = api_context_module.ApiContext
+        ApiHandlers = api_handlers_module.ApiHandlers
+
+        app = web.Application()
+        context = ApiContext(
+            spec=self._base_api_server.spec,
+            store_getter=self._base_api_server.store_getter,
+            aggregator_role_control=getattr(
+                self._base_api_server,
+                "aggregator_role_control",
+                None,
+            ),
+        )
+        handlers = ApiHandlers(context)
+
+        async def handle_finalized_block(_request: web.Request) -> web.Response:
+            store_getter = self._base_api_server.store_getter
+            store = store_getter() if store_getter else None
+            return await finalized_block_response(store, self._signed_block_getter)
+
+        routes = [
+            web.get("/lean/v0/health", handlers.health),
+            web.get("/lean/v0/states/finalized", handlers.finalized_state),
+            web.get("/lean/v0/blocks/finalized", handle_finalized_block),
+            web.get("/lean/v0/checkpoints/justified", handlers.justified_checkpoint),
+            web.get("/lean/v0/fork_choice", handlers.fork_choice),
+            web.get("/metrics", handlers.metrics),
+        ]
+        if hasattr(handlers, "aggregator_status"):
+            routes.extend(
+                [
+                    web.get("/lean/v0/admin/aggregator", handlers.aggregator_status),
+                    web.post("/lean/v0/admin/aggregator", handlers.aggregator_toggle),
+                ]
+            )
+        app.add_routes(routes)
+
+        self._runner = web.AppRunner(app)
+        await self._runner.setup()
+
+        config = self._base_api_server.config
+        self._site = web.TCPSite(self._runner, config.host, config.port)
+        await self._site.start()
+
+        logger.info("API server listening on %s:%d", config.host, config.port)
+
+    async def run(self) -> None:
+        await self.start()
+        await self._stop_event.wait()
+
+    def stop(self) -> None:
+        if self._runner is not None:
+            asyncio.create_task(self.aclose())
+        else:
+            self._stop_event.set()
+
+    async def aclose(self) -> None:
+        if self._runner is not None:
+            await self._runner.cleanup()
+            self._runner = None
+            self._site = None
+            logger.info("API server stopped")
+        self._stop_event.set()
+
+
+def build_api_server(
+    api_server_type: Any,
+    api_server_kwargs: dict[str, Any],
+    signed_block_getter: Any,
+) -> Any:
+    if api_server_supports_signed_block_getter(api_server_type):
+        return api_server_type(
+            **api_server_kwargs,
+            signed_block_getter=signed_block_getter,
+        )
+
+    logger.info("Using Hive helper API adapter with finalized block route")
+    return FinalizedBlockApiServer(
+        api_server_type(**api_server_kwargs),
+        signed_block_getter,
+    )
+
+
 def canonicalize_der_secp256k1_signature(der_signature: bytes) -> bytes:
     signature_r, signature_s = decode_dss_signature(der_signature)
     if signature_s > SECP256K1_ORDER // 2:

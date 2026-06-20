@@ -32,6 +32,7 @@ RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
+    RUST_MIN_STACK=134217728 \
     PATH=/usr/local/cargo/bin:$PATH
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \

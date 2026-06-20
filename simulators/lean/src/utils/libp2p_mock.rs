@@ -308,7 +308,17 @@ fn client_kind_label(client_name: &str) -> String {
 /// libp2p peer id matches what `compute_client_peer_id` expects.
 pub fn deterministic_client_private_key_hex(client_name: &str) -> String {
     let kind = client_kind_label(client_name);
-    let label = format!("{kind}:{kind}_0:node");
+    deterministic_client_private_key_hex_for_kind(&kind, &format!("{kind}_0"))
+}
+
+/// Hex-encoded deterministic secp256k1 secret for a specific lean client node id.
+pub fn deterministic_client_private_key_hex_for_node(client_name: &str, node_id: &str) -> String {
+    let kind = client_kind_label(client_name);
+    deterministic_client_private_key_hex_for_kind(&kind, node_id)
+}
+
+fn deterministic_client_private_key_hex_for_kind(kind: &str, node_id: &str) -> String {
+    let label = format!("{kind}:{node_id}:node");
     let hash = Sha256::digest(label.as_bytes());
     alloy_primitives::hex::encode(hash)
 }
