@@ -18,7 +18,6 @@ async fn main() {
     let simulation = Simulation::new();
     let devnet = resolve_selected_lean_devnet(&simulation).await;
     set_selected_lean_devnet(devnet);
-    println!(r#"HIVE_RUN_DEVNET {{"devnet":"{}"}}"#, devnet);
 
     let mut rpc_compat = Suite {
         name: "rpc-compat".to_string(),
