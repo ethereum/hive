@@ -12,7 +12,7 @@ func TestBuildRunStatusFromSuitePlanBeforeSuitesFinish(t *testing.T) {
 	fsys := fstest.MapFS{
 		simLog: {
 			Data: []byte(
-				`HIVE_SUITE_PLAN {"suites":[{"name":"rpc-compat","tests":64},{"name":"sync","tests":2},{"name":"client-interop","tests":2}]}` + "\n" +
+				`HIVE_SUITE_PLAN {"devnet":"devnet5","suites":[{"name":"rpc-compat","tests":64},{"name":"sync","tests":2},{"name":"client-interop","tests":2}]}` + "\n" +
 					`HIVE_RUN_HEARTBEAT {}` + "\n",
 			),
 			ModTime: time.Unix(1770000005, 0),
@@ -28,6 +28,9 @@ func TestBuildRunStatusFromSuitePlanBeforeSuitesFinish(t *testing.T) {
 	}
 	if status.State != "running" {
 		t.Fatalf("state mismatch: got %q, want running", status.State)
+	}
+	if status.Devnet != "devnet5" {
+		t.Fatalf("devnet mismatch: got %q, want devnet5", status.Devnet)
 	}
 	wantStates := []suiteRunStatus{
 		{Name: "rpc-compat", State: "in-progress", Total: 64},
@@ -52,6 +55,7 @@ func TestBuildRunStatusFromSuitePlanAndCompletedSuites(t *testing.T) {
 			Data: []byte(
 				`HIVE_SUITE_PLAN {"suites":[{"name":"rpc-compat","tests":3},{"name":"sync","tests":1},{"name":"client-interop","tests":1}]}` + "\n" +
 					`HIVE_SUITE_PROGRESS {"suite":"sync"}` + "\n" +
+					`Starting lean-spec local helper on devnet4 using /app/devnet4` + "\n" +
 					`HIVE_RUN_HEARTBEAT {}` + "\n",
 			),
 			ModTime: time.Unix(1770000000, 0),
@@ -60,10 +64,10 @@ func TestBuildRunStatusFromSuitePlanAndCompletedSuites(t *testing.T) {
 			Data: []byte(`{
 				"name":"rpc-compat",
 				"testCases":{
-					"1":{"name":"rpc-compat: client launch","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{}},
-					"2":{"name":"rpc-compat: test one","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{}},
+					"1":{"name":"rpc-compat: client launch","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{"1":{"name":"ream_devnet4"}}},
+					"2":{"name":"rpc-compat: test one","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{"1":{"name":"ream_devnet4"}}},
 					"3":{"name":"rpc-compat: shared context","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{},"multiTestContext":true},
-					"4":{"name":"rpc-compat: test two","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{}}
+					"4":{"name":"rpc-compat: test two","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:00:01Z","summaryResult":{"pass":true},"clientInfo":{"1":{"name":"ream_devnet4"}}}
 				},
 				"simLog":"1770000000-simulator-abc.log"
 			}`),
@@ -80,6 +84,9 @@ func TestBuildRunStatusFromSuitePlanAndCompletedSuites(t *testing.T) {
 	}
 	if status.State != "running" {
 		t.Fatalf("state mismatch: got %q, want running", status.State)
+	}
+	if status.Devnet != "devnet4" {
+		t.Fatalf("devnet mismatch: got %q, want devnet4", status.Devnet)
 	}
 	completedAt := time.Unix(1770000100, 0)
 	wantStates := []suiteRunStatus{
