@@ -14,7 +14,7 @@ use crate::scenarios::spec_assets::{
 use crate::scenarios::sync::run_sync_lean_test_suite;
 use crate::scenarios::validation::run_validation_lean_test_suite;
 use crate::utils::util::{resolve_selected_lean_devnet, set_selected_lean_devnet};
-use hivesim::{run_suite, PlannedTestSpec, Simulation, Suite};
+use hivesim::{run_suite_with_plan_metadata, PlannedTestSpec, Simulation, Suite};
 
 #[tokio::main]
 async fn main() {
@@ -175,7 +175,7 @@ async fn main() {
         client: None,
     });
 
-    run_suite(
+    run_suite_with_plan_metadata(
         simulation,
         vec![
             rpc_compat,
@@ -188,6 +188,7 @@ async fn main() {
             spec_assets_state_transition,
             spec_assets_verify_signatures,
         ],
+        serde_json::json!({ "devnet": devnet.to_string() }),
     )
     .await;
 }

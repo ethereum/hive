@@ -723,6 +723,14 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
 }
 
 pub async fn run_suite(host: Simulation, suites: Vec<Suite>) {
+    run_suite_with_plan_metadata(host, suites, serde_json::json!({})).await;
+}
+
+pub async fn run_suite_with_plan_metadata(
+    host: Simulation,
+    suites: Vec<Suite>,
+    plan_metadata: serde_json::Value,
+) {
     let suites = suites
         .into_iter()
         .filter(|suite| {
@@ -740,10 +748,13 @@ pub async fn run_suite(host: Simulation, suites: Vec<Suite>) {
         }
         suite_plan.push(serde_json::json!({ "name": suite.name.as_str(), "tests": tests }));
     }
-    println!(
-        "HIVE_SUITE_PLAN {}",
-        serde_json::json!({ "suites": suite_plan })
-    );
+    let mut plan = serde_json::json!({ "suites": suite_plan });
+    if let (Some(plan), Some(metadata)) = (plan.as_object_mut(), plan_metadata.as_object()) {
+        for (key, value) in metadata {
+            plan.insert(key.clone(), value.clone());
+        }
+    }
+    println!("HIVE_SUITE_PLAN {}", plan);
     let heartbeat = tokio::spawn(async {
         loop {
             println!("HIVE_RUN_HEARTBEAT {}", serde_json::json!({}));
