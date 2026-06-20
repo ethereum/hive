@@ -1673,6 +1673,10 @@ fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
     }
 }
 
+fn checkpoint_sync_requires_finalized_block_endpoint(devnet: LeanDevnet) -> bool {
+    !devnet.uses_merged_block_proof()
+}
+
 fn local_helper_runtime_asset_root(node_id: &str) -> PathBuf {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2140,7 +2144,9 @@ async fn wait_for_checkpoint_sync_state_ready(
 ) -> Result<(), String> {
     let http = http_client();
     let state_url = helper.checkpoint_sync_url();
-    let block_url = helper.checkpoint_sync_block_url();
+    let require_block_ready =
+        checkpoint_sync_requires_finalized_block_endpoint(selected_lean_devnet());
+    let block_url = require_block_ready.then(|| helper.checkpoint_sync_block_url());
     let mut last_error = String::new();
     let mut consecutive_successes = 0;
 
@@ -2151,11 +2157,16 @@ async fn wait_for_checkpoint_sync_state_ready(
             .header(reqwest::header::ACCEPT, SSZ_CONTENT_TYPE)
             .send()
             .await;
-        let block_result = http
-            .get(&block_url)
-            .header(reqwest::header::ACCEPT, SSZ_CONTENT_TYPE)
-            .send()
-            .await;
+        let block_result = if let Some(block_url) = &block_url {
+            Some(
+                http.get(block_url)
+                    .header(reqwest::header::ACCEPT, SSZ_CONTENT_TYPE)
+                    .send()
+                    .await,
+            )
+        } else {
+            None
+        };
 
         let state_ready = match state_result {
             Ok(response) => {
@@ -2172,17 +2183,24 @@ async fn wait_for_checkpoint_sync_state_ready(
         };
 
         let block_ready = match block_result {
-            Ok(response) => {
+            Some(Ok(response)) => {
                 let status = response.status();
                 if !status.is_success() {
-                    last_error = format!("received HTTP {status} from {block_url}");
+                    last_error = format!(
+                        "received HTTP {status} from {}",
+                        block_url.as_deref().unwrap_or("unknown block endpoint")
+                    );
                 }
                 status.is_success()
             }
-            Err(err) => {
-                last_error = format!("error sending request for url ({block_url}): {err}");
+            Some(Err(err)) => {
+                last_error = format!(
+                    "error sending request for url ({}): {err}",
+                    block_url.as_deref().unwrap_or("unknown block endpoint")
+                );
                 false
             }
+            None => true,
         };
 
         if state_ready && block_ready {
@@ -2200,8 +2218,14 @@ async fn wait_for_checkpoint_sync_state_ready(
         sleep(Duration::from_secs(1)).await;
     }
 
+    let expected_endpoints = if let Some(block_url) = block_url {
+        format!("{state_url} and {block_url}")
+    } else {
+        state_url
+    };
+
     Err(format!(
-        "Checkpoint-sync source state/block endpoints never became ready at {state_url} and {block_url}: {last_error}"
+        "Checkpoint-sync source endpoint(s) never became ready at {expected_endpoints}: {last_error}"
     ))
 }
 
@@ -2752,6 +2776,20 @@ mod tests {
     fn helper_startup_error_is_retryable_for_http_request_failure() {
         assert!(helper_startup_error_is_retryable(
             "lean_spec_0 http://172.17.0.3:5052/lean/v0/fork_choice request failed: error sending request for url"
+        ));
+    }
+
+    #[test]
+    fn checkpoint_sync_keeps_finalized_block_readiness_for_devnet4() {
+        assert!(checkpoint_sync_requires_finalized_block_endpoint(
+            LeanDevnet::Devnet4
+        ));
+    }
+
+    #[test]
+    fn checkpoint_sync_skips_finalized_block_readiness_for_devnet5() {
+        assert!(!checkpoint_sync_requires_finalized_block_endpoint(
+            LeanDevnet::Devnet5
         ));
     }
 
