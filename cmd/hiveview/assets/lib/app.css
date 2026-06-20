@@ -706,6 +706,20 @@ kbd {
     font-weight: 600;
 }
 
+.lean-run-status-devnet {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.25rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 55%, var(--bs-border-color));
+    border-radius: 4px;
+    color: var(--bs-primary-text-emphasis);
+    background: color-mix(in srgb, var(--bs-primary) 14%, var(--bs-body-bg));
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
 .lean-run-status-subtitle {
     font-size: 0.82rem;
 }

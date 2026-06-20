@@ -935,6 +935,7 @@ function renderRunStatus(status, estimates) {
     const finished = status.suites.filter(suite => suite.state === 'finished').length;
     const total = status.suites.length;
     const activeSuite = status.suites.find(suite => suite.state === 'in-progress');
+    const devnet = runStatusDevnet(status);
     const title = status.state === 'finished'
         ? `Run complete: ${finished}/${total} suites`
         : `Current run: ${finished}/${total} suites finished`;
@@ -947,6 +948,9 @@ function renderRunStatus(status, estimates) {
 
     container.empty();
     const heading = $('<div />').addClass('lean-run-status-heading');
+    if (devnet) {
+        heading.append($('<span />').addClass('lean-run-status-devnet').text(devnet));
+    }
     heading.append($('<span />').addClass('lean-run-status-title').text(title));
     heading.append($('<span />').addClass('lean-run-status-subtitle text-secondary').text(subtitleText));
 
@@ -961,6 +965,22 @@ function renderRunStatus(status, estimates) {
     });
 
     container.append(heading, progress).show();
+}
+
+function runStatusDevnet(status) {
+    const explicitDevnet = normalizeDevnet(status.devnet || '');
+    if (explicitDevnet) {
+        return explicitDevnet;
+    }
+
+    const simLogRun = leanLatestState.simLogRuns.find(run => run.simLog && run.simLog === status.simLog);
+    if (!simLogRun) {
+        return '';
+    }
+    const devnets = new Set(simLogRun.entries
+        .map(entry => normalizeDevnet(entry.devnet) || devnetFromEntry(entry))
+        .filter(Boolean));
+    return devnets.size === 1 ? Array.from(devnets)[0] : '';
 }
 
 function isVisibleRunStatus(status) {

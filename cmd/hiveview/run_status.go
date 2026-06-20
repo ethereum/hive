@@ -19,6 +19,7 @@ import (
 
 const suitePlanMarker = "HIVE_SUITE_PLAN "
 const suiteProgressMarker = "HIVE_SUITE_PROGRESS "
+const runDevnetMarker = "HIVE_RUN_DEVNET "
 const runHeartbeatMarker = "HIVE_RUN_HEARTBEAT "
 const runCompleteMarker = "HIVE_RUN_COMPLETE "
 const runInterruptedMarker = "HIVE_RUN_INTERRUPTED "
@@ -34,6 +35,7 @@ type serveRunStatus struct {
 type runStatus struct {
 	SimLog       string           `json:"simLog,omitempty"`
 	State        string           `json:"state"`
+	Devnet       string           `json:"devnet,omitempty"`
 	Start        time.Time        `json:"start,omitempty"`
 	LastActivity time.Time        `json:"lastActivity,omitempty"`
 	Suites       []suiteRunStatus `json:"suites,omitempty"`
@@ -48,6 +50,7 @@ type suiteRunStatus struct {
 }
 
 type suitePlan struct {
+	Devnet string           `json:"devnet,omitempty"`
 	Suites []suitePlanEntry `json:"suites"`
 }
 
@@ -81,6 +84,7 @@ type suiteProgress struct {
 type runDigest struct {
 	Plan        []suitePlanEntry
 	Progress    map[string]int
+	Devnet      string
 	Heartbeat   bool
 	Complete    bool
 	Interrupted bool
@@ -150,6 +154,7 @@ func buildRunStatusAtWithOptions(fsys fs.FS, now time.Time, options runStatusOpt
 	if len(digest.Plan) == 0 {
 		return status, nil
 	}
+	status.Devnet = digest.Devnet
 	if digest.Interrupted {
 		return runStatus{State: "unknown"}, nil
 	}
@@ -166,6 +171,9 @@ func buildRunStatusAtWithOptions(fsys fs.FS, now time.Time, options runStatusOpt
 		completedSuites[suite.Name] = completedSuiteStatus{
 			Finished:    countRunStatusTests(suite),
 			CompletedAt: file.ModTime(),
+		}
+		if status.Devnet == "" {
+			status.Devnet = suiteDevnet(suite, runStatusSuiteClients(suite))
 		}
 		if file.ModTime().After(status.LastActivity) {
 			status.LastActivity = file.ModTime()
@@ -258,6 +266,15 @@ func readRunDigest(fsys fs.FS, simLog string) (runDigest, error) {
 				return runDigest{}, err
 			}
 			digest.Plan = plan.Suites
+			if devnet := runStatusDevnetFromString(plan.Devnet); devnet != "" {
+				digest.Devnet = devnet
+			}
+			continue
+		}
+		if rawDevnet, ok := strings.CutPrefix(line, runDevnetMarker); ok {
+			if devnet := runStatusDevnetFromMarker(rawDevnet); devnet != "" {
+				digest.Devnet = devnet
+			}
 			continue
 		}
 		if rawProgress, ok := strings.CutPrefix(line, suiteProgressMarker); ok {
@@ -278,11 +295,54 @@ func readRunDigest(fsys fs.FS, simLog string) (runDigest, error) {
 		if strings.HasPrefix(line, runInterruptedMarker) {
 			digest.Interrupted = true
 		}
+		if digest.Devnet == "" {
+			digest.Devnet = runStatusDevnetFromString(line)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return runDigest{}, err
 	}
 	return digest, nil
+}
+
+func runStatusDevnetFromMarker(raw string) string {
+	var marker struct {
+		Devnet string `json:"devnet"`
+	}
+	if err := json.Unmarshal([]byte(raw), &marker); err == nil {
+		if devnet := runStatusDevnetFromString(marker.Devnet); devnet != "" {
+			return devnet
+		}
+	}
+	return runStatusDevnetFromString(raw)
+}
+
+func runStatusDevnetFromString(value string) string {
+	for _, match := range devnetLabelPattern.FindAllStringSubmatch(value, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		devnet := strings.ToLower(match[1])
+		if devnet != "devnet0" {
+			return devnet
+		}
+	}
+	return ""
+}
+
+func runStatusSuiteClients(suite *libhive.TestSuite) []string {
+	seen := make(map[string]bool)
+	clients := make([]string, 0)
+	for _, test := range suite.TestCases {
+		for _, client := range test.ClientInfo {
+			if client == nil || client.Name == "" || seen[client.Name] {
+				continue
+			}
+			seen[client.Name] = true
+			clients = append(clients, client.Name)
+		}
+	}
+	return clients
 }
 
 func runStatusActive(digest runDigest, lastActivity time.Time, now time.Time, logWriteState simulatorLogWriteState) bool {
