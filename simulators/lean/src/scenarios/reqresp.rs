@@ -10,9 +10,9 @@ use crate::utils::libp2p_mock::{
 };
 use crate::utils::util::{
     default_genesis_time, fork_choice_head_slot, http_client, lean_api_url, lean_clients,
-    lean_environment, lean_single_client_runtime_setup, load_fork_choice_response,
-    prepare_client_runtime_files, run_data_test_with_timeout, selected_lean_devnet,
-    simulator_container_ip, ClientUnderTestRole, TimedDataTestSpec,
+    lean_environment, load_fork_choice_response, prepare_client_runtime_files,
+    run_data_test_with_timeout, selected_lean_devnet, simulator_container_ip, ClientUnderTestRole,
+    TimedDataTestSpec,
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
@@ -64,10 +64,23 @@ dyn_async! {
         if clients.is_empty() {
             panic!("No lean clients were selected for this run");
         }
+        let planning = test.plan_test("reqresp: client launch", true);
 
         for client in &clients {
-            let (_fresh_client_environments, _fresh_client_files) = lean_single_client_runtime_setup(
-                &client.name);
+            if !planning {
+                let environment = lean_environment();
+                let files = prepare_client_runtime_files(&client.name, &environment)
+                    .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {}: {err}", client.name));
+                let launch_client = test
+                    .start_client_with_files(client.name.clone(), Some(environment), Some(files))
+                    .await;
+                if let Err(err) = launch_client.stop().await {
+                    eprintln!(
+                        "Unable to stop reqresp launch-attribution client {}: {err}",
+                        client.name
+                    );
+                }
+            }
 
 
             let status_happy_genesis_time = default_genesis_time();
