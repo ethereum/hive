@@ -193,6 +193,8 @@ impl RunningBadCheckpointPeer {
         }
 
         eprintln!("Restarting adversarial {LOCAL_HELPER_KIND} after retryable exit: {error}");
+        // Free the previous helper's p2p port before spawning the replacement.
+        self.helper.stop();
         let (mut helper, _genesis_validator_entries) =
             start_local_lean_spec_helper_with_genesis_metadata(&self.helper_config).await?;
         wait_for_checkpoint_slot_with_retry(
@@ -553,6 +555,20 @@ impl RunningLocalLeanSpecHelper {
             )),
         }
     }
+
+    /// Terminate the helper process and wait for it to be reaped so the kernel
+    /// releases its QUIC/UDP listener port.
+    ///
+    /// Restarts reuse the same `p2p_port`, so a replacement helper must not be
+    /// spawned until the previous process has fully exited. The `Drop` impl
+    /// also kills the child, but it only runs once the old value is reassigned,
+    /// which happens *after* the replacement has already tried (and failed) to
+    /// bind the still-held port with `Address already in use`. Calling this
+    /// before starting the replacement closes that race.
+    fn stop(&mut self) {
+        self.child.kill().ok();
+        self.child.wait().ok();
+    }
 }
 
 impl Drop for RunningLocalLeanSpecHelper {
@@ -576,6 +592,8 @@ async fn restart_local_helper_after_retryable_exit(
         "Restarting {LOCAL_HELPER_KIND} `{}` after retryable exit: {error}",
         helper.node_id
     );
+    // Free the previous helper's p2p port before spawning the replacement.
+    helper.stop();
     let (restarted_helper, _genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(helper_config).await?;
     *helper = restarted_helper;
@@ -1917,6 +1935,8 @@ async fn refresh_checkpoint_sync_source(
     helper_config: &LocalLeanSpecHelperConfig,
     minimum_slot: u64,
 ) -> Result<bool, String> {
+    // Free the previous helper's p2p port before spawning the replacement.
+    helper.stop();
     let (mut restarted_helper, _source_genesis_validator_entries) =
         start_local_lean_spec_helper_with_genesis_metadata(helper_config).await?;
     let refreshed_source_fork_choice =
@@ -2004,6 +2024,8 @@ async fn wait_for_checkpoint_slot_with_retry(
                 eprintln!(
                     "Restarting {LOCAL_HELPER_KIND} after finalized checkpoint wait failure on attempt {attempt}: {error}"
                 );
+                // Free the previous helper's p2p port before spawning the replacement.
+                helper.stop();
                 let (restarted_helper, _source_genesis_validator_entries) =
                     start_local_lean_spec_helper_with_genesis_metadata(helper_config).await?;
                 *helper = restarted_helper;
