@@ -15,9 +15,14 @@ use serde_json::{Map, Value};
 
 const SPEC_TEST_ROOT_DEVNET4: &str = "/app/hive/lean-spec-tests-devnet4";
 const SPEC_TEST_ROOT_DEVNET5: &str = "/app/hive/lean-spec-tests-devnet5";
-const FORK_CHOICE_FIXTURE_DIR: &str = "consensus/fork_choice/lstar/fc";
-const STATE_TRANSITION_FIXTURE_DIR: &str = "consensus/state_transition/lstar/state_transition";
-const VERIFY_SIGNATURES_FIXTURE_DIR: &str = "consensus/verify_signatures/lstar/verify_signatures";
+const FORK_CHOICE_FIXTURE_DIRS: &[&str] = &[
+    "consensus/fork_choice/lstar/fc",
+    "consensus/fork_choice/lstar/fork_choice",
+];
+const STATE_TRANSITION_FIXTURE_DIRS: &[&str] =
+    &["consensus/state_transition/lstar/state_transition"];
+const VERIFY_SIGNATURES_FIXTURE_DIRS: &[&str] =
+    &["consensus/verify_signatures/lstar/verify_signatures"];
 const SPEC_ASSET_TEST_TIMEOUT: Duration = Duration::from_secs(120);
 const SPEC_ASSET_FILTER_ENV: &str = "HIVE_LEAN_SPEC_ASSET_FILTER";
 const SPEC_ASSET_LIMIT_ENV: &str = "HIVE_LEAN_SPEC_ASSET_LIMIT";
@@ -30,11 +35,11 @@ enum SpecFixtureKind {
 }
 
 impl SpecFixtureKind {
-    fn fixture_dir(self) -> &'static str {
+    fn fixture_dirs(self) -> &'static [&'static str] {
         match self {
-            Self::ForkChoice => FORK_CHOICE_FIXTURE_DIR,
-            Self::StateTransition => STATE_TRANSITION_FIXTURE_DIR,
-            Self::VerifySignatures => VERIFY_SIGNATURES_FIXTURE_DIR,
+            Self::ForkChoice => FORK_CHOICE_FIXTURE_DIRS,
+            Self::StateTransition => STATE_TRANSITION_FIXTURE_DIRS,
+            Self::VerifySignatures => VERIFY_SIGNATURES_FIXTURE_DIRS,
         }
     }
 
@@ -190,7 +195,9 @@ fn spec_test_root() -> &'static str {
 
 fn discover_fixture_cases(root: &Path, kind: SpecFixtureKind) -> Vec<SpecFixtureCase> {
     let mut cases = Vec::new();
-    collect_fixture_cases(&root.join(kind.fixture_dir()), kind, &mut cases);
+    for fixture_dir in kind.fixture_dirs() {
+        collect_fixture_cases(&root.join(fixture_dir), kind, &mut cases);
+    }
     cases.sort_by(|a, b| a.path.cmp(&b.path).then(a.test_name.cmp(&b.test_name)));
     cases
 }
@@ -337,8 +344,12 @@ async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
 }
 
 fn expects_fork_choice_init_failure(case: &Value, steps: &[Value]) -> bool {
-    steps.is_empty()
-        && case
+    if !steps.is_empty() {
+        return false;
+    }
+
+    expected_case_rejection(case).is_some()
+        || case
             .pointer("/_info/description")
             .and_then(Value::as_str)
             .is_some_and(|description| description.contains("anchor_valid=False"))
@@ -420,7 +431,7 @@ async fn run_state_transition_fixture(client: &Client, fixture: &SpecFixtureCase
         .await
         .unwrap_or_else(|err| panic!("failed to decode state-transition response: {err}"));
 
-    let expect_exception = fixture.case.get("expectException").and_then(Value::as_str);
+    let expect_exception = expected_case_rejection(&fixture.case);
     assert_eq!(
         response.succeeded,
         expect_exception.is_none(),
@@ -479,7 +490,7 @@ async fn run_verify_signatures_fixture(client: &Client, fixture: &SpecFixtureCas
         .json()
         .await
         .unwrap_or_else(|err| panic!("failed to decode verify-signatures response: {err}"));
-    let expect_exception = fixture.case.get("expectException").and_then(Value::as_str);
+    let expect_exception = expected_case_rejection(&fixture.case);
 
     assert_eq!(
         response.succeeded,
@@ -492,4 +503,132 @@ async fn run_verify_signatures_fixture(client: &Client, fixture: &SpecFixtureCas
 
 fn normalize_hex(value: &str) -> String {
     value.trim_start_matches("0x").to_ascii_lowercase()
+}
+
+fn expected_case_rejection(case: &Value) -> Option<&str> {
+    case.get("expectException")
+        .or_else(|| case.get("rejectionReason"))
+        .and_then(Value::as_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use serde_json::json;
+
+    use super::{
+        discover_fixture_cases, expected_case_rejection, expects_fork_choice_init_failure,
+        SpecFixtureKind,
+    };
+
+    fn unique_fixture_root(test_name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after the Unix epoch")
+            .as_nanos();
+        let root = env::temp_dir().join(format!("lean-spec-assets-{test_name}-{unique}"));
+        fs::create_dir_all(&root).expect("failed to create temporary fixture root");
+        root
+    }
+
+    fn write_fixture(root: &Path, relative_path: &str) {
+        let path = root.join(relative_path);
+        fs::create_dir_all(
+            path.parent()
+                .expect("fixture path should include a parent directory"),
+        )
+        .expect("failed to create fixture directory");
+        fs::write(path, r#"{"case_a": {"steps": []}}"#).expect("failed to write fixture");
+    }
+
+    #[test]
+    fn discovers_legacy_devnet4_fork_choice_fixtures() {
+        let root = unique_fixture_root("legacy-fork-choice");
+        write_fixture(
+            &root,
+            "consensus/fork_choice/lstar/fc/test_group/test_case.json",
+        );
+
+        let cases = discover_fixture_cases(&root, SpecFixtureKind::ForkChoice);
+
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0].test_name, "case_a");
+        fs::remove_dir_all(root).expect("failed to remove temporary fixture root");
+    }
+
+    #[test]
+    fn discovers_current_devnet5_fork_choice_fixtures() {
+        let root = unique_fixture_root("current-fork-choice");
+        write_fixture(
+            &root,
+            "consensus/fork_choice/lstar/fork_choice/test_group/test_case.json",
+        );
+
+        let cases = discover_fixture_cases(&root, SpecFixtureKind::ForkChoice);
+
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0].test_name, "case_a");
+        fs::remove_dir_all(root).expect("failed to remove temporary fixture root");
+    }
+
+    #[test]
+    fn discovers_current_devnet5_fixture_kinds() {
+        let root = unique_fixture_root("current-kinds");
+        write_fixture(
+            &root,
+            "consensus/fork_choice/lstar/fork_choice/test_group/test_case.json",
+        );
+        write_fixture(
+            &root,
+            "consensus/state_transition/lstar/state_transition/test_group/test_case.json",
+        );
+        write_fixture(
+            &root,
+            "consensus/verify_signatures/lstar/verify_signatures/test_group/test_case.json",
+        );
+
+        assert_eq!(
+            discover_fixture_cases(&root, SpecFixtureKind::ForkChoice).len(),
+            1
+        );
+        assert_eq!(
+            discover_fixture_cases(&root, SpecFixtureKind::StateTransition).len(),
+            1
+        );
+        assert_eq!(
+            discover_fixture_cases(&root, SpecFixtureKind::VerifySignatures).len(),
+            1
+        );
+        fs::remove_dir_all(root).expect("failed to remove temporary fixture root");
+    }
+
+    #[test]
+    fn detects_legacy_and_current_expected_rejections() {
+        assert_eq!(
+            expected_case_rejection(&json!({ "expectException": "AssertionError" })),
+            Some("AssertionError")
+        );
+        assert_eq!(
+            expected_case_rejection(&json!({ "rejectionReason": "INVALID_BLOCK" })),
+            Some("INVALID_BLOCK")
+        );
+        assert_eq!(expected_case_rejection(&json!({ "post": {} })), None);
+    }
+
+    #[test]
+    fn detects_current_fork_choice_init_rejection() {
+        assert!(expects_fork_choice_init_failure(
+            &json!({ "rejectionReason": "ANCHOR_STATE_ROOT_MISMATCH" }),
+            &[]
+        ));
+        assert!(!expects_fork_choice_init_failure(
+            &json!({ "rejectionReason": "LATER_STEP_FAILURE" }),
+            &[json!({ "valid": false })]
+        ));
+    }
 }
