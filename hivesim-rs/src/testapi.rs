@@ -9,8 +9,13 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::IpAddr;
 use std::time::Duration;
+use tokio::time::{sleep, timeout};
 
 use crate::utils::extract_test_results;
+
+const SHARED_CLIENT_STARTUP_ATTEMPTS: u64 = 3;
+const SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(120);
+const SHARED_CLIENT_STARTUP_RETRY_DELAY: Duration = Duration::from_secs(1);
 
 pub type AsyncTestFunc = fn(
     &mut Test,
@@ -601,6 +606,89 @@ impl Drop for OwnerGuard {
     }
 }
 
+fn join_error_to_string(error: tokio::task::JoinError) -> String {
+    if error.is_panic() {
+        let payload = error.into_panic();
+        if let Some(error) = payload.downcast_ref::<&'static str>() {
+            error.to_string()
+        } else if let Some(error) = payload.downcast_ref::<String>() {
+            error.clone()
+        } else {
+            format!("unknown panic payload: {payload:?}")
+        }
+    } else {
+        error.to_string()
+    }
+}
+
+async fn start_shared_client_with_retry(
+    host: &Simulation,
+    suite_id: SuiteID,
+    owner_test_id: TestID,
+    client_name: &str,
+    environment: Option<HashMap<String, String>>,
+    files: Option<HashMap<String, Vec<u8>>>,
+) -> Result<(String, IpAddr), String> {
+    let mut last_error = None;
+
+    for attempt in 1..=SHARED_CLIENT_STARTUP_ATTEMPTS {
+        let host = host.clone();
+        let client_name_for_attempt = client_name.to_string();
+        let environment_for_attempt = environment.clone();
+        let files_for_attempt = files.clone();
+
+        let mut handle = tokio::spawn(async move {
+            host.start_client_with_files(
+                suite_id,
+                owner_test_id,
+                client_name_for_attempt,
+                environment_for_attempt,
+                files_for_attempt,
+            )
+            .await
+        });
+
+        let result: Result<(String, IpAddr), String> =
+            match timeout(SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT, &mut handle).await {
+                Ok(Ok(client)) => return Ok(client),
+                Ok(Err(error)) => Err(join_error_to_string(error)),
+                Err(_) => {
+                    handle.abort();
+                    let _ = handle.await;
+                    Err(format!(
+                        "startup attempt exceeded {} seconds",
+                        SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT.as_secs()
+                    ))
+                }
+            };
+
+        match result {
+            Err(error) if attempt < SHARED_CLIENT_STARTUP_ATTEMPTS => {
+                eprintln!(
+                    "Retrying shared-client startup for {client_name} after attempt {attempt} failed: {error}"
+                );
+                last_error = Some(error);
+                sleep(SHARED_CLIENT_STARTUP_RETRY_DELAY).await;
+            }
+            Err(error) => {
+                return Err(format!(
+                    "unable to start shared client {client_name} after {SHARED_CLIENT_STARTUP_ATTEMPTS} attempts: {error}"
+                ));
+            }
+            Ok(_) => unreachable!("successful shared-client startup returns above"),
+        }
+    }
+
+    Err(format!(
+        "unable to start shared client {} after {} attempts{}",
+        client_name,
+        SHARED_CLIENT_STARTUP_ATTEMPTS,
+        last_error
+            .map(|error| format!(": {error}"))
+            .unwrap_or_default()
+    ))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     host: Simulation,
@@ -619,15 +707,69 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
     guard.arm();
 
-    let (container_id, ip) = host
-        .start_client_with_files(
-            suite_id,
-            owner_test_id,
-            client_def.name.clone(),
-            environment,
-            files,
-        )
-        .await;
+    let (container_id, ip) = match start_shared_client_with_retry(
+        &host,
+        suite_id,
+        owner_test_id,
+        &client_def.name,
+        environment,
+        files,
+    )
+    .await
+    {
+        Ok(client) => client,
+        Err(err) => {
+            let mut scenarios_failed = 0;
+            let mut scenarios_filtered = 0;
+
+            for scenario in scenarios {
+                if let Some(test_match) = host.test_matcher.clone() {
+                    if !scenario.always_run && !test_match.match_test(&suite.name, &scenario.name) {
+                        scenarios_filtered += 1;
+                        continue;
+                    }
+                }
+
+                let scenario_test_id = host
+                    .start_test(
+                        suite_id,
+                        scenario.name.clone(),
+                        scenario.description.clone(),
+                    )
+                    .await;
+                host.end_test(
+                    suite_id,
+                    scenario_test_id,
+                    TestResult {
+                        pass: false,
+                        details: format!(
+                            "shared-client startup failed for {}; skipping scenario: {err}",
+                            client_def.name
+                        ),
+                    },
+                )
+                .await;
+                host.test_progress(&suite.name);
+                scenarios_failed += 1;
+            }
+
+            host.end_test(
+                suite_id,
+                owner_test_id,
+                TestResult {
+                    pass: false,
+                    details: format!(
+                        "shared-client startup failed for {}; {scenarios_failed} scenario(s) failed ({scenarios_filtered} filtered): {err}",
+                        client_def.name
+                    ),
+                },
+            )
+            .await;
+            host.test_progress(&suite.name);
+            guard.disarm();
+            return;
+        }
+    };
 
     let mut scenarios_run: usize = 0;
     let mut scenarios_passed: usize = 0;
