@@ -696,52 +696,6 @@ async fn register_timeout_client_for_failed_setup(
     }
 }
 
-pub(crate) async fn run_data_test<T: Send + 'static>(
-    host_test: &Test,
-    name: String,
-    description: String,
-    always_run: bool,
-    test_data: T,
-    func: AsyncLeanDataTestFunc<T>,
-) {
-    if host_test.plan_test(&name, always_run) {
-        return;
-    }
-
-    if let Some(test_match) = host_test.sim.test_matcher.clone() {
-        if !always_run && !test_match.match_test(&host_test.suite.name, &name) {
-            return;
-        }
-    }
-
-    let test_id = host_test
-        .sim
-        .start_test(host_test.suite_id, name, description)
-        .await;
-    let suite_id = host_test.suite_id;
-    let suite = host_test.suite.clone();
-    let simulation = host_test.sim.clone();
-
-    let test_result = extract_data_test_result(
-        tokio::spawn(async move {
-            let mut test = Test {
-                sim: simulation,
-                test_id,
-                suite,
-                suite_id,
-                result: Default::default(),
-            };
-
-            test.result.pass = true;
-            (func)(&mut test, test_data).await;
-        })
-        .await,
-    );
-
-    host_test.sim.end_test(suite_id, test_id, test_result).await;
-    host_test.sim.test_progress(&host_test.suite.name);
-}
-
 pub(crate) async fn run_data_test_with_timeout<T: Send + 'static>(
     host_test: &Test,
     spec: TimedDataTestSpec<T>,
