@@ -8,7 +8,7 @@ use crate::utils::helper::{
 };
 use crate::utils::util::{
     bootnode_metadata_for_client, current_unix_time, default_genesis_time, fork_choice_head_slot,
-    lean_bootnodes_for_client, lean_client_kind, lean_clients, lean_environment, run_data_test,
+    lean_bootnodes_for_client, lean_client_kind, lean_clients, lean_environment,
     run_data_test_with_timeout, selected_lean_devnet, try_load_fork_choice_response,
     ClientUnderTestRole, ForkChoiceResponse, TimedDataTestSpec,
 };
@@ -37,6 +37,43 @@ const HEAD_SYNC_TIMEOUT_SECS: u64 = CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
 const HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS: u64 = 600;
 const HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS: u64 = 420;
 const BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS: u64 = 120;
+const LONG_SYNC_OUTER_TIMEOUT_CAP_SECS: u64 = 15 * 60;
+const HEAD_SYNC_WITH_CLIENT_RESTART_TIMEOUT_SECS: u64 = 2 * HEAD_SYNC_TIMEOUT_SECS;
+const CHECKPOINT_SYNC_FRESH_START_OUTER_TIMEOUT_SECS: u64 =
+    CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS + CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS;
+const LATE_JOINER_HELPER_MESH_SUMMED_TIMEOUT_SECS: u64 = CHECKPOINT_SYNC_HELPER_MESH_TIMEOUT_SECS
+    + CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS
+    + HEAD_SYNC_WITH_CLIENT_RESTART_TIMEOUT_SECS
+    + LATE_JOINER_FINALIZATION_TIMEOUT_SECS;
+const LATE_JOINER_SAME_CLIENT_OUTER_TIMEOUT_SECS: u64 = ((SAME_CLIENT_GENESIS_BOOTSTRAP_PEER_COUNT
+    + 1) as u64
+    * CHECKPOINT_SYNC_CLIENT_TO_HEAD_TIMEOUT_SECS)
+    + LATE_JOINER_FINALIZATION_TIMEOUT_SECS;
+const HEAD_RECOVERY_SUMMED_TIMEOUT_SECS: u64 = HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS
+    + HEAD_SYNC_WITH_CLIENT_RESTART_TIMEOUT_SECS
+    + HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS
+    + HEAD_SYNC_TIMEOUT_SECS;
+const HEAD_BEHIND_FINALIZED_RECOVERY_SUMMED_TIMEOUT_SECS: u64 =
+    HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS
+        + HEAD_SYNC_WITH_CLIENT_RESTART_TIMEOUT_SECS
+        + HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS
+        + HEAD_SYNC_TIMEOUT_SECS;
+const BAD_CHECKPOINT_REJECTION_SUMMED_TIMEOUT_SECS: u64 = HEAD_BEHIND_FINALIZED_STARTUP_TIMEOUT_SECS
+    + HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS
+    + HEAD_SYNC_WITH_CLIENT_RESTART_TIMEOUT_SECS
+    + BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS
+    + HEAD_BEHIND_FINALIZED_HELPER_PROGRESS_TIMEOUT_SECS
+    + BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS
+    + HEAD_SYNC_TIMEOUT_SECS
+    + BAD_CHECKPOINT_PEER_AHEAD_TIMEOUT_SECS;
+const LATE_JOINER_HELPER_MESH_OUTER_TIMEOUT_SECS: u64 =
+    capped_long_sync_timeout_secs(LATE_JOINER_HELPER_MESH_SUMMED_TIMEOUT_SECS);
+const HEAD_RECOVERY_OUTER_TIMEOUT_SECS: u64 =
+    capped_long_sync_timeout_secs(HEAD_RECOVERY_SUMMED_TIMEOUT_SECS);
+const HEAD_BEHIND_FINALIZED_RECOVERY_OUTER_TIMEOUT_SECS: u64 =
+    capped_long_sync_timeout_secs(HEAD_BEHIND_FINALIZED_RECOVERY_SUMMED_TIMEOUT_SECS);
+const BAD_CHECKPOINT_REJECTION_OUTER_TIMEOUT_SECS: u64 =
+    capped_long_sync_timeout_secs(BAD_CHECKPOINT_REJECTION_SUMMED_TIMEOUT_SECS);
 const BAD_CHECKPOINT_PEER_MIN_SLOT_LEAD: u64 = 4;
 const SYNC_HELPER_PEER_COUNT: usize = 2;
 const SAME_CLIENT_GENESIS_BOOTSTRAP_PEER_COUNT: usize = 2;
@@ -50,9 +87,16 @@ const LEAN_CLIENT_P2P_PORT: u16 = 9000;
 const HEAD_SYNC_MAX_SLOT_LAG: u64 = 2;
 const PRE_PAUSE_MIN_CLIENT_HEAD_SLOT: u64 = 4;
 const LATE_JOINER_FINALIZATION_TIMEOUT_SECS: u64 = 300;
-const LATE_JOINER_OUTER_TIMEOUT_SECS: u64 = 15 * 60;
 const LATE_JOINER_MAX_FINALIZED_SLOT_LAG: u64 = 4;
 const LATE_JOINER_POLL_INTERVAL_SECS: u64 = 2;
+
+const fn capped_long_sync_timeout_secs(summed_timeout_secs: u64) -> u64 {
+    if summed_timeout_secs > LONG_SYNC_OUTER_TIMEOUT_CAP_SECS {
+        LONG_SYNC_OUTER_TIMEOUT_CAP_SECS
+    } else {
+        summed_timeout_secs
+    }
+}
 
 struct LateJoinerObservation {
     source: Option<ForkChoiceResponse>,
@@ -605,24 +649,28 @@ dyn_async! {
             } else {
                 HelperGossipForkDigestProfile::LegacyDevnet0
             };
-            run_data_test(
+            run_data_test_with_timeout(
                 test,
-                "sync: checkpoint sync fresh start".to_string(),
-                "Starts a local LeanSpec helper mesh, checkpoint-syncs the validator client under test from a finalized checkpoint, connects it to the helper mesh, and checks that the client catches up to the helper's live head slot.".to_string(),
-                false,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: checkpoint_sync_genesis_time,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: true,
-                    connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: Some(
-                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-                    ),
-                    split_helper_validators_across_mesh: false,
-                    helper_peer_count: SYNC_HELPER_PEER_COUNT,
-                    helper_fork_digest_profile,
+                TimedDataTestSpec {
+                    name: "sync: checkpoint sync fresh start".to_string(),
+                    description: "Starts a local LeanSpec helper mesh, checkpoint-syncs the validator client under test from a finalized checkpoint, connects it to the helper mesh, and checks that the client catches up to the helper's live head slot.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: Duration::from_secs(CHECKPOINT_SYNC_FRESH_START_OUTER_TIMEOUT_SECS),
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: checkpoint_sync_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: true,
+                        connect_client_to_lean_spec_mesh: true,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: Some(
+                            LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                        ),
+                        split_helper_validators_across_mesh: false,
+                        helper_peer_count: SYNC_HELPER_PEER_COUNT,
+                        helper_fork_digest_profile,
+                    },
                 },
                 test_checkpoint_sync_fresh_start,
             )
@@ -635,7 +683,7 @@ dyn_async! {
                     description: "Starts a local LeanSpec helper mesh, waits for the helpers to finalize, starts the validator client under test late from the helper checkpoint, and checks that it catches up and finalizes close to the helper source.".to_string(),
                     always_run: false,
                     client_name: client.name.clone(),
-                    timeout_duration: Duration::from_secs(LATE_JOINER_OUTER_TIMEOUT_SECS),
+                    timeout_duration: Duration::from_secs(LATE_JOINER_HELPER_MESH_OUTER_TIMEOUT_SECS),
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: default_genesis_time(),
@@ -662,7 +710,7 @@ dyn_async! {
                     description: "Starts two validator instances of the selected client from genesis, starts a third same-client observer instance late using the first two instances as bootnodes, and checks that the late joiner catches up and finalizes close to the bootstrap mesh.".to_string(),
                     always_run: false,
                     client_name: client.name.clone(),
-                    timeout_duration: Duration::from_secs(LATE_JOINER_OUTER_TIMEOUT_SECS),
+                    timeout_duration: Duration::from_secs(LATE_JOINER_SAME_CLIENT_OUTER_TIMEOUT_SECS),
                     test_data: SameClientLateJoinerTestData {
                         client_under_test: client.clone(),
                         genesis_time: default_genesis_time(),
@@ -673,72 +721,84 @@ dyn_async! {
             .await;
 
             let head_behind_finalized_recovery_genesis_time = default_genesis_time();
-            run_data_test(
+            run_data_test_with_timeout(
                 test,
-                "sync: head behind finalized recovery".to_string(),
-                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers finalize beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
-                false,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: head_behind_finalized_recovery_genesis_time,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: false,
-                    connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: Some(
-                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-                    ),
-                    split_helper_validators_across_mesh: false,
-                    helper_peer_count: SYNC_HELPER_PEER_COUNT,
-                    helper_fork_digest_profile,
+                TimedDataTestSpec {
+                    name: "sync: head behind finalized recovery".to_string(),
+                    description: "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers finalize beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: Duration::from_secs(HEAD_BEHIND_FINALIZED_RECOVERY_OUTER_TIMEOUT_SECS),
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: head_behind_finalized_recovery_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: false,
+                        connect_client_to_lean_spec_mesh: true,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: Some(
+                            LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                        ),
+                        split_helper_validators_across_mesh: false,
+                        helper_peer_count: SYNC_HELPER_PEER_COUNT,
+                        helper_fork_digest_profile,
+                    },
                 },
                 test_sync_head_behind_finalized_recovery,
             )
             .await;
 
             let bad_checkpoint_rejection_genesis_time = default_genesis_time();
-            run_data_test(
+            run_data_test_with_timeout(
                 test,
-                "sync: head behind finalized rejects ahead bad checkpoint".to_string(),
-                "Starts the client under test alongside two honest local LeanSpec helpers and an isolated adversarial LeanSpec peer whose validly signed chain is artificially ahead, pauses the client until the honest network finalizes beyond its head, unpauses it, and checks that the client follows the agreeing honest peers instead of the bad checkpoint from the single ahead peer.".to_string(),
-                false,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: bad_checkpoint_rejection_genesis_time,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: false,
-                    connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: Some(
-                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-                    ),
-                    split_helper_validators_across_mesh: false,
-                    helper_peer_count: SYNC_HELPER_PEER_COUNT,
-                    helper_fork_digest_profile,
+                TimedDataTestSpec {
+                    name: "sync: head behind finalized rejects ahead bad checkpoint".to_string(),
+                    description: "Starts the client under test alongside two honest local LeanSpec helpers and an isolated adversarial LeanSpec peer whose validly signed chain is artificially ahead, pauses the client until the honest network finalizes beyond its head, unpauses it, and checks that the client follows the agreeing honest peers instead of the bad checkpoint from the single ahead peer.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: Duration::from_secs(BAD_CHECKPOINT_REJECTION_OUTER_TIMEOUT_SECS),
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: bad_checkpoint_rejection_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: false,
+                        connect_client_to_lean_spec_mesh: true,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: Some(
+                            LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                        ),
+                        split_helper_validators_across_mesh: false,
+                        helper_peer_count: SYNC_HELPER_PEER_COUNT,
+                        helper_fork_digest_profile,
+                    },
                 },
                 test_sync_head_behind_finalized_rejects_ahead_bad_checkpoint,
             )
             .await;
 
             let head_recovery_genesis_time = default_genesis_time();
-            run_data_test(
+            run_data_test_with_timeout(
                 test,
-                "sync: head recovery".to_string(),
-                "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers justify beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
-                false,
-                PostGenesisSyncTestData {
-                    client_under_test: client.clone(),
-                    genesis_time: head_recovery_genesis_time,
-                    wait_for_client_justified_checkpoint: false,
-                    use_checkpoint_sync: false,
-                    connect_client_to_lean_spec_mesh: true,
-                    client_role: ClientUnderTestRole::Validator,
-                    source_helper_validator_indices: Some(
-                        LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
-                    ),
-                    split_helper_validators_across_mesh: false,
-                    helper_peer_count: SYNC_HELPER_PEER_COUNT,
-                    helper_fork_digest_profile,
+                TimedDataTestSpec {
+                    name: "sync: head recovery".to_string(),
+                    description: "Starts the client under test alongside a local LeanSpec helper mesh, pauses it after the helper source has finalized and the client is caught up, lets the helpers justify beyond the paused head, unpauses it, and checks that it catches back up to the helper live head slot.".to_string(),
+                    always_run: false,
+                    client_name: client.name.clone(),
+                    timeout_duration: Duration::from_secs(HEAD_RECOVERY_OUTER_TIMEOUT_SECS),
+                    test_data: PostGenesisSyncTestData {
+                        client_under_test: client.clone(),
+                        genesis_time: head_recovery_genesis_time,
+                        wait_for_client_justified_checkpoint: false,
+                        use_checkpoint_sync: false,
+                        connect_client_to_lean_spec_mesh: true,
+                        client_role: ClientUnderTestRole::Validator,
+                        source_helper_validator_indices: Some(
+                            LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0.to_string(),
+                        ),
+                        split_helper_validators_across_mesh: false,
+                        helper_peer_count: SYNC_HELPER_PEER_COUNT,
+                        helper_fork_digest_profile,
+                    },
                 },
                 test_sync_head_recovery,
             )
