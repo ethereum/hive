@@ -533,7 +533,7 @@ async fn start_interop_client(
             }
             Err(message) => {
                 panic!(
-                    "Unable to start client-interop node {} ({}) after {} attempts: {}",
+                    "Client-interop node {} ({}) crashed or failed during startup after {} attempts; no retries remain. Last startup failure: {}",
                     node.node_id, node.client.name, CLIENT_STARTUP_ATTEMPTS, message
                 );
             }
@@ -541,12 +541,12 @@ async fn start_interop_client(
     }
 
     panic!(
-        "Unable to start client-interop node {} ({}) after {} attempts{}",
+        "Client-interop node {} ({}) crashed or failed during startup after {} attempts; no retries remain{}",
         node.node_id,
         node.client.name,
         CLIENT_STARTUP_ATTEMPTS,
         last_error
-            .map(|error| format!(": {error}"))
+            .map(|error| format!(". Last startup failure: {error}"))
             .unwrap_or_default()
     );
 }
