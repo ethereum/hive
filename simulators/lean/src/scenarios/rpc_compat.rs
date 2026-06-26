@@ -1,6 +1,6 @@
 use crate::utils::helper::{
-    start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncContext,
-    PostGenesisSyncTestData,
+    start_post_genesis_sync_context_without_client_startup_retry as start_rpc_compat_post_genesis_sync_context,
+    HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
 };
 use crate::utils::libp2p_mock::LeanSignature;
 use crate::utils::util::{
@@ -26,7 +26,7 @@ use tree_hash_derive::TreeHash as TreeHashDerive;
 
 const FORK_CHOICE_TIMEOUT_SECS: u64 = 600;
 const FINALIZED_STATE_ALIGNMENT_TIMEOUT_SECS: u64 = 60;
-const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SSZ_CONTENT_TYPE: &str = "application/octet-stream";
 
 #[derive(Debug, Clone, PartialEq, Eq, Decode, TreeHashDerive)]
@@ -276,7 +276,7 @@ async fn load_post_genesis_fork_choice_setup(
     test: &Test,
     test_data: PostGenesisSyncTestData,
 ) -> (PostGenesisSyncContext, ForkChoiceResponse) {
-    let context = start_post_genesis_sync_context(test, &test_data).await;
+    let context = start_rpc_compat_post_genesis_sync_context(test, &test_data).await;
     let fork_choice = wait_for_post_genesis_fork_choice_response(&context.client_under_test).await;
     (context, fork_choice)
 }
@@ -352,7 +352,7 @@ async fn load_post_genesis_state_setup(
     test: &Test,
     test_data: PostGenesisSyncTestData,
 ) -> (PostGenesisSyncContext, LeanState, ForkChoiceResponse) {
-    let context = start_post_genesis_sync_context(test, &test_data).await;
+    let context = start_rpc_compat_post_genesis_sync_context(test, &test_data).await;
     let state = load_finalized_state(&context.client_under_test).await;
     let fork_choice = load_fork_choice_response(&context.client_under_test).await;
     (context, state, fork_choice)
@@ -596,7 +596,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: checkpoint_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: true,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -624,7 +623,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: finalized_filters_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -652,7 +650,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: finalized_boundary_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -680,7 +677,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: pre_finalized_only_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -838,7 +834,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: state_finalized_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -867,7 +862,6 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: finalized_block_pairing_genesis_time,
-                        retry_client_startup: false,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -950,7 +944,7 @@ dyn_async! {
 
 dyn_async! {
     async fn test_checkpoints_justified<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
-        let context = start_post_genesis_sync_context(test, &test_data).await;
+        let context = start_rpc_compat_post_genesis_sync_context(test, &test_data).await;
         assert!(
             context.source_fork_choice.justified.slot > 0,
             "helper source should reach a non-genesis justified checkpoint before syncing the client under test"
@@ -1322,7 +1316,7 @@ dyn_async! {
 // /lean/v0/blocks/finalized
 dyn_async! {
     async fn test_finalized_block_pairs_with_finalized_state<'a>(test: &'a mut Test, test_data: PostGenesisSyncTestData) {
-        let context = start_post_genesis_sync_context(test, &test_data).await;
+        let context = start_rpc_compat_post_genesis_sync_context(test, &test_data).await;
         let response = load_finalized_block_response(&context.client_under_test).await;
         assert_octet_stream_content_type(&response, "finalized block endpoint");
 

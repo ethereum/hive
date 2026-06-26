@@ -94,7 +94,6 @@ pub(crate) enum HelperGossipForkDigestProfile {
 pub(crate) struct PostGenesisSyncTestData {
     pub client_under_test: ClientDefinition,
     pub genesis_time: u64,
-    pub retry_client_startup: bool,
     pub wait_for_client_justified_checkpoint: bool,
     pub use_checkpoint_sync: bool,
     pub connect_client_to_lean_spec_mesh: bool,
@@ -1103,7 +1102,7 @@ pub(crate) async fn start_checkpoint_sync_client_context(
         client_type: test_data.client_under_test.name.clone(),
         environment: checkpoint_sync_client_environment.clone(),
         minimum_slot: minimum_source_checkpoint_slot(test_data),
-        startup_attempts: client_startup_attempts(test_data),
+        startup_attempts: CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
     })
     .await;
 
@@ -1121,7 +1120,7 @@ pub(crate) async fn start_checkpoint_sync_client_context(
         _helpers: helper_mesh.helpers,
         client_under_test,
         client_under_test_environment: checkpoint_sync_client_environment,
-        client_startup_attempts: client_startup_attempts(test_data),
+        client_startup_attempts: CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
         source_fork_choice: helper_mesh.source_fork_choice,
         client_checkpoint,
     }
@@ -1180,12 +1179,26 @@ pub(crate) async fn start_post_genesis_sync_context(
     start_post_genesis_sync_context_with_extra_bootnodes(test, test_data, Vec::new()).await
 }
 
+pub(crate) async fn start_post_genesis_sync_context_without_client_startup_retry(
+    test: &Test,
+    test_data: &PostGenesisSyncTestData,
+) -> PostGenesisSyncContext {
+    start_post_genesis_sync_context_inner(test, test_data, Vec::new(), false, 1).await
+}
+
 pub(crate) async fn start_post_genesis_sync_context_with_extra_bootnodes(
     test: &Test,
     test_data: &PostGenesisSyncTestData,
     extra_bootnodes: Vec<String>,
 ) -> PostGenesisSyncContext {
-    start_post_genesis_sync_context_inner(test, test_data, extra_bootnodes, false).await
+    start_post_genesis_sync_context_inner(
+        test,
+        test_data,
+        extra_bootnodes,
+        false,
+        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
+    )
+    .await
 }
 
 pub(crate) async fn start_post_genesis_sync_context_with_extra_bootnodes_after_helper_agreement(
@@ -1193,7 +1206,14 @@ pub(crate) async fn start_post_genesis_sync_context_with_extra_bootnodes_after_h
     test_data: &PostGenesisSyncTestData,
     extra_bootnodes: Vec<String>,
 ) -> PostGenesisSyncContext {
-    start_post_genesis_sync_context_inner(test, test_data, extra_bootnodes, true).await
+    start_post_genesis_sync_context_inner(
+        test,
+        test_data,
+        extra_bootnodes,
+        true,
+        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
+    )
+    .await
 }
 
 async fn start_post_genesis_sync_context_inner(
@@ -1201,7 +1221,9 @@ async fn start_post_genesis_sync_context_inner(
     test_data: &PostGenesisSyncTestData,
     extra_bootnodes: Vec<String>,
     wait_for_helper_agreement_before_client_start: bool,
+    client_startup_attempts: u64,
 ) -> PostGenesisSyncContext {
+    let client_startup_attempts = client_startup_attempts.max(1);
     let helper_peer_count = test_data.helper_peer_count.max(1);
     let passive_validator_mesh = should_start_passive_validator_mesh(test_data, helper_peer_count);
     let StartedLocalHelperMesh {
@@ -1234,7 +1256,7 @@ async fn start_post_genesis_sync_context_inner(
                 test,
                 test_data.client_under_test.name.clone(),
                 initial_client_under_test_environment.clone(),
-                client_startup_attempts(test_data),
+                client_startup_attempts,
             )
             .await,
         )
@@ -1269,7 +1291,7 @@ async fn start_post_genesis_sync_context_inner(
         {
             Ok(source_fork_choice) => source_fork_choice,
             Err(err) => {
-                if client_under_test.is_none() {
+                if client_under_test.is_none() && client_startup_attempts > 1 {
                     register_client_under_test_for_failed_setup(
                         test,
                         &test_data.client_under_test.name,
@@ -1430,7 +1452,7 @@ async fn start_post_genesis_sync_context_inner(
                     client_type: test_data.client_under_test.name.clone(),
                     environment: checkpoint_sync_client_environment.clone(),
                     minimum_slot: minimum_source_checkpoint_slot(test_data),
-                    startup_attempts: client_startup_attempts(test_data),
+                    startup_attempts: client_startup_attempts,
                 })
                 .await;
             (client_under_test, checkpoint_sync_client_environment)
@@ -1440,7 +1462,7 @@ async fn start_post_genesis_sync_context_inner(
                 test,
                 test_data.client_under_test.name.clone(),
                 delayed_client_under_test_environment.clone(),
-                client_startup_attempts(test_data),
+                client_startup_attempts,
             )
             .await;
             (client_under_test, delayed_client_under_test_environment)
@@ -1461,7 +1483,7 @@ async fn start_post_genesis_sync_context_inner(
         _helpers: helpers,
         client_under_test,
         client_under_test_environment,
-        client_startup_attempts: client_startup_attempts(test_data),
+        client_startup_attempts,
         source_fork_choice,
         client_checkpoint,
     }
@@ -1677,14 +1699,6 @@ fn with_extra_bootnodes(
 fn minimum_source_checkpoint_slot(test_data: &PostGenesisSyncTestData) -> u64 {
     if test_data.use_checkpoint_sync {
         MIN_FINALIZED_SLOT_FOR_CHECKPOINT_SYNC
-    } else {
-        1
-    }
-}
-
-fn client_startup_attempts(test_data: &PostGenesisSyncTestData) -> u64 {
-    if test_data.retry_client_startup {
-        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS
     } else {
         1
     }
@@ -2717,7 +2731,6 @@ mod tests {
                 meta: hivesim::types::ClientMetadata { roles: Vec::new() },
             },
             genesis_time: 1,
-            retry_client_startup: true,
             wait_for_client_justified_checkpoint: false,
             use_checkpoint_sync: false,
             connect_client_to_lean_spec_mesh: true,
