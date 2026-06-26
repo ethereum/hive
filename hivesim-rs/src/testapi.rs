@@ -9,13 +9,11 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::IpAddr;
 use std::time::Duration;
-use tokio::time::{sleep, timeout};
+use tokio::time::timeout;
 
 use crate::utils::extract_test_results;
 
-const SHARED_CLIENT_STARTUP_ATTEMPTS: u64 = 3;
-const SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(120);
-const SHARED_CLIENT_STARTUP_RETRY_DELAY: Duration = Duration::from_secs(1);
+const SHARED_CLIENT_STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub type AsyncTestFunc = fn(
     &mut Test,
@@ -621,7 +619,7 @@ fn join_error_to_string(error: tokio::task::JoinError) -> String {
     }
 }
 
-async fn start_shared_client_with_retry(
+async fn start_shared_client(
     host: &Simulation,
     suite_id: SuiteID,
     owner_test_id: TestID,
@@ -629,64 +627,34 @@ async fn start_shared_client_with_retry(
     environment: Option<HashMap<String, String>>,
     files: Option<HashMap<String, Vec<u8>>>,
 ) -> Result<(String, IpAddr), String> {
-    let mut last_error = None;
+    let host = host.clone();
+    let client_name_for_start = client_name.to_string();
+    let mut handle = tokio::spawn(async move {
+        host.start_client_with_files(
+            suite_id,
+            owner_test_id,
+            client_name_for_start,
+            environment,
+            files,
+        )
+        .await
+    });
 
-    for attempt in 1..=SHARED_CLIENT_STARTUP_ATTEMPTS {
-        let host = host.clone();
-        let client_name_for_attempt = client_name.to_string();
-        let environment_for_attempt = environment.clone();
-        let files_for_attempt = files.clone();
-
-        let mut handle = tokio::spawn(async move {
-            host.start_client_with_files(
-                suite_id,
-                owner_test_id,
-                client_name_for_attempt,
-                environment_for_attempt,
-                files_for_attempt,
-            )
-            .await
-        });
-
-        let result: Result<(String, IpAddr), String> =
-            match timeout(SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT, &mut handle).await {
-                Ok(Ok(client)) => return Ok(client),
-                Ok(Err(error)) => Err(join_error_to_string(error)),
-                Err(_) => {
-                    handle.abort();
-                    let _ = handle.await;
-                    Err(format!(
-                        "startup attempt exceeded {} seconds",
-                        SHARED_CLIENT_STARTUP_ATTEMPT_TIMEOUT.as_secs()
-                    ))
-                }
-            };
-
-        match result {
-            Err(error) if attempt < SHARED_CLIENT_STARTUP_ATTEMPTS => {
-                eprintln!(
-                    "Retrying shared-client startup for {client_name} after attempt {attempt} failed: {error}"
-                );
-                last_error = Some(error);
-                sleep(SHARED_CLIENT_STARTUP_RETRY_DELAY).await;
-            }
-            Err(error) => {
-                return Err(format!(
-                    "unable to start shared client {client_name} after {SHARED_CLIENT_STARTUP_ATTEMPTS} attempts: {error}"
-                ));
-            }
-            Ok(_) => unreachable!("successful shared-client startup returns above"),
+    match timeout(SHARED_CLIENT_STARTUP_TIMEOUT, &mut handle).await {
+        Ok(Ok(client)) => Ok(client),
+        Ok(Err(error)) => Err(format!(
+            "startup task failed: {}",
+            join_error_to_string(error)
+        )),
+        Err(_) => {
+            handle.abort();
+            let _ = handle.await;
+            Err(format!(
+                "startup exceeded {} seconds",
+                SHARED_CLIENT_STARTUP_TIMEOUT.as_secs()
+            ))
         }
     }
-
-    Err(format!(
-        "unable to start shared client {} after {} attempts{}",
-        client_name,
-        SHARED_CLIENT_STARTUP_ATTEMPTS,
-        last_error
-            .map(|error| format!(": {error}"))
-            .unwrap_or_default()
-    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -707,7 +675,7 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
     guard.arm();
 
-    let (container_id, ip) = match start_shared_client_with_retry(
+    let (container_id, ip) = match start_shared_client(
         &host,
         suite_id,
         owner_test_id,

@@ -613,6 +613,7 @@ dyn_async! {
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: checkpoint_sync_genesis_time,
+                    retry_client_startup: true,
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: true,
                     connect_client_to_lean_spec_mesh: true,
@@ -639,6 +640,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: default_genesis_time(),
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -681,6 +683,7 @@ dyn_async! {
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: head_behind_finalized_recovery_genesis_time,
+                    retry_client_startup: true,
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: false,
                     connect_client_to_lean_spec_mesh: true,
@@ -705,6 +708,7 @@ dyn_async! {
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: bad_checkpoint_rejection_genesis_time,
+                    retry_client_startup: true,
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: false,
                     connect_client_to_lean_spec_mesh: true,
@@ -729,6 +733,7 @@ dyn_async! {
                 PostGenesisSyncTestData {
                     client_under_test: client.clone(),
                     genesis_time: head_recovery_genesis_time,
+                    retry_client_startup: true,
                     wait_for_client_justified_checkpoint: false,
                     use_checkpoint_sync: false,
                     connect_client_to_lean_spec_mesh: true,

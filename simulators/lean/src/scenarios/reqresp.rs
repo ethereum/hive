@@ -82,6 +82,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_happy_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -112,6 +113,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_genesis_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: false,
                         connect_client_to_lean_spec_mesh: false,
@@ -142,6 +144,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_advanced_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -175,6 +178,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_bad_root_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -205,6 +209,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_bad_fork_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -235,6 +240,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: status_malformed_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -265,6 +271,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_single_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -295,6 +302,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_multiple_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: false,
                         connect_client_to_lean_spec_mesh: false,
@@ -325,6 +333,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_unknown_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -355,6 +364,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_mixed_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -385,6 +395,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_max_limit_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -415,6 +426,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_too_many_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -445,6 +457,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_duplicate_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -475,6 +488,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: blocks_malformed_req_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -505,6 +519,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: range_single_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -535,6 +550,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: range_multiple_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: false,
@@ -565,6 +581,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: range_zero_count_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -595,6 +612,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: range_too_many_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -625,6 +643,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: backfill_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -655,6 +674,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: catchup_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
@@ -685,6 +705,7 @@ dyn_async! {
                     test_data: PostGenesisSyncTestData {
                         client_under_test: client.clone(),
                         genesis_time: concurrency_genesis_time,
+                        retry_client_startup: true,
                         wait_for_client_justified_checkpoint: false,
                         use_checkpoint_sync: true,
                         connect_client_to_lean_spec_mesh: true,
