@@ -525,29 +525,25 @@ async fn start_interop_client(
             Ok(client) => return client,
             Err(message) if attempt < CLIENT_STARTUP_ATTEMPTS => {
                 eprintln!(
-                    "Retrying client-interop startup for node {} ({}) after attempt {} failed: {}",
-                    node.node_id, node.client.name, attempt, message
+                    "Retrying client-interop startup for node {} ({}) after startup failure: {}",
+                    node.node_id, node.client.name, message
                 );
                 last_error = Some(message);
                 sleep(Duration::from_secs(1)).await;
             }
             Err(message) => {
                 panic!(
-                    "Client-interop node {} ({}) crashed or failed during startup after {} attempts; no retries remain. Last startup failure: {}",
-                    node.node_id, node.client.name, CLIENT_STARTUP_ATTEMPTS, message
+                    "Client-interop node {} ({}) failed during startup: {}",
+                    node.node_id, node.client.name, message
                 );
             }
         };
     }
 
+    let cause = last_error.unwrap_or_else(|| "no startup failure cause was reported".to_string());
     panic!(
-        "Client-interop node {} ({}) crashed or failed during startup after {} attempts; no retries remain{}",
-        node.node_id,
-        node.client.name,
-        CLIENT_STARTUP_ATTEMPTS,
-        last_error
-            .map(|error| format!(". Last startup failure: {error}"))
-            .unwrap_or_default()
+        "Client-interop node {} ({}) failed during startup: {}",
+        node.node_id, node.client.name, cause
     );
 }
 
