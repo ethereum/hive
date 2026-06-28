@@ -52,7 +52,6 @@ const LOCAL_HELPER_STARTUP_TIMEOUT_SECS: u64 = 120;
 const LOCAL_HELPER_METADATA_TIMEOUT_SECS: u64 = 60;
 const LOCAL_HELPER_STARTUP_ATTEMPTS: u64 = 10;
 const LOCAL_HELPER_RETRY_DELAY_SECS: u64 = 2;
-const CLIENT_UNDER_TEST_STARTUP_ATTEMPTS: u64 = 3;
 const CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS: u64 = 120;
 const CHECKPOINT_SYNC_CLIENT_READY_TIMEOUT_SECS: u64 = 30;
 const MESH_HELPER_READY_TIMEOUT_SECS: u64 = 120;
@@ -107,7 +106,6 @@ pub(crate) struct PostGenesisSyncTestData {
 pub(crate) struct PostGenesisSyncContext {
     _helpers: RunningLocalLeanSpecHelperGroup,
     pub client_under_test: Client,
-    client_under_test_environment: HashMap<String, String>,
     pub source_fork_choice: ForkChoiceSnapshot,
     pub client_checkpoint: Option<CheckpointResponse>,
 }
@@ -135,24 +133,6 @@ struct StartedLocalHelperMesh {
 }
 
 impl PostGenesisSyncContext {
-    pub(crate) async fn restart_client_under_test(&mut self, test: &Test) -> Result<(), String> {
-        let client_type = self.client_under_test.kind.clone();
-        let old_container = self.client_under_test.container.clone();
-        self.client_under_test.stop().await.map_err(|err| {
-            format!(
-                "unable to stop client under test {client_type} container {old_container} before restart: {err}"
-            )
-        })?;
-
-        self.client_under_test = start_client_under_test_with_retry(
-            test,
-            client_type,
-            self.client_under_test_environment.clone(),
-        )
-        .await;
-        Ok(())
-    }
-
     pub(crate) async fn try_load_live_helper_fork_choice(
         &mut self,
     ) -> Result<ForkChoiceResponse, String> {
@@ -1109,17 +1089,16 @@ pub(crate) async fn start_checkpoint_sync_client_context(
         test_data.connect_client_to_lean_spec_mesh,
         test_data.client_role,
     );
-    let client_under_test =
-        start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
-            test,
-            helper: &mut helper_mesh.helpers.source,
-            source_fork_choice: &mut helper_mesh.source_fork_choice,
-            helper_config: helper_mesh.source_helper_config.clone(),
-            client_type: test_data.client_under_test.name.clone(),
-            environment: checkpoint_sync_client_environment.clone(),
-            minimum_slot: minimum_source_checkpoint_slot(test_data),
-        })
-        .await;
+    let client_under_test = start_checkpoint_sync_client_under_test(CheckpointSyncClientStart {
+        test,
+        helper: &mut helper_mesh.helpers.source,
+        source_fork_choice: &mut helper_mesh.source_fork_choice,
+        helper_config: helper_mesh.source_helper_config.clone(),
+        client_type: test_data.client_under_test.name.clone(),
+        environment: checkpoint_sync_client_environment,
+        minimum_slot: minimum_source_checkpoint_slot(test_data),
+    })
+    .await;
 
     let client_checkpoint = if test_data.wait_for_client_justified_checkpoint {
         Some(
@@ -1134,7 +1113,6 @@ pub(crate) async fn start_checkpoint_sync_client_context(
     PostGenesisSyncContext {
         _helpers: helper_mesh.helpers,
         client_under_test,
-        client_under_test_environment: checkpoint_sync_client_environment,
         source_fork_choice: helper_mesh.source_fork_choice,
         client_checkpoint,
     }
@@ -1243,7 +1221,7 @@ async fn start_post_genesis_sync_context_inner(
 
     let client_under_test = if should_start_client_early {
         Some(
-            start_client_under_test_with_retry(
+            start_client_under_test(
                 test,
                 test_data.client_under_test.name.clone(),
                 initial_client_under_test_environment.clone(),
@@ -1419,8 +1397,8 @@ async fn start_post_genesis_sync_context_inner(
         };
     }
 
-    let (client_under_test, client_under_test_environment) = match client_under_test {
-        Some(client_under_test) => (client_under_test, initial_client_under_test_environment),
+    let client_under_test = match client_under_test {
+        Some(client_under_test) => client_under_test,
         None if test_data.use_checkpoint_sync => {
             let checkpoint_sync_client_environment = client_under_test_environment(
                 &helpers,
@@ -1433,27 +1411,24 @@ async fn start_post_genesis_sync_context_inner(
             );
             let checkpoint_sync_client_environment =
                 with_extra_bootnodes(checkpoint_sync_client_environment, &extra_bootnodes);
-            let client_under_test =
-                start_checkpoint_sync_client_under_test_with_retry(CheckpointSyncClientStart {
-                    test,
-                    helper: &mut helpers.source,
-                    source_fork_choice: &mut source_fork_choice,
-                    helper_config: source_helper_config.clone(),
-                    client_type: test_data.client_under_test.name.clone(),
-                    environment: checkpoint_sync_client_environment.clone(),
-                    minimum_slot: minimum_source_checkpoint_slot(test_data),
-                })
-                .await;
-            (client_under_test, checkpoint_sync_client_environment)
+            start_checkpoint_sync_client_under_test(CheckpointSyncClientStart {
+                test,
+                helper: &mut helpers.source,
+                source_fork_choice: &mut source_fork_choice,
+                helper_config: source_helper_config.clone(),
+                client_type: test_data.client_under_test.name.clone(),
+                environment: checkpoint_sync_client_environment,
+                minimum_slot: minimum_source_checkpoint_slot(test_data),
+            })
+            .await
         }
         None => {
-            let client_under_test = start_client_under_test_with_retry(
+            start_client_under_test(
                 test,
                 test_data.client_under_test.name.clone(),
-                delayed_client_under_test_environment.clone(),
+                delayed_client_under_test_environment,
             )
-            .await;
-            (client_under_test, delayed_client_under_test_environment)
+            .await
         }
     };
 
@@ -1470,7 +1445,6 @@ async fn start_post_genesis_sync_context_inner(
     PostGenesisSyncContext {
         _helpers: helpers,
         client_under_test,
-        client_under_test_environment,
         source_fork_choice,
         client_checkpoint,
     }
@@ -1762,58 +1736,31 @@ async fn register_client_under_test_for_failed_setup(
     }
 }
 
-pub(crate) async fn start_client_under_test_with_retry(
+fn client_under_test_crash_message(client_type: &str, error: &str) -> String {
+    format!(
+        "Test failed because the client under test {client_type} crashed or failed during startup; not retrying client startup. Startup failure: {error}"
+    )
+}
+
+pub(crate) async fn start_client_under_test(
     test: &Test,
     client_type: String,
     environment: HashMap<String, String>,
 ) -> Client {
     let files = prepare_client_runtime_files(&client_type, &environment)
         .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
-    let mut last_error = None;
 
-    for attempt in 1..=CLIENT_UNDER_TEST_STARTUP_ATTEMPTS {
-        let test = test.clone();
-        let client_type_for_attempt = client_type.clone();
-        let environment_for_attempt = environment.clone();
-        let files_for_attempt = files.clone();
-
-        match start_client_under_test_attempt(
-            test,
-            client_type_for_attempt,
-            environment_for_attempt,
-            files_for_attempt,
-        )
+    start_client_under_test_attempt(test.clone(), client_type.clone(), environment, files)
         .await
-        {
-            Ok(client) => return client,
-            Err(message) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
-                eprintln!(
-                    "Retrying client-under-test startup for {client_type} after attempt {attempt} failed: {message}"
-                );
-                last_error = Some(message);
-                sleep(Duration::from_secs(1)).await;
-            }
-            Err(message) => {
-                panic!(
-                    "Unable to start client under test {client_type} after {CLIENT_UNDER_TEST_STARTUP_ATTEMPTS} attempts: {message}"
-                );
-            }
-        }
-    }
-
-    panic!(
-        "Unable to start client under test {} after {} attempts{}",
-        client_type,
-        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
-        last_error
-            .map(|error| format!(": {error}"))
-            .unwrap_or_default()
-    );
+        .unwrap_or_else(|message| {
+            panic!(
+                "{}",
+                client_under_test_crash_message(&client_type, &message)
+            )
+        })
 }
 
-async fn start_checkpoint_sync_client_under_test_with_retry(
-    params: CheckpointSyncClientStart<'_>,
-) -> Client {
+async fn start_checkpoint_sync_client_under_test(params: CheckpointSyncClientStart<'_>) -> Client {
     let files = prepare_client_runtime_files(&params.client_type, &params.environment)
         .unwrap_or_else(|err| {
             panic!(
@@ -1821,97 +1768,46 @@ async fn start_checkpoint_sync_client_under_test_with_retry(
                 params.client_type
             )
         });
-    let mut last_error = None;
-    let mut client_was_started = false;
 
-    for attempt in 1..=CLIENT_UNDER_TEST_STARTUP_ATTEMPTS {
-        if client_was_started {
-            wait_for_checkpoint_sync_state_ready(params.helper)
-                .await
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "{}",
-                        helper_failed_after_client_started_message(
-                            &params.client_type,
-                            "checking checkpoint-sync source readiness before a retry",
-                            &err,
-                        )
-                    )
-                });
-        } else {
-            ensure_checkpoint_sync_source_ready(
-                params.helper,
-                params.source_fork_choice,
-                &params.helper_config,
-                params.minimum_slot,
-            )
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Checkpoint-sync source state endpoint was not ready for {} before initial client startup attempt {}: {}",
-                    params.client_type, attempt, err
-                )
-            });
-        }
-        sleep(Duration::from_secs(1)).await;
-
-        let test = params.test.clone();
-        let client_type_for_attempt = params.client_type.clone();
-        let environment_for_attempt = params.environment.clone();
-        let files_for_attempt = files.clone();
-
-        match start_client_under_test_attempt(
-            test,
-            client_type_for_attempt,
-            environment_for_attempt,
-            files_for_attempt,
+    ensure_checkpoint_sync_source_ready(
+        params.helper,
+        params.source_fork_choice,
+        &params.helper_config,
+        params.minimum_slot,
+    )
+    .await
+    .unwrap_or_else(|err| {
+        panic!(
+            "Checkpoint-sync source state endpoint was not ready for {} before client startup: {}",
+            params.client_type, err
         )
-        .await
-        {
-            Ok(client) => match wait_for_checkpoint_sync_client_post_genesis(&client).await {
-                Ok(()) => return client,
-                Err(error) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
-                    client_was_started = true;
-                    eprintln!(
-                        "Retrying checkpoint-sync client-under-test startup for {} after attempt {} never reached a post-genesis forkchoice state: {}",
-                        params.client_type, attempt, error
-                    );
-                    last_error = Some(error);
-                    drop(client);
-                    sleep(Duration::from_secs(1)).await;
-                }
-                Err(error) => {
-                    panic!(
-                        "Unable to start checkpoint-sync client under test {} after {} attempts: {}",
-                        params.client_type, CLIENT_UNDER_TEST_STARTUP_ATTEMPTS, error
-                    );
-                }
-            },
-            Err(message) if attempt < CLIENT_UNDER_TEST_STARTUP_ATTEMPTS => {
-                eprintln!(
-                    "Retrying checkpoint-sync client-under-test startup for {} after attempt {} failed: {}",
-                    params.client_type, attempt, message
-                );
-                last_error = Some(message);
-                sleep(Duration::from_secs(1)).await;
-            }
-            Err(message) => {
-                panic!(
-                    "Unable to start checkpoint-sync client under test {} after {} attempts: {}",
-                    params.client_type, CLIENT_UNDER_TEST_STARTUP_ATTEMPTS, message
-                );
-            }
-        }
-    }
+    });
+    sleep(Duration::from_secs(1)).await;
 
-    panic!(
-        "Unable to start checkpoint-sync client under test {} after {} attempts{}",
-        params.client_type,
-        CLIENT_UNDER_TEST_STARTUP_ATTEMPTS,
-        last_error
-            .map(|error| format!(": {error}"))
-            .unwrap_or_default()
-    );
+    let client = start_client_under_test_attempt(
+        params.test.clone(),
+        params.client_type.clone(),
+        params.environment.clone(),
+        files,
+    )
+    .await
+    .unwrap_or_else(|message| {
+        panic!(
+            "{}",
+            client_under_test_crash_message(&params.client_type, &message)
+        )
+    });
+
+    wait_for_checkpoint_sync_client_post_genesis(&client)
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "Checkpoint-sync client under test {} started but crashed, became unreachable, or failed before exposing a post-genesis forkchoice state; not retrying client startup. Client failure: {}",
+                params.client_type, error
+            )
+        });
+
+    client
 }
 
 async fn ensure_checkpoint_sync_source_ready(

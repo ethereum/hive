@@ -1,6 +1,6 @@
 use crate::utils::helper::{
-    start_post_genesis_sync_context, HelperGossipForkDigestProfile, PostGenesisSyncTestData,
-    LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
+    start_client_under_test, start_post_genesis_sync_context, HelperGossipForkDigestProfile,
+    PostGenesisSyncTestData, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::libp2p_mock::{
     client_multiaddr, compute_client_peer_id, decode_request, encode_request, encode_request_raw,
@@ -69,11 +69,8 @@ dyn_async! {
         for client in &clients {
             if !planning {
                 let environment = lean_environment();
-                let files = prepare_client_runtime_files(&client.name, &environment)
-                    .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {}: {err}", client.name));
-                let launch_client = test
-                    .start_client_with_files(client.name.clone(), Some(environment), Some(files))
-                    .await;
+                let launch_client =
+                    start_client_under_test(test, client.name.clone(), environment).await;
                 if let Err(err) = launch_client.stop().await {
                     eprintln!(
                         "Unable to stop reqresp launch-attribution client {}: {err}",

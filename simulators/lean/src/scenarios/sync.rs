@@ -1,7 +1,6 @@
 use crate::utils::helper::{
     start_bad_checkpoint_peer, start_checkpoint_sync_client_context,
-    start_checkpoint_sync_helper_mesh, start_client_under_test_with_retry,
-    start_post_genesis_sync_context,
+    start_checkpoint_sync_helper_mesh, start_client_under_test, start_post_genesis_sync_context,
     start_post_genesis_sync_context_with_extra_bootnodes_after_helper_agreement,
     HelperGossipForkDigestProfile, PostGenesisSyncContext, PostGenesisSyncTestData,
     RunningBadCheckpointPeer, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
@@ -173,14 +172,14 @@ fn helper_failed_after_test_start_message(client_name: &str, phase: &str, error:
 }
 
 enum HeadSyncWaitError {
-    RetryableClient(String),
+    ClientFailure(String),
     NonRetryable(String),
 }
 
 impl HeadSyncWaitError {
     fn into_message(self) -> String {
         match self {
-            Self::RetryableClient(message) | Self::NonRetryable(message) => message,
+            Self::ClientFailure(message) | Self::NonRetryable(message) => message,
         }
     }
 }
@@ -280,19 +279,19 @@ async fn try_wait_for_client_to_reach_source_head(
         }
 
         if let Some(err) = last_client_error {
-            return Err(HeadSyncWaitError::RetryableClient(format!(
-                "Client under test fork_choice endpoint never became readable within {} seconds while comparing against the local LeanSpec helper head: {}",
+            return Err(HeadSyncWaitError::ClientFailure(format!(
+                "Client under test {client_name} crashed or became unreachable: fork_choice endpoint never became readable within {} seconds while comparing against the local LeanSpec helper head: {}",
                 HEAD_SYNC_TIMEOUT_SECS, err
             )));
         }
 
-        return Err(HeadSyncWaitError::RetryableClient(format!(
-            "Client under test could not be compared with the local LeanSpec helper head within {} seconds",
+        return Err(HeadSyncWaitError::ClientFailure(format!(
+            "Client under test {client_name} could not be compared with the local LeanSpec helper head within {} seconds",
             HEAD_SYNC_TIMEOUT_SECS
         )));
     };
-    Err(HeadSyncWaitError::RetryableClient(format!(
-        "Client under test never reached required head slot {} and caught up to the local LeanSpec helper head slot within {} seconds (allowed lag: {} slots, helper-before head: {:#x} at slot {} [justified={}, finalized={}], client head: {:#x} at slot {} [justified={}, finalized={}], helper-after head: {:#x} at slot {} [justified={}, finalized={}])",
+    Err(HeadSyncWaitError::ClientFailure(format!(
+        "Client under test {client_name} never reached required head slot {} and caught up to the local LeanSpec helper head slot within {} seconds (allowed lag: {} slots, helper-before head: {:#x} at slot {} [justified={}, finalized={}], client head: {:#x} at slot {} [justified={}, finalized={}], helper-after head: {:#x} at slot {} [justified={}, finalized={}])",
         minimum_client_head_slot,
         HEAD_SYNC_TIMEOUT_SECS,
         HEAD_SYNC_MAX_SLOT_LAG,
@@ -327,8 +326,7 @@ async fn wait_for_client_to_reach_source_head(
     .unwrap_or_else(|err| panic!("{}", err.into_message()))
 }
 
-async fn wait_for_client_to_reach_source_head_with_client_restart(
-    test: &Test,
+async fn wait_for_client_to_reach_source_head_for_phase(
     context: &mut PostGenesisSyncContext,
     minimum_source_head_slot: u64,
     minimum_source_finalized_slot: u64,
@@ -345,33 +343,11 @@ async fn wait_for_client_to_reach_source_head_with_client_restart(
     {
         Ok(result) => result,
         Err(HeadSyncWaitError::NonRetryable(message)) => panic!("{message}"),
-        Err(HeadSyncWaitError::RetryableClient(first_error)) => {
+        Err(HeadSyncWaitError::ClientFailure(message)) => {
             let client_name = context.client_under_test.kind.clone();
-            eprintln!(
-                "Restarting client under test {client_name} after it failed to catch up during {phase}: {first_error}"
-            );
-            context
-                .restart_client_under_test(test)
-                .await
-                .unwrap_or_else(|restart_err| {
-                    panic!(
-                        "Unable to restart client under test {client_name} after failed {phase}: {restart_err}. Initial catch-up failure: {first_error}"
-                    )
-                });
-
-            try_wait_for_client_to_reach_source_head(
-                context,
-                minimum_source_head_slot,
-                minimum_source_finalized_slot,
-                minimum_client_head_slot,
+            panic!(
+                "Client under test {client_name} failed during {phase}; not retrying or restarting the client. {message}"
             )
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Client under test {client_name} still failed to catch up during {phase} after one restart: {}. Initial catch-up failure before restart: {first_error}",
-                    err.into_message()
-                )
-            })
         }
     }
 }
@@ -840,8 +816,7 @@ dyn_async! {
 
         let checkpoint_sync_boundary = context.source_fork_choice.finalized.slot;
 
-        wait_for_client_to_reach_source_head_with_client_restart(
-            test,
+        wait_for_client_to_reach_source_head_for_phase(
             &mut context,
             checkpoint_sync_boundary,
             checkpoint_sync_boundary,
@@ -933,12 +908,8 @@ async fn start_same_client_genesis_node(
         node_index,
         &bootnodes,
     );
-    let client = start_client_under_test_with_retry(
-        test,
-        test_data.client_under_test.name.clone(),
-        environment,
-    )
-    .await;
+    let client =
+        start_client_under_test(test, test_data.client_under_test.name.clone(), environment).await;
     let metadata = bootnode_metadata_for_client(&private_key, client.ip, LEAN_CLIENT_P2P_PORT);
     let bootnode = lean_bootnodes_for_client(client_kind, &[metadata]);
 
@@ -1267,8 +1238,7 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head_with_client_restart(
-                test,
+            wait_for_client_to_reach_source_head_for_phase(
                 &mut context,
                 0,
                 1,
@@ -1353,8 +1323,7 @@ dyn_async! {
         });
 
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head_with_client_restart(
-                test,
+            wait_for_client_to_reach_source_head_for_phase(
                 &mut context,
                 0,
                 1,
@@ -1458,8 +1427,7 @@ dyn_async! {
         .await;
         let minimum_source_head_slot = fork_choice_head_slot(&honest_helper_agreement_before_pause);
         let (source_before_pause, client_before_pause) =
-            wait_for_client_to_reach_source_head_with_client_restart(
-                test,
+            wait_for_client_to_reach_source_head_for_phase(
                 &mut context,
                 minimum_source_head_slot,
                 1,
