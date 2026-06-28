@@ -1,8 +1,7 @@
 ARG devnet4_baseimage=sifrai/lean
 ARG devnet4_tag=devnet-4
 ARG devnet5_baseimage=sifrai/lean
-# TODO: this is a placeholder until a devnet5 image is published
-ARG devnet5_tag=devnet-4
+ARG devnet5_tag=devnet-5
 
 FROM $devnet5_baseimage:$devnet5_tag AS devnet5
 FROM $devnet4_baseimage:$devnet4_tag
