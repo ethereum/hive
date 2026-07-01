@@ -601,6 +601,21 @@ impl Drop for OwnerGuard {
     }
 }
 
+fn join_error_to_string(err: tokio::task::JoinError) -> String {
+    if !err.is_panic() {
+        return err.to_string();
+    }
+
+    let payload = err.into_panic();
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        message.to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        format!("?{payload:?}")
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     host: Simulation,
@@ -619,28 +634,90 @@ async fn run_shared_client_test<T: Clone + Send + Sync + 'static>(
     let mut guard = OwnerGuard::new(host.clone(), suite_id, owner_test_id);
     guard.arm();
 
-    let (container_id, ip) = host
-        .start_client_with_files(
-            suite_id,
-            owner_test_id,
-            client_def.name.clone(),
-            environment,
-            files,
-        )
-        .await;
+    let mut scenarios_filtered: usize = 0;
+    let scenarios = scenarios
+        .into_iter()
+        .filter(|scenario| {
+            if let Some(test_match) = host.test_matcher.clone() {
+                if !scenario.always_run && !test_match.match_test(&suite.name, &scenario.name) {
+                    scenarios_filtered += 1;
+                    return false;
+                }
+            }
+            true
+        })
+        .collect::<Vec<_>>();
+
+    let host_for_start = host.clone();
+    let client_name_for_start = client_def.name.clone();
+    let start_result = tokio::spawn(async move {
+        host_for_start
+            .start_client_with_files(
+                suite_id,
+                owner_test_id,
+                client_name_for_start,
+                environment,
+                files,
+            )
+            .await
+    })
+    .await;
+
+    let (container_id, ip) = match start_result {
+        Ok(client) => client,
+        Err(err) => {
+            let startup_error = join_error_to_string(err);
+            let owner_details = format!(
+                "shared-client lifecycle owner failed to start client {}: {}",
+                client_def.name, startup_error
+            );
+            let mut scenarios_run = 0usize;
+
+            for scenario in scenarios {
+                let scenario_test_id = host
+                    .start_test(
+                        suite_id,
+                        scenario.name.clone(),
+                        scenario.description.clone(),
+                    )
+                    .await;
+                host.end_test(
+                    suite_id,
+                    scenario_test_id,
+                    TestResult {
+                        pass: false,
+                        details: format!(
+                            "shared-client owner failed to start client {}; skipping scenario. Cause: {}",
+                            client_def.name, startup_error
+                        ),
+                    },
+                )
+                .await;
+                host.test_progress(&suite.name);
+                scenarios_run += 1;
+            }
+
+            host.end_test(
+                suite_id,
+                owner_test_id,
+                TestResult {
+                    pass: false,
+                    details: format!(
+                        "{owner_details}; 0/{scenarios_run} scenario(s) passed ({scenarios_filtered} filtered)"
+                    ),
+                },
+            )
+            .await;
+            host.test_progress(&suite.name);
+            guard.disarm();
+            return;
+        }
+    };
 
     let mut scenarios_run: usize = 0;
     let mut scenarios_passed: usize = 0;
-    let mut scenarios_filtered: usize = 0;
 
     for scenario in scenarios {
-        if let Some(test_match) = host.test_matcher.clone() {
-            if !scenario.always_run && !test_match.match_test(&suite.name, &scenario.name) {
-                scenarios_filtered += 1;
-                continue;
-            }
-        }
-
         let scenario_test_id = host
             .start_test(
                 suite_id,
