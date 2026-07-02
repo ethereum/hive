@@ -799,6 +799,51 @@ impl MockNode {
         }
     }
 
+    /// Drive the swarm until `peer` subscribes to `topic`, or the timeout
+    /// elapses. Subscriptions seen while waiting are recorded in
+    /// `seen_subscriptions`, matching `wait_for_request`.
+    pub async fn wait_for_subscription(
+        &mut self,
+        topic: &IdentTopic,
+        peer: &PeerId,
+        timeout_duration: Duration,
+    ) -> bool {
+        let target = topic.hash();
+        if self
+            .seen_subscriptions
+            .get(&target)
+            .is_some_and(|peers| peers.contains(peer))
+        {
+            return true;
+        }
+        let deadline = tokio::time::Instant::now() + timeout_duration;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return false;
+            }
+            match tokio::time::timeout(remaining, self.swarm.select_next_some()).await {
+                Ok(SwarmEvent::Behaviour(MockBehaviourEvent::Gossipsub(
+                    GossipsubEvent::Subscribed {
+                        peer_id,
+                        topic: event_topic,
+                    },
+                ))) => {
+                    let matched = event_topic == target && &peer_id == peer;
+                    self.seen_subscriptions
+                        .entry(event_topic)
+                        .or_default()
+                        .insert(peer_id);
+                    if matched {
+                        return true;
+                    }
+                }
+                Ok(_) => continue,
+                Err(_) => return false,
+            }
+        }
+    }
+
     /// Send a response to an inbound request.
     pub fn send_response(
         &mut self,
