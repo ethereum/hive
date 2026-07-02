@@ -267,6 +267,9 @@ func (b *ContainerBackend) CreateNetwork(name string) (string, error) {
 	network, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:       name,
 		Attachable: true,
+		Options: map[string]interface{}{
+			"com.docker.network.bridge.enable_ip_masquerade": "false",
+		},
 	})
 	if err != nil {
 		return "", err
