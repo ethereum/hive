@@ -14,6 +14,7 @@ var (
 	INVALID_PAYLOAD_ATTRIBUTES = pInt(-38003)
 	TOO_LARGE_REQUEST          = pInt(-38004)
 	UNSUPPORTED_FORK_ERROR     = pInt(-38005)
+	UNKNOWN_PARENT             = pInt(-38007)
 )
 
 func pInt(v int) *int {
