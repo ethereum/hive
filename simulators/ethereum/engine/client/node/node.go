@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -708,11 +710,16 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 }
 
 func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error) {
-	panic("NOT IMPLEMENTED")
+	pool := n.eth.TxPool()
+	if tx = pool.Get(hash); tx != nil {
+		return tx, pool.Status(hash) == txpool.TxStatusPending, nil
+	}
+	return nil, false, ethereum.NotFound
 }
 
 func (n *GethNode) PendingTransactionCount(ctx context.Context) (uint, error) {
-	panic("NOT IMPLEMENTED")
+	pending, _ := n.eth.TxPool().Stats()
+	return uint(pending), nil
 }
 
 func (n *GethNode) EnodeURL() (string, error) {
