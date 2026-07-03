@@ -1,5 +1,5 @@
 use crate::utils::helper::{
-    start_client_under_test, start_post_genesis_sync_context, HelperGossipForkDigestProfile,
+    start_post_genesis_sync_context, try_start_client_under_test, HelperGossipForkDigestProfile,
     PostGenesisSyncTestData, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::libp2p_mock::{
@@ -65,17 +65,24 @@ dyn_async! {
             panic!("No lean clients were selected for this run");
         }
         let planning = test.plan_test("reqresp: client launch", true);
+        let mut launch_failures = Vec::new();
 
         for client in &clients {
             if !planning {
                 let environment = lean_environment();
-                let launch_client =
-                    start_client_under_test(test, client.name.clone(), environment).await;
-                if let Err(err) = launch_client.stop().await {
-                    eprintln!(
-                        "Unable to stop reqresp launch-attribution client {}: {err}",
-                        client.name
-                    );
+                match try_start_client_under_test(test, client.name.clone(), environment).await {
+                    Ok(launch_client) => {
+                        if let Err(err) = launch_client.stop().await {
+                            eprintln!(
+                                "Unable to stop reqresp launch-attribution client {}: {err}",
+                                client.name
+                            );
+                        }
+                    }
+                    Err(message) => {
+                        eprintln!("{message}");
+                        launch_failures.push(message);
+                    }
                 }
             }
 
@@ -714,6 +721,13 @@ dyn_async! {
 
 
 
+        }
+
+        if !launch_failures.is_empty() {
+            panic!(
+                "One or more reqresp launch-attribution clients failed; all reqresp child tests were still scheduled:\n{}",
+                launch_failures.join("\n")
+            );
         }
     }
 }
