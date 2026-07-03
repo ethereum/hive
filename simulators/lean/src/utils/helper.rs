@@ -1747,17 +1747,22 @@ pub(crate) async fn start_client_under_test(
     client_type: String,
     environment: HashMap<String, String>,
 ) -> Client {
+    try_start_client_under_test(test, client_type, environment)
+        .await
+        .unwrap_or_else(|message| panic!("{message}"))
+}
+
+pub(crate) async fn try_start_client_under_test(
+    test: &Test,
+    client_type: String,
+    environment: HashMap<String, String>,
+) -> Result<Client, String> {
     let files = prepare_client_runtime_files(&client_type, &environment)
-        .unwrap_or_else(|err| panic!("Unable to prepare runtime assets for {client_type}: {err}"));
+        .map_err(|err| format!("Unable to prepare runtime assets for {client_type}: {err}"))?;
 
     start_client_under_test_attempt(test.clone(), client_type.clone(), environment, files)
         .await
-        .unwrap_or_else(|message| {
-            panic!(
-                "{}",
-                client_under_test_crash_message(&client_type, &message)
-            )
-        })
+        .map_err(|message| client_under_test_crash_message(&client_type, &message))
 }
 
 async fn start_checkpoint_sync_client_under_test(params: CheckpointSyncClientStart<'_>) -> Client {
