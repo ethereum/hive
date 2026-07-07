@@ -58,8 +58,9 @@ func main() {
 // generateCommand generates a test chain.
 func generateCommand(args []string) {
 	var (
-		cfg     generatorConfig
-		outlist = flag.String("outputs", "", "Enabled output modules")
+		cfg      generatorConfig
+		outlist  = flag.String("outputs", "", "Enabled output modules")
+		disabled = flag.String("disable-txmods", "", "Comma-separated list of tx modifiers to disable")
 	)
 	flag.IntVar(&cfg.chainLength, "length", 2, "The length of the pow chain to generate")
 	flag.Uint64Var(&cfg.gasLimit, "gaslimit", defaultGasLimit, "Block gas limit of the chain")
@@ -77,6 +78,12 @@ func generateCommand(args []string) {
 			cfg.outputs = outputFunctionNames()
 		}
 		cfg.outputs = splitAndTrim(*outlist)
+	}
+	for _, name := range splitAndTrim(*disabled) {
+		if _, ok := modRegistry[name]; !ok {
+			fatal(fmt.Errorf("unknown tx modifier %q", name))
+		}
+		cfg.disabledMods = append(cfg.disabledMods, name)
 	}
 
 	cfg, err := cfg.withDefaults()
