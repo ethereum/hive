@@ -1,4 +1,4 @@
-ARG baseimage=piertwo/lantern
+ARG baseimage=bitminemavan/lantern
 ARG devnet4_tag=v0.0.4
 ARG devnet5_tag=devnet-5
 
