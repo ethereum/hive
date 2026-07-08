@@ -1,4 +1,6 @@
-use crate::types::{ClientDefinition, StartNodeResponse, SuiteID, TestID, TestRequest, TestResult};
+use crate::types::{
+    ApiError, ClientDefinition, StartNodeResponse, SuiteID, TestID, TestRequest, TestResult,
+};
 use crate::TestMatcher;
 use std::collections::HashMap;
 use std::env;
@@ -248,15 +250,23 @@ impl Simulation {
             }
         }
 
-        let resp = client
+        let response = client
             .post(url)
             .multipart(form)
             .send()
             .await
-            .expect("Failed to send start client request")
-            .json::<StartNodeResponse>()
+            .expect("Failed to send start client request");
+        let status = response.status();
+        let body = response
+            .bytes()
             .await
-            .expect("Failed to convert start node response to json");
+            .expect("Failed to read start client response body");
+
+        // Surface hive's real error (e.g. "client did not start: ...") rather
+        // than the opaque serde "missing field `id`" that results from blindly
+        // decoding an error body as a StartNodeResponse.
+        let resp = parse_start_node_response(status, &body)
+            .unwrap_or_else(|err| panic!("Failed to start client: {err}"));
 
         let ip = IpAddr::from_str(&resp.ip).expect("Failed to decode IpAddr from string");
 
@@ -388,6 +398,37 @@ impl Simulation {
     }
 }
 
+/// Interpret hive's response to a start-client request.
+///
+/// On success hive returns HTTP 200 with a [`StartNodeResponse`]
+/// (`{"id","ip"}`). On failure it returns a non-2xx status with an
+/// [`ApiError`] body (`{"error": "..."}`) whose message is the actual cause,
+/// e.g. `client did not start: ...` when the container exits during startup
+/// (see `startClient`/`serveError` in hive's `internal/libhive/api.go`).
+///
+/// Decoding every response as a [`StartNodeResponse`] regardless of status
+/// turns that real failure into an opaque serde `missing field \`id\`` error,
+/// so extract hive's own message (falling back to the raw body) instead.
+fn parse_start_node_response(
+    status: reqwest::StatusCode,
+    body: &[u8],
+) -> Result<StartNodeResponse, String> {
+    if status.is_success() {
+        if let Ok(resp) = serde_json::from_slice::<StartNodeResponse>(body) {
+            return Ok(resp);
+        }
+    }
+
+    let detail = serde_json::from_slice::<ApiError>(body)
+        .map(|api_err| api_err.error)
+        .unwrap_or_else(|_| String::from_utf8_lossy(body).trim().to_string());
+
+    Err(format!(
+        "hive rejected start-client request (HTTP {}): {detail}",
+        status.as_u16()
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,6 +462,45 @@ mod tests {
             }
         });
         (format!("http://{addr}"), hits, handle)
+    }
+
+    #[test]
+    fn parse_start_node_response_success() {
+        let body = br#"{"id":"abc123","ip":"172.17.0.4"}"#;
+        let resp = parse_start_node_response(reqwest::StatusCode::OK, body)
+            .expect("valid StartNodeResponse should parse");
+        assert_eq!(resp.id, "abc123");
+        assert_eq!(resp.ip, "172.17.0.4");
+    }
+
+    #[test]
+    fn parse_start_node_response_surfaces_backend_error() {
+        // Mirrors hive's serveError body when the container exits during startup.
+        let body = br#"{"error":"client did not start: container exited"}"#;
+        let err = parse_start_node_response(reqwest::StatusCode::INTERNAL_SERVER_ERROR, body)
+            .expect_err("an error body must not be treated as success");
+        assert!(
+            err.contains("client did not start: container exited"),
+            "should surface hive's message, got: {err}"
+        );
+        assert!(err.contains("500"), "should include the status, got: {err}");
+        // Regression guard: the old code masked this as serde's "missing field `id`".
+        assert!(
+            !err.contains("missing field"),
+            "must not leak the serde decode error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_start_node_response_falls_back_to_raw_body() {
+        // A non-JSON error body (e.g. from a proxy) is surfaced verbatim.
+        let body = b"502 upstream unavailable";
+        let err = parse_start_node_response(reqwest::StatusCode::BAD_GATEWAY, body)
+            .expect_err("non-success status must be an error");
+        assert!(
+            err.contains("502 upstream unavailable"),
+            "should include the raw body, got: {err}"
+        );
     }
 
     #[tokio::test]

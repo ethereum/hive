@@ -10,6 +10,15 @@ pub struct StartNodeResponse {
     pub ip: String, // IP address in bridge network
 }
 
+/// ApiError mirrors the JSON body hive's API returns for a failed request
+/// (`{"error": "..."}`, see `serveError` in `internal/libhive/api.go`). The
+/// start-client endpoint returns it with a non-2xx status when the container
+/// cannot be created or exits during startup (e.g. `client did not start: ...`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ApiError {
+    pub error: String,
+}
+
 // ClientMetadata is part of the ClientDefinition and lists metadata
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClientMetadata {
