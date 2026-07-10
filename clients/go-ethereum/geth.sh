@@ -49,6 +49,12 @@ set -e
 geth=/usr/local/bin/geth
 FLAGS="--state.scheme=path"
 
+# Raise geth's engine API reorg depth limit (default 32) for simulators that
+# rewind deeply, e.g. consume-enginex; geth without the flag ignores the var.
+if [ "$HIVE_EXPECT_DEEP_REORGS" != "" ]; then
+    export GETH_ENGINE_MAXREORGDEPTH=512
+fi
+
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
 fi
