@@ -6,6 +6,12 @@ set -ex
 # no ansi colors
 export RUST_LOG_STYLE=never
 
+# EEST consume-enginex reuses one client across tests in the same pre-allocation
+# group and resets it to genesis between tests; allow rewinds deeper than the
+# 128-block default. Ethrex builds without --max-reorg-depth support ignore this
+# variable.
+export ETHREX_MAX_REORG_DEPTH=512
+
 ethrex=./ethrex
 
 # Configure the chain.
