@@ -9,15 +9,80 @@ use crate::utils::util::{
 };
 use alloy_primitives::B256;
 use hivesim::{dyn_async, Client, Test};
+use libp2p::gossipsub::IdentTopic;
 use ssz::Encode;
 use std::time::Duration;
-use tokio::time::sleep;
 
 const REQRESP_LIBP2P_TIMEOUT_SECS: u64 = 30;
 
 // Suite: validation
 // Tests that clients properly validate blocks,
 // rejecting invalid data according to the lean consensus spec.
+
+async fn setup_mock_for_validation(clients: Vec<Client>) -> (MockNode, Client, IdentTopic) {
+    let client = expect_single_client(clients);
+    let client_type = client.kind.clone();
+    let test = client.test.clone();
+
+    let mut mock = MockNode::new().expect("failed to create mock node");
+    let listen_addr = mock
+        .get_listen_address()
+        .await
+        .expect("mock node should bind to an address");
+
+    let _mock_peer_id = mock.local_peer_id();
+    let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
+    let (ip, port) =
+        extract_ip_port(&external_addr).expect("mock listen address should have IP and port");
+    let mock_enr = mock
+        .enr_string(
+            match ip {
+                std::net::IpAddr::V4(v4) => v4,
+                _ => panic!("expected IPv4"),
+            },
+            port,
+        )
+        .expect("should generate ENR for mock node");
+
+    let fork_digest = if selected_lean_devnet().uses_latest_leanspec_format() {
+        "12345678"
+    } else {
+        "devnet0"
+    };
+    let block_topic = lean_block_topic(fork_digest);
+    mock.subscribe(&block_topic)
+        .expect("mock node should subscribe to block topic");
+
+    let mut environment = lean_environment();
+    environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
+
+    let files = prepare_client_runtime_files(&client_type, &environment)
+        .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
+
+    let client = test
+        .start_client_with_files(client_type, Some(environment), Some(files))
+        .await;
+
+    let (_peer, _req_id, request, channel) = tokio::time::timeout(
+        Duration::from_secs(REQRESP_LIBP2P_TIMEOUT_SECS),
+        mock.wait_for_request(),
+    )
+    .await
+    .expect("client should connect and send a request")
+    .expect("mock should receive a request");
+
+    let decompressed = decode_request(&request).expect("should be able to decode request");
+    let client_status = Status::from_ssz_bytes(&decompressed)
+        .expect("first request should be a valid Status message");
+
+    mock.send_response(
+        channel,
+        vec![(RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())],
+    )
+    .expect("should send valid test response");
+
+    (mock, client, block_topic)
+}
 
 dyn_async! {
     pub async fn run_validation_lean_test_suite<'a>(test: &'a mut Test, _client: Option<Client>) {
@@ -67,57 +132,9 @@ dyn_async! {
 
 dyn_async! {
     async fn test_rejects_invalid_proposer<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
-        let client_type = client.kind.clone();
-        let test = client.test.clone();
 
-        let mut mock = MockNode::new().expect("failed to create mock node");
-        let listen_addr = mock.get_listen_address().await
-            .expect("mock node should bind to an address");
-        let _mock_peer_id = mock.local_peer_id();
-        let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
-        let (ip, port) = extract_ip_port(&external_addr)
-            .expect("mock listen address should have IP and port");
-        let mock_enr = mock.enr_string(
-            match ip {
-                std::net::IpAddr::V4(v4) => v4,
-                _ => panic!("expected IPv4"),
-            },
-            port,
-        ).expect("should generate ENR for mock node");
-
-        let fork_digest = if selected_lean_devnet().uses_latest_leanspec_format() {
-            "12345678"
-        } else {
-            "devnet0"
-        };
-        let block_topic = lean_block_topic(fork_digest);
-        mock.subscribe(&block_topic).expect("mock should subscribe to block topic");
-
-        let mut environment = lean_environment();
-        environment.insert("HIVE_BOOTNODES".to_string(), mock_enr.clone());
-        let files = prepare_client_runtime_files(
-            &client_type, &environment)
-            .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
-        let client = test.start_client_with_files(client_type, Some(environment), Some(files)).await;
-
-
-        let (_peer, _req_id, request, channel) = tokio::time::timeout(
-            Duration::from_secs(REQRESP_LIBP2P_TIMEOUT_SECS),
-            mock.wait_for_request()
-        ).await
-            .expect("client should connect and send a request")
-            .expect("mock should receive a request");
-
-        let decompressed = decode_request(&request)
-            .expect("should be able to decode request");
-        let client_status = Status::from_ssz_bytes(&decompressed)
-            .expect("first request should be a valid Status message");
-
-        // Echo the client's Status so it thinks we're on the same chain.
-        mock.send_response(channel, vec![
-            (RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())
-        ]).expect("should send valid status response");
+        let (mut mock, client, block_topic) =
+    setup_mock_for_validation(clients).await;
 
         mock.process_events_for(Duration::from_secs(3)).await;
 
@@ -144,56 +161,8 @@ dyn_async! {
 
 dyn_async! {
     async fn test_rejects_invalid_parent_root<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
-        let client_type = client.kind.clone();
-        let test = client.test.clone();
-
-        let mut mock = MockNode::new().expect("failed to create mock node");
-        let listen_addr = mock.get_listen_address().await
-            .expect("mock node should bind to an address");
-        let _mock_peer_id = mock.local_peer_id();
-        let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
-        let (ip, port) = extract_ip_port(&external_addr)
-            .expect("mock listen address should have IP and port");
-        let mock_enr = mock.enr_string(
-            match ip {
-                std::net::IpAddr::V4(v4) => v4,
-                _ => panic!("expected IPv4"),
-            },
-            port,
-        ).expect("should generate ENR for mock node");
-
-        let fork_digest = if selected_lean_devnet().uses_latest_leanspec_format() {
-            "12345678"
-        } else {
-            "devnet0"
-        };
-        let block_topic = lean_block_topic(fork_digest);
-        mock.subscribe(&block_topic).expect("mock should subscribe to block topic");
-
-        let mut environment = lean_environment();
-        environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
-        let files = prepare_client_runtime_files(
-            &client_type, &environment)
-            .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
-        let client = test.start_client_with_files(client_type, Some(environment), Some(files)).await;
-
-        let (_peer, _req_id, request, channel) = tokio::time::timeout(
-            Duration::from_secs(REQRESP_LIBP2P_TIMEOUT_SECS),
-            mock.wait_for_request()
-        ).await
-            .expect("client should connect and send a request")
-            .expect("mock should receive a request");
-
-        let decompressed = decode_request(&request)
-            .expect("should be able to decode request");
-        let client_status = Status::from_ssz_bytes(&decompressed)
-            .expect("first request should be a valid Status message");
-
-        // Echo the client's Status so it thinks we're on the same chain.
-        mock.send_response(channel, vec![
-            (RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())
-        ]).expect("should send valid status response");
+        let (mut mock, client, block_topic) =
+    setup_mock_for_validation(clients).await;
 
         mock.process_events_for(Duration::from_secs(3)).await;
 
@@ -204,7 +173,7 @@ dyn_async! {
         mock.publish(block_topic, block_bytes)
             .expect("should publish invalid block");
 
-        sleep(Duration::from_secs(5)).await;
+        mock.process_events_for(Duration::from_secs(5)).await;
 
         let fork_choice = load_fork_choice_response(&client).await;
         assert_eq!(
@@ -220,56 +189,8 @@ dyn_async! {
 
 dyn_async! {
     async fn test_rejects_invalid_state_root<'a>(clients: Vec<Client>, _: ()) {
-        let client = expect_single_client(clients);
-        let client_type = client.kind.clone();
-        let test = client.test.clone();
-
-        let mut mock = MockNode::new().expect("failed to create mock node");
-        let listen_addr = mock.get_listen_address().await
-            .expect("mock node should bind to an address");
-        let _mock_peer_id = mock.local_peer_id();
-        let external_addr = replace_multiaddr_ip(&listen_addr, simulator_container_ip());
-        let (ip, port) = extract_ip_port(&external_addr)
-            .expect("mock listen address should have IP and port");
-        let mock_enr = mock.enr_string(
-            match ip {
-                std::net::IpAddr::V4(v4) => v4,
-                _ => panic!("expected IPv4"),
-            },
-            port,
-        ).expect("should generate ENR for mock node");
-
-        let fork_digest = if selected_lean_devnet().uses_latest_leanspec_format() {
-            "12345678"
-        } else {
-            "devnet0"
-        };
-        let block_topic = lean_block_topic(fork_digest);
-        mock.subscribe(&block_topic).expect("mock should subscribe to block topic");
-
-        let mut environment = lean_environment();
-        environment.insert("HIVE_BOOTNODES".to_string(), mock_enr);
-        let files = prepare_client_runtime_files(
-            &client_type, &environment)
-            .unwrap_or_else(|e| panic!("failed to prepare client files: {e}"));
-        let client = test.start_client_with_files(client_type, Some(environment), Some(files)).await;
-
-        let (_peer, _req_id, request, channel) = tokio::time::timeout(
-            Duration::from_secs(REQRESP_LIBP2P_TIMEOUT_SECS),
-            mock.wait_for_request()
-        ).await
-            .expect("client should connect and send a request")
-            .expect("mock should receive a request");
-
-        let decompressed = decode_request(&request)
-            .expect("should be able to decode request");
-        let client_status = Status::from_ssz_bytes(&decompressed)
-            .expect("first request should be a valid Status message");
-
-        // Echo the client's Status so it thinks we're on the same chain.
-        mock.send_response(channel, vec![
-            (RESPONSE_CODE_SUCCESS, client_status.as_ssz_bytes())
-        ]).expect("should send valid status response");
+        let (mut mock, client, block_topic) =
+    setup_mock_for_validation(clients).await;
 
         mock.process_events_for(Duration::from_secs(3)).await;
 
@@ -280,7 +201,7 @@ dyn_async! {
         mock.publish(block_topic, block_bytes)
             .expect("should publish invalid block");
 
-        sleep(Duration::from_secs(5)).await;
+        mock.process_events_for(Duration::from_secs(5)).await;
 
         let fork_choice = load_fork_choice_response(&client).await;
         assert_eq!(
