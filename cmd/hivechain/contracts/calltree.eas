@@ -1,0 +1,130 @@
+;;; -*- mode: asm -*-
+;;; This contract exercises every callTracer frame type in one invocation;
+;;; see the numbered sections. Callee addresses are genesis predeploys and
+;;; must match genesis.go.
+
+#pragma target "london"
+
+#define callmeAddr     = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d1
+#define callenvAddr    = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d2
+#define callrevertAddr = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d3
+#define emitAddr       = 0x7dcd17433742f4c0ca53122ab541d0ba67fc27df
+#define identityAddr   = 0x04
+
+;;; 1: CALL callme with its expected input and 1 wei -> success frame with output
+    push 0xff01 << (30*8)       ; [word]
+    push 0                      ; [offset, word]
+    mstore                      ; []
+    push 32                     ; [retSize]
+    push 0x100                  ; [retOff, retSize]
+    push 2                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push 1                      ; [value, argsOff, argsSize, retOff, retSize]
+    push callmeAddr             ; [addr, value, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, value, argsOff, argsSize, retOff, retSize]
+    call                        ; [success]
+    pop                         ; []
+
+;;; 2: CALL callrevert with a non-zero word -> Error("user error") revert frame
+    push 1                      ; [word]
+    push 0                      ; [offset, word]
+    mstore                      ; []
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 32                     ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push 0                      ; [value, argsOff, argsSize, retOff, retSize]
+    push callrevertAddr         ; [addr, value, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, value, argsOff, argsSize, retOff, retSize]
+    call                        ; [success]
+    pop                         ; []
+
+;;; 3: STATICCALL callenv -> successful STATICCALL frame
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 0                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push callenvAddr            ; [addr, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, argsOff, argsSize, retOff, retSize]
+    staticcall                  ; [success]
+    pop                         ; []
+
+;;; 4: STATICCALL emit -> write-protection failure frame (emit does SSTORE)
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 0                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push emitAddr               ; [addr, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, argsOff, argsSize, retOff, retSize]
+    staticcall                  ; [success]
+    pop                         ; []
+
+;;; 5: DELEGATECALL emit -> depth-2 log attributed to this contract
+    push 0                      ; [word] pin calldata (previously read section 2's residual memory)
+    push 0                      ; [offset, word]
+    mstore                      ; []
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 4                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push emitAddr               ; [addr, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, argsOff, argsSize, retOff, retSize]
+    delegatecall                ; [success]
+    pop                         ; []
+
+;;; 6: CALLCODE callme with its expected input -> CALLCODE frame
+    push 0xff01 << (30*8)       ; [word]
+    push 0                      ; [offset, word]
+    mstore                      ; []
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 2                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push 0                      ; [value, argsOff, argsSize, retOff, retSize]
+    push callmeAddr             ; [addr, value, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, value, argsOff, argsSize, retOff, retSize]
+    callcode                    ; [success]
+    pop                         ; []
+
+;;; 7: CALL identity precompile -> precompile frame
+    push 0                      ; [retSize]
+    push 0                      ; [retOff, retSize]
+    push 4                      ; [argsSize, retOff, retSize]
+    push 0                      ; [argsOff, argsSize, retOff, retSize]
+    push 0                      ; [value, argsOff, argsSize, retOff, retSize]
+    push identityAddr           ; [addr, value, argsOff, argsSize, retOff, retSize]
+    push 60000                  ; [gas, addr, value, argsOff, argsSize, retOff, retSize]
+    call                        ; [success]
+    pop                         ; []
+
+;;; 8: CREATE a child that emits a log and self-destructs
+    push @childcode             ; [codeoff]
+    codesize                    ; [codesize, codeoff]
+    sub                         ; [size]
+    dup1                        ; [size, size]
+    push @childcode             ; [codeoff, size, size]
+    push 0x200                  ; [memoff, codeoff, size, size]
+    codecopy                    ; [size]
+    push 0x200                  ; [offset, size]
+    push 0                      ; [value, offset, size]
+    create                      ; [addr]
+    pop                         ; []
+
+;;; 9: top-level LOG1
+    push "tree"                 ; [topic]
+    push 0                      ; [size, topic]
+    push 0                      ; [offset, size, topic]
+    log1                        ; []
+
+;;; return callme's output (2 bytes)
+    push 2                      ; [size]
+    push 0x100                  ; [offset, size]
+    return                      ; []
+
+childcode:
+    push "child"                ; [topic]
+    push 0                      ; [size, topic]
+    push 0                      ; [offset, size, topic]
+    log1                        ; []
+    caller                      ; [addr]
+    selfdestruct                ; []

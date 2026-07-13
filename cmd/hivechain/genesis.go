@@ -194,6 +194,16 @@ func addSnapTestContract(ga types.GenesisAlloc) {
 const (
 	emitAddr      = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
 	largeLogsAddr = "0x8dcd17433742f4c0ca53122ab541d0ba67fc27ff"
+
+	// calltree and its fixed-address callees; the callee addresses are
+	// hardcoded in contracts/calltree.eas. The callees are predeployed
+	// (rather than reusing the deploy-* mods' instances) because deployment
+	// addresses depend on modifier scheduling and cannot be baked into
+	// committed bytecode.
+	calltreeAddr           = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d0"
+	calltreeCallmeAddr     = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d1"
+	calltreeCallenvAddr    = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d2"
+	calltreeCallrevertAddr = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d3"
 )
 
 // addModContracts adds the contracts used by block modifiers.
@@ -204,6 +214,23 @@ func addModContracts(ga types.GenesisAlloc) {
 	}
 	ga[common.HexToAddress(largeLogsAddr)] = types.Account{
 		Code:    modLargeReceiptCode,
+		Balance: new(big.Int),
+	}
+	// calltree carries a balance so it can attach value to its subcalls.
+	ga[common.HexToAddress(calltreeAddr)] = types.Account{
+		Code:    calltreeCode,
+		Balance: big.NewInt(1000000000),
+	}
+	ga[common.HexToAddress(calltreeCallmeAddr)] = types.Account{
+		Code:    callmeCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(calltreeCallenvAddr)] = types.Account{
+		Code:    callenvCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(calltreeCallrevertAddr)] = types.Account{
+		Code:    callrevertCode,
 		Balance: new(big.Int),
 	}
 }
