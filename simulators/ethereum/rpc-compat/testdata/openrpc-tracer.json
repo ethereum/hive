@@ -1,0 +1,77 @@
+{
+  "openrpc": "1.2.4",
+  "info": {"title": "tracer schema test fixture", "version": "1.0.0"},
+  "methods": [
+    {
+      "name": "debug_traceTransaction",
+      "params": [],
+      "result": {
+        "name": "Transaction trace",
+        "schema": {
+          "anyOf": [
+            {
+              "title": "Opcode tracer result",
+              "type": "object",
+              "required": ["structLogs"],
+              "properties": {"structLogs": {"type": "array"}}
+            },
+            {
+              "title": "Call tracer result",
+              "$id": "https://example.org/callframe",
+              "type": "object",
+              "required": ["type", "from"],
+              "properties": {
+                "type": {"type": "string"},
+                "from": {"type": "string"},
+                "calls": {"type": "array", "items": {"$ref": "https://example.org/callframe"}}
+              }
+            },
+            {
+              "title": "Named tracer result",
+              "description": "any JSON value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "debug_traceBlockByNumber",
+      "params": [],
+      "result": {
+        "name": "Block trace",
+        "schema": {
+          "title": "Array of per-transaction traces",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "title": "Opcode tracer entry",
+                "type": "object",
+                "required": ["txHash", "result"]
+              },
+              {
+                "title": "Call tracer entry",
+                "type": "object",
+                "required": ["txHash"],
+                "anyOf": [{"required": ["result"]}, {"required": ["error"]}]
+              },
+              {
+                "title": "Named tracer entry",
+                "type": "object",
+                "required": ["txHash"]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "eth_call",
+      "params": [],
+      "result": {
+        "name": "Return data",
+        "schema": {"type": "string"}
+      }
+    }
+  ]
+}

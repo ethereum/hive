@@ -14,7 +14,7 @@ func TestCapabilitiesSchemaValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseSpec: %v", err)
 	}
-	schema := schemas["eth_capabilities"]
+	schema := schemas.full["eth_capabilities"]
 	if schema == nil {
 		t.Fatal("no schema for eth_capabilities")
 	}
