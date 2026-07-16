@@ -77,12 +77,6 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 		Versions: s.ClientVersions,
 	}
 	for _, test := range s.TestCases {
-		e.NTests++
-		if test.SummaryResult.Pass {
-			e.Passes++
-		} else {
-			e.Fails++
-		}
 		if test.SummaryResult.Timeout {
 			e.Timeout = true
 		}
@@ -93,6 +87,17 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 			if !slices.Contains(e.Clients, client.Name) {
 				e.Clients = append(e.Clients, client.Name)
 			}
+		}
+		// Multi-test context entries own the lifecycle of clients shared
+		// across tests; they are infrastructure, not test results.
+		if test.MultiTestContext {
+			continue
+		}
+		e.NTests++
+		if test.SummaryResult.Pass {
+			e.Passes++
+		} else {
+			e.Fails++
 		}
 	}
 	return e
