@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -80,10 +81,22 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 
 	b.logger.Info("building image", "image", name, "nocache", opts.NoCache, "pull", b.config.PullEnabled)
 	if err := b.client.BuildImage(opts); err != nil {
-		b.logger.Error("image build failed", "image", name, "err", err)
+		if imageAlreadyExists(err) {
+			b.logger.Info("image already exists", "image", name)
+		} else {
+			b.logger.Error("image build failed", "image", name, "err", err)
+		}
 		return err
 	}
 	return nil
+}
+
+// imageAlreadyExists reports whether a build failed only because a concurrent
+// hive process already produced the identical image, a benign cross-process
+// race when multiple simulations share one Docker daemon.
+func imageAlreadyExists(err error) bool {
+	ok, _ := regexp.MatchString("\\bAlreadyExists: ", err.Error())
+	return ok
 }
 
 func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
