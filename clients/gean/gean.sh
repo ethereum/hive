@@ -9,7 +9,16 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
+# Require the devnet label explicitly. A silent default once let the devnet4
+# binary run against a devnet5 network: the node starts, peers, and only
+# diverges at consensus, which is slow to trace back to a wrapper default. The
+# lean simulator always sets this, so demanding it costs nothing and closes the
+# footgun.
+if [ -z "${HIVE_LEAN_DEVNET_LABEL:-}" ]; then
+    echo "HIVE_LEAN_DEVNET_LABEL is not set; expected 'devnet4' or 'devnet5'" >&2
+    exit 1
+fi
+DEVNET_LABEL="$HIVE_LEAN_DEVNET_LABEL"
 NODE_ID="${HIVE_NODE_ID:-gean_0}"
 BOOTNODES="${HIVE_BOOTNODES:-none}"
 ASSET_ROOT="/tmp/gean-runtime"
@@ -54,6 +63,13 @@ case "$DEVNET_LABEL" in
 esac
 
 GEAN_BIN="${GEAN_BIN:-$DEFAULT_GEAN_BIN}"
+
+# A mispackaged image (label resolved to a binary the build never produced)
+# should fail here with a clear message rather than at exec with an opaque one.
+if [ ! -x "$GEAN_BIN" ]; then
+    echo "gean binary for '$DEVNET_LABEL' missing or not executable at $GEAN_BIN" >&2
+    exit 1
+fi
 
 cleanup() {
     if [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
