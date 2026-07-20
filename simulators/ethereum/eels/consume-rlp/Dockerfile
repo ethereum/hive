@@ -7,7 +7,7 @@ ENV FIXTURES=${fixtures}
 ARG branch=""
 
 ## Clone and install EELS
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git isal
 
 # Clone repo and use the default branch if none specified
 RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
@@ -18,13 +18,23 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
     fi
 
 WORKDIR /execution-specs/packages/testing
-
-# Cache the fixtures. This is done to avoid re-downloading the fixtures every time
-# the container starts.
-# If newer version of the fixtures is needed, the image needs to be rebuilt.
-# Use `--docker.nocache` flag to force rebuild.
-RUN uv run consume cache --input "$FIXTURES"
 RUN uv sync
 
+# Optionally keep pre-staged fixtures compressed in the image. A caller that
+# stages ./fixtures.tar.gz and passes fixtures=/fixtures gets the local fixtures;
+# otherwise FIXTURES stays a release/URL and consume downloads as before. The
+# `Dockerfile` anchor keeps COPY from failing when no tarball is staged.
+COPY Dockerfile fixtures.tar.gz* /staged/
+RUN rm -f /staged/Dockerfile && \
+    if [ "$FIXTURES" != /fixtures ] || [ ! -f /staged/fixtures.tar.gz ]; then \
+        rm -rf /staged && uv run --no-sync consume cache --input "$FIXTURES"; \
+    fi
+
 ## Define `consume rlp` entry point using the local fixtures
-ENTRYPOINT uv run consume rlp -v --input "$FIXTURES"
+ENTRYPOINT if [ "$FIXTURES" = /fixtures ] && [ -f /staged/fixtures.tar.gz ]; then \
+        mkdir -p /fixtures && \
+        igzip -d -c /staged/fixtures.tar.gz | \
+            tar -xf - -C /fixtures --strip-components=1 \
+                fixtures/.meta fixtures/blockchain_tests; \
+    fi && \
+    exec uv run --no-sync consume rlp -v --input "$FIXTURES"
