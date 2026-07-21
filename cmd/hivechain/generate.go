@@ -28,11 +28,12 @@ type generatorConfig struct {
 	merged       bool   // create a proof-of-stake chain
 
 	// chain options
-	txInterval        int    // frequency of blocks containing transactions
-	txCount           int    // number of txs in block
-	chainLength       int    // number of generated blocks
-	gasLimit          uint64 // block gas limit
-	finalizedDistance int    // distance of finalized block from head
+	txInterval        int      // frequency of blocks containing transactions
+	txCount           int      // number of txs in block
+	chainLength       int      // number of generated blocks
+	gasLimit          uint64   // block gas limit
+	finalizedDistance int      // distance of finalized block from head
+	disabledMods      []string // tx modifiers to skip
 
 	// output options
 	outputs   []string // enabled outputs
@@ -99,6 +100,9 @@ func newGenerator(cfg generatorConfig) *generator {
 
 func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 	for name, new := range modRegistry {
+		if slices.Contains(cfg.disabledMods, name) {
+			continue
+		}
 		list = append(list, &modifierInstance{
 			name:          name,
 			blockModifier: new(),

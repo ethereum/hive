@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // writeForkEnv writes chain fork configuration in the form that hive expects.
@@ -50,19 +52,24 @@ func (g *generator) writeForkEnv() error {
 	setTime("HIVE_SHANGHAI_TIMESTAMP", cfg.ShanghaiTime)
 	setTime("HIVE_CANCUN_TIMESTAMP", cfg.CancunTime)
 	setTime("HIVE_PRAGUE_TIMESTAMP", cfg.PragueTime)
+	setTime("HIVE_OSAKA_TIMESTAMP", cfg.OsakaTime)
+	setTime("HIVE_BPO1_TIMESTAMP", cfg.BPO1Time)
+	setTime("HIVE_BPO2_TIMESTAMP", cfg.BPO2Time)
 
 	// blob schedule
+	setBlobConfig := func(fork string, bc *params.BlobConfig) {
+		if bc != nil {
+			env["HIVE_"+fork+"_BLOB_TARGET"] = fmt.Sprint(bc.Target)
+			env["HIVE_"+fork+"_BLOB_MAX"] = fmt.Sprint(bc.Max)
+			env["HIVE_"+fork+"_BLOB_BASE_FEE_UPDATE_FRACTION"] = fmt.Sprint(bc.UpdateFraction)
+		}
+	}
 	if cfg.BlobScheduleConfig != nil {
-		if cfg.BlobScheduleConfig.Cancun != nil {
-			env["HIVE_CANCUN_BLOB_TARGET"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.Target)
-			env["HIVE_CANCUN_BLOB_MAX"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.Max)
-			env["HIVE_CANCUN_BLOB_BASE_FEE_UPDATE_FRACTION"] = fmt.Sprint(cfg.BlobScheduleConfig.Cancun.UpdateFraction)
-		}
-		if cfg.BlobScheduleConfig.Prague != nil {
-			env["HIVE_PRAGUE_BLOB_TARGET"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.Target)
-			env["HIVE_PRAGUE_BLOB_MAX"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.Max)
-			env["HIVE_PRAGUE_BLOB_BASE_FEE_UPDATE_FRACTION"] = fmt.Sprint(cfg.BlobScheduleConfig.Prague.UpdateFraction)
-		}
+		setBlobConfig("CANCUN", cfg.BlobScheduleConfig.Cancun)
+		setBlobConfig("PRAGUE", cfg.BlobScheduleConfig.Prague)
+		setBlobConfig("OSAKA", cfg.BlobScheduleConfig.Osaka)
+		setBlobConfig("BPO1", cfg.BlobScheduleConfig.BPO1)
+		setBlobConfig("BPO2", cfg.BlobScheduleConfig.BPO2)
 	}
 
 	return g.writeJSON("forkenv.json", env)
