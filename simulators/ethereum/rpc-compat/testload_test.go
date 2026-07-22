@@ -6,6 +6,22 @@ import (
 	"testing"
 )
 
+func TestLoadLargeMessage(t *testing.T) {
+	const messageSize = 24 * 1024 * 1024
+	data := ">> {\"payload\":\"" + strings.Repeat("a", messageSize) + "\"}\n"
+
+	result, err := loadTestFile("large-message", strings.NewReader(data))
+	if err != nil {
+		t.Fatal("error:", err)
+	}
+	if len(result.messages) != 1 {
+		t.Fatalf("got %d messages, want 1", len(result.messages))
+	}
+	if !result.messages[0].send {
+		t.Fatal("large message was not parsed as a request")
+	}
+}
+
 func TestLoad(t *testing.T) {
 	data := `// this is a test comment
 // this is the second line
