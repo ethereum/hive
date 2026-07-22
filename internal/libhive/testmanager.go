@@ -541,22 +541,29 @@ func logFileSize(path string) int64 {
 	return info.Size()
 }
 
+type clientStop struct {
+	id   string
+	wait func()
+}
+
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
 	testSuite, ok := manager.runningTestSuites[suiteID]
 	if !ok {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSuchTestCase
 	}
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
 	if result == nil {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSummaryResult
 	}
 
@@ -578,17 +585,26 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		}
 	}
 
-	// Stop running clients.
+	// Claim still-running clients for stopping while holding the lock; the
+	// actual container removal happens after the lock is released, so
+	// concurrently running test cases are not blocked on the manager.
+	var stops []clientStop
 	for _, v := range testCase.ClientInfo {
 		if v.wait != nil {
-			manager.backend.DeleteContainer(v.ID)
-			v.wait()
+			stops = append(stops, clientStop{id: v.ID, wait: v.wait})
 			v.wait = nil
 		}
 	}
 
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
+	manager.testCaseMutex.Unlock()
+
+	// Stop the claimed clients.
+	for _, stop := range stops {
+		manager.backend.DeleteContainer(stop.id)
+		stop.wait()
+	}
 	return nil
 }
 
@@ -636,23 +652,36 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 // StopNode stops a client container.
 func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
-
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSuchNode
 	}
 	nodeInfo, ok := testCase.ClientInfo[nodeID]
 	if !ok {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSuchNode
 	}
+	// Claim the node for stopping while holding the lock, then release it:
+	// container removal can take a while and must not block API calls of
+	// concurrently running test cases.
+	stop := clientStop{id: nodeInfo.ID, wait: nodeInfo.wait}
+	nodeInfo.wait = nil
+	manager.testCaseMutex.Unlock()
+
 	// Stop the container.
-	if nodeInfo.wait != nil {
-		if err := manager.backend.DeleteContainer(nodeInfo.ID); err != nil {
+	if stop.wait != nil {
+		if err := manager.backend.DeleteContainer(stop.id); err != nil {
+			// Keep the node stoppable when removal fails. This also preserves
+			// EndTest's ability to clean it up on a later attempt.
+			manager.testCaseMutex.Lock()
+			if nodeInfo.wait == nil {
+				nodeInfo.wait = stop.wait
+			}
+			manager.testCaseMutex.Unlock()
 			return fmt.Errorf("unable to stop client: %v", err)
 		}
-		nodeInfo.wait()
-		nodeInfo.wait = nil
+		stop.wait()
 	}
 	return nil
 }
