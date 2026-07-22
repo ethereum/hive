@@ -13,6 +13,8 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+const maxTestLineSize = 32 * 1024 * 1024 // Large-receipt fixtures can contain JSON lines larger than 20 MiB.
+
 type rpcTest struct {
 	name     string
 	comment  string
@@ -34,7 +36,7 @@ func loadTestFile(name string, r io.Reader) (rpcTest, error) {
 		inHeader = true
 		test     = rpcTest{name: name}
 	)
-	scan.Buffer(buf, 1024*1024)
+	scan.Buffer(buf, maxTestLineSize)
 	for scan.Scan() {
 		line := strings.TrimSpace(scan.Text())
 		switch {
