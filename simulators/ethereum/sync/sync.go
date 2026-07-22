@@ -45,7 +45,7 @@ Each client runs as a source for all other clients (including itself).`,
 		Role:        "eth1_snap",
 		Name:        "CLIENT as snap-sync server",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
-		Parameters:  params,
+		Parameters:  snapParams,
 		Files:       sourceFiles,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
 			runSourceTest(t, c, "eth1_snap", snapParams)
