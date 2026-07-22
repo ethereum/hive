@@ -18,6 +18,15 @@ jobs:
     steps:
       # Build it.
       - checkout
+      - run:
+          name: "Check gofmt"
+          command: |
+            unformatted=$(gofmt -l .)
+            if [ -n "$unformatted" ]; then
+              echo "These files are not gofmt-formatted; run 'gofmt -w .':"
+              echo "$unformatted"
+              exit 1
+            fi
       - go/load-cache
       - go/mod-download
       - go/save-cache
