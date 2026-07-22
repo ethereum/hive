@@ -32,6 +32,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	snapParams := params.Set("HIVE_NODETYPE", "snap")
+	fullParams := params.Set("HIVE_NODETYPE", "full")
 
 	// Run snap sync tests.
 	var snapSuite = hivesim.Suite{
@@ -46,8 +48,7 @@ Each client runs as a source for all other clients (including itself).`,
 		Parameters:  params,
 		Files:       sourceFiles,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
-			params = params.Set("HIVE_NODETYPE", "snap")
-			runSourceTest(t, c, "eth1_snap", params)
+			runSourceTest(t, c, "eth1_snap", snapParams)
 		},
 	})
 	sim := hivesim.New()
@@ -66,11 +67,10 @@ Each client runs as a source for all other clients (including itself).`,
 		Role:        "eth1",
 		Name:        "CLIENT as sync server",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
-		Parameters:  params,
+		Parameters:  fullParams,
 		Files:       sourceFiles,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
-			params = params.Set("HIVE_NODETYPE", "full")
-			runSourceTest(t, c, "eth1", params)
+			runSourceTest(t, c, "eth1", fullParams)
 		},
 	})
 	hivesim.MustRunSuite(hivesim.New(), fullSuite)
@@ -94,7 +94,7 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client, role string, params hivesim.
 	if err != nil {
 		t.Fatal("can't get node peer-to-peer endpoint:", enode)
 	}
-	sinkParams := params.Set("HIVE_BOOTNODE", enode)
+	sinkParams := params.Set("HIVE_BOOTNODE", enode).Set("HIVE_CHECK_LIVE_PORT", "8551")
 
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{

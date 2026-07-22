@@ -54,13 +54,6 @@ DATADIR="/reth-hive-datadir"
 mkdir $DATADIR
 FLAGS="$FLAGS --datadir $DATADIR"
 
-# TODO If a specific network ID is requested, use that
-#if [ "$HIVE_NETWORK_ID" != "" ]; then
-#    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
-#else
-#    FLAGS="$FLAGS --networkid 1337"
-#fi
-
 # Configure the chain.
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
@@ -116,10 +109,15 @@ else
     $reth import $FLAGS "${BLOCKS[-1]}"
 fi
 
-# Only set boot nodes in online steps
-# It doesn't make sense to dial out, use only a pre-set bootnode.
+# Hive provides a direct peer for the online sync tests.
 if [ "$HIVE_BOOTNODE" != "" ]; then
-    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE --trusted-peers=$HIVE_BOOTNODE"
+    FLAGS="$FLAGS --trusted-peers=$HIVE_BOOTNODE --trusted-only --disable-discovery"
+fi
+
+if [ "$HIVE_NETWORK_ID" != "" ]; then
+    FLAGS="$FLAGS --network-id=$HIVE_NETWORK_ID"
+else
+    FLAGS="$FLAGS --network-id=1337"
 fi
 
 # Configure any mining operation
@@ -172,4 +170,4 @@ fi
 
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
-RUST_LOG=info $reth node $FLAGS
+$reth node $FLAGS
