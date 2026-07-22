@@ -1,5 +1,5 @@
 use crate::utils::helper::{
-    start_post_genesis_sync_context, try_start_client_under_test, HelperGossipForkDigestProfile,
+    start_client_under_test, start_post_genesis_sync_context, HelperGossipForkDigestProfile,
     PostGenesisSyncTestData, LEAN_SPEC_SOURCE_VALIDATORS_EXCLUDING_V0,
 };
 use crate::utils::libp2p_mock::{
@@ -15,7 +15,7 @@ use crate::utils::util::{
     TimedDataTestSpec,
 };
 use alloy_primitives::B256;
-use hivesim::{dyn_async, Client, Test};
+use hivesim::{dyn_async, utils::client_test_name, Client, Test};
 use ssz::Encode;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -24,6 +24,10 @@ const POST_GENESIS_TEST_TIMEOUT: Duration = Duration::from_secs(8 * 60);
 const REQRESP_SYNC_TIMEOUT_SECS: u64 = 180;
 const STATUS_EXCHANGE_TIMEOUT_SECS: u64 = 60;
 const REQRESP_LIBP2P_TIMEOUT_SECS: u64 = 30;
+// Headroom over `CLIENT_UNDER_TEST_STARTUP_ATTEMPT_TIMEOUT_SECS` (helper.rs), so
+// `run_data_test_with_timeout`'s outer timeout never races the inner per-attempt
+// timeout used by `start_client_under_test`.
+const CLIENT_LAUNCH_ATTRIBUTION_TIMEOUT: Duration = Duration::from_secs(150);
 
 /// Dial a lean client from a MockNode using its deterministic PeerId and multiaddr.
 async fn dial_client(mock: &mut MockNode, client: &Client) -> Result<(), String> {
@@ -64,28 +68,31 @@ dyn_async! {
         if clients.is_empty() {
             panic!("No lean clients were selected for this run");
         }
-        let planning = test.plan_test("reqresp: client launch", true);
-        let mut launch_failures = Vec::new();
-
         for client in &clients {
-            if !planning {
-                let environment = lean_environment();
-                match try_start_client_under_test(test, client.name.clone(), environment).await {
-                    Ok(launch_client) => {
-                        if let Err(err) = launch_client.stop().await {
-                            eprintln!(
-                                "Unable to stop reqresp launch-attribution client {}: {err}",
-                                client.name
-                            );
-                        }
-                    }
-                    Err(message) => {
-                        eprintln!("{message}");
-                        launch_failures.push(message);
-                    }
-                }
-            }
-
+            // Attribute a launch failure to exactly the client that failed to
+            // boot. Each client gets its own `run_data_test_with_timeout` call
+            // below, which registers a fresh hive test id per client; hive's
+            // clientInfo for a test comes from which container(s) were started
+            // under that test id, so a per-client id means a boot failure by
+            // one client can no longer paint every other selected client as
+            // having a "client launch" failure too. This does not gate the
+            // child req/resp tests scheduled below: they still run
+            // unconditionally regardless of this smoke test's outcome.
+            run_data_test_with_timeout(
+                test,
+                TimedDataTestSpec {
+                    name: client_test_name("reqresp: client launch".to_string(), client.name.clone()),
+                    description: "Launches the client under test as a boot smoke test, attributed only to this client.".to_string(),
+                    always_run: true,
+                    client_name: client.name.clone(),
+                    timeout_duration: CLIENT_LAUNCH_ATTRIBUTION_TIMEOUT,
+                    test_data: LaunchAttributionTestData {
+                        client_type: client.name.clone(),
+                    },
+                },
+                test_reqresp_client_launch_attribution,
+            )
+            .await;
 
             let status_happy_genesis_time = default_genesis_time();
             run_data_test_with_timeout(
@@ -722,11 +729,28 @@ dyn_async! {
 
 
         }
+    }
+}
 
-        if !launch_failures.is_empty() {
-            panic!(
-                "One or more reqresp launch-attribution clients failed; all reqresp child tests were still scheduled:\n{}",
-                launch_failures.join("\n")
+// === LAUNCH ATTRIBUTION ===
+
+/// Test data for the per-client "reqresp: client launch" boot smoke test.
+struct LaunchAttributionTestData {
+    client_type: String,
+}
+
+dyn_async! {
+    async fn test_reqresp_client_launch_attribution<'a>(test: &'a mut Test, test_data: LaunchAttributionTestData) {
+        let environment = lean_environment();
+        // `start_client_under_test` panics with a message identifying
+        // `test_data.client_type` on failure; `run_data_test_with_timeout`
+        // catches that panic and reports it as this (single-client) test's
+        // failure, so the attribution stays scoped to this client only.
+        let launch_client = start_client_under_test(test, test_data.client_type.clone(), environment).await;
+        if let Err(err) = launch_client.stop().await {
+            eprintln!(
+                "Unable to stop reqresp launch-attribution client {}: {err}",
+                test_data.client_type
             );
         }
     }
