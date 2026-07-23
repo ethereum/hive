@@ -190,6 +190,9 @@ def clique_engine:
     "eip8246TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
     "eip8282TransitionTimestamp": env.HIVE_AMSTERDAM_TIMESTAMP|to_hex,
 
+    # Bogota
+    "eip7805TransitionTimestamp": env.HIVE_BOGOTA_TIMESTAMP|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
