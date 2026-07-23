@@ -60,9 +60,9 @@ case "$HIVE_LOGLEVEL" in
 esac
 FLAGS="$FLAGS --log-level:$loglevel"
 
-# It doesn't make sense to dial out, use only a pre-set bootnode.
+# Hive provides a directly reachable peer, not a discovery network.
 if [ "$HIVE_BOOTNODE" != "" ]; then
-  FLAGS="$FLAGS --bootstrap-node:$HIVE_BOOTNODE"
+  FLAGS="$FLAGS --static-peers:$HIVE_BOOTNODE"
 fi
 
 if [ "$HIVE_NETWORK_ID" != "" ]; then

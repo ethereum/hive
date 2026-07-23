@@ -126,7 +126,8 @@ FLAGS="$FLAGS --min-gas-price=1 --tx-pool-price-bump=0 --rpc-gas-cap=50000000"
 
 # Configure peer-to-peer networking.
 if [ "$HIVE_BOOTNODE" != "" ]; then
-    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+    printf '["%s"]\n' "$HIVE_BOOTNODE" > /static-nodes.json
+    FLAGS="$FLAGS --discovery-enabled=false --static-nodes-file=/static-nodes.json"
 fi
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --network-id=$HIVE_NETWORK_ID"
@@ -134,7 +135,7 @@ else
     FLAGS="$FLAGS --network-id=1337"
 fi
 
-# Configure sync mode
+# Configure sync mode for Hive's single-peer topology.
 case "$HIVE_NODETYPE" in
     "" | "full" | "archive")
         syncmode=FULL ;;
@@ -145,6 +146,9 @@ case "$HIVE_NODETYPE" in
         exit 1 ;;
 esac
 FLAGS="$FLAGS --sync-mode=$syncmode"
+if [ "$syncmode" = "SNAP" ]; then
+    FLAGS="$FLAGS --sync-min-peers=1"
+fi
 
 # Enable Snap Server.
 FLAGS="$FLAGS --snapsync-server-enabled"
