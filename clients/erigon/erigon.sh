@@ -133,7 +133,7 @@ FLAGS="$FLAGS --ws --ws.port=8546"
 
 # Configure GraphQL.
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
-    FLAGS="$FLAGS --graphql"
+    FLAGS="$FLAGS --graphql --rpc.allow-unprotected-txs"
 fi
 
 # Increase blob slots for tests
