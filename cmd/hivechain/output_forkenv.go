@@ -55,6 +55,7 @@ func (g *generator) writeForkEnv() error {
 	setTime("HIVE_OSAKA_TIMESTAMP", cfg.OsakaTime)
 	setTime("HIVE_BPO1_TIMESTAMP", cfg.BPO1Time)
 	setTime("HIVE_BPO2_TIMESTAMP", cfg.BPO2Time)
+	setTime("HIVE_AMSTERDAM_TIMESTAMP", cfg.AmsterdamTime)
 
 	// blob schedule
 	setBlobConfig := func(fork string, bc *params.BlobConfig) {
