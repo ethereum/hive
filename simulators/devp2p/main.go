@@ -128,7 +128,27 @@ Results from the test tool are reported as individual sub-tests.`,
 		},
 	}
 
-	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
+	snap2 := hivesim.Suite{
+		Name:        "snap2",
+		Description: "This suite tests the snap/2 protocol (EIP-8189): BAL-based state healing.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch",
+				Description: `This test launches the client and runs the snap/2 test tool.
+Results from the test tool are reported as individual sub-tests.`,
+				Parameters: forkenv,
+				Files: map[string]string{
+					"genesis.json": testChainDir + "/genesis.json",
+					"chain.rlp":    testChainDir + "/chain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runSnap2Test,
+			},
+		},
+	}
+
+	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap, snap2)
 }
 
 func loadTestChainConfig() hivesim.Params {
@@ -171,6 +191,26 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 
 	_, pattern := t.Sim.TestPattern()
 	cmd := exec.Command("./devp2p", "rlpx", "snap-test",
+		"--tap",
+		"--run", pattern,
+		"--node", enode,
+		"--chain", testChainDir,
+		"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+		"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+	)
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runSnap2Test(t *hivesim.T, c *hivesim.Client) {
+	enode, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "rlpx", "snap2-test",
 		"--tap",
 		"--run", pattern,
 		"--node", enode,
