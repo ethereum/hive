@@ -26,6 +26,9 @@ var callrevertCode []byte
 //go:embed bytecode/emit.bin
 var emitCode []byte
 
+//go:embed bytecode/calltree.bin
+var calltreeCode []byte
+
 //go:embed bytecode/7702account.bin
 var mod7702AccountCode []byte
 
