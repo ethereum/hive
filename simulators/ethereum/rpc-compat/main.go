@@ -38,6 +38,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if _, ok := clientEnv["HIVE_TARGET_GAS_LIMIT"]; !ok {
+		clientEnv["HIVE_TARGET_GAS_LIMIT"] = "60000000"
+	}
 
 	// Load the OpenRPC spec so speconly tests can be validated against the
 	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
