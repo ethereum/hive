@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -72,14 +73,14 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 		if !ok {
 			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
 		}
-		params = append(params, blobHashes, b.BeaconRoot(), requests)
+		params = append(params, blobHashes, b.BeaconRoot(), encodeEngineRequests(requests))
 	case cfg.IsPrague(b.Number(), b.Time()):
 		method = "engine_newPayloadV4"
 		requests, ok := g.clRequests[b.NumberU64()]
 		if !ok {
 			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
 		}
-		params = append(params, blobHashes, b.BeaconRoot(), requests)
+		params = append(params, blobHashes, b.BeaconRoot(), encodeEngineRequests(requests))
 	case cfg.IsCancun(b.Number(), b.Time()):
 		method = "engine_newPayloadV3"
 		params = append(params, blobHashes, b.BeaconRoot())
@@ -90,6 +91,14 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 	}
 	id := fmt.Sprintf("np%d", b.NumberU64())
 	return &rpcRequest{JsonRPC: "2.0", ID: id, Method: method, Params: params}
+}
+
+func encodeEngineRequests(requests [][]byte) []hexutil.Bytes {
+	encoded := make([]hexutil.Bytes, len(requests))
+	for i := range requests {
+		encoded[i] = requests[i]
+	}
+	return encoded
 }
 
 func (g *generator) block2fcu(b *types.Block) *rpcRequest {

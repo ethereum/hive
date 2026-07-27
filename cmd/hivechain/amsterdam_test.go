@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -66,6 +67,24 @@ func TestAmsterdamChainAndEngineOutputs(t *testing.T) {
 	}
 	if got, want := crypto.Keccak256Hash(payload.BlockAccessList), *postFork.BlockAccessListHash(); got != want {
 		t.Fatalf("payload block access list hash mismatch: got %s, want %s", got, want)
+	}
+	encodedRequests, ok := np.Params[3].([]hexutil.Bytes)
+	if !ok {
+		t.Fatalf("wrong execution requests type %T", np.Params[3])
+	}
+	for i, request := range encodedRequests {
+		if len(request) == 0 {
+			t.Fatalf("execution request %d is empty", i)
+		}
+	}
+	encodedRequest, err := json.Marshal(np)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, prefix := range [][]byte{[]byte(`"0x03`), []byte(`"0x04`)} {
+		if !bytes.Contains(encodedRequest, prefix) {
+			t.Errorf("newPayloadV5 JSON is missing hex request prefix %s", prefix)
+		}
 	}
 
 	fcu := g.block2fcu(postFork)
