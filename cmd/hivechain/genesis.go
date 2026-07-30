@@ -183,6 +183,11 @@ func addPragueSystemContracts(ga types.GenesisAlloc) {
 func addAmsterdamSystemContracts(ga types.GenesisAlloc) {
 	ga[params.BuilderDepositAddress] = types.Account{Balance: big.NewInt(1), Code: params.BuilderDepositCode}
 	ga[params.BuilderExitAddress] = types.Account{Balance: big.NewInt(1), Code: params.BuilderExitCode}
+	ga[params.DeterministicFactoryAddress] = types.Account{
+		Balance: new(big.Int),
+		Nonce:   1,
+		Code:    params.DeterministicFactoryCode,
+	}
 }
 
 func addSnapTestContract(ga types.GenesisAlloc) {
