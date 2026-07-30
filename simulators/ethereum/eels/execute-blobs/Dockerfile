@@ -1,4 +1,4 @@
-# Builds and runs the EELS (execution-specs) consume engine simulator
+# Builds and runs the EELS (execution-specs) execute-blobs simulator
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ## Default git-ref/fork
@@ -17,8 +17,10 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
         git checkout FETCH_HEAD; \
     fi
 
-WORKDIR /execution-specs/packages/testing
+WORKDIR /execution-specs/
 RUN uv sync
 
-## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT uv run execute hive --fork=$FORK -v -m blob_transaction_test
+## Define `execute hive` entry point for the blob transaction tests
+# --no-sync skips re-syncing the environment on container start; the image
+# build already ran `uv sync`.
+ENTRYPOINT exec uv run --no-sync execute hive --fork=$FORK -v -m blob_transaction_test
