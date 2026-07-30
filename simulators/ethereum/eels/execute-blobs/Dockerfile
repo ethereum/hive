@@ -7,7 +7,7 @@ ARG fork=Osaka
 ENV FORK=${fork}
 
 ## Clone and install EELS
-RUN apt-get update && apt-get install -y git cmake g++ libclang-dev
+RUN apt-get update && apt-get install -y git
 
 # Clone repo and use the default branch if none specified
 RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
@@ -18,9 +18,9 @@ RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
     fi
 
 WORKDIR /execution-specs/
-RUN uv sync --all-extras
+RUN uv sync
 
 ## Define `execute hive` entry point for the blob transaction tests
 # --no-sync skips re-syncing the environment on container start; the image
-# build already ran `uv sync --all-extras`.
+# build already ran `uv sync`.
 ENTRYPOINT exec uv run --no-sync execute hive --fork=$FORK -v -m blob_transaction_test
