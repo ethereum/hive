@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet4}"
+DEVNET_LABEL="${HIVE_LEAN_DEVNET_LABEL:-devnet5}"
 NODE_ID="${HIVE_NODE_ID:-ream_0}"
 BOOTNODES="${HIVE_BOOTNODES:-none}"
 ASSET_ROOT="/tmp/ream-runtime"
@@ -11,9 +11,6 @@ NETWORK_CONFIG="${HIVE_LEAN_NETWORK_CONFIG:-$ASSET_ROOT/config.yaml}"
 VALIDATOR_REGISTRY_PATH="${HIVE_LEAN_VALIDATOR_REGISTRY_PATH:-$ASSET_ROOT/validators.yaml}"
 
 case "$DEVNET_LABEL" in
-    devnet4)
-        DEFAULT_REAM_BIN="/usr/local/bin/ream-devnet4"
-        ;;
     devnet5)
         DEFAULT_REAM_BIN="/usr/local/bin/ream-devnet5"
         ;;
