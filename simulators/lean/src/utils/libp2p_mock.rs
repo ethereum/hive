@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Cursor, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -335,46 +335,44 @@ impl LeanBlock {
 }
 
 /// Encode a block as an unsigned gossip block message using the selected
-/// devnet's wire shape: snappy-compressed SSZ bytes (no varint prefix).
+/// devnet's wire shape: raw-snappy-compressed SSZ bytes (no varint prefix).
+///
+/// Gossip payloads carry raw snappy. Snappy *framing* belongs to req/resp, and
+/// a framed payload published on a gossip topic is undecodable to a conformant
+/// client, which silently reduces every gossip test that publishes a block to
+/// asserting that the client discarded garbage.
 pub fn encode_gossip_block(block: &LeanBlock) -> Vec<u8> {
     let ssz_bytes = block.to_signed_wire_ssz_bytes();
-    let mut encoder = FrameEncoder::new(Vec::new());
-    encoder
-        .write_all(&ssz_bytes)
-        .expect("failed to snappy-compress gossip bytes");
-    encoder
-        .flush()
-        .expect("failed to flush gossip snappy encoder");
-    encoder
-        .into_inner()
-        .expect("failed to finish gossip snappy encoder")
+    snap::raw::Encoder::new()
+        .compress_vec(&ssz_bytes)
+        .expect("failed to snappy-compress gossip bytes")
 }
 
-/// Decode a framed-snappy, raw-snappy, or raw-SSZ signed-block payload and retain its block.
+/// Decode a signed-block payload captured from the block gossip topic.
 ///
-/// This accepts the exact bytes carried on the gossipsub topic. It is useful
-/// for tests that capture a client-produced, cryptographically valid envelope
-/// and need to identify the corresponding block in the client's fork-choice
-/// store without synthesizing a proof in Hive.
+/// This takes the exact bytes carried on the gossipsub topic. It is useful for
+/// tests that capture a client-produced, cryptographically valid envelope and
+/// need to identify the corresponding block in the client's fork-choice store
+/// without synthesizing a proof in Hive.
+///
+/// Gossip payloads are raw snappy, so that is the only encoding accepted here.
+/// A client that publishes snappy framing or bare SSZ on a gossip topic is not
+/// conformant, and absorbing that would hide the defect and let the client pass
+/// the tests built on top of this.
 pub fn decode_gossip_block(data: &[u8]) -> io::Result<LeanBlock> {
-    let mut decoder = FrameDecoder::new(Cursor::new(data));
-    let mut decompressed = Vec::new();
-    if decoder.read_to_end(&mut decompressed).is_ok() {
-        if let Ok(block) = LeanBlock::from_signed_wire_ssz_bytes(&decompressed) {
-            return Ok(block);
-        }
-    }
+    let decompressed = snap::raw::Decoder::new()
+        .decompress_vec(data)
+        .map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("gossip payload is not raw snappy: {err}"),
+            )
+        })?;
 
-    if let Ok(decompressed) = snap::raw::Decoder::new().decompress_vec(data) {
-        if let Ok(block) = LeanBlock::from_signed_wire_ssz_bytes(&decompressed) {
-            return Ok(block);
-        }
-    }
-
-    LeanBlock::from_signed_wire_ssz_bytes(data).map_err(|err| {
+    LeanBlock::from_signed_wire_ssz_bytes(&decompressed).map_err(|err| {
         io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("neither framed-snappy, raw-snappy, nor raw signed-block SSZ: {err:?}"),
+            format!("gossip payload is not a signed block: {err:?}"),
         )
     })
 }
