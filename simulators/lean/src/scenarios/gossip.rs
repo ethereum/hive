@@ -328,7 +328,9 @@ dyn_async! {
         mock.publish(block_topic.clone(), block_bytes.clone())
             .expect("should publish first copy of invalid block");
         sleep(Duration::from_secs(1)).await;
-        mock.publish(block_topic, block_bytes)
+        // Re-send the exact same bytes, so the client sees a real duplicate.
+        // The mock has to bypass its own publisher-side duplicate cache to do it.
+        mock.publish_duplicate(block_topic, block_bytes)
             .expect("should publish second copy of invalid block");
 
         mock.process_events_for(Duration::from_secs(5)).await;

@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Cursor, Write};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_primitives::B256;
@@ -9,7 +11,8 @@ use futures::prelude::*;
 use libp2p::{
     gossipsub::{
         Behaviour as GossipsubBehaviour, ConfigBuilder as GossipsubConfigBuilder,
-        Event as GossipsubEvent, IdentTopic, MessageAuthenticity, TopicHash, ValidationMode,
+        Event as GossipsubEvent, IdentTopic, Message as GossipsubMessage, MessageAuthenticity,
+        MessageId, TopicHash, ValidationMode,
     },
     request_response::{
         self, Behaviour as RequestResponseBehaviour, Codec, Event as ReqRespEvent,
@@ -42,6 +45,44 @@ pub const LEAN_BLOCKS_BY_RANGE_PROTOCOL: &str = "/leanconsensus/req/blocks_by_ra
 // Keep the mock's gossipsub limit above that client-side limit so a valid
 // client-produced signed block reaches the validation test.
 const LEAN_GOSSIP_MAX_TRANSMIT_SIZE: usize = 16 * 1024 * 1024;
+
+/// Domain prefix used when the gossip payload failed snappy decompression.
+const MESSAGE_DOMAIN_INVALID_SNAPPY: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
+/// Domain prefix used when the gossip payload decompressed successfully.
+const MESSAGE_DOMAIN_VALID_SNAPPY: [u8; 4] = [0x01, 0x00, 0x00, 0x00];
+/// Lean gossip message ids are the first 20 bytes of the SHA256 digest.
+const MESSAGE_ID_LENGTH: usize = 20;
+
+/// Compute a gossip message id the way lean clients do.
+///
+/// libp2p's default id function is `source || sequence_number`, which is a
+/// constant under [`MessageAuthenticity::Anonymous`]: an anonymous message
+/// carries neither field, so every message the mock publishes hashes to the
+/// same id and gossipsub rejects the second one with `PublishError::Duplicate`.
+/// Deriving the id from the payload instead keeps distinct messages distinct,
+/// and matches the lean networking spec so the mock agrees with the client on
+/// what counts as a duplicate.
+///
+/// `salt` is mock-local and never travels on the wire. [`MockNode::publish_duplicate`]
+/// bumps it so a test can re-send byte-identical data that the client under
+/// test still sees as a genuine duplicate.
+fn lean_gossip_message_id(message: &GossipsubMessage, salt: u64) -> MessageId {
+    // Gossip payloads use raw snappy; framing is only used by req/resp.
+    let decompressed = snap::raw::Decoder::new().decompress_vec(&message.data).ok();
+    let (domain, data) = match decompressed.as_deref() {
+        Some(data) => (MESSAGE_DOMAIN_VALID_SNAPPY, data),
+        None => (MESSAGE_DOMAIN_INVALID_SNAPPY, message.data.as_slice()),
+    };
+
+    let topic = message.topic.as_str().as_bytes();
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update((topic.len() as u64).to_le_bytes());
+    hasher.update(topic);
+    hasher.update(data);
+    hasher.update(salt.to_le_bytes());
+    MessageId::from(hasher.finalize()[..MESSAGE_ID_LENGTH].to_vec())
+}
 
 // Gossip topic helpers
 pub fn lean_block_topic(fork_digest: &str) -> IdentTopic {
@@ -294,46 +335,44 @@ impl LeanBlock {
 }
 
 /// Encode a block as an unsigned gossip block message using the selected
-/// devnet's wire shape: snappy-compressed SSZ bytes (no varint prefix).
+/// devnet's wire shape: raw-snappy-compressed SSZ bytes (no varint prefix).
+///
+/// Gossip payloads carry raw snappy. Snappy *framing* belongs to req/resp, and
+/// a framed payload published on a gossip topic is undecodable to a conformant
+/// client, which silently reduces every gossip test that publishes a block to
+/// asserting that the client discarded garbage.
 pub fn encode_gossip_block(block: &LeanBlock) -> Vec<u8> {
     let ssz_bytes = block.to_signed_wire_ssz_bytes();
-    let mut encoder = FrameEncoder::new(Vec::new());
-    encoder
-        .write_all(&ssz_bytes)
-        .expect("failed to snappy-compress gossip bytes");
-    encoder
-        .flush()
-        .expect("failed to flush gossip snappy encoder");
-    encoder
-        .into_inner()
-        .expect("failed to finish gossip snappy encoder")
+    snap::raw::Encoder::new()
+        .compress_vec(&ssz_bytes)
+        .expect("failed to snappy-compress gossip bytes")
 }
 
-/// Decode a framed-snappy, raw-snappy, or raw-SSZ signed-block payload and retain its block.
+/// Decode a signed-block payload captured from the block gossip topic.
 ///
-/// This accepts the exact bytes carried on the gossipsub topic. It is useful
-/// for tests that capture a client-produced, cryptographically valid envelope
-/// and need to identify the corresponding block in the client's fork-choice
-/// store without synthesizing a proof in Hive.
+/// This takes the exact bytes carried on the gossipsub topic. It is useful for
+/// tests that capture a client-produced, cryptographically valid envelope and
+/// need to identify the corresponding block in the client's fork-choice store
+/// without synthesizing a proof in Hive.
+///
+/// Gossip payloads are raw snappy, so that is the only encoding accepted here.
+/// A client that publishes snappy framing or bare SSZ on a gossip topic is not
+/// conformant, and absorbing that would hide the defect and let the client pass
+/// the tests built on top of this.
 pub fn decode_gossip_block(data: &[u8]) -> io::Result<LeanBlock> {
-    let mut decoder = FrameDecoder::new(Cursor::new(data));
-    let mut decompressed = Vec::new();
-    if decoder.read_to_end(&mut decompressed).is_ok() {
-        if let Ok(block) = LeanBlock::from_signed_wire_ssz_bytes(&decompressed) {
-            return Ok(block);
-        }
-    }
+    let decompressed = snap::raw::Decoder::new()
+        .decompress_vec(data)
+        .map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("gossip payload is not raw snappy: {err}"),
+            )
+        })?;
 
-    if let Ok(decompressed) = snap::raw::Decoder::new().decompress_vec(data) {
-        if let Ok(block) = LeanBlock::from_signed_wire_ssz_bytes(&decompressed) {
-            return Ok(block);
-        }
-    }
-
-    LeanBlock::from_signed_wire_ssz_bytes(data).map_err(|err| {
+    LeanBlock::from_signed_wire_ssz_bytes(&decompressed).map_err(|err| {
         io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("neither framed-snappy, raw-snappy, nor raw signed-block SSZ: {err:?}"),
+            format!("gossip payload is not a signed block: {err:?}"),
         )
     })
 }
@@ -619,6 +658,9 @@ pub struct MockNode {
     /// subscription check this set first so they don't miss events that
     /// arrived before the test loop started.
     pub seen_subscriptions: HashMap<TopicHash, HashSet<PeerId>>,
+    /// Mock-local salt mixed into [`lean_gossip_message_id`], bumped by
+    /// [`MockNode::publish_duplicate`] to re-send byte-identical payloads.
+    publish_salt: Arc<AtomicU64>,
 }
 
 impl MockNode {
@@ -633,6 +675,9 @@ impl MockNode {
         let secp_keypair = libp2p_identity::secp256k1::Keypair::from(secret_key);
         let keypair = libp2p_identity::Keypair::from(secp_keypair);
 
+        let publish_salt = Arc::new(AtomicU64::new(0));
+        let message_id_salt = publish_salt.clone();
+
         let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
             .with_tokio()
             .with_quic()
@@ -641,6 +686,14 @@ impl MockNode {
                 let gossipsub_config = GossipsubConfigBuilder::default()
                     .validation_mode(ValidationMode::Anonymous)
                     .max_transmit_size(LEAN_GOSSIP_MAX_TRANSMIT_SIZE)
+                    // Required by the anonymous config above: an anonymous
+                    // message carries no source and no sequence number, which
+                    // is all libp2p's default id function hashes, so every
+                    // message would get the same id and the second publish
+                    // would be rejected as a duplicate.
+                    .message_id_fn(move |message| {
+                        lean_gossip_message_id(message, message_id_salt.load(Ordering::Relaxed))
+                    })
                     .build()
                     .expect("Failed to create anonymous gossipsub config");
                 // Lean clients use anonymous gossipsub validation. Publishing signed
@@ -678,6 +731,7 @@ impl MockNode {
             gossip_messages: Vec::new(),
             secret_key_bytes: Some(secret_key_bytes),
             seen_subscriptions: HashMap::new(),
+            publish_salt,
         })
     }
 
@@ -883,6 +937,19 @@ impl MockNode {
             .publish(topic, data)
             .map_err(|e| format!("Failed to publish message: {e:?}"))
             .map(|_| ())
+    }
+
+    /// Re-publish a payload this mock has already sent on the same topic.
+    ///
+    /// gossipsub refuses to publish a message whose id is already in its
+    /// publisher-side duplicate cache, so a plain [`MockNode::publish`] of
+    /// identical bytes fails with `PublishError::Duplicate` before anything
+    /// reaches the wire. Bumping the mock-local id salt sidesteps that cache
+    /// without touching the bytes sent, so the client under test receives a
+    /// genuine duplicate and exercises its own deduplication.
+    pub fn publish_duplicate(&mut self, topic: IdentTopic, data: Vec<u8>) -> Result<(), String> {
+        self.publish_salt.fetch_add(1, Ordering::Relaxed);
+        self.publish(topic, data)
     }
 
     /// Drain gossip messages observed since the previous call.
