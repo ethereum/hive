@@ -1,7 +1,7 @@
 FROM golang:1-alpine as builder
-ARG GOPROXY
+ARG GOPROXY="https://proxy.golang.org|direct"
 ENV GOPROXY=${GOPROXY}
-RUN apk add --update gcc musl-dev linux-headers
+RUN apk add --update gcc git musl-dev linux-headers
 
 # Get dependencies first. This improves caching behavior since they only need
 # to be re-downloaded when go.mod changes.
