@@ -53,17 +53,17 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo -n $JWT_SECRET > /jwt.secret
 fi
 
-# Generate the genesis and chainspec file.
-mkdir -p /chainspec
-jq -f /mapper.jq /genesis.json > /chainspec/test.json
+# Generate a Geth-style genesis file.
+mv /genesis.json /genesis-input.json
+jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis. 
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.accounts[] | select(.balance == "0x123450000000000000000" or has("builtin")))' /chainspec/test.json
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
 else
     echo "Supplied genesis state:"
-    cat /chainspec/test.json
+    cat /genesis.json
 fi
 
 # Check sync mode.
