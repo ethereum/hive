@@ -195,11 +195,9 @@ const (
 	emitAddr      = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
 	largeLogsAddr = "0x8dcd17433742f4c0ca53122ab541d0ba67fc27ff"
 
-	// calltree and its fixed-address callees; the callee addresses are
-	// hardcoded in contracts/calltree.eas. The callees are predeployed
-	// (rather than reusing the deploy-* mods' instances) because deployment
-	// addresses depend on modifier scheduling and cannot be baked into
-	// committed bytecode.
+	// The callees are predeployed, rather than reusing the deploy mod instances,
+	// because the tracetest mod needs to create a tx calling the calltree
+	// contract and does not have access to the deploy mod tx info.
 	calltreeAddr           = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d0"
 	calltreeCallmeAddr     = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d1"
 	calltreeCallenvAddr    = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d2"
@@ -216,10 +214,9 @@ func addModContracts(ga types.GenesisAlloc) {
 		Code:    modLargeReceiptCode,
 		Balance: new(big.Int),
 	}
-	// calltree carries a balance so it can attach value to its subcalls.
 	ga[common.HexToAddress(calltreeAddr)] = types.Account{
 		Code:    calltreeCode,
-		Balance: big.NewInt(1000000000),
+		Balance: big.NewInt(1000000000), // need balance to forward
 	}
 	ga[common.HexToAddress(calltreeCallmeAddr)] = types.Account{
 		Code:    callmeCode,
