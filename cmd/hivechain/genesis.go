@@ -194,6 +194,14 @@ func addSnapTestContract(ga types.GenesisAlloc) {
 const (
 	emitAddr      = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
 	largeLogsAddr = "0x8dcd17433742f4c0ca53122ab541d0ba67fc27ff"
+
+	// The callees are predeployed, rather than reusing the deploy mod instances,
+	// because the tracetest mod needs to create a tx calling the calltree
+	// contract and does not have access to the deploy mod tx info.
+	calltreeAddr           = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d0"
+	calltreeCallmeAddr     = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d1"
+	calltreeCallenvAddr    = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d2"
+	calltreeCallrevertAddr = "0x9dcd17433742f4c0ca53122ab541d0ba67fc27d3"
 )
 
 // addModContracts adds the contracts used by block modifiers.
@@ -204,6 +212,22 @@ func addModContracts(ga types.GenesisAlloc) {
 	}
 	ga[common.HexToAddress(largeLogsAddr)] = types.Account{
 		Code:    modLargeReceiptCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(calltreeAddr)] = types.Account{
+		Code:    calltreeCode,
+		Balance: big.NewInt(1000000000), // need balance to forward
+	}
+	ga[common.HexToAddress(calltreeCallmeAddr)] = types.Account{
+		Code:    callmeCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(calltreeCallenvAddr)] = types.Account{
+		Code:    callenvCode,
+		Balance: new(big.Int),
+	}
+	ga[common.HexToAddress(calltreeCallrevertAddr)] = types.Account{
+		Code:    callrevertCode,
 		Balance: new(big.Int),
 	}
 }
