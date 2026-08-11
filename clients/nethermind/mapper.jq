@@ -28,18 +28,6 @@ def to_bool:
   end
 ;
 
-# Only mark the chain as post-merge when Hive supplied a terminal total difficulty.
-def merge_config:
-  if env.HIVE_TERMINAL_TOTAL_DIFFICULTY == null then
-    {}
-  else
-    {
-      "terminalTotalDifficulty": (env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int),
-      "terminalTotalDifficultyPassed": true
-    }
-  end
-;
-
 # Replace config in input and keep it first for Nethermind's format detection.
 # Nethermind also requires alloc address keys to carry a 0x prefix.
 {
@@ -66,6 +54,8 @@ def merge_config:
     "arrowGlacierBlock": env.HIVE_FORK_ARROW_GLACIER|to_int,
     "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
     "mergeNetsplitBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
+    "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
+    "terminalTotalDifficultyPassed": (if env.HIVE_TERMINAL_TOTAL_DIFFICULTY == null then null else true end),
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
@@ -124,7 +114,7 @@ def merge_config:
     "bpo4Time": env.HIVE_BPO4_TIMESTAMP|to_int,
     "bpo5Time": env.HIVE_BPO5_TIMESTAMP|to_int,
     "depositContractAddress": (env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x00000000219ab540356cBB839Cbe05303d7705Fa")
-  } + merge_config | remove_empty
+  } | remove_empty
 } + (
   del(.config) |
   if .alloc then
