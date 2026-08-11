@@ -5,10 +5,12 @@
 
 #pragma target "london"
 
+;;; These contracts are predeployed via the genesis file.
 #define callmeAddr     = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d1
 #define callenvAddr    = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d2
 #define callrevertAddr = 0x9dcd17433742f4c0ca53122ab541d0ba67fc27d3
 #define emitAddr       = 0x7dcd17433742f4c0ca53122ab541d0ba67fc27df
+
 #define identityAddr   = 0x04
 
 ;;; 1: CALL callme with its expected input and 1 wei -> success frame with output
