@@ -54,13 +54,12 @@ def to_bool:
     "arrowGlacierBlock": env.HIVE_FORK_ARROW_GLACIER|to_int,
     "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
     "mergeNetsplitBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
-    "terminalTotalDifficulty": (env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int // 9223372036854775807),
+    "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
     "osakaTime": env.HIVE_OSAKA_TIMESTAMP|to_int,
     "amsterdamTime": env.HIVE_AMSTERDAM_TIMESTAMP|to_int,
-    "terminalTotalDifficultyPassed": true,
     "blobSchedule": {
       "cancun": {
         "target": (if env.HIVE_CANCUN_BLOB_TARGET then env.HIVE_CANCUN_BLOB_TARGET|to_int else 3 end),
@@ -114,7 +113,7 @@ def to_bool:
     "bpo4Time": env.HIVE_BPO4_TIMESTAMP|to_int,
     "bpo5Time": env.HIVE_BPO5_TIMESTAMP|to_int,
     "depositContractAddress": (env.HIVE_DEPOSIT_CONTRACT_ADDRESS // "0x00000000219ab540356cBB839Cbe05303d7705Fa")
-  }|remove_empty
+  } | remove_empty
 } + (
   del(.config) |
   if .alloc then
