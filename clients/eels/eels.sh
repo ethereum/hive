@@ -9,22 +9,16 @@
 # This script assumes the following environment variables:
 #
 #  - HIVE_CHAIN_ID                network ID number to use for the eth protocol
-#  - HIVE_AMSTERDAM_TIMESTAMP     timestamp of the Amsterdam hard-fork
+#  - HIVE_<FORK>_TIMESTAMP        fork schedule, read directly by the server
 #
-# EELS executes payloads with the execution specification itself and only
-# supports chains that run the Amsterdam fork from genesis. It does not
-# support peer-to-peer networking, `/chain.rlp`, or `/blocks/` imports.
+# EELS executes payloads with the execution specification itself and
+# supports all post-merge forks. It does not support peer-to-peer
+# networking, `/chain.rlp`, or `/blocks/` imports.
 
 set -e
 
 if [ ! -f /genesis.json ]; then
     echo "/genesis.json is missing" >&2
-    exit 1
-fi
-
-if [ "$HIVE_AMSTERDAM_TIMESTAMP" != "0" ]; then
-    echo "eels only supports Amsterdam from genesis;" \
-        "got HIVE_AMSTERDAM_TIMESTAMP=$HIVE_AMSTERDAM_TIMESTAMP" >&2
     exit 1
 fi
 
