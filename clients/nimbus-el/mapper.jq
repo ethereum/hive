@@ -51,7 +51,8 @@ def to_bool:
     "alloc"        : .alloc,
     "baseFeePerGas": .baseFeePerGas,
     "excessBlobGas": .excessBlobGas,
-    "blobGasUsed"  : .blobGasUsed
+    "blobGasUsed"  : .blobGasUsed,
+    "slotNumber"   : .slotNumber
   }|remove_empty,
   "config": {
     "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
