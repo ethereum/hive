@@ -22,18 +22,10 @@ func main() {
 		Description: "This suite runs Discovery v4 protocol tests.",
 		Tests: []hivesim.AnyTest{
 			hivesim.ClientTestSpec{
-				Role: "eth1",
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "5",
-				},
-				AlwaysRun: true,
-				Run:       runDiscv4Test,
+				Role:       "eth1",
+				Parameters: eth1DiscoveryParams(),
+				AlwaysRun:  true,
+				Run:        runDiscv4Test,
 			},
 		},
 	}
@@ -43,21 +35,17 @@ func main() {
 		Description: "This suite runs Discovery v5 protocol tests.",
 		Tests: []hivesim.AnyTest{
 			hivesim.ClientTestSpec{
-				Role: "eth1",
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "5",
-					"HIVE_DISCV5":         "1",
-				},
-				AlwaysRun: true,
+				Role:       "eth1",
+				Parameters: eth1Discv5Params(),
+				AlwaysRun:  true,
 				Run: func(t *hivesim.T, c *hivesim.Client) {
 					runDiscv5Test(t, c, (*hivesim.Client).EnodeURL)
 				},
+			},
+			hivesim.TestSpec{
+				Name:        "self ENR is reachable over IPv6 with configured IPv4 and IPv6 endpoints",
+				Description: "This test creates a dual-stack Docker network, starts the client with fixed IPv4 and IPv6 addresses on that network, then runs the devp2p discv5 self-record test over both address families.",
+				Run:         runDiscv5DualStackDockerNetworkTests,
 			},
 			hivesim.ClientTestSpec{
 				Role: "beacon",
@@ -129,6 +117,22 @@ Results from the test tool are reported as individual sub-tests.`,
 	}
 
 	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
+}
+
+func eth1DiscoveryParams() hivesim.Params {
+	return hivesim.Params{
+		"HIVE_NETWORK_ID":     "19763",
+		"HIVE_CHAIN_ID":       "19763",
+		"HIVE_FORK_HOMESTEAD": "0",
+		"HIVE_FORK_TANGERINE": "0",
+		"HIVE_FORK_SPURIOUS":  "0",
+		"HIVE_FORK_BYZANTIUM": "0",
+		"HIVE_LOGLEVEL":       "5",
+	}
+}
+
+func eth1Discv5Params() hivesim.Params {
+	return eth1DiscoveryParams().Set("HIVE_DISCV5", "1")
 }
 
 func loadTestChainConfig() hivesim.Params {
