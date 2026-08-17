@@ -420,6 +420,74 @@ func TestStartClientInitialNetworks(t *testing.T) {
 	}
 }
 
+func TestInitialNetworkConfigSurvivesInitialNetworksOption(t *testing.T) {
+	endpoint := NetworkEndpointConfig{
+		IPv4Address: "10.210.0.3",
+		IPv6Address: "fd00:ca7d:3e57::3",
+	}
+	connections := make(map[string]libhive.NetworkEndpointOptions)
+	tm, srv := newFakeAPI(&fakes.BackendHooks{
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			return &libhive.ContainerInfo{}, nil
+		},
+		CreateNetwork: func(name string, options libhive.NetworkOptions) (string, error) {
+			return name + "-id", nil
+		},
+		ConnectContainer: func(containerID string, networkID string, options libhive.NetworkEndpointOptions) error {
+			connections[networkID] = options
+			return nil
+		},
+	})
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+	if err := sim.CreateNetwork(suiteID, "configured"); err != nil {
+		t.Fatal("can't create configured network:", err)
+	}
+	if err := sim.CreateNetwork(suiteID, "plain"); err != nil {
+		t.Fatal("can't create plain network:", err)
+	}
+
+	_, _, err = sim.StartClientWithOptions(
+		suiteID,
+		testID,
+		"client-1",
+		WithInitialNetworkConfig("configured", endpoint),
+		WithInitialNetworks([]string{"plain"}),
+	)
+	if err != nil {
+		t.Fatalf("failed to start client: %v", err)
+	}
+	configuredOptions, ok := findConnectionOptions(connections, "_configured-id")
+	if !ok {
+		t.Fatal("configured network was not connected at start")
+	}
+	if configuredOptions.IPv4Address != endpoint.IPv4Address || configuredOptions.IPv6Address != endpoint.IPv6Address {
+		t.Fatalf("wrong configured endpoint options: %#v", configuredOptions)
+	}
+	if _, ok := findConnectionOptions(connections, "_plain-id"); !ok {
+		t.Fatal("plain network was not connected at start")
+	}
+}
+
+func findConnectionOptions(connections map[string]libhive.NetworkEndpointOptions, suffix string) (libhive.NetworkEndpointOptions, bool) {
+	for networkID, options := range connections {
+		if strings.HasSuffix(networkID, suffix) {
+			return options, true
+		}
+	}
+	return libhive.NetworkEndpointOptions{}, false
+}
+
 func TestNetworkConfigAndIPv6Address(t *testing.T) {
 	var (
 		gotNetworkOptions  libhive.NetworkOptions

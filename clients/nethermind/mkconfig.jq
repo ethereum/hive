@@ -110,7 +110,7 @@ def base_config:
     "Network": ({
       "DiscoveryPort": 30303,
       "P2PPort": 30303,
-      "ExternalIp": (env.HIVE_EXTERNAL_IP // "127.0.0.1"),
+      "ExternalIp": (if env.HIVE_EXTERNAL_IP != null and env.HIVE_EXTERNAL_IP != "" then env.HIVE_EXTERNAL_IP else "127.0.0.1" end),
     }
     + (if env.HIVE_LOCAL_IP != null and env.HIVE_LOCAL_IP != "" then { "LocalIp": env.HIVE_LOCAL_IP } else {} end)
     + (if env.HIVE_EXTERNAL_IP_V4 != null and env.HIVE_EXTERNAL_IP_V4 != "" then { "ExternalIpV4": env.HIVE_EXTERNAL_IP_V4 } else {} end)

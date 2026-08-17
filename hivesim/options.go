@@ -34,6 +34,11 @@ func WithInitialNetworks(networks []string) StartOption {
 	return optionFunc(func(setup *clientSetup) {
 		setup.config.Networks = make([]string, len(networks))
 		copy(setup.config.Networks, networks)
+		for network := range setup.config.NetworkEndpoints {
+			if !containsString(setup.config.Networks, network) {
+				setup.config.Networks = append(setup.config.Networks, network)
+			}
+		}
 	})
 }
 

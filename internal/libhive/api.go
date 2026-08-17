@@ -583,11 +583,9 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 
 	networkName := mux.Vars(r)["network"]
 	var config simapi.NetworkConfig
-	if r.Body != nil && r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-			serveError(w, err, http.StatusBadRequest)
-			return
-		}
+	if err := decodeOptionalJSON(r, &config); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
 	}
 	err = api.tm.CreateNetworkWithOptions(suiteID, networkName, NetworkOptions{
 		IPv4Subnet: config.IPv4Subnet,
@@ -668,11 +666,9 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
 	var config simapi.NetworkEndpointConfig
-	if r.Body != nil && r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-			serveError(w, err, http.StatusBadRequest)
-			return
-		}
+	if err := decodeOptionalJSON(r, &config); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
 	}
 	if err := api.tm.ConnectContainerWithOptions(suiteID, name, containerID, NetworkEndpointOptions{
 		IPv4Address: config.IPv4Address,
@@ -684,6 +680,17 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("API: container connected to network", "network", name, "container", containerID)
 	serveOK(w)
+}
+
+func decodeOptionalJSON(r *http.Request, v interface{}) error {
+	if r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+		return nil
+	}
+	err := json.NewDecoder(r.Body).Decode(v)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }
 
 // networkDisconnect disconnects a container from a network.
