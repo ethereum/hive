@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/ethereum/go-ethereum v1.17.6-0.20260810092515-366048eaff3c // glamsterdam-devnet-8
+	github.com/ethereum/go-ethereum v1.17.6-0.20260813154252-aa1f2fcf5129 // glamsterdam-devnet-8
 	github.com/ethereum/hive/hiveproxy v0.0.0-20240610172618-786a798a0cfe
 	github.com/evanw/esbuild v0.18.11
 	github.com/fatih/color v1.18.0
