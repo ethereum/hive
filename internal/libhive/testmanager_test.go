@@ -3,6 +3,7 @@ package libhive_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -10,11 +11,124 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ethereum/hive/internal/fakes"
 	"github.com/ethereum/hive/internal/libhive"
 	"github.com/ethereum/hive/internal/simapi"
 )
+
+const testOperationTimeout = 5 * time.Second
+
+func TestClientTeardownDoesNotBlockOtherTests(t *testing.T) {
+	for _, method := range []string{"EndTest", "StopNode"} {
+		t.Run(method, func(t *testing.T) {
+			deleteStarted := make(chan struct{})
+			continueDelete := make(chan struct{})
+			backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+				DeleteContainer: func(string) error {
+					close(deleteStarted)
+					<-continueDelete
+					return nil
+				},
+			})
+
+			clients := []*libhive.ClientDefinition{{Name: "test-client", Image: "test-client-image"}}
+			tm := libhive.NewTestManager(libhive.SimEnv{}, backend, clients, libhive.HiveInfo{})
+			srv := httptest.NewServer(tm.API())
+			defer srv.Close()
+
+			suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+			if err != nil {
+				t.Fatal("StartTestSuite:", err)
+			}
+			testID, err := tm.StartTest(suiteID, "test", "test description")
+			if err != nil {
+				t.Fatal("StartTest:", err)
+			}
+			nodeID := startClientHTTP(t, srv.URL, suiteID, testID)
+
+			teardownDone := make(chan error, 1)
+			go func() {
+				if method == "EndTest" {
+					teardownDone <- tm.EndTest(suiteID, testID, &libhive.TestResult{Pass: true})
+				} else {
+					teardownDone <- tm.StopNode(testID, nodeID)
+				}
+			}()
+
+			select {
+			case <-deleteStarted:
+			case <-time.After(testOperationTimeout):
+				t.Fatal("container deletion did not start")
+			}
+
+			startDone := make(chan error, 1)
+			go func() {
+				_, err := tm.StartTest(suiteID, "concurrent-test", "concurrent test description")
+				startDone <- err
+			}()
+
+			select {
+			case err := <-startDone:
+				if err != nil {
+					t.Fatal("concurrent StartTest:", err)
+				}
+			case <-time.After(testOperationTimeout):
+				close(continueDelete)
+				t.Fatal("StartTest blocked on an unrelated container deletion")
+			}
+
+			close(continueDelete)
+			select {
+			case err := <-teardownDone:
+				if err != nil {
+					t.Fatalf("%s: %v", method, err)
+				}
+			case <-time.After(testOperationTimeout):
+				t.Fatalf("%s did not complete", method)
+			}
+		})
+	}
+}
+
+func TestStopNodeRetriesContainerDeletion(t *testing.T) {
+	deleteCalls := 0
+	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+		DeleteContainer: func(string) error {
+			deleteCalls++
+			if deleteCalls == 1 {
+				return errors.New("test deletion failure")
+			}
+			return nil
+		},
+	})
+
+	clients := []*libhive.ClientDefinition{{Name: "test-client", Image: "test-client-image"}}
+	tm := libhive.NewTestManager(libhive.SimEnv{}, backend, clients, libhive.HiveInfo{})
+	srv := httptest.NewServer(tm.API())
+	defer srv.Close()
+
+	suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+	if err != nil {
+		t.Fatal("StartTestSuite:", err)
+	}
+	testID, err := tm.StartTest(suiteID, "test", "test description")
+	if err != nil {
+		t.Fatal("StartTest:", err)
+	}
+	nodeID := startClientHTTP(t, srv.URL, suiteID, testID)
+
+	if err := tm.StopNode(testID, nodeID); err == nil {
+		t.Fatal("first StopNode succeeded, want deletion error")
+	}
+	if err := tm.StopNode(testID, nodeID); err != nil {
+		t.Fatal("second StopNode:", err)
+	}
+	if deleteCalls != 2 {
+		t.Fatalf("DeleteContainer called %d times, want 2", deleteCalls)
+	}
+}
 
 func TestRegisterMultiTestNode(t *testing.T) {
 	// Track container deletions to verify lifecycle behavior.
