@@ -110,10 +110,35 @@ func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 		To:        common.Address{},
 		AuthList:  []types.SetCodeAuthorization{auth},
 	}
-	gas, err := core.IntrinsicGas(txdata.Data, txdata.AccessList, txdata.AuthList, false, true, true, true)
+
+	blockNum := ctx.block.Number()
+	timestamp := ctx.block.Timestamp()
+
+	rules := ctx.ChainConfig().Rules(
+		blockNum,
+		ctx.gen.genesis.Config.IsPostMerge(blockNum.Uint64(), timestamp),
+		timestamp,
+	)
+
+	head := &types.Header{
+		Number: blockNum,
+		Time:   timestamp,
+	}
+
+	cpsb := core.CostPerStateByte(head, ctx.ChainConfig())
+
+	gasCosts, err := core.IntrinsicGas(
+		txdata.Data,
+		txdata.AccessList,
+		txdata.AuthList,
+		false,
+		rules,
+		cpsb,
+	)
 	if err != nil {
 		panic(err)
 	}
+	gas := gasCosts.Sum()
 	txdata.Gas = gas
 	if !ctx.HasGas(gas) {
 		return fmt.Errorf("not enough gas to authorize")
