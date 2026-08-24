@@ -76,8 +76,9 @@ func generateCommand(args []string) {
 	if *outlist != "" {
 		if *outlist == "all" {
 			cfg.outputs = outputFunctionNames()
+		} else {
+			cfg.outputs = splitAndTrim(*outlist)
 		}
-		cfg.outputs = splitAndTrim(*outlist)
 	}
 	for _, name := range splitAndTrim(*disabled) {
 		if _, ok := modRegistry[name]; !ok {
