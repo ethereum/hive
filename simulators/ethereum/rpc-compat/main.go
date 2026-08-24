@@ -39,6 +39,7 @@ func main() {
 		panic(err)
 	}
 	if _, ok := clientEnv["HIVE_TARGET_GAS_LIMIT"]; !ok {
+		// Match execution-apis' Geth default so all clients build the same next-block gas limit.
 		clientEnv["HIVE_TARGET_GAS_LIMIT"] = "60000000"
 	}
 
