@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -55,33 +56,9 @@ func (g *generator) writeEngineHeadFcU() error {
 }
 
 func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
-	ed := engine.ExecutableData{
-		ParentHash:    b.ParentHash(),
-		FeeRecipient:  b.Coinbase(),
-		StateRoot:     b.Root(),
-		ReceiptsRoot:  b.ReceiptHash(),
-		LogsBloom:     b.Bloom().Bytes(),
-		Random:        b.MixDigest(),
-		Number:        b.NumberU64(),
-		GasLimit:      b.GasLimit(),
-		GasUsed:       b.GasUsed(),
-		Timestamp:     b.Time(),
-		ExtraData:     b.Extra(),
-		BaseFeePerGas: b.BaseFee(),
-		BlockHash:     b.Hash(),
-		Transactions:  [][]byte{},
-		Withdrawals:   b.Withdrawals(),
-		BlobGasUsed:   b.BlobGasUsed(),
-		ExcessBlobGas: b.ExcessBlobGas(),
-	}
+	ed := engine.BlockToExecutableData(b, nil, nil, nil).ExecutionPayload
 	var blobHashes = make([]common.Hash, 0)
 	for _, tx := range b.Transactions() {
-		// Fill in transactions list.
-		bin, err := tx.MarshalBinary()
-		if err != nil {
-			panic(err)
-		}
-		ed.Transactions = append(ed.Transactions, bin)
 		// Collect blob hashes for post-Cancun blocks.
 		blobHashes = append(blobHashes, tx.BlobHashes()...)
 	}
@@ -90,13 +67,20 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 	var params = []any{ed}
 	cfg := g.genesis.Config
 	switch {
+	case cfg.IsAmsterdam(b.Number(), b.Time()):
+		method = "engine_newPayloadV5"
+		requests, ok := g.clRequests[b.NumberU64()]
+		if !ok {
+			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
+		}
+		params = append(params, blobHashes, b.BeaconRoot(), encodeEngineRequests(requests))
 	case cfg.IsPrague(b.Number(), b.Time()):
 		method = "engine_newPayloadV4"
 		requests, ok := g.clRequests[b.NumberU64()]
 		if !ok {
 			panic(fmt.Sprintf("missing execution requests for block %d", b.NumberU64()))
 		}
-		params = append(params, blobHashes, b.BeaconRoot(), requests)
+		params = append(params, blobHashes, b.BeaconRoot(), encodeEngineRequests(requests))
 	case cfg.IsCancun(b.Number(), b.Time()):
 		method = "engine_newPayloadV3"
 		params = append(params, blobHashes, b.BeaconRoot())
@@ -107,6 +91,14 @@ func (g *generator) block2newpayload(b *types.Block) *rpcRequest {
 	}
 	id := fmt.Sprintf("np%d", b.NumberU64())
 	return &rpcRequest{JsonRPC: "2.0", ID: id, Method: method, Params: params}
+}
+
+func encodeEngineRequests(requests [][]byte) []hexutil.Bytes {
+	encoded := make([]hexutil.Bytes, len(requests))
+	for i := range requests {
+		encoded[i] = requests[i]
+	}
+	return encoded
 }
 
 func (g *generator) block2fcu(b *types.Block) *rpcRequest {
@@ -123,17 +115,24 @@ func (g *generator) block2fcu(b *types.Block) *rpcRequest {
 	}
 
 	var method string
+	var params []any
 	cfg := g.genesis.Config
 	switch {
+	case cfg.IsAmsterdam(b.Number(), b.Time()):
+		method = "engine_forkchoiceUpdatedV4"
+		params = []any{&fc, nil, nil}
 	case cfg.IsCancun(b.Number(), b.Time()):
 		method = "engine_forkchoiceUpdatedV3"
+		params = []any{&fc, nil}
 	case cfg.IsShanghai(b.Number(), b.Time()):
 		method = "engine_forkchoiceUpdatedV2"
+		params = []any{&fc, nil}
 	default:
 		method = "engine_forkchoiceUpdatedV1"
+		params = []any{&fc, nil}
 	}
 	id := fmt.Sprintf("fcu%d", b.NumberU64())
-	return &rpcRequest{JsonRPC: "2.0", ID: id, Method: method, Params: []any{&fc, nil}}
+	return &rpcRequest{JsonRPC: "2.0", ID: id, Method: method, Params: params}
 }
 
 type rpcRequest struct {

@@ -28,6 +28,7 @@ var outputFunctions = map[string]func(*generator) error{
 	"newpayload":     (*generator).writeEngineNewPayload,
 	"headfcu":        (*generator).writeEngineHeadFcU,
 	"headnewpayload": (*generator).writeEngineHeadNewPayload,
+	"bal":            (*generator).writeBlockAccessLists,
 }
 
 func outputFunctionNames() []string {

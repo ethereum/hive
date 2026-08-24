@@ -55,6 +55,7 @@ func (g *generator) writeForkEnv() error {
 	setTime("HIVE_OSAKA_TIMESTAMP", cfg.OsakaTime)
 	setTime("HIVE_BPO1_TIMESTAMP", cfg.BPO1Time)
 	setTime("HIVE_BPO2_TIMESTAMP", cfg.BPO2Time)
+	setTime("HIVE_AMSTERDAM_TIMESTAMP", cfg.AmsterdamTime)
 
 	// blob schedule
 	setBlobConfig := func(fork string, bc *params.BlobConfig) {
@@ -67,7 +68,9 @@ func (g *generator) writeForkEnv() error {
 	if cfg.BlobScheduleConfig != nil {
 		setBlobConfig("CANCUN", cfg.BlobScheduleConfig.Cancun)
 		setBlobConfig("PRAGUE", cfg.BlobScheduleConfig.Prague)
-		setBlobConfig("OSAKA", cfg.BlobScheduleConfig.Osaka)
+		// Named forks inherit the most recent BPO configuration. Keep exporting
+		// the Osaka aliases for client mappers which still model it explicitly.
+		setBlobConfig("OSAKA", cfg.BlobScheduleConfig.Prague)
 		setBlobConfig("BPO1", cfg.BlobScheduleConfig.BPO1)
 		setBlobConfig("BPO2", cfg.BlobScheduleConfig.BPO2)
 	}

@@ -132,6 +132,14 @@ func (g *generator) run() error {
 	// Import the chain. This runs all block validation rules.
 	bc, err := g.importChain(engine, chain)
 	if err != nil {
+		// The regular output stage doesn't run when import fails, so dump the access
+		// lists of the generated blocks here. Note these are the lists produced by
+		// block assembly, not the ones recomputed by the failing import.
+		if slices.Contains(g.cfg.outputs, "bal") {
+			if derr := g.dumpBlockAccessLists(chain); derr != nil {
+				fmt.Println("warning: can't write block access lists:", derr)
+			}
+		}
 		return err
 	}
 

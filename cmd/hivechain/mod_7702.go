@@ -110,7 +110,15 @@ func (m *mod7702) authorizeCode(ctx *genBlockContext) error {
 		To:        common.Address{},
 		AuthList:  []types.SetCodeAuthorization{auth},
 	}
-	gas, err := core.IntrinsicGas(txdata.Data, txdata.AccessList, txdata.AuthList, false, true, true, true)
+	gas, err := core.IntrinsicGas(
+		txdata.Data,
+		txdata.AccessList,
+		txdata.AuthList,
+		sender.addr,
+		&txdata.To,
+		uint256.NewInt(0),
+		ctx.ChainConfig().Rules(ctx.Number(), true, ctx.Timestamp()),
+	)
 	if err != nil {
 		panic(err)
 	}

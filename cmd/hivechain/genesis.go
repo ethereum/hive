@@ -50,6 +50,7 @@ var (
 		"osaka",
 		"bpo1",
 		"bpo2",
+		"amsterdam",
 	}
 )
 
@@ -111,13 +112,14 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.BlobScheduleConfig.Prague = params.DefaultPragueBlobConfig
 		case "osaka":
 			chaincfg.OsakaTime = &timestamp
-			chaincfg.BlobScheduleConfig.Osaka = params.DefaultOsakaBlobConfig
 		case "bpo1":
 			chaincfg.BPO1Time = &timestamp
 			chaincfg.BlobScheduleConfig.BPO1 = params.DefaultBPO1BlobConfig
 		case "bpo2":
 			chaincfg.BPO2Time = &timestamp
 			chaincfg.BlobScheduleConfig.BPO2 = params.DefaultBPO2BlobConfig
+		case "amsterdam":
+			chaincfg.AmsterdamTime = &timestamp
 		default:
 			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
@@ -158,6 +160,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	}
 	addCancunSystemContracts(g.Alloc)
 	addPragueSystemContracts(g.Alloc)
+	addAmsterdamSystemContracts(g.Alloc)
 	addSnapTestContract(g.Alloc)
 	addModContracts(g.Alloc)
 
@@ -175,6 +178,16 @@ func addPragueSystemContracts(ga types.GenesisAlloc) {
 	ga[params.HistoryStorageAddress] = types.Account{Balance: big.NewInt(1), Code: params.HistoryStorageCode}
 	ga[params.WithdrawalQueueAddress] = types.Account{Balance: big.NewInt(1), Code: params.WithdrawalQueueCode}
 	ga[params.ConsolidationQueueAddress] = types.Account{Balance: big.NewInt(1), Code: params.ConsolidationQueueCode}
+}
+
+func addAmsterdamSystemContracts(ga types.GenesisAlloc) {
+	ga[params.BuilderDepositAddress] = types.Account{Balance: big.NewInt(1), Code: params.BuilderDepositCode}
+	ga[params.BuilderExitAddress] = types.Account{Balance: big.NewInt(1), Code: params.BuilderExitCode}
+	ga[params.DeterministicFactoryAddress] = types.Account{
+		Balance: new(big.Int),
+		Nonce:   1,
+		Code:    params.DeterministicFactoryCode,
+	}
 }
 
 func addSnapTestContract(ga types.GenesisAlloc) {
