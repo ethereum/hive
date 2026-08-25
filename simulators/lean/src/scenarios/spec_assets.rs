@@ -296,6 +296,15 @@ async fn post_json_raw(client: &Client, path: &str, payload: &Value) -> reqwest:
         .unwrap_or_else(|err| panic!("failed to POST {url}: {err}"))
 }
 
+fn driver_step_request(step: &Value) -> Value {
+    let mut request = step.clone();
+    if let Some(object) = request.as_object_mut() {
+        object.remove("checks");
+        object.remove("storeSnapshot");
+    }
+    request
+}
+
 async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
     let steps = fixture
         .case
@@ -326,7 +335,8 @@ async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
     );
 
     for (index, step) in steps.iter().enumerate() {
-        let response = post_json(client, "/lean/v0/test_driver/fork_choice/step", step).await;
+        let request = driver_step_request(step);
+        let response = post_json(client, "/lean/v0/test_driver/fork_choice/step", &request).await;
         let response: DriverStepResponse = response.json().await.unwrap_or_else(|err| {
             panic!("failed to decode fork-choice step response at step {index}: {err}")
         });
@@ -337,9 +347,7 @@ async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
                 response.error
             );
         }
-        if let Some(checks) = step.get("checks") {
-            assert_fork_choice_checks(index, &response.snapshot, checks);
-        }
+        assert_fork_choice_checks(index, &response.snapshot, step);
     }
 }
 
@@ -355,68 +363,58 @@ fn expects_fork_choice_init_failure(case: &Value, steps: &[Value]) -> bool {
             .is_some_and(|description| description.contains("anchor_valid=False"))
 }
 
-fn assert_fork_choice_checks(step_index: usize, snapshot: &DriverSnapshot, checks: &Value) {
-    if let Some(expected) = checks.get("headSlot").and_then(Value::as_u64) {
+fn assert_fork_choice_checks(step_index: usize, snapshot: &DriverSnapshot, step: &Value) {
+    let Some(checks) = step.get("checks") else {
+        return;
+    };
+    // `expected_store` holds fixture expectations; `snapshot` holds the client's
+    // actual store state. Every assertion below is expected against actual store state.
+    let expected_store = step.get("storeSnapshot");
+
+    let assert_slot = |key: &str, actual: u64| {
+        if let Some(expected) = checks.get(key).and_then(Value::as_u64) {
+            assert_eq!(actual, expected, "step {step_index} {key} mismatch");
+        }
+    };
+    assert_slot("headSlot", snapshot.head_slot);
+    assert_slot("time", snapshot.time);
+    assert_slot("latestJustifiedSlot", snapshot.justified_checkpoint.slot);
+    assert_slot("latestFinalizedSlot", snapshot.finalized_checkpoint.slot);
+
+    // Root checks pin a symbolic label, so the expected root comes from the
+    // fixture's snapshot.
+    let assert_root = |key: &str, pointer: &str, actual: &str| {
+        if checks.get(key).and_then(Value::as_str).is_none() {
+            return;
+        }
+        let Some(expected) = expected_store
+            .and_then(|store| store.pointer(pointer))
+            .and_then(Value::as_str)
+        else {
+            return;
+        };
         assert_eq!(
-            snapshot.head_slot, expected,
-            "step {step_index} headSlot mismatch"
-        );
-    }
-    if let Some(expected) = checks.get("headRoot").and_then(Value::as_str) {
-        assert_eq!(
-            normalize_hex(&snapshot.head_root),
+            normalize_hex(actual),
             normalize_hex(expected),
-            "step {step_index} headRoot mismatch"
+            "step {step_index} {key} mismatch"
         );
-    }
-    if let Some(expected) = checks.get("time").and_then(Value::as_u64) {
-        assert_eq!(snapshot.time, expected, "step {step_index} time mismatch");
-    }
-    if let Some(expected) = checks
-        .pointer("/justifiedCheckpoint/slot")
-        .and_then(Value::as_u64)
-    {
-        assert_eq!(
-            snapshot.justified_checkpoint.slot, expected,
-            "step {step_index} justified slot mismatch"
-        );
-    }
-    if let Some(expected) = checks
-        .pointer("/justifiedCheckpoint/root")
-        .and_then(Value::as_str)
-    {
-        assert_eq!(
-            normalize_hex(&snapshot.justified_checkpoint.root),
-            normalize_hex(expected),
-            "step {step_index} justified root mismatch"
-        );
-    }
-    if let Some(expected) = checks
-        .pointer("/finalizedCheckpoint/slot")
-        .and_then(Value::as_u64)
-    {
-        assert_eq!(
-            snapshot.finalized_checkpoint.slot, expected,
-            "step {step_index} finalized slot mismatch"
-        );
-    }
-    if let Some(expected) = checks
-        .pointer("/finalizedCheckpoint/root")
-        .and_then(Value::as_str)
-    {
-        assert_eq!(
-            normalize_hex(&snapshot.finalized_checkpoint.root),
-            normalize_hex(expected),
-            "step {step_index} finalized root mismatch"
-        );
-    }
-    if let Some(expected) = checks.get("safeTarget").and_then(Value::as_str) {
-        assert_eq!(
-            normalize_hex(&snapshot.safe_target),
-            normalize_hex(expected),
-            "step {step_index} safeTarget mismatch"
-        );
-    }
+    };
+    assert_root("headRootLabel", "/headRoot", &snapshot.head_root);
+    assert_root(
+        "latestJustifiedRootLabel",
+        "/latestJustified/root",
+        &snapshot.justified_checkpoint.root,
+    );
+    assert_root(
+        "latestFinalizedRootLabel",
+        "/latestFinalized/root",
+        &snapshot.finalized_checkpoint.root,
+    );
+    assert_root(
+        "safeTargetRootLabel",
+        "/safeTargetRoot",
+        &snapshot.safe_target,
+    );
 }
 
 async fn run_state_transition_fixture(client: &Client, fixture: &SpecFixtureCase) {
@@ -520,6 +518,10 @@ mod tests {
     };
 
     use serde_json::json;
+
+    use crate::scenarios::spec_assets::{
+        assert_fork_choice_checks, driver_step_request, DriverCheckpoint, DriverSnapshot,
+    };
 
     use super::{
         discover_fixture_cases, expected_case_rejection, expects_fork_choice_init_failure,
@@ -630,5 +632,122 @@ mod tests {
             &json!({ "rejectionReason": "LATER_STEP_FAILURE" }),
             &[json!({ "valid": false })]
         ));
+    }
+
+    fn snapshot_fixture() -> DriverSnapshot {
+        DriverSnapshot {
+            head_slot: 6,
+            head_root: "0xaa".to_string(),
+            time: 30,
+            justified_checkpoint: DriverCheckpoint {
+                slot: 4,
+                root: "0xbb".to_string(),
+            },
+            finalized_checkpoint: DriverCheckpoint {
+                slot: 2,
+                root: "0xcc".to_string(),
+            },
+            safe_target: "0xdd".to_string(),
+        }
+    }
+
+    #[test]
+    fn asserts_head_slot_from_fixture_key() {
+        let step = json!({ "checks": {"headSlot": 6}});
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    #[should_panic(expected = "headSlot mismatch")]
+    fn reject_head_slot_divergence() {
+        let step = json!({ "checks": {"headSlot": 4}});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn asserts_time_from_fixture_key() {
+        let step = json!({ "checks": {"time": 30}});
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    #[should_panic(expected = "time mismatch")]
+    fn rejects_time_mismatch() {
+        let step = json!({ "checks": {"time": 15}});
+        
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn asserts_latest_justified_slot_from_fixture_key() {
+        let step = json!({ "checks": {"latestJustifiedSlot": 4}});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    #[should_panic(expected = "latestJustifiedSlot mismatch")]
+    fn rejects_diverging_latest_justified_slot() {
+        let step = json!({"checks": { "latestJustifiedSlot": 5 }});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn asserts_latest_finalized_checkpoint_from_fixture_key() {
+        let step = json!({"checks": {"latestFinalizedSlot": 2}});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    #[should_panic(expected = "latestFinalizedSlot mismatch")]
+    fn rejects_diverging_latest_finalized_slot() {
+        let step = json!({"checks": {"latestFinalizedSlot": 3}});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn resolves_head_root_label_from_store_snapshot() {
+        let step = json!({
+            "checks": {"headRootLabel": "a_6"},
+            "storeSnapshot": {"headRoot": "0xAA"}
+        });
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    #[should_panic(expected = "headRootLabel mismatch")]
+    fn rejects_diverging_head_root_label() {
+        let step = json!({
+            "checks": {"headRootLabel": "a_6"},
+            "storeSnapshot": {"headRoot": "0xff"}
+        });
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn skips_root_labels_when_no_store_snapshot_is_present() {
+        let step = json!({"checks": {"headRootLabel": "a_6"}});
+
+        assert_fork_choice_checks(0, &snapshot_fixture(), &step);
+    }
+
+    #[test]
+    fn driver_step_request_omits_fixture_expectations() {
+        let step = json!({
+            "stepType": "block",
+            "checks": { "headSlot": 6},
+            "storeSnapshot": {"headRoot": "0xaa"}
+        });
+
+        let request = driver_step_request(&step);
+
+        assert!(request.get("stepType").is_some());
+        assert!(request.get("checks").is_none());
+        assert!(request.get("storeSnapshot").is_none());
     }
 }
