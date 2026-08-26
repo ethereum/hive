@@ -1,9 +1,12 @@
 package suite_withdrawals
 
 import (
+	"math/big"
 	"testing"
 
+	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	enginetest "github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
 type BaseSpecExpected struct {
@@ -48,6 +51,30 @@ func TestBaseSpecFunctions(t *testing.T) {
 		if spec.GetTotalPayloadCount() != tc.ExpectedTotalPayloadCount {
 			t.Fatalf("tc %d: unexpected total payload count, expected=%d, got=%d", i, tc.ExpectedTotalPayloadCount, spec.GetTotalPayloadCount())
 		}
+	}
+}
+
+func TestConfigureCLMock(t *testing.T) {
+	spec := WithdrawalsBaseSpec{
+		BaseSpec: enginetest.BaseSpec{
+			SlotsToSafe:      big.NewInt(32),
+			SlotsToFinalized: big.NewInt(64),
+		},
+		TimeIncrements: 12,
+	}
+	cl := new(clmock.CLMocker)
+
+	spec.ConfigureCLMock(cl)
+
+	if cl.SlotsToSafe == nil || cl.SlotsToSafe.Cmp(spec.SlotsToSafe) != 0 {
+		t.Fatalf("unexpected slots to safe: want %v, got %v", spec.SlotsToSafe, cl.SlotsToSafe)
+	}
+	if cl.SlotsToFinalized == nil || cl.SlotsToFinalized.Cmp(spec.SlotsToFinalized) != 0 {
+		t.Fatalf("unexpected slots to finalized: want %v, got %v", spec.SlotsToFinalized, cl.SlotsToFinalized)
+	}
+	wantTimeIncrement := big.NewInt(int64(spec.GetBlockTimeIncrements()))
+	if cl.BlockTimestampIncrement == nil || cl.BlockTimestampIncrement.Cmp(wantTimeIncrement) != 0 {
+		t.Fatalf("unexpected block timestamp increment: want %v, got %v", wantTimeIncrement, cl.BlockTimestampIncrement)
 	}
 }
 

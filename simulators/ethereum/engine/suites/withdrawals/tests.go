@@ -1052,6 +1052,7 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 // Changes the CL Mocker default time increments of 1 to the value specified
 // in the test spec.
 func (ws *WithdrawalsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
+	ws.BaseSpec.ConfigureCLMock(cl)
 	cl.BlockTimestampIncrement = big.NewInt(int64(ws.GetBlockTimeIncrements()))
 }
 
