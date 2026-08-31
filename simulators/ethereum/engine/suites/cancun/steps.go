@@ -642,6 +642,8 @@ type SendBlobTransactions struct {
 	ReplaceTransactions bool
 	// Skip verification of retrieving the tx from node
 	SkipVerificationFromNode bool
+	// Recipient of the blob transactions
+	Recipient *common.Address
 	// Account index to send the blob transactions from
 	AccountIndex uint64
 	// Client index to send the blob transactions to
@@ -658,7 +660,10 @@ func (step SendBlobTransactions) GetBlobsPerTransaction() uint64 {
 
 func (step SendBlobTransactions) Execute(t *TestContext) error {
 	// Send a blob transaction
-	addr := common.BigToAddress(cancun.DATAHASH_START_ADDRESS)
+	recipient := common.BigToAddress(cancun.DATAHASH_START_ADDRESS)
+	if step.Recipient != nil {
+		recipient = *step.Recipient
+	}
 	blobCountPerTx := step.GetBlobsPerTransaction()
 	var engine client.EngineClient
 	if step.ClientIndex >= uint64(len(t.Engines)) {
@@ -668,7 +673,7 @@ func (step SendBlobTransactions) Execute(t *TestContext) error {
 	//  Send the blob transactions
 	for bTx := uint64(0); bTx < step.TransactionCount; bTx++ {
 		blobTxCreator := &helper.BlobTransactionCreator{
-			To:         &addr,
+			To:         &recipient,
 			GasLimit:   100000,
 			GasTip:     step.BlobTransactionGasTipCap,
 			GasFee:     step.BlobTransactionGasFeeCap,

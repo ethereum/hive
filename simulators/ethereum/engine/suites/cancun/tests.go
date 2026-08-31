@@ -18,6 +18,7 @@ import (
 // Precalculate the first data gas cost increase
 var (
 	DATA_GAS_COST_INCREMENT_EXCEED_BLOBS = GetMinExcessBlobsForBlobGasPrice(2)
+	blobPackingRecipient                 = common.Address{}
 )
 
 func pUint64(v uint64) *uint64 {
@@ -258,13 +259,17 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Multiple Accounts",
+			Name: "Blob Transaction Packing, Multiple Accounts",
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
-			using account A.
-			Send N blob transactions with 1 blob each from account B.
-			Verify that the payloads are created with the correct ordering:
-			 - All payloads must have full blobs.
+			Send cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions with
+			cancun.MAX_BLOBS_PER_BLOCK-1 blobs each, using account A, to an EOA.
+			Each has cancun.MAX_BLOBS_PER_BLOCK-1 times the execution tip of a
+			single-blob transaction.
+			Send twice as many single-blob transactions from account B.
+			The multi-blob transaction plus a single-blob transaction have the same
+			execution cost and priority-fee revenue as
+			cancun.MAX_BLOBS_PER_BLOCK single-blob transactions, so every payload
+			must fill the blob capacity.
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
@@ -272,23 +277,30 @@ var Tests = []test.Spec{
 		},
 
 		TestSequence: TestSequence{
-			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions from
-			// account A.
+			// Send the multi-blob transactions from account A.
 			SendBlobTransactions{
-				TransactionCount:              5,
+				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(120),
-				AccountIndex:                  0,
+				BlobTransactionGasFeeCap:      globals.GasPrice,
+				BlobTransactionGasTipCap: new(big.Int).Mul(
+					globals.GasTipPrice,
+					big.NewInt(int64(cancun.MAX_BLOBS_PER_BLOCK-1)),
+				),
+				Recipient:    &blobPackingRecipient,
+				AccountIndex: 0,
 			},
-			// Then send the single-blob transactions from account B
+			// Send enough single-blob transactions to fill every payload via either packing.
 			SendBlobTransactions{
-				TransactionCount:              5,
+				TransactionCount:              2 * (cancun.MAX_BLOBS_PER_BLOCK - 1),
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+				BlobTransactionGasFeeCap:      globals.GasPrice,
+				BlobTransactionGasTipCap:      globals.GasTipPrice,
+				Recipient:                     &blobPackingRecipient,
 				AccountIndex:                  1,
 			},
 
-			// All payloads have full blobs
 			NewPayloads{
 				PayloadCount:              5,
 				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
@@ -299,14 +311,17 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Multiple Clients",
+			Name: "Blob Transaction Packing, Multiple Clients",
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
-			using account A, to client A.
-			Send N blob transactions with 1 blob each from account B, to client
-			B.
-			Verify that the payloads are created with the correct ordering:
-			 - All payloads must have full blobs.
+			Send cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions with
+			cancun.MAX_BLOBS_PER_BLOCK-1 blobs each from account A to an EOA via
+			client A. Each has cancun.MAX_BLOBS_PER_BLOCK-1 times the execution tip
+			of a single-blob transaction.
+			Send twice as many single-blob transactions from account B to client B.
+			The multi-blob transaction plus a single-blob transaction have the same
+			execution cost and priority-fee revenue as
+			cancun.MAX_BLOBS_PER_BLOCK single-blob transactions, so every payload
+			must fill the blob capacity.
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
@@ -330,26 +345,33 @@ var Tests = []test.Spec{
 				ExpectedIncludedBlobCount: 0,
 			},
 
-			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions from
-			// account A, to client A.
+			// Send the multi-blob transactions from account A to client A.
 			SendBlobTransactions{
-				TransactionCount:              5,
+				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(120),
-				AccountIndex:                  0,
-				ClientIndex:                   0,
+				BlobTransactionGasFeeCap:      globals.GasPrice,
+				BlobTransactionGasTipCap: new(big.Int).Mul(
+					globals.GasTipPrice,
+					big.NewInt(int64(cancun.MAX_BLOBS_PER_BLOCK-1)),
+				),
+				Recipient:    &blobPackingRecipient,
+				AccountIndex: 0,
+				ClientIndex:  0,
 			},
-			// Then send the single-blob transactions from account B, to client
-			// B.
+			// Send enough single-blob transactions from account B to client B to
+			// fill every payload via either packing.
 			SendBlobTransactions{
-				TransactionCount:              5,
+				TransactionCount:              2 * (cancun.MAX_BLOBS_PER_BLOCK - 1),
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+				BlobTransactionGasFeeCap:      globals.GasPrice,
+				BlobTransactionGasTipCap:      globals.GasTipPrice,
+				Recipient:                     &blobPackingRecipient,
 				AccountIndex:                  1,
 				ClientIndex:                   1,
 			},
 
-			// All payloads have full blobs
 			NewPayloads{
 				PayloadCount:              5,
 				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
