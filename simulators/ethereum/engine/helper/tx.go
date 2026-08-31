@@ -559,7 +559,31 @@ func (txSender *TransactionSender) SendTransaction(testCtx context.Context, acco
 			return nil, errors.Wrapf(testCtx.Err(), "timeout retrying SendTransaction, last error: %v", err)
 		}
 	}
+	// Wait until the transaction is pending in the producer's pool so a payload
+	// built immediately afterwards includes it. See ethereum/hive#1351.
+	_ = WaitForTransactionPending(testCtx, node, tx.Hash())
 	return tx, nil
+}
+
+// transactionPendingTimeout bounds the best-effort wait for a sent transaction
+// to become pending before falling back to the previous timing behavior.
+const transactionPendingTimeout = 10 * time.Second
+
+// WaitForTransactionPending blocks until node reports txHash as pending in its
+// transaction pool, or transactionPendingTimeout elapses.
+func WaitForTransactionPending(testCtx context.Context, node client.EngineClient, txHash common.Hash) error {
+	ctx, cancel := context.WithTimeout(testCtx, transactionPendingTimeout)
+	defer cancel()
+	for {
+		if _, isPending, err := node.TransactionByHash(ctx, txHash); err == nil && isPending {
+			return nil
+		}
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func (txSender *TransactionSender) SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
