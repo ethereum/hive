@@ -34,7 +34,38 @@ func WithInitialNetworks(networks []string) StartOption {
 	return optionFunc(func(setup *clientSetup) {
 		setup.config.Networks = make([]string, len(networks))
 		copy(setup.config.Networks, networks)
+		for network := range setup.config.NetworkEndpoints {
+			if !containsString(setup.config.Networks, network) {
+				setup.config.Networks = append(setup.config.Networks, network)
+			}
+		}
 	})
+}
+
+// WithInitialNetworkConfig configures a network the client is initially connected to
+// using the given endpoint settings.
+func WithInitialNetworkConfig(network string, config NetworkEndpointConfig) StartOption {
+	return optionFunc(func(setup *clientSetup) {
+		if !containsString(setup.config.Networks, network) {
+			setup.config.Networks = append(setup.config.Networks, network)
+		}
+		if setup.config.NetworkEndpoints == nil {
+			setup.config.NetworkEndpoints = make(map[string]simapi.NetworkEndpointConfig)
+		}
+		setup.config.NetworkEndpoints[network] = simapi.NetworkEndpointConfig{
+			IPv4Address: config.IPv4Address,
+			IPv6Address: config.IPv6Address,
+		}
+	})
+}
+
+func containsString(values []string, value string) bool {
+	for _, existing := range values {
+		if existing == value {
+			return true
+		}
+	}
+	return false
 }
 
 // WithStaticFiles adds files from the local filesystem to the client. Map: destination file path -> source file path.
