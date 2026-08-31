@@ -122,6 +122,9 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
 fi
+if [ "$HIVE_TARGET_GAS_LIMIT" != "" ]; then
+    FLAGS="$FLAGS --target-gas-limit=$HIVE_TARGET_GAS_LIMIT"
+fi
 FLAGS="$FLAGS --min-gas-price=1 --tx-pool-price-bump=0 --rpc-gas-cap=50000000"
 
 # Configure peer-to-peer networking.

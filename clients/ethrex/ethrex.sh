@@ -95,6 +95,9 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
     echo "Warning: miner extra data not supported."
     exit 1
 fi
+if [ "$HIVE_TARGET_GAS_LIMIT" != "" ]; then
+    FLAGS="$FLAGS --builder.gas-limit $HIVE_TARGET_GAS_LIMIT"
+fi
 
 # Import clique signing key.
 if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then

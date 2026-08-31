@@ -128,6 +128,9 @@ fi
 #if [ "$HIVE_MINER_EXTRA" != "" ]; then
 #    FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 #fi
+if [ "$HIVE_TARGET_GAS_LIMIT" != "" ]; then
+    FLAGS="$FLAGS --builder.gaslimit $HIVE_TARGET_GAS_LIMIT"
+fi
 
 # Import clique signing key.
 # TODO
