@@ -1,0 +1,6 @@
+- client: grandine-specs
+- client: lighthouse-specs
+- client: lodestar-specs
+- client: nimbus-specs
+- client: prysm-specs
+- client: teku-specs

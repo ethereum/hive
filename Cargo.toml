@@ -1,6 +1,6 @@
 [workspace]
 members = ["hivesim-rs", "simulators/lean"]
-exclude = ["simulators/portal"]
+exclude = ["simulators/cl", "simulators/portal"]
 default-members = ["simulators/lean"]
 resolver = "2"
 
