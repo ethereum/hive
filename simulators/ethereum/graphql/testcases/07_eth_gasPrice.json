@@ -4,12 +4,7 @@
   "responses": [
     {
       "data" : {
-        "gasPrice" : "0x10"
-      }
-    },
-    {
-      "data" : {
-        "gasPrice" : "0x1"
+        "gasPrice" : "0x3446428a"
       }
     }
   ],
