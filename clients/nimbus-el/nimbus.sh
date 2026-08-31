@@ -69,6 +69,10 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
   FLAGS="$FLAGS --network:$HIVE_NETWORK_ID"
 fi
 
+if [ "$HIVE_TARGET_GAS_LIMIT" != "" ]; then
+  FLAGS="$FLAGS --gas-limit:$HIVE_TARGET_GAS_LIMIT"
+fi
+
 # Configure the chain.
 jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --network:/genesis-start.json"
