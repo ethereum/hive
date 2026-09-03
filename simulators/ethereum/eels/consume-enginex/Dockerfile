@@ -5,12 +5,22 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 ARG fixtures=stable@latest
 ENV FIXTURES=${fixtures}
 ARG branch=""
+# Optional token for authenticated GitHub clones; anonymous clones are
+# rate-limited per IP and fail intermittently on shared CI runners. Pass only
+# short-lived tokens (e.g. the Actions job token): the classic builder records
+# build-arg values in the image history.
+ARG github_token=""
 
 ## Clone and install EELS
 RUN apt-get update && apt-get install -y git isal
 
 # Clone repo and use the default branch if none specified
-RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
+RUN if [ -n "$github_token" ]; then \
+        export GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$github_token" | base64 -w0)"; \
+    fi && \
+    git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
     cd execution-specs && \
     if [ -n "$branch" ]; then \
     git fetch --depth 1 origin "$branch" && \
