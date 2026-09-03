@@ -108,7 +108,7 @@ func filterClientDesignators(clients []ClientDesignator) []ClientDesignator {
 
 		// Filter build args
 		for key, value := range client.BuildArgs {
-			if !excludedBuildArgs[key] {
+			if !isSensitiveBuildArg(key) {
 				filteredClient.BuildArgs[key] = value
 			}
 		}
@@ -123,8 +123,11 @@ func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefiniti
 		hiveInfo.Commit, hiveInfo.Date = hiveVersion()
 	}
 
-	// Filter sensitive build args from HiveInfo.ClientFile
+	// Filter sensitive build args from HiveInfo.ClientFile and from the
+	// recorded command line: both end up in the results JSON and are served
+	// to simulators by the /hive endpoint.
 	hiveInfo.ClientFile = filterClientDesignators(hiveInfo.ClientFile)
+	hiveInfo.Command = redactCommandArgs(hiveInfo.Command)
 
 	return &TestManager{
 		clientDefs:        clients,
