@@ -4,20 +4,18 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 [ethereum/execution-specs](https://github.com/ethereum/execution-specs) against
 clients. Each simulator's default Dockerfile starts from a pre-built image
 published by that repository under `ghcr.io/ethereum/execution-specs/hive/`.
-Nothing is cloned or downloaded when hive builds the simulator image; hive pulls
-one image and adds a few metadata layers. `Dockerfile.git` in each directory
+Hive pulls the image without cloning execution-specs, installing dependencies or
+extracting fixtures during the simulator build. `Dockerfile.git` in each directory
 builds the simulator from source instead, see
 [Building from source](#building-from-source).
 
 ## What a tag selects
 
-**A tag selects the version of the tests. The simulator and framework code
-follows the head of the branch the tests belong to.** A `consume` simulator
-carries the release's generated fixtures; an `execute` simulator carries the
-release's Python test sources, snapshotted at the commit that produced it. In
-both, the framework, exception mappings included, is the branch head, so runner
-fixes arrive without a new test release, and `consume-engine` and
-`execute-blobs` under the same tag run the same tests.
+A tag selects the version of the tests. A `consume` image contains the release's
+generated fixtures; an `execute` image contains its Python test sources. Images
+for the current release of a branch receive framework updates when that branch
+moves. Older releases retain the framework from their last image build. Nightly
+images use the tests and framework from the nightly fill's commit.
 
 | Simulator | Image | Test content in the image |
 | --- | --- | --- |
@@ -38,8 +36,8 @@ fixes arrive without a new test release, and `consume-engine` and
 
 ## Tags
 
-A tag is an execution-specs release name, the one `consume --input` accepts,
-with `@` replaced by `-`, or a channel that follows the releases of a line.
+Release tags omit the `tests@` prefix for mainnet releases. For devnet releases,
+they omit `tests-` and replace `@` with `-`. Channel tags follow a release line.
 Examples: release 8.1.4 of the Glamsterdam devnet, cut from
 `devnets/glamsterdam/8`, and mainnet release 20.0.2.
 
@@ -52,7 +50,7 @@ Examples: release 8.1.4 of the Glamsterdam devnet, cut from
 
 `latest` is what `consume --input tests@latest` resolves, `glamsterdam-devnet-8`
 is to devnet 8 what `latest` is to the default branch, and no tag is named after
-a fork. Channel tags are rebuilt whenever their branch moves; a release tag
+a fork. Release channels are rebuilt whenever their branch moves; a release tag
 keeps the framework of its last build once a newer release of its branch
 exists. Tags name sources, not bytes: to run the exact image of a previous run,
 append its digest to the tag, `tag=latest@sha256:<digest>`. The simulator log
@@ -68,8 +66,8 @@ fixture release with `consume cache`. Select it with `dockerfile: git` in a
 defaults to the repository's default branch, and `fixtures`, the `consume
 --input` value that defaults to `tests@latest`. The release name behind an
 image tag, `tests-glamsterdam-devnet@v8.1.4` for `glamsterdam-devnet-v8.1.4`, is
-the `fixtures` input that gives the source build the same tests, and a commit
-from a simulator log header as `branch` reproduces a run's sources from source:
+the `fixtures` input that gives consume source builds the same fixtures, and
+`branch` selects the framework source:
 
 ```yaml
 - simulator: ethereum/eels/consume-rlp
@@ -82,6 +80,11 @@ from a simulator log header as `branch` reproduces a run's sources from source:
 The simulator build parameters section of [docs/commandline.md] pairs each tag
 with its release name and branch.
 
+The default Dockerfiles do not accept `branch` or `fixtures`. Existing callers
+must switch to `tag` or select `Dockerfile.git`; Docker does not reject unused
+build arguments. For `execute-blobs`, a source build runs the tests from `branch`,
+whereas a release image contains the release's test sources.
+
 ## Examples
 
 ```sh
@@ -91,10 +94,10 @@ with its release name and branch.
 # follow the glamsterdam devnet 8 releases, as a dashboard for that devnet does
 ./hive --sim ethereum/eels/consume-engine --client go-ethereum --sim.buildarg tag=glamsterdam-devnet-8
 
-# last night's fill of the main line
+# most recent nightly fill of the main line
 ./hive --sim ethereum/eels/consume-engine --client go-ethereum --sim.buildarg tag=nightly
 
-# a pinned release
+# a specific test release
 ./hive --sim ethereum/eels/consume-engine --client go-ethereum --sim.buildarg tag=glamsterdam-devnet-v8.1.4
 
 # an image built locally with packages/testing/docker/hive/build.sh in execution-specs
@@ -106,4 +109,4 @@ machine. The tag scheme, how the images are built and how to assemble a
 combination that is not published are documented in the execution-specs
 repository under `docs/running_tests/hive/images/`.
 
-[docs/commandline.md]: ../../../docs/commandline.md
+[docs/commandline.md]: ../../../../docs/commandline.md

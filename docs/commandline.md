@@ -135,8 +135,8 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 `Dockerfile` accepts:
 
 - `tag`: The image tag. It selects the tests; the simulator code in the image is the
-  head of the branch the tests belong to. Defaults to `latest`. `<tag>@sha256:<digest>`
-  pins an exact image.
+  framework revision chosen when the image was published. Defaults to `latest`.
+  `<tag>@sha256:<digest>` pins an exact image.
 - `image`: The image name, to use another registry namespace or a locally built image.
   Defaults to the published image of the simulator.
 
@@ -152,10 +152,10 @@ Both files accept `disable_strict_exception_matching` on `consume-engine` and
 `consume-enginex`, which defaults to `nimbus-el` and is passed to consume's corresponding
 option, and `fork` on `execute-blobs`, which defaults to `Osaka`.
 
-An image tag is an execution-specs release name with `@` replaced by `-`, or a channel
-that follows the releases of a line. The release name is also the `fixtures` input that
-gives `Dockerfile.git` the same tests, and the branch the release was cut from is its
-`branch`:
+Mainnet release tags omit `tests@`; devnet release tags omit `tests-` and replace
+`@` with `-`. Channel tags follow the releases of a line. For consume simulators,
+the release name is the `fixtures` input for `Dockerfile.git`, and the branch the
+release was cut from is its `branch`:
 
 | `tag` | Release | `branch` |
 | --- | --- | --- |
@@ -165,6 +165,12 @@ gives `Dockerfile.git` the same tests, and the branch the release was cut from i
 | `glamsterdam-devnet-latest` | the highest `tests-glamsterdam-devnet@*` release | the branch of that devnet |
 | `latest` | the highest `tests@v*` release, as `tests@latest`; the default | empty, the default branch |
 | `nightly` | the most recent nightly fill of the default branch; no release | the default branch |
+
+Current-release images receive framework updates on branch pushes; older releases
+retain their last build. Nightly images use the nightly fill's commit.
+`execute-blobs` source builds run the tests from `branch`, while release images
+contain the release's test sources. Existing `branch` and `fixtures` arguments
+require `dockerfile: git`; the default Dockerfiles no longer use them.
 
 Tags name sources, not bytes; `tag=<tag>@sha256:<digest>` runs an exact image. The full
 tag scheme is described in the [EELS simulators README] and in the execution-specs

@@ -1,8 +1,7 @@
 # Runs the EELS (execution-specs) consume enginex simulator from the image published by
 # ethereum/execution-specs. The image contains the simulator code and the
 # blockchain_tests_engine_x fixtures it consumes, pre-alloc groups included.
-# The tag is the only build argument that selects what runs; see README.md in
-# this directory for the tag scheme.
+# Use tag to select the tests; see ../README.md for build arguments.
 ARG image=ghcr.io/ethereum/execution-specs/hive/consume-enginex
 ARG tag=latest
 
