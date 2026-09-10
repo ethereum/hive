@@ -23,9 +23,9 @@ RUN uv sync
 # Optionally keep pre-staged fixtures compressed in the image. A caller that
 # stages ./fixtures.tar.gz and passes fixtures=/fixtures gets the local fixtures;
 # otherwise FIXTURES stays a release/URL and consume downloads as before. The
-# `Dockerfile` anchor keeps COPY from failing when no tarball is staged.
-COPY Dockerfile fixtures.tar.gz* /staged/
-RUN rm -f /staged/Dockerfile && \
+# `Dockerfile.git` anchor keeps COPY from failing when no tarball is staged.
+COPY Dockerfile.git fixtures.tar.gz* /staged/
+RUN rm -f /staged/Dockerfile.git && \
     if [ "$FIXTURES" != /fixtures ] || [ ! -f /staged/fixtures.tar.gz ]; then \
         rm -rf /staged && uv run --no-sync consume cache --input "$FIXTURES"; \
     fi
