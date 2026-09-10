@@ -66,7 +66,7 @@ execution-specs, runs `uv sync` and, for the `consume-*` simulators, downloads a
 fixture release with `consume cache`. Select it with `dockerfile: git` in a
 `--sim.file` configuration. It takes `branch`, an execution-specs Git ref that
 defaults to the repository's default branch, and `fixtures`, the `consume
---input` value that defaults to `stable@latest`. The release name behind an
+--input` value that defaults to `tests@latest`. The release name behind an
 image tag, `tests-glamsterdam-devnet@v8.1.4` for `glamsterdam-devnet-v8.1.4`, is
 the `fixtures` input that gives the source build the same tests, and a commit
 from a simulator log header as `branch` reproduces a run's sources from source:

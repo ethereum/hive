@@ -145,8 +145,8 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 - `branch`: The execution-specs Git ref to build from. Empty, the default, uses the
   repository's default branch.
 - `fixtures`: The fixture input passed to `consume --input`: a release name such as
-  `tests@v20.0.2`, or a URL. Defaults to `stable@latest`, a legacy alias of
-  `tests@latest`, the latest mainnet release. `consume-*` only.
+  `tests@v20.0.2`, or a URL. Defaults to `tests@latest`, the latest mainnet release.
+  `consume-*` only.
 
 Both files accept `disable_strict_exception_matching` on `consume-engine` and
 `consume-enginex`, which defaults to `nimbus-el` and is passed to consume's corresponding
