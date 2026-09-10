@@ -2,10 +2,12 @@
 
 The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 [ethereum/execution-specs](https://github.com/ethereum/execution-specs) against
-clients. Each simulator's Dockerfile starts from a pre-built image published by
-that repository under `ghcr.io/ethereum/execution-specs/hive/`. Nothing is
-cloned or downloaded when hive builds the simulator image; hive pulls one image
-and adds a few metadata layers.
+clients. Each simulator's default Dockerfile starts from a pre-built image
+published by that repository under `ghcr.io/ethereum/execution-specs/hive/`.
+Nothing is cloned or downloaded when hive builds the simulator image; hive pulls
+one image and adds a few metadata layers. `Dockerfile.git` in each directory
+builds the simulator from source instead, see
+[Building from source](#building-from-source).
 
 ## What a tag selects
 
@@ -57,6 +59,29 @@ append its digest to the tag, `tag=latest@sha256:<digest>`. The simulator log
 header names the sources of every run as `consume ref` or `execute ref` and
 `fixtures release` or `tests release`.
 
+## Building from source
+
+`Dockerfile.git` in each simulator directory is the previous build: it clones
+execution-specs, runs `uv sync` and, for the `consume-*` simulators, downloads a
+fixture release with `consume cache`. Select it with `dockerfile: git` in a
+`--sim.file` configuration. It takes `branch`, an execution-specs Git ref that
+defaults to the repository's default branch, and `fixtures`, the `consume
+--input` value that defaults to `stable@latest`. The release name behind an
+image tag, `tests-glamsterdam-devnet@v8.1.4` for `glamsterdam-devnet-v8.1.4`, is
+the `fixtures` input that gives the source build the same tests, and a commit
+from a simulator log header as `branch` reproduces a run's sources from source:
+
+```yaml
+- simulator: ethereum/eels/consume-rlp
+  dockerfile: git
+  build_args:
+    branch: devnets/glamsterdam/8
+    fixtures: tests-glamsterdam-devnet@v8.1.4
+```
+
+The simulator build parameters section of [docs/commandline.md] pairs each tag
+with its release name and branch.
+
 ## Examples
 
 ```sh
@@ -80,3 +105,5 @@ Pass `--docker.pull` to refresh a moving tag that is already present on the
 machine. The tag scheme, how the images are built and how to assemble a
 combination that is not published are documented in the execution-specs
 repository under `docs/running_tests/hive/images/`.
+
+[docs/commandline.md]: ../../../docs/commandline.md
