@@ -647,22 +647,17 @@ func (n *GethNode) HeaderByHash(ctx context.Context, hash common.Hash) (*types.H
 
 func (n *GethNode) SendTransaction(ctx context.Context, tx typ.Transaction) error {
 	if v, ok := tx.(*types.Transaction); ok {
-		return n.eth.APIBackend.SendTx(ctx, v)
+		// The next payload can be requested immediately after submission.
+		return n.eth.TxPool().Add([]*types.Transaction{v}, true)[0]
 	}
 	return fmt.Errorf("invalid transaction type")
 }
 
 func (n *GethNode) SendTransactions(ctx context.Context, txs ...typ.Transaction) []error {
 	for _, tx := range txs {
-		if v, ok := tx.(*types.Transaction); ok {
-			err := n.eth.APIBackend.SendTx(ctx, v)
-			if err != nil {
-				return []error{err}
-			}
-		} else {
-			return []error{fmt.Errorf("invalid transaction type")}
+		if err := n.SendTransaction(ctx, tx); err != nil {
+			return []error{err}
 		}
-
 	}
 	return nil
 }
