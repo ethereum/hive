@@ -1,5 +1,5 @@
 # This simulation runs JSON-RPC API tests.
-FROM golang:1-alpine as builder
+FROM golang:1-alpine AS builder
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY}
 ARG branch=main
