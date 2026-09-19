@@ -17,18 +17,8 @@ RUN git init /execution-apis && \
 
 # Generate openrpc.json from the spec source. It is gitignored in
 # execution-apis (built by `make build`), so it is not present in the clone.
-# speconly tests validate responses against this schema. The flags mirror the
-# `build` target in execution-apis' Makefile.
-RUN cd /execution-apis/tools && go build -o specgen ./cmd/specgen && \
-    cd /execution-apis && ./tools/specgen -o openrpc.json -deref \
-      -schemas 'src/schemas' \
-      -schemas 'src/engine/openrpc/schemas' \
-      -methods 'src/eth' \
-      -methods 'src/debug' \
-      -methods 'src/txpool' \
-      -methods 'src/engine/openrpc/methods' \
-      -methods 'src/testing' \
-      -error-groups 'src/error-groups'
+# speconly tests validate responses against this schema.
+RUN cd /execution-apis && make build
 
 # To run local tests, copy the directory into the same as the simulator and
 # uncomment the line below
@@ -49,6 +39,7 @@ ADD . /source
 WORKDIR /source
 COPY --from=builder /source/rpc-compat .
 COPY --from=builder /execution-apis/tests ./tests
+COPY --from=builder /execution-apis/refs-openrpc.json ./refs-openrpc.json
 COPY --from=builder /execution-apis/openrpc.json ./openrpc.json
 
 ENTRYPOINT ["./rpc-compat"]
