@@ -5,7 +5,7 @@ ENV GOPROXY=${GOPROXY}
 ARG branch=main
 ENV GIT_REF=${branch}
 
-RUN apk add --update git ca-certificates gcc musl-dev linux-headers
+RUN apk add --update git ca-certificates gcc musl-dev linux-headers make
 
 # Clone the tests repo.
 # Allow the user to specify a branch or commit to checkout
