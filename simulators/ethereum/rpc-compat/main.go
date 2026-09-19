@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -75,19 +76,27 @@ conformance with the execution API specification.`[1:],
 }
 
 func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
+	// load the OpenRPC spec file so it can be accessed by test validation scripts.
+	specJSON, err := os.ReadFile("refs-openrpc.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	_, testPattern := t.Sim.TestPattern()
 	re := regexp.MustCompile(testPattern)
 	tests, err := iofile.LoadDirectory(t, "tests", re)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, test := range tests {
 		test := test
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("%s (%s)", test.Name, clientName),
 			Description: test.Comment,
 			Run: func(t *hivesim.T) {
-				if err := runTest(t, c, &test); err != nil {
+				scriptConfig := iofile.ScriptConfig{Log: t, OpenRPCSchema: specJSON}
+				if err := runTest(t, c, &test, scriptConfig); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -95,7 +104,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	}
 }
 
-func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test) error {
+func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig iofile.ScriptConfig) error {
 	var (
 		client    = &http.Client{Timeout: 5 * time.Second}
 		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
@@ -183,7 +192,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test) error {
 		t.Fatalf("unhandled response in test case")
 	}
 
-	return test.RunScript(t, responses)
+	return test.RunScript(scriptConfig, responses)
 }
 
 // redactErrorMessages removes the "message" field from every "error" object

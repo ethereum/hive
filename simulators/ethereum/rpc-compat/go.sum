@@ -35,6 +35,8 @@ github.com/ethereum/c-kzg-4844/v2 v2.1.6 h1:xQymkKCT5E2Jiaoqf3v4wsNgjZLY0lRSkZn2
 github.com/ethereum/c-kzg-4844/v2 v2.1.6/go.mod h1:8HMkUZ5JRv4hpw/XUrYWSQNAUzhHMg2UDb/U+5m+XNw=
 github.com/ethereum/execution-apis/tools v0.0.0-20260917221134-9c3b1d8a7cc2 h1:K9G2iIzs1oLhw/wt5hw9xxBsrITo7rhCXVwcn+RlBtY=
 github.com/ethereum/execution-apis/tools v0.0.0-20260917221134-9c3b1d8a7cc2/go.mod h1:iI6HjTxIy9Hz2GC+Er50aVMkAWJFiTWzn8z4EgGAmyA=
+github.com/ethereum/execution-apis/tools v0.0.0-20260919093351-64566ec4687a h1:PLsl4ybquMK4Bg/7f4UGBdeFRy6qIMTmpA28BepsxUw=
+github.com/ethereum/execution-apis/tools v0.0.0-20260919093351-64566ec4687a/go.mod h1:4Ak7DB97NabrjWA2rU2GRhNozz8b7hTazH7cmfcfIcE=
 github.com/ethereum/go-ethereum v1.17.5-0.20260707124025-4d2181aa413d h1:9/b5utVTZPQVUhAAJ0uz7+dhox5xVF6AFjVNJZfoNsw=
 github.com/ethereum/go-ethereum v1.17.5-0.20260707124025-4d2181aa413d/go.mod h1:W3iLMHC24CJJyHjpNH0vwBtyfiMyyeHzUtPINI1ShKQ=
 github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce h1:wgH9mh3TFSd+LFSsXO6RdTEO3niapJRywO1Xl3/IoIE=
@@ -176,6 +178,7 @@ golang.org/x/net v0.0.0-20220225172249-27dd8689420f/go.mod h1:CfG3xpIq0wQ8r1q4Su
 golang.org/x/net v0.0.0-20220607020251-c690dde0001d/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/net v0.50.0 h1:ucWh9eiCGyDR3vtzso0WMQinm2Dnt8cFMuQa9K33J60=
 golang.org/x/net v0.50.0/go.mod h1:UgoSli3F/pBgdJBHCTc+tp3gmrU4XswgGRgtnwWTfyM=
+golang.org/x/net v0.53.0 h1:d+qAbo5L0orcWAr0a9JweQpjXF19LMXJE8Ey7hwOdUA=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
@@ -205,6 +208,8 @@ golang.org/x/sys v0.8.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.11.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.41.0 h1:Ivj+2Cp/ylzLiEU89QhWblYnOE9zerudt9Ftecq2C6k=
 golang.org/x/sys v0.41.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+golang.org/x/sys v0.43.0 h1:Rlag2XtaFTxp19wS8MXlJwTvoh8ArU6ezoyFsMyCTNI=
+golang.org/x/sys v0.43.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
