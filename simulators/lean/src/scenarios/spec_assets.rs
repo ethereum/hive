@@ -296,15 +296,6 @@ async fn post_json_raw(client: &Client, path: &str, payload: &Value) -> reqwest:
         .unwrap_or_else(|err| panic!("failed to POST {url}: {err}"))
 }
 
-fn driver_step_request(step: &Value) -> Value {
-    let mut request = step.clone();
-    if let Some(object) = request.as_object_mut() {
-        object.remove("checks");
-        object.remove("storeSnapshot");
-    }
-    request
-}
-
 async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
     let steps = fixture
         .case
@@ -335,8 +326,7 @@ async fn run_fork_choice_fixture(client: &Client, fixture: &SpecFixtureCase) {
     );
 
     for (index, step) in steps.iter().enumerate() {
-        let request = driver_step_request(step);
-        let response = post_json(client, "/lean/v0/test_driver/fork_choice/step", &request).await;
+        let response = post_json(client, "/lean/v0/test_driver/fork_choice/step", step).await;
         let response: DriverStepResponse = response.json().await.unwrap_or_else(|err| {
             panic!("failed to decode fork-choice step response at step {index}: {err}")
         });
@@ -520,7 +510,7 @@ mod tests {
     use serde_json::json;
 
     use crate::scenarios::spec_assets::{
-        assert_fork_choice_checks, driver_step_request, DriverCheckpoint, DriverSnapshot,
+        assert_fork_choice_checks, DriverCheckpoint, DriverSnapshot,
     };
 
     use super::{
@@ -675,7 +665,7 @@ mod tests {
     #[should_panic(expected = "time mismatch")]
     fn rejects_time_mismatch() {
         let step = json!({ "checks": {"time": 15}});
-        
+
         assert_fork_choice_checks(0, &snapshot_fixture(), &step);
     }
 
@@ -734,20 +724,5 @@ mod tests {
         let step = json!({"checks": {"headRootLabel": "a_6"}});
 
         assert_fork_choice_checks(0, &snapshot_fixture(), &step);
-    }
-
-    #[test]
-    fn driver_step_request_omits_fixture_expectations() {
-        let step = json!({
-            "stepType": "block",
-            "checks": { "headSlot": 6},
-            "storeSnapshot": {"headRoot": "0xaa"}
-        });
-
-        let request = driver_step_request(&step);
-
-        assert!(request.get("stepType").is_some());
-        assert!(request.get("checks").is_none());
-        assert!(request.get("storeSnapshot").is_none());
     }
 }
