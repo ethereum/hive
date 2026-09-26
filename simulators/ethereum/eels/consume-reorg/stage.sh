@@ -11,7 +11,7 @@ SRC=${1:?execution-specs checkout}
 shift
 HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=$(mktemp -d)
-(cd "$SRC" && uv run fill tests/reorg --from Shanghai --until Cancun \
+(cd "$SRC" && uv run fill tests/reorg --from Shanghai --until Amsterdam \
     --output "$OUT/fixtures" --clean -q "$@" >/dev/null)
 (cd "$OUT" && COPYFILE_DISABLE=1 tar -czf "$HERE/fixtures.tar.gz" \
     fixtures/.meta fixtures/blockchain_tests_engine_reorg)
