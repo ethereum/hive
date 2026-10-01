@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -92,9 +90,18 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 }
 
 func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
+	engineURL := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8551"))
+	return runRPCTest(t, client, url, engineURL, test)
+}
+
+type testLogger interface {
+	Log(...interface{})
+}
+
+func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *rpcTest) error {
 	var (
-		client    = &http.Client{Timeout: 5 * time.Second}
-		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 		err       error
 		respBytes []byte
 		method    string
@@ -107,7 +114,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 			t.Log(">> ", msg.data)
 			method = gjson.Get(msg.data, "method").String()
 			request = msg.data
-			respBytes, err = postHttp(client, url, strings.NewReader(msg.data))
+			respBytes, err = postRPC(client, url, engineURL, msg.data)
 			if err != nil {
 				return err
 			}
@@ -145,6 +152,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				continue
 			}
 
+			resp, err = normalizePayloadID(method, resp, expectedData)
+			if err != nil {
+				return err
+			}
+
 			// Patch JSON to remove error messages wherever both the client and expected
 			// response contain an error object. This handles both top-level JSON-RPC
 			// errors and nested errors (e.g. eth_simulateV1 calls[].error.message).
@@ -174,7 +186,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	}
 
 	if respBytes != nil {
-		t.Fatalf("unhandled response in test case")
+		return fmt.Errorf("unhandled response in test case")
 	}
 	return nil
 }
@@ -256,21 +268,6 @@ func numbersEqual(a, b json.Number) bool {
 		return af == bf || math.IsNaN(af) && math.IsNaN(bf)
 	}
 	return a == b
-}
-
-// sendHttp sends an HTTP POST with the provided json data and reads the
-// response into a byte slice and returns it.
-func postHttp(c *http.Client, url string, d io.Reader) ([]byte, error) {
-	req, err := http.NewRequest("POST", url, d)
-	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("write error: %v", err)
-	}
-	return io.ReadAll(resp.Body)
 }
 
 // sendForkchoiceUpdated delivers the initial FcU request to the client.
