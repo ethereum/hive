@@ -1,3 +1,5 @@
+//go:build pbtgen
+
 package main
 
 import (

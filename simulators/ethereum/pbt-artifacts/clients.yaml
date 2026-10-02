@@ -3,9 +3,11 @@
 #   ./hive --sim ethereum/pbt-artifacts \
 #          --client-file simulators/ethereum/pbt-artifacts/clients.yaml
 #
-# Only the clients with artifact code are pinned. geth's PBT stack, the
-# EIP-8347 preimage writer included (CPerezz/go-ethereum#39-#42), is merged
-# into pbt-delete-source; the pin moves to pbt once the stack lands there.
+# Only the clients with artifact code are pinned, each to the branch that
+# writes EIP-8347's tagged snapshot records (EIPs#12404): geth to pbt and
+# nethermind to update-pbt-snapshot-format, until it merges into pbt-state.
+# Dockerfile.git clones a branch, not a commit, so a push there moves what
+# runs here.
 #
 # erigon and besu are deliberately unpinned. erigon's preimage export is on
 # stock main-latest, and besu has no offline artifact command on any branch, so
@@ -19,14 +21,14 @@
   dockerfile: git
   build_args:
     github: CPerezz/go-ethereum
-    tag: pbt-delete-source
+    tag: pbt
 
 - client: nethermind
   nametag: pbt
   dockerfile: git
   build_args:
     github: NethermindEth/nethermind
-    tag: pbt-state
+    tag: update-pbt-snapshot-format
 
 - client: erigon
 

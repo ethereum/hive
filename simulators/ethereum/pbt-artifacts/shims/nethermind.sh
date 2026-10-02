@@ -2,8 +2,8 @@
 # Nethermind consumes the artifacts during node startup, so verify boots a
 # throwaway node against them and reads the outcome off its log; convert
 # boots another that exports both and exits. Written against
-# NethermindEth/nethermind@pbt-state (bf548a39); see README.md for the
-# chainspec it synthesizes.
+# NethermindEth/nethermind's update-pbt-snapshot-format (clients.yaml pins
+# it); see README.md for the chainspec it synthesizes.
 set -u
 . /hive-bin/pbt-common.sh
 
@@ -30,10 +30,11 @@ config() { # snapshot path, preimages path
     }' > /pbt/config.json
 }
 
-# boot runs the throwaway node. The import step throws InvalidDataException
-# on a bad artifact; any other fatal is the shim's own fault or the machine's,
-# and is a crash. Success is the line VerifyAlignment logs, after which the
-# node is killed rather than left to start networking.
+# boot runs the throwaway node. "anchor failed validation" is the importer's
+# own rejection of a bad artifact; an import crash, a critical error, or any
+# other exit is a crash, not a verdict. Success is the flat-state line logged
+# after import, after which the node is killed rather than left to start
+# networking.
 boot() {
     local log=/pbt/nethermind.log
     rm -rf "$log" /pbt/nm-db
@@ -45,13 +46,15 @@ boot() {
             echo "client_exit=0"
             return 0
         fi
-        if grep -q "A critical error has occurred" "$log" 2>/dev/null; then
+        if grep -q "anchor failed validation" "$log" 2>/dev/null; then
             kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
-            grep -a -A3 "A critical error has occurred" "$log" | head -8 >&2
-            if grep -q "InvalidDataException" "$log"; then
-                echo "client_exit=1"
-                return 1
-            fi
+            grep -a "anchor failed validation" "$log" >&2
+            echo "client_exit=1"
+            return 1
+        fi
+        if grep -qE "anchor import failed|A critical error has occurred" "$log" 2>/dev/null; then
+            kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+            tail -20 "$log" >&2
             echo "client_exit=2"
             return 2
         fi
@@ -59,7 +62,7 @@ boot() {
             wait "$pid"; local status=$?
             echo "client_exit=$status"
             tail -20 "$log" >&2
-            return $status
+            return 2
         fi
         sleep 1
     done
@@ -114,7 +117,7 @@ convert)
     for f in snapshot.pbt preimages.bin; do
         if ! at=$(cmp /pbt/nm-out/export/$f /pbt/nm-four/$f); then
             echo "nondeterministic=$f: ${at:-one file is a prefix of the other}" >&2
-            exit 1
+            exit 2
         fi
     done
     echo "snapshot=$(b64 /pbt/nm-out/export/snapshot.pbt)"

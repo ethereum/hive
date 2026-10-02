@@ -1,17 +1,18 @@
+//go:build pbtgen
+
 package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/big"
 	"os"
 	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Anchor state: one account per embedding rule.
@@ -162,56 +163,26 @@ func edgeCaseAlloc() types.GenesisAlloc {
 // fixed-width records in keccak256(address) order, slots in keccak256(slot)
 // order.
 func derivePreimages(alloc types.GenesisAlloc) []byte {
-	byHash := func(a, b []byte) int { return bytes.Compare(crypto.Keccak256(a), crypto.Keccak256(b)) }
-
-	addrs := make([]common.Address, 0, len(alloc))
-	for addr := range alloc {
-		addrs = append(addrs, addr)
-	}
-	slices.SortFunc(addrs, func(a, b common.Address) int { return byHash(a[:], b[:]) })
-
-	var buf bytes.Buffer
-	for _, addr := range addrs {
-		slots := make([]common.Hash, 0, len(alloc[addr].Storage))
-		for slot := range alloc[addr].Storage {
+	recs := make([]record, 0, len(alloc))
+	for addr, acct := range alloc {
+		slots := make([]common.Hash, 0, len(acct.Storage))
+		for slot := range acct.Storage {
 			slots = append(slots, slot)
 		}
-		slices.SortFunc(slots, func(a, b common.Hash) int { return byHash(a[:], b[:]) })
-
-		buf.Write(addr[:])
-		buf.Write(binary.BigEndian.AppendUint32(nil, uint32(len(slots))))
-		for _, slot := range slots {
-			buf.Write(slot[:])
-		}
+		recs = append(recs, record{addr: addr, slots: slots})
 	}
-	return buf.Bytes()
+	return encodePreimages(recs)
 }
 
 // checkOrdering fails unless the state can tell hashed-key order from raw
 // order, which the ordering cases depend on.
 func checkOrdering(alloc types.GenesisAlloc) error {
-	addrs := make([]common.Address, 0, len(alloc))
-	for addr := range alloc {
-		addrs = append(addrs, addr)
-	}
-	raw := slices.Clone(addrs)
-	slices.SortFunc(raw, func(a, b common.Address) int { return bytes.Compare(a[:], b[:]) })
-	slices.SortFunc(addrs, func(a, b common.Address) int {
-		return bytes.Compare(crypto.Keccak256(a[:]), crypto.Keccak256(b[:]))
-	})
-	if slices.Equal(raw, addrs) {
+	addrs := slices.SortedFunc(maps.Keys(alloc), func(a, b common.Address) int { return byKeccak(a[:], b[:]) })
+	if slices.IsSortedFunc(addrs, func(a, b common.Address) int { return bytes.Compare(a[:], b[:]) }) {
 		return fmt.Errorf("addresses sort the same by raw bytes and by keccak")
 	}
-	slots := make([]common.Hash, 0)
-	for slot := range alloc[storageSpread].Storage {
-		slots = append(slots, slot)
-	}
-	num := slices.Clone(slots)
-	slices.SortFunc(num, func(a, b common.Hash) int { return bytes.Compare(a[:], b[:]) })
-	slices.SortFunc(slots, func(a, b common.Hash) int {
-		return bytes.Compare(crypto.Keccak256(a[:]), crypto.Keccak256(b[:]))
-	})
-	if slices.Equal(num, slots) {
+	slots := slices.SortedFunc(maps.Keys(alloc[storageSpread].Storage), func(a, b common.Hash) int { return byKeccak(a[:], b[:]) })
+	if slices.IsSortedFunc(slots, func(a, b common.Hash) int { return bytes.Compare(a[:], b[:]) }) {
 		return fmt.Errorf("storageSpread's slots sort the same numerically and by keccak")
 	}
 	return nil

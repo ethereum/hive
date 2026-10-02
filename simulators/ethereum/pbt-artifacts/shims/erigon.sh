@@ -32,7 +32,7 @@ convert)
     echo "client_exit=$status"
     if [ $status -ne 0 ] || [ ! -f /pbt/out/framed.bin ]; then
         echo "$out" >&2
-        exit 1
+        exit 2
     fi
     echo "preimages=$(b64 /pbt/out/framed.bin)"
     ;;

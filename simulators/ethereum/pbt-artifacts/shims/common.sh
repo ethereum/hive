@@ -5,18 +5,13 @@ FIXTURES=/pbt/fixtures
 
 unpack() {
     [ -d "$FIXTURES" ] && return 0
-    mkdir -p "$FIXTURES" && tar -xf /pbt-fixtures.tar -C "$FIXTURES" 2>/dev/null
-}
-
-# genesis_block prints block 0 as JSON from the node hive booted.
-genesis_block() {
-    curl -sf -X POST -H 'Content-Type: application/json' \
-        --data '{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["0x0",false]}' \
-        http://127.0.0.1:8545 | jq -e '.result'
+    mkdir -p "$FIXTURES" && tar -xf /pbt-fixtures.tar -C "$FIXTURES" 2>/dev/null || { rm -rf "$FIXTURES"; return 1; }
 }
 
 genesis_root() {
-    root=$(genesis_block | jq -r '.stateRoot') || { echo "no answer from the node's RPC" >&2; exit 2; }
+    root=$(curl -sf -X POST -H 'Content-Type: application/json' \
+        --data '{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["0x0",false]}' \
+        http://127.0.0.1:8545 | jq -er '.result.stateRoot') || { echo "no answer from the node's RPC" >&2; exit 2; }
     echo "mpt_root=$root"
 }
 

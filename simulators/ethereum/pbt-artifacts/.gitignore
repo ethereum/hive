@@ -1,12 +1,8 @@
-# Build outputs. Go names a binary after its directory, so these are what
-# `go build` leaves behind at each of the three module roots here.
 /pbt-artifacts
 /matrix
 /tools/matrix/matrix
 /fixtures/gen/gen
 
-# The fixture set and its tar are built inside the simulator image, not
-# checked in; a local run of fixtures/gen writing here stays local.
 /fixtures.tar
 /fixtures/genesis.json
 /fixtures/manifest.json
@@ -14,8 +10,5 @@
 /fixtures/preimages/
 /fixtures/snapshot/
 
-# The generator ships its module files disabled (go.mod.dist, go.sum.dist)
-# so hive's simulator build never sees a module it cannot build. Regenerating
-# copies them into place; the copies are local and stay that way.
 /fixtures/gen/go.mod
 /fixtures/gen/go.sum

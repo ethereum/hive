@@ -8,9 +8,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -65,13 +67,13 @@ func collect(dir string) (map[string]map[string]string, map[string][]string, map
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		a, erra := os.Stat(entries[i])
-		b, errb := os.Stat(entries[j])
+	slices.SortFunc(entries, func(a, b string) int {
+		fa, erra := os.Stat(a)
+		fb, errb := os.Stat(b)
 		if erra != nil || errb != nil {
-			return entries[i] < entries[j]
+			return strings.Compare(a, b)
 		}
-		return a.ModTime().Before(b.ModTime())
+		return fa.ModTime().Compare(fb.ModTime())
 	})
 	var (
 		rows      = make(map[string]map[string]string)
@@ -117,9 +119,8 @@ func collect(dir string) (map[string]map[string]string, map[string][]string, map
 			switch {
 			case rest == "capability-matrix":
 				text := slice(details, tc.SummaryResult.Log.Begin, tc.SummaryResult.Log.End)
-				if named, fields := parseRow(text); named != "" {
+				if fields := parseRow(text); fields != nil {
 					runRows[client] = fields
-					seen[named] = true
 				}
 			case !tc.SummaryResult.Pass:
 				runFailures[client] = append(runFailures[client], rest)
@@ -147,30 +148,25 @@ func slice(blob []byte, begin, end int64) string {
 }
 
 // parseRow reads one "client=... key=value ..." line.
-func parseRow(text string) (string, map[string]string) {
+func parseRow(text string) map[string]string {
 	for line := range strings.SplitSeq(text, "\n") {
 		if !strings.HasPrefix(line, "client=") {
 			continue
 		}
 		fields := make(map[string]string)
-		var client string
 		for _, field := range strings.Fields(line) {
 			k, v, ok := strings.Cut(field, "=")
-			if !ok {
-				continue
-			}
-			if k == "client" {
-				client = v
+			if !ok || k == "client" {
 				continue
 			}
 			fields[k] = v
 		}
-		return client, fields
+		return fields
 	}
-	return "", nil
+	return nil
 }
 
-func render(out *os.File, rows map[string]map[string]string, failures map[string][]string, agreement map[string]string) {
+func render(out io.Writer, rows map[string]map[string]string, failures map[string][]string, agreement map[string]string) {
 	fmt.Fprintln(out, "# EIP-8347 offline-artifact capability matrix")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Measured by `hive --sim ethereum/pbt-artifacts`. A cell is the count of")
@@ -188,11 +184,13 @@ func render(out *os.File, rows map[string]map[string]string, failures map[string
 	fmt.Fprintln(out, header)
 	fmt.Fprintln(out, sep)
 
-	names := make([]string, 0, len(rows))
-	for name := range rows {
-		names = append(names, name)
+	names := slices.Collect(maps.Keys(rows))
+	for client := range failures {
+		if _, ok := rows[client]; !ok {
+			names = append(names, client)
+		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 
 	for _, name := range names {
 		line := "|" + name + "|"
@@ -232,7 +230,7 @@ func render(out *os.File, rows map[string]map[string]string, failures map[string
 			if len(cases) == 0 {
 				continue
 			}
-			sort.Strings(cases)
+			slices.Sort(cases)
 			fmt.Fprintf(out, "\n**%s**\n", name)
 			for _, c := range cases {
 				fmt.Fprintf(out, "- `%s`\n", c)

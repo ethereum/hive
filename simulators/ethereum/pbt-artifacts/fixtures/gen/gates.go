@@ -1,3 +1,5 @@
+//go:build pbtgen
+
 package main
 
 import (
@@ -13,24 +15,21 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// pbtRootPy is the spec reference's root for a genesis; see the script.
+// pbtRootPy computes a genesis's PBT root with execution-specs' state model.
 //
 //go:embed pbt_root.py
 var pbtRootPy string
 
-// The canonical pair as admitted: execution-specs computes its root, and
-// nethermind writes the same bytes. The image regenerates it on every build,
-// so a converter or generator change that moves it fails there. To move it
-// on purpose, admit the new pair with validate.sh and an execution-specs
-// checkout, then update both.
+// Digests of the admitted pair: execution-specs computes its root and
+// nethermind writes the same bytes. To move it on purpose, run validate.sh
+// with an execution-specs checkout and update both.
 var (
-	pinnedSnapshot  = common.HexToHash("0xf2301b3bf78f12445f102e1761824c4c05a46b9cc5153cc415abef42626258db")
+	pinnedSnapshot  = common.HexToHash("0x5d688e1b25e248b6e0a64d6436391b008bb505da8e849261ff0d934642949c0c")
 	pinnedPreimages = common.HexToHash("0xe0af5df37c748df3eb3ba0adb07b138e19ffaeccfd6e2eaf7c46ebaf7dc60d2b")
 )
 
-// admit holds a pair convert has already held to the strict decoder to the
-// spec reference's root, when a checkout is given, and to the pin. Neither
-// rests on geth's PBT code.
+// admit checks the pair against the pinned digests and, given -ref, its root
+// against execution-specs. Neither rests on geth's PBT code.
 func admit(valid *artifacts, genesisPath, ref string) error {
 	if ref != "" {
 		root, err := specRoot(ref, genesisPath)
@@ -41,8 +40,8 @@ func admit(valid *artifacts, genesisPath, ref string) error {
 			return fmt.Errorf("the spec reference roots the genesis at %x, the converter at %x", root, valid.root)
 		}
 	}
-	snap := crypto.Keccak256Hash(mustRead(valid.snapshotFD))
-	pre := crypto.Keccak256Hash(mustRead(valid.preimageFD))
+	snap := crypto.Keccak256Hash(valid.snapshotBlob)
+	pre := crypto.Keccak256Hash(valid.preimageBlob)
 	if snap != pinnedSnapshot || pre != pinnedPreimages {
 		return fmt.Errorf("the canonical pair moved: snapshot %x, preimages %x; pinned %x, %x", snap, pre, pinnedSnapshot, pinnedPreimages)
 	}

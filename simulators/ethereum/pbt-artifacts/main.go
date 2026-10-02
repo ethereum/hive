@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -25,6 +26,13 @@ const (
 	exitUnsupported = 3
 )
 
+// matrixKeys are the capability-matrix columns tools/matrix renders, in the
+// order a row lists them.
+var matrixKeys = []string{
+	"genesis_root", "verify_preimages", "verify_snapshot",
+	"produce_preimages", "produce_snapshot", "produce_negatives",
+}
+
 var (
 	mptRootRE   = regexp.MustCompile(`(?m)^mpt_root=(0x[0-9a-fA-F]{64})`)
 	snapshotRE  = regexp.MustCompile(`(?m)^snapshot=([A-Za-z0-9+/=]+)`)
@@ -43,6 +51,7 @@ func main() {
 	suite.Add(hivesim.TestSpec{
 		Name:        "artifact conformance",
 		Description: "Runs every fixture against every client.",
+		AlwaysRun:   true,
 		Run:         func(t *hivesim.T) { runAllClients(t, fixtures) },
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
@@ -53,15 +62,16 @@ func runAllClients(t *hivesim.T, fixtures *manifest) {
 	if err != nil {
 		t.Fatalf("cannot list client types: %v", err)
 	}
-	producers := newProducerSet()
+	producers := &producerSet{by: map[string][]producerResult{}}
 	var wg sync.WaitGroup
 	for _, ct := range clients {
 		wg.Add(1)
 		go func(ct *hivesim.ClientDefinition) {
 			defer wg.Done()
 			t.Run(hivesim.TestSpec{
-				Name: fmt.Sprintf("%s: artifacts", ct.Name),
-				Run:  func(t *hivesim.T) { runClient(t, fixtures, ct, producers) },
+				Name:      fmt.Sprintf("%s: artifacts", ct.Name),
+				AlwaysRun: true,
+				Run:       func(t *hivesim.T) { runClient(t, fixtures, ct, producers) },
 			})
 		}(ct)
 	}
@@ -69,15 +79,12 @@ func runAllClients(t *hivesim.T, fixtures *manifest) {
 	runAgreement(t, fixtures, producers)
 }
 
-// client serializes shim execs: the verbs share one datadir.
+// client runs shim verbs against one datadir.
 type client struct {
 	*hivesim.Client
-	mu sync.Mutex
 }
 
 func (c *client) run(verb string, args ...string) *hivesim.ExecInfo {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	info, err := c.Exec(append([]string{"pbt-artifacts.sh", verb}, args...)...)
 	if err != nil {
 		return &hivesim.ExecInfo{ExitCode: -1, Stderr: err.Error()}
@@ -93,11 +100,9 @@ func runClient(t *hivesim.T, fixtures *manifest, ct *hivesim.ClientDefinition, p
 		"/hive-bin/pbt-artifacts.sh": shim,
 		"/hive-bin/pbt-common.sh":    filepath.Join("shims", "common.sh"),
 	}
-	c := &client{
-		Client: t.StartClient(ct.Name, hivesim.Params{"HIVE_LOGLEVEL": "3"}, hivesim.WithStaticFiles(files)),
-	}
-	report := newReport(c.Type)
+	report := &report{clientType: ct.Name, fields: map[string]string{}}
 	defer report.publish(t)
+	c := &client{Client: t.StartClient(ct.Name, hivesim.Params{"HIVE_LOGLEVEL": "3"}, hivesim.WithStaticFiles(files))}
 
 	anchored := runGenesisRoot(t, c, fixtures, report)
 	for _, suite := range []string{"preimages", "snapshot"} {
@@ -112,14 +117,16 @@ func runClient(t *hivesim.T, fixtures *manifest, ct *hivesim.ClientDefinition, p
 func runGenesisRoot(t *hivesim.T, c *client, fixtures *manifest, report *report) bool {
 	var ok bool
 	t.Run(hivesim.TestSpec{
-		Name: fmt.Sprintf("%s/genesis/state-root", c.Type),
+		Name:      fmt.Sprintf("%s/genesis/state-root", c.Type),
+		AlwaysRun: true,
 		Run: func(t *hivesim.T) {
 			info := c.run("genesis-root")
+			t.Logf("%s%s", info.Stdout, info.Stderr)
 			switch info.ExitCode {
 			case exitAccept:
 			case exitUnsupported:
 				report.set("genesis_root", "unsupported")
-				t.Fatalf("unsupported: %s", strings.TrimSpace(info.Stderr))
+				return
 			default:
 				report.set("genesis_root", "crash")
 				t.Fatalf("crash: genesis-root exited %d\n%s", info.ExitCode, info.Stderr)
@@ -148,18 +155,23 @@ func runVerifySuite(t *hivesim.T, c *client, fixtures *manifest, report *report,
 	}
 
 	var baseline int
+	var reason string
 	t.Run(hivesim.TestSpec{
-		Name: fmt.Sprintf("%s/%s/valid", c.Type, suite),
+		Name:      fmt.Sprintf("%s/%s/valid", c.Type, suite),
+		AlwaysRun: true,
 		Run: func(t *hivesim.T) {
 			info := c.run("verify", fixtures.Valid.Snapshot, fixtures.Valid.Preimages, anchor)
+			t.Logf("%s%s", info.Stdout, info.Stderr)
 			baseline = info.ExitCode
 			switch info.ExitCode {
 			case exitAccept:
-			case exitReject:
-				t.Fatalf("the sound artifact pair was rejected\n%s", info.Stderr)
 			case exitUnsupported:
-				t.Fatalf("unsupported: this client cannot verify artifacts\n%s", info.Stderr)
+				reason = "unsupported: this client cannot verify artifacts"
 			default:
+				reason = fmt.Sprintf("inconclusive: the sound pair did not verify (exit %d)", info.ExitCode)
+				if info.ExitCode == exitReject {
+					t.Fatalf("the sound artifact pair was rejected\n%s", info.Stderr)
+				}
 				t.Fatalf("crash: verify exited %d\n%s", info.ExitCode, info.Stderr)
 			}
 		},
@@ -168,11 +180,11 @@ func runVerifySuite(t *hivesim.T, c *client, fixtures *manifest, report *report,
 	case exitAccept:
 	case exitUnsupported:
 		report.set(key, "unsupported")
-		skipAll(t, c.Type, suite, len(cases), "unsupported: this client cannot verify artifacts")
+		skipAll(t, c.Type, suite, len(cases), reason)
 		return
 	default:
 		report.set(key, "inconclusive")
-		skipAll(t, c.Type, suite, len(cases), "inconclusive: the sound pair was rejected")
+		skipAll(t, c.Type, suite, len(cases), reason)
 		return
 	}
 
@@ -180,13 +192,10 @@ func runVerifySuite(t *hivesim.T, c *client, fixtures *manifest, report *report,
 	for _, tc := range cases {
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("%s/%s", c.Type, tc.ID),
-			Description: tc.describe(),
+			Description: tc.Description,
 			Run: func(t *hivesim.T) {
 				info := c.run("verify", tc.Snapshot, tc.Preimages, anchor)
-				if tc.Expect == expectUnspecified {
-					t.Logf("unspecified clause %s: exit %d", tc.Clause, info.ExitCode)
-					return
-				}
+				t.Logf("%s%s", info.Stdout, info.Stderr)
 				scored++
 				switch info.ExitCode {
 				case exitReject:
@@ -195,7 +204,7 @@ func runVerifySuite(t *hivesim.T, c *client, fixtures *manifest, report *report,
 					}
 					passed++
 				case exitAccept:
-					t.Fatalf("accepted an artifact that breaks %s", tc.Clause)
+					t.Fatalf("accepted an artifact that breaks %s", tc.ID)
 				case exitUnsupported:
 					t.Fatalf("unsupported: verify stopped working mid-suite")
 				default:
@@ -220,9 +229,11 @@ func runConvert(t *hivesim.T, c *client, fixtures *manifest, report *report, pro
 	var stderr string
 	unconverted := "crash"
 	t.Run(hivesim.TestSpec{
-		Name: fmt.Sprintf("%s/convert/run", c.Type),
+		Name:      fmt.Sprintf("%s/convert/run", c.Type),
+		AlwaysRun: true,
 		Run: func(t *hivesim.T) {
 			info := c.run("convert", anchor)
+			t.Logf("%s%s", info.Stdout, info.Stderr)
 			stderr = info.Stderr
 			switch info.ExitCode {
 			case exitAccept:
@@ -230,24 +241,29 @@ func runConvert(t *hivesim.T, c *client, fixtures *manifest, report *report, pro
 				report.set("produce_preimages", "unsupported")
 				report.set("produce_snapshot", "unsupported")
 				unconverted = "unsupported"
-				t.Fatalf("unsupported: this client converts no artifact\n%s", info.Stderr)
+				return
 			default:
 				report.set("produce_preimages", "crash")
 				report.set("produce_snapshot", "crash")
 				t.Fatalf("crash: convert exited %d\n%s", info.ExitCode, info.Stderr)
 			}
-			for name, re := range map[string]*regexp.Regexp{"snapshot": snapshotRE, "preimages": preimagesRE} {
-				raw := match(re, info.Stdout)
+			res := map[string]*regexp.Regexp{"preimages": preimagesRE, "snapshot": snapshotRE}
+			for _, name := range []string{"preimages", "snapshot"} {
+				raw := match(res[name], info.Stdout)
 				if raw == "" {
 					continue
 				}
 				blob, err := base64.StdEncoding.DecodeString(raw)
 				if err != nil {
+					report.set("produce_preimages", "crash")
+					report.set("produce_snapshot", "crash")
 					t.Fatalf("the %s produced is not valid base64: %v", name, err)
 				}
 				produced[name] = blob
 			}
 			if len(produced) == 0 {
+				report.set("produce_preimages", "crash")
+				report.set("produce_snapshot", "crash")
 				t.Fatalf("convert exited 0 but produced nothing\n%s", info.Stdout)
 			}
 		},
@@ -285,10 +301,9 @@ func runConvert(t *hivesim.T, c *client, fixtures *manifest, report *report, pro
 	return ""
 }
 
-// runProduceNegatives hands the converter a source with a defect, which it
-// must refuse without printing an artifact. It runs only where the sound
-// source converted, so a refusal is the defect's doing. A shim that cannot
-// apply a defect answers unsupported, which is a capability, not a failure.
+// runProduceNegatives asks the converter to refuse a defective source; it
+// runs only where the sound source converted. Unsupported is a capability,
+// not a failure.
 func runProduceNegatives(t *hivesim.T, c *client, fixtures *manifest, report *report, unconverted string) {
 	cases := fixtures.cases("produce")
 	if unconverted != "" {
@@ -300,17 +315,17 @@ func runProduceNegatives(t *hivesim.T, c *client, fixtures *manifest, report *re
 	for _, tc := range cases {
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("%s/%s", c.Type, tc.ID),
-			Description: tc.describe(),
+			Description: tc.Description,
 			Run: func(t *hivesim.T) {
 				info := c.run("convert", append([]string{anchor}, tc.Defect...)...)
+				t.Logf("%s%s", info.Stdout, info.Stderr)
 				if info.ExitCode == exitUnsupported {
-					t.Logf("unsupported: %s", strings.TrimSpace(info.Stderr))
 					return
 				}
 				scored++
 				switch {
 				case info.ExitCode == exitAccept:
-					t.Fatalf("converted a source that breaks %s", tc.Clause)
+					t.Fatalf("converted a source that breaks %s", tc.ID)
 				case info.ExitCode != exitReject:
 					t.Fatalf("crash: convert exited %d\n%s", info.ExitCode, info.Stderr)
 				case strings.TrimSpace(info.Stderr) == "":
@@ -341,18 +356,14 @@ type producerResult struct {
 	blob   []byte
 }
 
-func newProducerSet() *producerSet { return &producerSet{by: map[string][]producerResult{}} }
-
 func (p *producerSet) add(artifact, client string, blob []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.by[artifact] = append(p.by[artifact], producerResult{client, blob})
 }
 
-// runAgreement is the run's own verdict per artifact: every producer must
-// match the canonical bytes. None matching is the worst outcome, since then
-// either every implementation is wrong or the fixture is. One producer
-// leaves agreement unproven, which is reported but not failed.
+// runAgreement fails an artifact when any producer differs from the
+// canonical bytes; one producer is inconclusive.
 func runAgreement(t *hivesim.T, fixtures *manifest, producers *producerSet) {
 	for _, artifact := range []string{"preimages", "snapshot"} {
 		results := producers.by[artifact] // every writer has returned
@@ -365,7 +376,7 @@ func runAgreement(t *hivesim.T, fixtures *manifest, producers *producerSet) {
 				}
 				var agree, differ []string
 				for _, r := range results {
-					if firstDiff(r.blob, want) < 0 {
+					if bytes.Equal(r.blob, want) {
 						agree = append(agree, r.client)
 					} else {
 						differ = append(differ, r.client)
@@ -400,33 +411,20 @@ func skipAll(t *hivesim.T, clientName, suite string, n int, reason string) {
 // report is one client's row of the capability matrix.
 type report struct {
 	clientType string
-	mu         sync.Mutex
 	fields     map[string]string
-	order      []string
 }
 
-func newReport(clientType string) *report {
-	return &report{clientType: clientType, fields: map[string]string{}}
-}
-
-func (r *report) set(key, value string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, seen := r.fields[key]; !seen {
-		r.order = append(r.order, key)
-	}
-	r.fields[key] = value
-}
+func (r *report) set(key, value string) { r.fields[key] = value }
 
 // publish writes the row as an always-passing test, so it survives in the
 // results whatever the cases did.
 func (r *report) publish(t *hivesim.T) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	var b strings.Builder
 	fmt.Fprintf(&b, "client=%s", r.clientType)
-	for _, k := range r.order {
-		fmt.Fprintf(&b, " %s=%s", k, r.fields[k])
+	for _, k := range matrixKeys {
+		if v, ok := r.fields[k]; ok {
+			fmt.Fprintf(&b, " %s=%s", k, v)
+		}
 	}
 	summary := b.String()
 	t.Run(hivesim.TestSpec{
@@ -435,10 +433,8 @@ func (r *report) publish(t *hivesim.T) {
 	})
 }
 
-// shimFor returns the shim for a client. Hive names a client
-// <client>_<nametag> once build arguments are in play, so the base name is
-// tried too. A client with no shim gets the generic one, which reports every
-// verb unsupported.
+// shimFor tries <client>_<nametag> then the base name; a client with no shim
+// gets unsupported.sh.
 func shimFor(clientName string) string {
 	for _, name := range []string{clientName, strings.SplitN(clientName, "_", 2)[0]} {
 		path := filepath.Join("shims", name+".sh")

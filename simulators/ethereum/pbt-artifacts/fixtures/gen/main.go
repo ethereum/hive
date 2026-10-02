@@ -1,24 +1,26 @@
+//go:build pbtgen
+
 // Command gen writes the fixture set: the anchor genesis, the valid
 // artifacts from the reference converter, and one file per way an artifact
 // can lie. The simulator image runs it when it builds. -ref names an
 // execution-specs checkout for the root gate, which only a local run has.
 //
-//	go run . -geth /path/to/geth [-ref /path/to/execution-specs] -out /tmp/fixtures
+//	go run -tags pbtgen . -geth /path/to/geth [-ref /path/to/execution-specs] -out /tmp/fixtures
 package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -52,6 +54,7 @@ func run(gethBin, outDir, ref string) error {
 	if err != nil {
 		return err
 	}
+	valid.stateRoot = (&core.Genesis{Alloc: alloc}).ToBlock().Root()
 	fmt.Printf("valid artifacts: pbtRoot %x, %d leaves, %d preimage records\n",
 		valid.root, len(valid.leaves), len(valid.records))
 	if err := admit(valid, genesisPath, ref); err != nil {
@@ -66,17 +69,18 @@ func run(gethBin, outDir, ref string) error {
 	if err != nil {
 		return err
 	}
-	return writeManifest(outDir, genesisPath, valid, append(cases, produce...))
+	return writeManifest(outDir, valid, append(cases, produce...))
 }
 
 // artifacts is the valid pair, decoded.
 type artifacts struct {
-	root       common.Hash
-	stateRoot  common.Hash
-	leaves     []leaf
-	records    []record
-	snapshotFD string
-	preimageFD string
+	root         common.Hash
+	stateRoot    common.Hash
+	snap         *snapshot
+	leaves       []leaf
+	records      []record
+	snapshotBlob []byte
+	preimageBlob []byte
 }
 
 type leaf struct {
@@ -114,17 +118,19 @@ func convert(gethBin, genesisPath, outDir string, alloc types.GenesisAlloc) (*ar
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("geth bintrie convert: %w\n%s", err, out)
 	}
-	stateRoot, err := genesisStateRoot(genesisPath)
-	if err != nil {
-		return nil, err
-	}
 
 	snapBlob, err := os.ReadFile(snapPath)
 	if err != nil {
 		return nil, err
 	}
-	if err := decodeSnapshotStrict(snapBlob); err != nil {
+	snap, err := decodeSnapshot(snapBlob, true)
+	if err != nil {
 		return nil, fmt.Errorf("the converter's snapshot breaks a serialization rule: %w", err)
+	}
+	// Every case is written by this encoder, so it must reproduce the
+	// converter's bytes, or a case differs from them in more than its mutation.
+	if !bytes.Equal(snap.encode(), snapBlob) {
+		return nil, fmt.Errorf("the generator's encoder does not reproduce the converter's snapshot")
 	}
 	preBlob, err := os.ReadFile(prePath)
 	if err != nil {
@@ -134,36 +140,21 @@ func convert(gethBin, genesisPath, outDir string, alloc types.GenesisAlloc) (*ar
 	if !bytes.Equal(preBlob, want) {
 		return nil, fmt.Errorf("the converter's preimage file disagrees with the layout the state implies:\nconverter %x\nderived   %x", preBlob, want)
 	}
-	root, leaves, err := decodeSnapshot(snapBlob)
-	if err != nil {
-		return nil, fmt.Errorf("the converter's own snapshot does not decode: %w", err)
-	}
-	records, err := decodePreimages(preBlob)
+	leaves := snap.leaves()
+	records, err := decodePreimages(preBlob, true)
 	if err != nil {
 		return nil, fmt.Errorf("the derived preimage file does not decode: %w", err)
 	}
-	if got := foldRoot(leaves); got != root {
-		return nil, fmt.Errorf("valid snapshot claims root %x, its leaves fold to %x", root, got)
+	if got := foldRoot(leaves); got != snap.root {
+		return nil, fmt.Errorf("valid snapshot claims root %x, its leaves fold to %x", snap.root, got)
 	}
 	if err := checkLeaves(leaves, deriveLeaves(alloc)); err != nil {
 		return nil, fmt.Errorf("converter disagrees with the embedding rules: %w", err)
 	}
 	return &artifacts{
-		root: root, stateRoot: stateRoot, leaves: leaves, records: records,
-		snapshotFD: snapPath, preimageFD: prePath,
+		root: snap.root, snap: snap, leaves: leaves, records: records,
+		snapshotBlob: snapBlob, preimageBlob: preBlob,
 	}, nil
-}
-
-func genesisStateRoot(genesisPath string) (common.Hash, error) {
-	blob, err := os.ReadFile(genesisPath)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	var g core.Genesis
-	if err := json.Unmarshal(blob, &g); err != nil {
-		return common.Hash{}, fmt.Errorf("parsing the genesis we just wrote: %w", err)
-	}
-	return g.ToBlock().Root(), nil
 }
 
 func foldRoot(leaves []leaf) common.Hash {
@@ -180,31 +171,56 @@ func foldRoot(leaves []leaf) common.Hash {
 // hook may also reshape the records.
 type mutation struct {
 	id     string
-	suite  string
 	clause string
-	expect string
 	note   string
 
 	leaves   func([]leaf) []leaf
+	snap     func(*snapshot) *snapshot
+	framed   func([]framed) []framed // the valid records, under the valid root
 	records  func([]record) []record
 	rawSnap  func([]byte) []byte
 	rawPre   func([]byte) []byte
-	keepRoot bool // keep the valid root in the header, so check 1 catches it
+	keepRoot bool // keep the valid root, so check 1 catches it
 	verbatim bool // write records in the order given, not keccak order
+}
+
+// checkClause holds a case's bytes to its clause: a snapshot.* or preimages.*
+// clause is a byte rule the named strict decoder must reject with exactly
+// that clause; any other clause is a dual-check rule the decoder must accept.
+func checkClause(id, clause, prefix, decoder string, err error) error {
+	byteRule := strings.HasPrefix(clause, prefix)
+	switch {
+	case byteRule && err == nil:
+		return fmt.Errorf("case %s: %s is a byte rule but the strict %s decoder accepts the bytes", id, clause, decoder)
+	case byteRule:
+		var re *ruleError
+		if !errors.As(err, &re) || re.clause != clause {
+			return fmt.Errorf("case %s: %s is a byte rule but the strict %s decoder rejects it as %v", id, clause, decoder, err)
+		}
+	case !byteRule && err != nil:
+		return fmt.Errorf("case %s: %s is a dual-check rule but the strict %s decoder rejects the bytes: %v", id, clause, decoder, err)
+	}
+	return nil
 }
 
 func writeCases(outDir string, valid *artifacts) ([]caseEntry, error) {
 	var entries []caseEntry
+	seen := make(map[string]bool)
 	for _, m := range mutations(valid) {
-		dir := filepath.Join(outDir, m.suite, filepath.Base(m.id))
+		if seen[m.id] {
+			return nil, fmt.Errorf("case %s is written twice", m.id)
+		}
+		seen[m.id] = true
+		suite, _, _ := strings.Cut(m.id, "/")
+		dir := filepath.Join(outDir, filepath.FromSlash(m.id))
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
 		}
 		entry := caseEntry{
-			ID: m.id, Suite: m.suite, Clause: m.clause, Expect: m.expect, Note: m.note,
+			ID: m.id, Suite: suite, Clause: m.clause,
 			Snapshot: "valid/snapshot.bin", Preimages: "valid/preimages.bin",
 		}
-		var snap, pre []byte // nil means untouched; empty means an empty file
+		var snapBytes, pre []byte // nil means untouched; empty means an empty file
 		switch {
 		case m.leaves != nil:
 			leaves := m.leaves(cloneLeaves(valid.leaves))
@@ -212,10 +228,22 @@ func writeCases(outDir string, valid *artifacts) ([]caseEntry, error) {
 			if !m.keepRoot {
 				root = foldRoot(leaves)
 			}
-			snap = encodeSnapshot(root, uint64(len(leaves)), leaves)
+			s, err := fromLeaves(root, leaves)
+			if err != nil {
+				return nil, fmt.Errorf("case %s: %w", m.id, err)
+			}
+			snapBytes = s.encode()
 			if m.records != nil {
 				pre = encodePreimages(m.records(cloneRecords(valid.records)))
 			}
+		case m.snap != nil:
+			s := m.snap(cloneSnapshot(valid.snap))
+			if !m.keepRoot {
+				s.root = foldRoot(s.leaves())
+			} else {
+				s.root = valid.root
+			}
+			snapBytes = s.encode()
 		case m.records != nil:
 			recs := m.records(cloneRecords(valid.records))
 			if m.verbatim {
@@ -223,43 +251,57 @@ func writeCases(outDir string, valid *artifacts) ([]caseEntry, error) {
 			} else {
 				pre = encodePreimages(recs)
 			}
+		case m.framed != nil:
+			snapBytes = frame(m.framed(valid.snap.records()), valid.root)
 		case m.rawSnap != nil:
-			snap = m.rawSnap(mustRead(valid.snapshotFD))
+			snapBytes = m.rawSnap(valid.snapshotBlob)
 		case m.rawPre != nil:
-			pre = m.rawPre(mustRead(valid.preimageFD))
+			pre = m.rawPre(valid.preimageBlob)
 		default:
 			return nil, fmt.Errorf("case %s shapes nothing", m.id)
+		}
+		if snapBytes != nil {
+			_, err := decodeSnapshot(snapBytes, true)
+			if err := checkClause(m.id, m.clause, "snapshot.", "snapshot", err); err != nil {
+				return nil, err
+			}
+		}
+		if pre != nil {
+			_, err := decodePreimages(pre, true)
+			if err := checkClause(m.id, m.clause, "preimages.", "preimage", err); err != nil {
+				return nil, err
+			}
 		}
 		changed := false
 		for _, f := range []struct {
 			blob  []byte
-			valid string
+			valid []byte
 			name  string
 			field *string
 		}{
-			{snap, valid.snapshotFD, "snapshot.bin", &entry.Snapshot},
-			{pre, valid.preimageFD, "preimages.bin", &entry.Preimages},
+			{snapBytes, valid.snapshotBlob, "snapshot.bin", &entry.Snapshot},
+			{pre, valid.preimageBlob, "preimages.bin", &entry.Preimages},
 		} {
 			if f.blob == nil {
 				continue
 			}
-			path := filepath.Join(dir, f.name)
-			if err := os.WriteFile(path, f.blob, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, f.name), f.blob, 0644); err != nil {
 				return nil, err
 			}
-			*f.field = rel(outDir, path)
-			changed = changed || !bytes.Equal(f.blob, mustRead(f.valid))
+			*f.field = path.Join(m.id, f.name)
+			changed = changed || !bytes.Equal(f.blob, f.valid)
 		}
 		if !changed {
 			return nil, fmt.Errorf("case %s produced the valid files unchanged", m.id)
 		}
 		entry.Effect = &effect{}
-		if snap != nil {
-			entry.Effect.Snapshot = snapshotEffect(mustRead(valid.snapshotFD), snap)
+		if snapBytes != nil {
+			entry.Effect.Snapshot = snapshotEffect(valid.snapshotBlob, snapBytes)
 		}
 		if pre != nil {
-			entry.Effect.Preimages = preimageEffect(mustRead(valid.preimageFD), pre)
+			entry.Effect.Preimages = preimageEffect(valid.preimageBlob, pre)
 		}
+		entry.Description = describeCase(m.clause, m.note, nil, entry.Effect.Snapshot, entry.Effect.Preimages)
 		entries = append(entries, entry)
 	}
 	return entries, nil
@@ -281,32 +323,17 @@ func produceCases(alloc types.GenesisAlloc) ([]caseEntry, error) {
 		return nil, fmt.Errorf("slot 7 is held by %d accounts; the missing-slot case needs one", holders)
 	}
 	drop := func(id, note string, preimage []byte) caseEntry {
+		const clause = "converter.preimage-set-matches-leaves"
+		defect := []string{"drop-preimage", crypto.Keccak256Hash(preimage).Hex()}
 		return caseEntry{
-			ID: "produce/" + id, Suite: "produce", Expect: "reject",
-			Clause: "converter.preimage-set-matches-leaves", Note: note,
-			Defect: []string{"drop-preimage", crypto.Keccak256Hash(preimage).Hex()},
+			ID: "produce/" + id, Suite: "produce", Clause: clause, Defect: defect,
+			Description: describeCase(clause, note, defect, nil, nil),
 		}
 	}
 	return []caseEntry{
 		drop("missing-account-preimage", "the source has no preimage for account "+eoaBalance.Hex(), eoaBalance[:]),
 		drop("missing-slot-preimage", "the source has no preimage for slot 7, held by "+storageHeader.Hex(), slot[:]),
 	}, nil
-}
-
-func mustRead(path string) []byte {
-	blob, err := os.ReadFile(path)
-	if err != nil {
-		panic(err)
-	}
-	return blob
-}
-
-func rel(outDir, path string) string {
-	r, err := filepath.Rel(outDir, path)
-	if err != nil {
-		return path
-	}
-	return filepath.ToSlash(r)
 }
 
 func cloneLeaves(in []leaf) []leaf {
@@ -326,72 +353,48 @@ func cloneRecords(in []record) []record {
 }
 
 type caseEntry struct {
-	ID        string   `json:"id"`
-	Suite     string   `json:"suite"`
-	Snapshot  string   `json:"snapshot,omitempty"`
-	Preimages string   `json:"preimages,omitempty"`
-	Defect    []string `json:"defect,omitempty"`
-	Expect    string   `json:"expect"`
-	Clause    string   `json:"clause"`
-	Note      string   `json:"note,omitempty"`
-	Effect    *effect  `json:"effect,omitempty"`
+	ID          string   `json:"id"`
+	Suite       string   `json:"suite"`
+	Snapshot    string   `json:"snapshot,omitempty"`
+	Preimages   string   `json:"preimages,omitempty"`
+	Defect      []string `json:"defect,omitempty"`
+	Clause      string   `json:"clause"`
+	Description string   `json:"description"`
+	Effect      *effect  `json:"effect,omitempty"`
 }
 
 type manifest struct {
-	Spec struct {
-		EIP8347   string `json:"eip8347"`
-		EIP8297   string `json:"eip8297"`
-		Hasher    string `json:"hasher"`
-		Generator string `json:"generator"`
-	} `json:"spec"`
 	Genesis struct {
 		File      string `json:"file"`
 		StateRoot string `json:"stateRoot"`
-		PBTRoot   string `json:"pbtRoot"`
-		Accounts  int    `json:"accounts"`
 	} `json:"genesis"`
 	Valid struct {
 		Snapshot       string `json:"snapshot"`
 		Preimages      string `json:"preimages"`
 		SnapshotDigest string `json:"snapshotDigest"`
 		PreimageDigest string `json:"preimageDigest"`
-		SnapshotSHA256 string `json:"snapshotSha256"`
-		PreimageSHA256 string `json:"preimageSha256"`
-		LeafCount      int    `json:"leafCount"`
-		Records        int    `json:"records"`
 	} `json:"valid"`
 	Cases []caseEntry `json:"cases"`
 }
 
-func writeManifest(outDir, genesisPath string, valid *artifacts, cases []caseEntry) error {
+func writeManifest(outDir string, valid *artifacts, cases []caseEntry) error {
+	seen := make(map[string]bool, len(cases))
+	for _, c := range cases {
+		if seen[c.ID] {
+			return fmt.Errorf("case id %s is written twice", c.ID)
+		}
+		seen[c.ID] = true
+	}
 	if a, b := duplicateEffect(cases); a != "" {
 		return fmt.Errorf("cases %s and %s record the same effect: they are one mutation written twice", a, b)
 	}
-	snapBlob, err := os.ReadFile(valid.snapshotFD)
-	if err != nil {
-		return err
-	}
-	preBlob, err := os.ReadFile(valid.preimageFD)
-	if err != nil {
-		return err
-	}
 	var m manifest
-	m.Spec.EIP8347 = "https://github.com/ethereum/EIPs/blob/master/EIPS/eip-8347.md@2026-08-25"
-	m.Spec.EIP8297 = "https://github.com/ethereum/EIPs/blob/master/EIPS/eip-8297.md@2026-09-21"
-	m.Spec.Hasher = "blake3"
-	m.Spec.Generator = "simulators/ethereum/pbt-artifacts/fixtures/gen"
 	m.Genesis.File = "genesis.json"
 	m.Genesis.StateRoot = valid.stateRoot.Hex()
-	m.Genesis.PBTRoot = valid.root.Hex()
-	m.Genesis.Accounts = len(valid.records)
 	m.Valid.Snapshot = "valid/snapshot.bin"
 	m.Valid.Preimages = "valid/preimages.bin"
-	m.Valid.SnapshotDigest = crypto.Keccak256Hash(snapBlob).Hex()
-	m.Valid.PreimageDigest = crypto.Keccak256Hash(preBlob).Hex()
-	m.Valid.SnapshotSHA256 = "0x" + hex.EncodeToString(sha256sum(snapBlob))
-	m.Valid.PreimageSHA256 = "0x" + hex.EncodeToString(sha256sum(preBlob))
-	m.Valid.LeafCount = len(valid.leaves)
-	m.Valid.Records = len(valid.records)
+	m.Valid.SnapshotDigest = crypto.Keccak256Hash(valid.snapshotBlob).Hex()
+	m.Valid.PreimageDigest = crypto.Keccak256Hash(valid.preimageBlob).Hex()
 	m.Cases = cases
 
 	blob, err := json.MarshalIndent(&m, "", "  ")
@@ -402,48 +405,44 @@ func writeManifest(outDir, genesisPath string, valid *artifacts, cases []caseEnt
 	return os.WriteFile(filepath.Join(outDir, "manifest.json"), append(blob, '\n'), 0644)
 }
 
-func sha256sum(b []byte) []byte {
-	sum := sha256.Sum256(b)
-	return sum[:]
+// cloneSnapshot deep-copies a decoded snapshot, so a mutation can edit the
+// copy without disturbing the valid one other cases still read.
+func cloneSnapshot(s *snapshot) *snapshot {
+	out := &snapshot{root: s.root}
+	for _, h := range s.headers {
+		out.headers = append(out.headers, cloneHeader(h))
+	}
+	for _, g := range s.code {
+		out.code = append(out.code, cloneGroup(g))
+	}
+	for _, r := range s.storage {
+		out.storage = append(out.storage, cloneStorageRecord(r))
+	}
+	return out
 }
 
-func encodeSnapshot(root common.Hash, count uint64, leaves []leaf) []byte {
-	var buf bytes.Buffer
-	buf.Write(root[:])
-	buf.Write(binary.BigEndian.AppendUint64(nil, count))
-	for _, l := range leaves {
-		buf.Write(encodeLeaf(l))
+func cloneHeader(h header) header {
+	h.nonce, h.balance, h.codeSize = slices.Clone(h.nonce), slices.Clone(h.balance), slices.Clone(h.codeSize)
+	h.slots = slices.Clone(h.slots)
+	for i := range h.slots {
+		h.slots[i].value = slices.Clone(h.slots[i].value)
 	}
-	return buf.Bytes()
+	return h
 }
 
-// encodeRecordsVerbatim writes records in the order given.
-func encodeRecordsVerbatim(recs []record) []byte {
-	var buf bytes.Buffer
-	for _, r := range recs {
-		buf.Write(r.addr[:])
-		buf.Write(binary.BigEndian.AppendUint32(nil, uint32(len(r.slots))))
-		for _, s := range r.slots {
-			buf.Write(s[:])
-		}
+func cloneGroup(g group) group {
+	g.entries = slices.Clone(g.entries)
+	for i := range g.entries {
+		g.entries[i].value = slices.Clone(g.entries[i].value)
 	}
-	return buf.Bytes()
+	return g
 }
 
-// encodePreimages writes records in keccak order.
-func encodePreimages(recs []record) []byte {
-	byHash := func(a, b []byte) int { return bytes.Compare(crypto.Keccak256(a), crypto.Keccak256(b)) }
-	slices.SortStableFunc(recs, func(a, b record) int { return byHash(a.addr[:], b.addr[:]) })
-
-	var buf bytes.Buffer
-	for _, r := range recs {
-		slots := slices.Clone(r.slots)
-		slices.SortStableFunc(slots, func(a, b common.Hash) int { return byHash(a[:], b[:]) })
-		buf.Write(r.addr[:])
-		buf.Write(binary.BigEndian.AppendUint32(nil, uint32(len(slots))))
-		for _, s := range slots {
-			buf.Write(s[:])
-		}
+func cloneStorageRecord(r storageRecord) storageRecord {
+	groups := make([]group, len(r.groups))
+	for i, g := range r.groups {
+		groups[i] = cloneGroup(g)
 	}
-	return buf.Bytes()
+	r.groups = groups
+	return r
 }

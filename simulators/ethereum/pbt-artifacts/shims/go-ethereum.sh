@@ -21,12 +21,15 @@ genesis-root)
 verify)
     unpack || { echo "cannot unpack the fixtures" >&2; exit 2; }
     init_datadir /pbt/dd-verify || { echo "genesis init failed" >&2; exit 2; }
+    [ -f "$FIXTURES/$1" ] && [ -f "$FIXTURES/$2" ] || { echo "fixture file missing" >&2; exit 2; }
     out=$("$GETH" --datadir /pbt/dd-verify bintrie import --verify-only "$FIXTURES/$1" "$FIXTURES/$2" "$3" 2>&1)
     status=$?
     echo "client_exit=$status"
-    [ $status -eq 0 ] && exit 0
-    echo "$out" >&2
-    exit 1
+    case $status in
+    0) exit 0 ;;
+    1) echo "$out" >&2; exit 1 ;;
+    *) echo "$out" >&2; exit 2 ;;
+    esac
     ;;
 
 convert)

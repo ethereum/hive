@@ -1,10 +1,14 @@
+//go:build pbtgen
+
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -16,11 +20,7 @@ type effect struct {
 	Preimages *fileEffect `json:"preimages,omitempty"`
 }
 
-// fileEffect is one artifact's change. Added, Removed and Changed name
-// snapshot leaf keys or preimage record addresses, at most four each, in
-// file order. RootKept is a header still claiming the valid root over
-// contents that moved; Claimed is its leaf count, written only when it
-// disagrees with the leaves the file holds.
+// fileEffect is one artifact's change; the name lists hold at most four entries, in file order.
 type fileEffect struct {
 	ValidLen  int      `json:"validLen"`
 	CaseLen   int      `json:"caseLen"`
@@ -31,7 +31,47 @@ type fileEffect struct {
 	Changed   []string `json:"changed,omitempty"`
 	Reordered bool     `json:"reordered,omitempty"`
 	RootKept  bool     `json:"rootKept,omitempty"`
-	Claimed   uint64   `json:"claimed,omitempty"`
+}
+
+func (f *fileEffect) String() string {
+	s := fmt.Sprintf("%d -> %d bytes, first differs at %d", f.ValidLen, f.CaseLen, f.FirstDiff)
+	if !f.Parses {
+		s += ", no longer parses"
+	}
+	for _, l := range []struct {
+		label string
+		list  []string
+	}{{"added", f.Added}, {"removed", f.Removed}, {"changed", f.Changed}} {
+		if len(l.list) > 0 {
+			s += "; " + l.label + " " + strings.Join(l.list, " ")
+		}
+	}
+	if f.Reordered {
+		s += "; reordered"
+	}
+	if f.RootKept {
+		s += "; root kept"
+	}
+	return s
+}
+
+// describeCase renders a case's manifest description: the clause, its note,
+// the defect for a produce case, and each touched file's effect.
+func describeCase(clause, note string, defect []string, snap, pre *fileEffect) string {
+	s := "Clause: " + clause
+	if note != "" {
+		s += "\n" + note
+	}
+	if len(defect) > 0 {
+		s += "\ndefect: " + strings.Join(defect, " ")
+	}
+	if snap != nil {
+		s += "\nsnapshot: " + snap.String()
+	}
+	if pre != nil {
+		s += "\npreimages: " + pre.String()
+	}
+	return s
 }
 
 // snapshotEffect diffs a case's snapshot against the valid one, which must
@@ -42,40 +82,35 @@ func snapshotEffect(validBlob, caseBlob []byte) *fileEffect {
 		CaseLen:   len(caseBlob),
 		FirstDiff: firstDiff(validBlob, caseBlob),
 	}
-	validRoot, _, validLeaves, err := decodeSnapshotLoose(validBlob)
+	validSnap, err := decodeSnapshot(validBlob, false)
 	if err != nil {
 		panic(fmt.Sprintf("the valid snapshot does not decode: %v", err))
 	}
-	root, claimed, caseLeaves, err := decodeSnapshotLoose(caseBlob)
+	caseSnap, err := decodeSnapshot(caseBlob, false)
 	f.Parses = err == nil
-	f.Added, f.Removed, f.Changed, f.Reordered = diffEntries(leafEntries(validLeaves), leafEntries(caseLeaves), "=")
-	if uint64(len(caseLeaves)) != claimed {
-		f.Claimed = claimed
-	}
-	f.RootKept = root == validRoot && (len(f.Added)+len(f.Removed)+len(f.Changed) > 0 || f.Reordered)
+	f.Added, f.Removed, f.Changed, f.Reordered = diffEntries(leafEntries(validSnap.leaves()), leafEntries(caseSnap.leaves()), "=")
+	f.RootKept = caseSnap.root == validSnap.root && (len(f.Added)+len(f.Removed)+len(f.Changed) > 0 || f.Reordered)
 	return f
 }
 
-// preimageEffect diffs a case's preimage file against the valid one. The
-// file has no header, so no root is kept and no count is claimed.
+// preimageEffect diffs a case's preimage file against the valid one.
 func preimageEffect(validBlob, caseBlob []byte) *fileEffect {
 	f := &fileEffect{
 		ValidLen:  len(validBlob),
 		CaseLen:   len(caseBlob),
 		FirstDiff: firstDiff(validBlob, caseBlob),
 	}
-	validRecs, err := decodePreimages(validBlob)
+	validRecs, err := decodePreimages(validBlob, false)
 	if err != nil {
 		panic(fmt.Sprintf("the valid preimage file does not decode: %v", err))
 	}
-	caseRecs, err := decodePreimages(caseBlob)
+	caseRecs, err := decodePreimages(caseBlob, false)
 	f.Parses = err == nil
 	f.Added, f.Removed, f.Changed, f.Reordered = diffEntries(recordEntries(validRecs), recordEntries(caseRecs), ":")
 	return f
 }
 
-// entry is one file element reduced to what the diff needs: a name that is
-// its identity, and a value token that changes whenever its content does.
+// entry is a file element's identity and a token that changes with its content.
 type entry struct{ name, value string }
 
 func leafEntries(leaves []leaf) []entry {
@@ -97,15 +132,14 @@ func recordEntries(recs []record) []entry {
 	return out
 }
 
-// slotDigest folds a record's slot keys into the first 64 bits of their
-// hash, so a slot added, removed, replaced or reordered yields a different
-// token. 64 bits is ample to separate the records of one fixture set.
+// slotDigest is 64 bits of hash over the slot keys, so any slot change yields a new token.
 func slotDigest(r record) string {
 	var keys []byte
 	for _, s := range r.slots {
 		keys = append(keys, s[:]...)
 	}
-	return hex.EncodeToString(sha256sum(keys))[:16]
+	sum := sha256.Sum256(keys)
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 // diffEntries names what the case added, removed and changed, each list held
@@ -139,8 +173,7 @@ func values(entries []entry) map[string]string {
 	return out
 }
 
-// shared is the entry names in file order, filtered to those the other file
-// also holds, which is the sequence a reordering disturbs.
+// shared lists the names both files hold, in this file's order.
 func shared(entries []entry, other map[string]string) []string {
 	out := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -160,9 +193,7 @@ func firstDiff(a, b []byte) int {
 	return min(len(a), len(b))
 }
 
-// duplicateEffect names the first two cases recording the same effect: they
-// are one mutation written twice, and the simulator refuses such a set.
-// Producer cases change the source, not an artifact, and record none.
+// duplicateEffect names the first two cases recording the same effect.
 func duplicateEffect(cases []caseEntry) (string, string) {
 	seen := make(map[string]string, len(cases))
 	for _, c := range cases {
