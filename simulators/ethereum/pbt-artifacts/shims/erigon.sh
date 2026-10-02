@@ -1,7 +1,6 @@
 #!/bin/bash
-# Erigon produces the preimage file and consumes neither artifact. Its
-# snapshot-side conversion rewrites its own commitment domain in place, which
-# is not the EIP's artifact, and it has no importer.
+# Erigon exports both artifacts and consumes neither: its import-pbt is an
+# integration-tool path into a stopped node, not a check of an external pair.
 set -u
 . /hive-bin/pbt-common.sh
 
@@ -27,13 +26,14 @@ convert)
     # salt nor a commitment-state record, only a started node does. The export
     # takes its own read-only transaction.
     rm -rf /pbt/out && mkdir -p /pbt/out
-    out=$("$ERIGON" --datadir /erigon-hive-datadir snapshots export-preimages --out /pbt/out 2>&1)
+    out=$("$ERIGON" --datadir /erigon-hive-datadir snapshots export-pbt --out /pbt/out 2>&1)
     status=$?
     echo "client_exit=$status"
-    if [ $status -ne 0 ] || [ ! -f /pbt/out/framed.bin ]; then
+    if [ $status -ne 0 ] || [ ! -f /pbt/out/pbt-snapshot.bin ] || [ ! -f /pbt/out/framed.bin ]; then
         echo "$out" >&2
         exit 2
     fi
+    echo "snapshot=$(b64 /pbt/out/pbt-snapshot.bin)"
     echo "preimages=$(b64 /pbt/out/framed.bin)"
     ;;
 

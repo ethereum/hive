@@ -2,8 +2,8 @@
 # Nethermind consumes the artifacts during node startup, so verify boots a
 # throwaway node against them and reads the outcome off its log; convert
 # boots another that exports both and exits. Written against
-# NethermindEth/nethermind's update-pbt-snapshot-format (clients.yaml pins
-# it); see README.md for the chainspec it synthesizes.
+# NethermindEth/nethermind's pbt-state (clients.yaml pins it); see README.md
+# for the chainspec it synthesizes.
 set -u
 . /hive-bin/pbt-common.sh
 

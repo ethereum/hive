@@ -26,9 +26,9 @@ The live migration (BAL replay, shadow roots, the fork switch) belongs to
 go -C simulators/ethereum/pbt-artifacts run ./tools/matrix "$PWD/workspace/logs" > CAPABILITY.md
 ```
 
-`clients.yaml` pins geth and nethermind to the branches carrying their PBT
-work; erigon and besu run stock. To measure a local build, point the stock
-client Dockerfile at your image:
+`clients.yaml` pins geth, nethermind, erigon and besu to the branches carrying
+their PBT work. To measure a local build, point the stock client Dockerfile at
+your image:
 
 ```yaml
 - client: go-ethereum
@@ -39,8 +39,8 @@ client Dockerfile at your image:
 ## Driving a client
 
 One shim per client, uploaded to `/hive-bin/pbt-artifacts.sh` and invoked
-over hive's exec channel, with `shims/common.sh` beside it. Nothing under
-`clients/` changes; adding a client is one script in `shims/`, named after
+over hive's exec channel, with `shims/common.sh` beside it. No client's
+start-up script changes; adding a client is one script in `shims/`, named after
 the client. A client with no shim gets `shims/unsupported.sh` and shows up as
 a gap, not a failure.
 

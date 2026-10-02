@@ -1,18 +1,23 @@
 #!/bin/bash
-# Besu: genesis-root via RPC; verify via `storage pbt verify`; convert via
-# `storage pbt convert` (preimages from genesis alloc + snapshot from anchor state).
+# Besu verifies and converts with `besu storage pbt`, on builds that carry it
+# (matkt/besu's glamsterdam-devnet-8-pbt); a stock build answers unsupported.
+# Every call gets a fresh datadir, so the running node is never touched.
 set -u
 . /hive-bin/pbt-common.sh
 
 BESU=/opt/besu/bin/besu
 verb="${1:-}"; shift || true
 
-# Fresh datadir so offline verbs do not fight the running node's RocksDB lock.
-# Uses the same mapped /genesis.json the hive node booted from.
-init_datadir() {
-    local dir="$1"
-    rm -rf "$dir"
-    mkdir -p "$dir"
+# pbt runs a storage pbt command on a fresh datadir built from the genesis
+# besu.sh mapped for the node.
+pbt() {
+    rm -rf /pbt/besu-dd
+    "$BESU" --data-path=/pbt/besu-dd --genesis-file=/genesis.json storage pbt "$@" 2>&1
+}
+
+# `storage pbt --help` exits 0 on a stock build too, so look for the command.
+supported() {
+    "$BESU" storage --help 2>/dev/null | grep -qE '^\s+pbt\b' || { echo "this besu has no storage pbt command" >&2; exit 3; }
 }
 
 case "$verb" in
@@ -21,69 +26,30 @@ genesis-root)
     ;;
 
 verify)
+    supported
     unpack || { echo "cannot unpack the fixtures" >&2; exit 2; }
-    [ $# -ge 3 ] || { echo "verify needs <snapshot> <preimages> <anchor>" >&2; exit 2; }
-    snapshot="$FIXTURES/$1"
-    preimages="$FIXTURES/$2"
-    anchor="$3"
-    init_datadir /pbt/dd-verify || { echo "cannot create verify datadir" >&2; exit 2; }
-    out=$("$BESU" \
-        --data-path=/pbt/dd-verify \
-        --genesis-file=/genesis.json \
-        --data-storage-format=BONSAI \
-        --network-id=1337 \
-        --logging=WARN \
-        storage pbt verify \
-        --snapshot="$snapshot" \
-        --preimages="$preimages" \
-        --anchor="$anchor" 2>&1)
+    [ -f "$FIXTURES/$1" ] && [ -f "$FIXTURES/$2" ] || { echo "fixture file missing" >&2; exit 2; }
+    out=$(pbt verify --snapshot "$FIXTURES/$1" --preimages "$FIXTURES/$2" --anchor "$3")
     status=$?
     echo "client_exit=$status"
-    if [ $status -eq 0 ]; then
-        exit 0
-    fi
+    [ $status -eq 0 ] && exit 0
     echo "$out" >&2
-    # Picocli maps ExecutionException to exit 1; treat reject: and that exit as reject.
-    if [ $status -eq 1 ] || echo "$out" | grep -qiE '^reject:|invalid preimage'; then
-        exit 1
-    fi
+    [ $status -eq 1 ] && echo "$out" | grep -q 'EIP-8347 dual-check rejected' && exit 1
     exit 2
     ;;
 
 convert)
-    # Hive: convert <anchor> [drop-preimage <0xhash>]...
-    # Besu derives preimages from genesis alloc (no keccak preimage store to mutate),
-    # so drop-preimage defects are unsupported.
-    [ $# -ge 1 ] || { echo "convert needs <anchor>" >&2; exit 2; }
-    anchor="$1"
-    shift
-    if [ $# -gt 0 ]; then
-        echo "besu has no mutable preimage store for drop-preimage defects" >&2
-        exit 3
-    fi
-    init_datadir /pbt/dd-convert || { echo "cannot create convert datadir" >&2; exit 2; }
-    mkdir -p /pbt/out
-    out=$("$BESU" \
-        --data-path=/pbt/dd-convert \
-        --genesis-file=/genesis.json \
-        --data-storage-format=BONSAI \
-        --network-id=1337 \
-        --logging=WARN \
-        storage pbt convert \
-        --snapshot=/pbt/out/snapshot.bin \
-        --preimages-out=/pbt/out/preimages.bin \
-        --anchor="$anchor" 2>&1)
+    supported
+    anchor="$1"; shift
+    # Bonsai keeps no preimage store: the preimages come from the genesis alloc.
+    [ $# -eq 0 ] || { echo "no preimage store to remove from" >&2; exit 3; }
+    rm -rf /pbt/besu-out && mkdir -p /pbt/besu-out
+    out=$(pbt convert --preimages-out /pbt/besu-out/preimages.bin --snapshot /pbt/besu-out/snapshot.bin --anchor "$anchor")
     status=$?
     echo "client_exit=$status"
-    if [ $status -ne 0 ]; then
-        echo "$out" >&2
-        if [ $status -eq 1 ] || echo "$out" | grep -qiE 'rejected|reject:'; then
-            exit 1
-        fi
-        exit 2
-    fi
-    echo "snapshot=$(b64 /pbt/out/snapshot.bin)"
-    echo "preimages=$(b64 /pbt/out/preimages.bin)"
+    [ $status -eq 0 ] || { echo "$out" >&2; exit 2; }
+    echo "snapshot=$(b64 /pbt/besu-out/snapshot.bin)"
+    echo "preimages=$(b64 /pbt/besu-out/preimages.bin)"
     ;;
 
 *)
