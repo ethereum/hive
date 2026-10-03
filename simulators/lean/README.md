@@ -20,6 +20,32 @@ LeanSpec helper image generates and caches a small fixed set of validator keys
 at image-build time so the tests do not need to regenerate them on every
 container start.
 
+## XMSS signer lifecycle
+
+The reusable Hive adapter for the client-side proposal signer lives in
+`src/utils/signer.rs`. It implements the common
+`POST /lean/v0/test_driver/signer/sign_proposal` request and response envelope,
+including structured `signed`, `refused`, and `error` outcomes and correlation
+checks for the requested validator, slot, and block root.
+
+The `signer-lifecycle` suite registers two Ream devnet5 integration scenarios:
+preparation-boundary containment/recovery and signing-state preservation after
+rejected requests. A separate pinned Python LeanSpec oracle verifies every
+successful signature against the configured registry key. Existing primitive
+boundary, deterministic-retry and malformed-signature tests are not duplicated
+as standalone cases. See [contracts and execution](docs/signer-lifecycle.md) and
+the [coverage/source audit](../../docs/lean-signer-coverage-audit-2026-09-19.md).
+
+The preparation case permits an explicit refusal; it does not assume automatic
+advancement. Missing endpoints, transport failures and internal errors do not
+count as safe refusals. Other clients/profiles have no registered signer cases.
+
+Run its focused tests with:
+
+```
+cargo test -p lean-sim signer::tests
+```
+
 ## Prerequisites
 
 The lean simulator is part of the Rust workspace, so its source is compiled

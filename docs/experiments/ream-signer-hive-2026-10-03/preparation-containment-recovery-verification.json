@@ -1,0 +1,41 @@
+{
+  "passed": false,
+  "failures": [
+    "active-unprepared: operation failed (never a safe refusal)"
+  ],
+  "steps": [
+    {
+      "requestId": "before-boundary",
+      "expected": "signed",
+      "outcome": "signed",
+      "valid": true,
+      "controls": {
+        "wrongRootRejected": true,
+        "wrongSlotRejected": true,
+        "wrongKeyRejected": true,
+        "alteredSignatureRejected": true
+      }
+    },
+    {
+      "requestId": "active-unprepared",
+      "expected": "signed_or_refused",
+      "outcome": "operation_error",
+      "error": "failed to call Lean signer operation at http://172.17.0.4:5052/lean/v0/test_driver/signer/sign_proposal: error sending request for url (http://172.17.0.4:5052/lean/v0/test_driver/signer/sign_proposal): client error (SendRequest): connection closed before message completed"
+    },
+    {
+      "requestId": "overlap-recovery",
+      "expected": "signed",
+      "outcome": "signed",
+      "valid": true,
+      "controls": {
+        "wrongRootRejected": true,
+        "wrongSlotRejected": true,
+        "wrongKeyRejected": true,
+        "alteredSignatureRejected": true
+      }
+    }
+  ],
+  "distinctVerifiedRootsAtOnePosition": 1,
+  "referenceCommit": "0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8",
+  "scheme": "SIGAbortingTargetSumLifetime32Dim46Base8"
+}

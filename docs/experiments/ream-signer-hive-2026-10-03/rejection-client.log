@@ -1,0 +1,31 @@
+2026-10-03T14:52:31.170922Z  INFO ream:
+
+ ███████████   ██████████   █████████   ██████   ██████
+▒▒███▒▒▒▒▒███ ▒▒███▒▒▒▒▒█  ███▒▒▒▒▒███ ▒▒██████ ██████
+ ▒███    ▒███  ▒███  █ ▒  ▒███    ▒███  ▒███▒█████▒███
+ ▒██████████   ▒██████    ▒███████████  ▒███▒▒███ ▒███
+ ▒███▒▒▒▒▒███  ▒███▒▒█    ▒███▒▒▒▒▒███  ▒███ ▒▒▒  ▒███
+ ▒███    ▒███  ▒███ ▒   █ ▒███    ▒███  ▒███      ▒███
+ █████   █████ ██████████ █████   █████ █████     █████
+▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒     ▒▒▒▒▒
+
+ GIT_DESCRIBE     : 9cd3498
+ Full Commit      : 9cd3498b97a5b2dbc54fd5b48c28143b773ca47d
+ Build Platform   : linux-aarch64
+ Compiler Version : rustc1.98.0
+ Cargo Features   : devnet5
+
+2026-10-03T14:52:31.183102Z  INFO ream: starting up lean node...
+2026-10-03T14:52:31.192564Z  INFO ream: Initializing aggregation verifier bytecode...
+2026-10-03T14:52:31.192747Z  INFO compile_main_program_self_referential: rec_aggregation::compilation: Warning: Too much grinding for WHIR folding
+2026-10-03T14:52:33.631252Z  INFO ream: Aggregation verifier bytecode initialized
+2026-10-03T14:52:33.640658Z  INFO ream: ream lean database has been initialized
+2026-10-03T14:52:33.668610Z  INFO ream_rpc_common::server: starting HTTP server on 0.0.0.0:5052
+2026-10-03T14:52:33.668697Z  INFO actix_server::builder: starting 10 workers
+2026-10-03T14:52:33.668716Z  INFO actix_server::server: Tokio runtime found; starting in existing Tokio runtime
+2026-10-03T14:52:33.668724Z  INFO actix_server::server: starting service: "actix-web-service-0.0.0.0:5052", workers: 10, listening on: 0.0.0.0:5052
+2026-10-03T14:52:33.694161Z  INFO actix_web::middleware::logger: 172.17.0.3 "POST /lean/v0/test_driver/signer/sign_proposal HTTP/1.1" 200 5413 "-" "-" 0.006116
+2026-10-03T14:52:33.694290Z  INFO actix_web::middleware::logger: 172.17.0.3 "POST /lean/v0/test_driver/signer/sign_proposal HTTP/1.1" 200 351 "-" "-" 0.000016
+2026-10-03T14:52:33.705024Z  INFO actix_web::middleware::logger: 172.17.0.3 "POST /lean/v0/test_driver/signer/sign_proposal HTTP/1.1" 200 5412 "-" "-" 0.010624
+2026-10-03T14:52:33.705117Z  INFO actix_web::middleware::logger: 172.17.0.3 "POST /lean/v0/test_driver/signer/sign_proposal HTTP/1.1" 200 309 "-" "-" 0.000013
+2026-10-03T14:52:33.707655Z  INFO actix_web::middleware::logger: 172.17.0.3 "POST /lean/v0/test_driver/signer/sign_proposal HTTP/1.1" 200 5412 "-" "-" 0.002471
