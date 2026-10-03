@@ -45,17 +45,15 @@ test assets at a pinned revision.
 
 The four HTTP adapter tests and six independent-oracle regressions pass in the
 isolated PR checkout. Formatting passes. The standalone `signer-verifier` Docker
-target builds. Replaying the historical live transcripts returns preparation
+target builds. Replaying the saved live transcripts returns preparation
 failure (exit 1) and rejection success (exit 0).
 
-This registered run used Hive’s development API and the cached Linux simulator
-`hive/simulators/lean:signer-rerun-20260930`. Its Rust signer sources are unchanged
-in this draft, and its oracle/helper hashes match this checkout. The cached
-reference is the audited LeanSpec revision. The controller binary was compiled
-from `abec1400`; its recorded build revision is distinct from the PR base.
-This is not evidence of a clean complete simulator-image build. The PR preserves
-the original devnet4/devnet5 build commands; complete image validation is tracked
-below. The independently buildable oracle target passed separately.
+The complete simulator image built successfully from this PR checkout with the
+original devnet4/devnet5 build commands and normal Docker layer caching. This
+registered run used that complete image (`hive/simulators/lean:signer-draft`),
+not a cached-runtime overlay. The controller was built from the isolated checkout
+before the first commit; its recorded build base is `43ea47be`. No controller
+source changes are included. Image and binary hashes are recorded in the manifest.
 
 For normal execution and independent replay, see the
 [suite instructions](../../../simulators/lean/docs/signer-lifecycle.md).
@@ -63,4 +61,4 @@ The [coverage audit](../../lean-signer-coverage-audit-2026-09-19.md) describes t
 bounded source comparison and why non-reuse is an optional caller-policy check,
 not a mandatory endpoint-conformance scenario.
 
-Complete simulator image build: pending.
+Complete simulator image build: **pass**.

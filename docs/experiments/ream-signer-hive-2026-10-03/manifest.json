@@ -7,8 +7,8 @@
   "clientCommit": "9cd3498b97a5b2dbc54fd5b48c28143b773ca47d",
   "clientVersion": "ream devnet5: ream 9cd3498-9cd3498 linux-aarch64 rustc1.98.0",
   "hiveClientImageId": "sha256:3803113f296080f8550892900138c3275199347d0ab890e8f9988fee6bd82157",
-  "simulatorImageId": "sha256:d2070c6581e5ba3391e1699fd9d96ae45afd32933161e05003285430fece29d5",
-  "simulatorRuntime": "cached signer-rerun-20260930; unchanged Rust signer sources, current oracle; registered Hive dev API, not a clean full-image build",
+  "simulatorImageId": "sha256:ce2744ec1a2b315088321cacf53837bfc41a80207df054126ae5e18ca340459c",
+  "simulatorRuntime": "Complete simulator Dockerfile built from isolated PR checkout; no cached-runtime overlay; registered Hive development API",
   "sourceSha256": {
     "simulators/lean/src/scenarios/signer_lifecycle.rs": "aec2f5bffcd615f0800f52b34d8755bdd898a98fb084c7122ab112132fac091d",
     "simulators/lean/src/utils/signer.rs": "3dbf0d0bd1df18a3a669ee4f27894dffb4d049bbaf7dbc4cda7ee47ffbe81c96",
@@ -31,12 +31,12 @@
     "formatting": "pass",
     "savedTranscriptReplay": "preparation exit 1; rejection exit 0"
   },
-  "fullImageBuild": "pending; recorded separately in README",
+  "fullImageBuild": "pass: docker build -f simulators/lean/Dockerfile -t hive/simulators/lean:signer-draft . (normal Docker layer cache; original devnet build settings preserved)",
   "simulatorBinarySha256": "5bcce35716853bc127088bf77fc44f9d3b83f61584885af4aae934f50e7214c9",
-  "controllerBinaryBuildCommit": "abec1400387b394ec4eae17ecca3f776cc0ed858",
+  "controllerBinaryBuildCommit": "43ea47bef5761351e3da7b726050ea80ab362c52",
   "rawClientLogSha256": {
-    "preparation-client.log": "6f61c6b02a6547c3112a56db0b2ad72d5873d47c30c25c0a70c13e2b0748d6cf",
-    "rejection-client.log": "61745db0edd49a557e80199123f100a8caced95e0694b65769dff94f3070efcb"
+    "preparation-client.log": "2e869d595a1d354cd9d93914b824e01795db434c2b328cb879d0e78abe76877f",
+    "rejection-client.log": "174a556687b72074b77882c705d04eb93bd75d4e888e5160020a1783e5cffcfc"
   },
   "clientLogNormalization": "ANSI color escapes and trailing whitespace removed; all log lines retained"
 }
