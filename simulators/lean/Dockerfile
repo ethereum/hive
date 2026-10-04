@@ -93,8 +93,7 @@ ENV LEAN_SIGNER_REFERENCE_ROOT=/app/signer-reference
 WORKDIR /workspace
 COPY ./simulators/lean/tools/signer_oracle.py ./simulators/lean/tools/test_signer_oracle.py \
     /workspace/simulators/lean/tools/
-COPY ./docs/experiments/ream-signer-merged-2026-09-07 \
-    /workspace/docs/experiments/ream-signer-merged-2026-09-07
+COPY ./simulators/lean/tools/testdata /workspace/simulators/lean/tools/testdata
 CMD ["/app/signer-reference/.venv/bin/python", "-m", "unittest", "discover", \
      "-s", "simulators/lean/tools", "-p", "test_signer_oracle.py", "-v"]
 

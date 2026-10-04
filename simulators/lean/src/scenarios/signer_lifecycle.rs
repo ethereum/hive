@@ -1,4 +1,4 @@
-//! Live proposal-signer integration gaps; see docs/signer-lifecycle.md.
+//! Live proposal-signer containment and recovery with independent verification.
 use std::{
     collections::HashMap,
     env, fs,

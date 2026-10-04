@@ -2,7 +2,7 @@
 """Independent public-evidence verifier. stdin/stdout JSON; exits 0/1/2.
 
 0: declared scenario contract met; 1: client failure; 2: unusable evidence/runtime.
-This process never loads secret keys. See signer-lifecycle.md for contract scope.
+This process never loads secret keys.
 """
 
 import importlib.metadata

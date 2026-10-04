@@ -18,29 +18,8 @@ class OracleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         oracle.configure_reference(os.environ["LEAN_SIGNER_REFERENCE_ROOT"])
-        directory = (
-            Path(__file__).resolve().parents[3]
-            / "docs/experiments/ream-signer-merged-2026-09-07"
-        )
-        manifest = json.loads((directory / "manifest.json").read_text())
-        cls.baseline = {
-            "referenceCommit": oracle.REFERENCE,
-            "scheme": oracle.SCHEME,
-            "expectedPublicKey": manifest["expectedProposalPublicKey"],
-            "controlPublicKey": manifest["negativeControlPublicKey"],
-            "steps": [
-                {
-                    "request": json.loads(
-                        (directory / f"request-{name}.json").read_text()
-                    ),
-                    "response": json.loads(
-                        (directory / f"response-{name}.json").read_text()
-                    ),
-                    "expected": "retry" if name == "a-repeat" else "signed",
-                }
-                for name in manifest["cases"]
-            ],
-        }
+        fixture = Path(__file__).resolve().parent / "testdata/signer-transcript.json"
+        cls.baseline = json.loads(fixture.read_text())
 
     def test_saved_conflict_is_verified_and_policy_failure_is_explicit(self):
         evidence = copy.deepcopy(self.baseline)
