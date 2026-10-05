@@ -1,6 +1,6 @@
 #!/bin/bash
-# Erigon exports both artifacts and consumes neither: its import-pbt is an
-# integration-tool path into a stopped node, not a check of an external pair.
+# Erigon reads the node's own datadir read-only: verify-pbt checks a pair
+# against block 0's header, export-pbt writes both artifacts.
 set -u
 . /hive-bin/pbt-common.sh
 
@@ -13,8 +13,17 @@ genesis-root)
     ;;
 
 verify)
-    echo "erigon has no importer for an externally produced snapshot or preimage file" >&2
-    exit 3
+    unpack || { echo "cannot unpack the fixtures" >&2; exit 2; }
+    [ -f "$FIXTURES/$1" ] && [ -f "$FIXTURES/$2" ] || { echo "fixture file missing" >&2; exit 2; }
+    rm -rf /pbt/verify-tmp
+    out=$("$ERIGON" --datadir /erigon-hive-datadir snapshots verify-pbt --tmpdir /pbt/verify-tmp \
+        --snapshot "$FIXTURES/$1" --preimages "$FIXTURES/$2" --block "$3" 2>&1)
+    status=$?
+    echo "client_exit=$status"
+    [ $status -eq 0 ] && exit 0
+    echo "$out" >&2
+    [ $status -eq 1 ] && echo "$out" | grep -q 'verify-pbt: artifact rejected' && exit 1
+    exit 2
     ;;
 
 convert)
