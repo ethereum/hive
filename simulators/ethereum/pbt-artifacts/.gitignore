@@ -1,0 +1,14 @@
+/pbt-artifacts
+/matrix
+/tools/matrix/matrix
+/fixtures/gen/gen
+
+/fixtures.tar
+/fixtures/genesis.json
+/fixtures/manifest.json
+/fixtures/valid/
+/fixtures/preimages/
+/fixtures/snapshot/
+
+/fixtures/gen/go.mod
+/fixtures/gen/go.sum
