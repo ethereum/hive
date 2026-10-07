@@ -63,7 +63,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArg
 		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), "Dockerfile")); err != nil {
 			return "", fmt.Errorf("failed to derive relative simulator Dockerfile path: %v", err)
 		} else {
-			buildDockerfile = p
+			buildDockerfile = filepath.ToSlash(p)
 		}
 	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)

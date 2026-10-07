@@ -30,6 +30,16 @@ type ExecInfo struct {
 	ExitCode int    `json:"exitCode"`
 }
 
+type NetworkConfig struct {
+	IPv4Subnet string `json:"ipv4_subnet,omitempty"`
+	IPv6Subnet string `json:"ipv6_subnet,omitempty"`
+}
+
+type NetworkEndpointConfig struct {
+	IPv4Address string `json:"ipv4_address,omitempty"`
+	IPv6Address string `json:"ipv6_address,omitempty"`
+}
+
 // ClientMetadata is part of the ClientDefinition and lists metadata
 type ClientMetadata struct {
 	Roles []string `yaml:"roles" json:"roles"`

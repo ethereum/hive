@@ -275,7 +275,11 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// Connect to the networks if requested, so it is started already joined to each one.
 	for _, network := range networks {
-		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
+		endpoint := clientConfig.NetworkEndpoints[network]
+		if err := api.tm.ConnectContainerWithOptions(suiteID, network, containerID, NetworkEndpointOptions{
+			IPv4Address: endpoint.IPv4Address,
+			IPv6Address: endpoint.IPv6Address,
+		}); err != nil {
 			slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
 			serveError(w, err, http.StatusInternalServerError)
 			return
@@ -357,9 +361,16 @@ func (api *simAPI) checkClient(req *simapi.NodeConfig) (*ClientDefinition, error
 
 // checkClientNetworks pre-checks the existence of initial networks for a client container.
 func (api *simAPI) checkClientNetworks(req *simapi.NodeConfig, suiteID TestSuiteID) ([]string, error) {
+	seen := make(map[string]bool, len(req.Networks))
 	for _, network := range req.Networks {
 		if !api.tm.NetworkExists(suiteID, network) {
 			return nil, fmt.Errorf("invalid network name '%s' in client start request", network)
+		}
+		seen[network] = true
+	}
+	for network := range req.NetworkEndpoints {
+		if !seen[network] {
+			return nil, fmt.Errorf("network endpoint config references unjoined network '%s'", network)
 		}
 	}
 	return req.Networks, nil
@@ -571,7 +582,15 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	networkName := mux.Vars(r)["network"]
-	err = api.tm.CreateNetwork(suiteID, networkName)
+	var config simapi.NetworkConfig
+	if err := decodeOptionalJSON(r, &config); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	err = api.tm.CreateNetworkWithOptions(suiteID, networkName, NetworkOptions{
+		IPv4Subnet: config.IPv4Subnet,
+		IPv6Subnet: config.IPv6Subnet,
+	})
 	if err != nil {
 		slog.Error("API: failed to create network", "network", networkName, "error", err)
 		serveError(w, err, http.StatusBadRequest)
@@ -610,7 +629,12 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 
 	node := mux.Vars(r)["node"]
 	network := mux.Vars(r)["network"]
-	ipAddr, err := api.tm.ContainerIP(suiteID, network, node)
+	family, err := parseIPFamily(r.URL.Query().Get("family"))
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	ipAddr, err := api.tm.ContainerIPForFamily(suiteID, network, node, family)
 	if err != nil {
 		slog.Error("API: failed to get container IP", "container", node, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
@@ -618,6 +642,17 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("API: container IP requested", "network", network, "container", node, "ip", ipAddr)
 	serveJSON(w, ipAddr)
+}
+
+func parseIPFamily(value string) (IPFamily, error) {
+	switch value {
+	case "", "4":
+		return IPFamily4, nil
+	case "6":
+		return IPFamily6, nil
+	default:
+		return 0, fmt.Errorf("unsupported IP family %q", value)
+	}
 }
 
 // networkConnect connects a container to a network.
@@ -630,13 +665,32 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 
 	name := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
-	if err := api.tm.ConnectContainer(suiteID, name, containerID); err != nil {
+	var config simapi.NetworkEndpointConfig
+	if err := decodeOptionalJSON(r, &config); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	if err := api.tm.ConnectContainerWithOptions(suiteID, name, containerID, NetworkEndpointOptions{
+		IPv4Address: config.IPv4Address,
+		IPv6Address: config.IPv6Address,
+	}); err != nil {
 		slog.Error("API: failed to connect container", "network", name, "container", containerID, "error", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	slog.Info("API: container connected to network", "network", name, "container", containerID)
 	serveOK(w)
+}
+
+func decodeOptionalJSON(r *http.Request, v interface{}) error {
+	if r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+		return nil
+	}
+	err := json.NewDecoder(r.Body).Decode(v)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }
 
 // networkDisconnect disconnects a container from a network.

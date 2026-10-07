@@ -107,11 +107,14 @@ def base_config:
       "GasCap": 50000000,
       "WebSocketsPort": 8546,
     },
-    "Network": {
+    "Network": ({
       "DiscoveryPort": 30303,
       "P2PPort": 30303,
-      "ExternalIp": "127.0.0.1",
-    },
+      "ExternalIp": (if env.HIVE_EXTERNAL_IP != null and env.HIVE_EXTERNAL_IP != "" then env.HIVE_EXTERNAL_IP else "127.0.0.1" end),
+    }
+    + (if env.HIVE_LOCAL_IP != null and env.HIVE_LOCAL_IP != "" then { "LocalIp": env.HIVE_LOCAL_IP } else {} end)
+    + (if env.HIVE_EXTERNAL_IP_V4 != null and env.HIVE_EXTERNAL_IP_V4 != "" then { "ExternalIpV4": env.HIVE_EXTERNAL_IP_V4 } else {} end)
+    + (if env.HIVE_EXTERNAL_IP_V6 != null and env.HIVE_EXTERNAL_IP_V6 != "" then { "ExternalIpV6": env.HIVE_EXTERNAL_IP_V6 } else {} end)),
     "Hive": {
       "ChainFile": "/chain.rlp",
       "GenesisFilePath": "/genesis.json",

@@ -179,6 +179,15 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	// has an IP on the bridge network. Fall back to checking the per-network
 	// endpoint settings.
 	if info.IP == "" {
+		if network, ok := container.NetworkSettings.Networks["bridge"]; ok && network.IPAddress != "" {
+			logger.Debug("using IP from bridge network endpoint (top-level IPAddress was empty)", "ip", network.IPAddress)
+			info.IP = network.IPAddress
+			if info.MAC == "" {
+				info.MAC = network.MacAddress
+			}
+		}
+	}
+	if info.IP == "" {
 		for name, network := range container.NetworkSettings.Networks {
 			if network.IPAddress != "" {
 				logger.Debug("using IP from network endpoint (top-level IPAddress was empty)", "network", name, "ip", network.IPAddress)
@@ -263,11 +272,23 @@ func (b *ContainerBackend) UnpauseContainer(containerID string) error {
 }
 
 // CreateNetwork creates a docker network.
-func (b *ContainerBackend) CreateNetwork(name string) (string, error) {
-	network, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
+func (b *ContainerBackend) CreateNetwork(name string, options libhive.NetworkOptions) (string, error) {
+	createOptions := docker.CreateNetworkOptions{
 		Name:       name,
 		Attachable: true,
-	})
+	}
+	if options.IPv4Subnet != "" || options.IPv6Subnet != "" {
+		createOptions.IPAM = &docker.IPAMOptions{}
+		if options.IPv4Subnet != "" {
+			createOptions.IPAM.Config = append(createOptions.IPAM.Config, docker.IPAMConfig{Subnet: options.IPv4Subnet})
+		}
+		if options.IPv6Subnet != "" {
+			createOptions.EnableIPv6 = true
+			createOptions.IPAM.Config = append(createOptions.IPAM.Config, docker.IPAMConfig{Subnet: options.IPv6Subnet})
+		}
+	}
+
+	network, err := b.client.CreateNetwork(createOptions)
 	if err != nil {
 		return "", err
 	}
@@ -304,7 +325,7 @@ func (b *ContainerBackend) RemoveNetwork(id string) error {
 }
 
 // ContainerIP finds the IP of a container in the given network.
-func (b *ContainerBackend) ContainerIP(containerID, networkID string) (net.IP, error) {
+func (b *ContainerBackend) ContainerIP(containerID, networkID string, family libhive.IPFamily) (net.IP, error) {
 	details, err := b.client.InspectContainerWithOptions(docker.InspectContainerOptions{
 		ID: containerID,
 	})
@@ -314,17 +335,39 @@ func (b *ContainerBackend) ContainerIP(containerID, networkID string) (net.IP, e
 	// Range over all networks to which the container is connected and get network-specific IP.
 	for _, network := range details.NetworkSettings.Networks {
 		if network.NetworkID == networkID {
-			return net.ParseIP(network.IPAddress), nil
+			var address string
+			switch family {
+			case libhive.IPFamily4:
+				address = network.IPAddress
+			case libhive.IPFamily6:
+				address = network.GlobalIPv6Address
+			default:
+				return nil, fmt.Errorf("unsupported IP family %d", family)
+			}
+			ip := net.ParseIP(address)
+			if ip == nil {
+				return nil, fmt.Errorf("container has no IPv%d address in network", family)
+			}
+			return ip, nil
 		}
 	}
 	return nil, fmt.Errorf("network not found")
 }
 
 // ConnectContainer connects the given container to a network.
-func (b *ContainerBackend) ConnectContainer(containerID, networkID string) error {
-	return b.client.ConnectNetwork(networkID, docker.NetworkConnectionOptions{
+func (b *ContainerBackend) ConnectContainer(containerID, networkID string, options libhive.NetworkEndpointOptions) error {
+	connectOptions := docker.NetworkConnectionOptions{
 		Container: containerID,
-	})
+	}
+	if options.IPv4Address != "" || options.IPv6Address != "" {
+		connectOptions.EndpointConfig = &docker.EndpointConfig{
+			IPAMConfig: &docker.EndpointIPAMConfig{
+				IPv4Address: options.IPv4Address,
+				IPv6Address: options.IPv6Address,
+			},
+		}
+	}
+	return b.client.ConnectNetwork(networkID, connectOptions)
 }
 
 // DisconnectContainer disconnects the given container from a network.

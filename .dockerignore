@@ -12,3 +12,13 @@ target
 **/.pytest_cache
 **/.mypy_cache
 **/.ruff_cache
+
+# The devp2p simulator builds from the repository root because it imports the
+# local hivesim API. Keep unrelated repo areas out of that Docker context.
+.circleci
+clients
+cmd
+docs
+hiveproxy
+hivesim-rs
+scripts

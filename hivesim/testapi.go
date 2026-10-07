@@ -176,6 +176,11 @@ func (c *Client) EnodeURLNetwork(network string) (string, error) {
 	return c.test.Sim.ClientEnodeURLNetwork(c.test.SuiteID, c.test.TestID, c.Container, network)
 }
 
+// EnodeURLNetworkIPv6 returns the peer-to-peer IPv6 endpoint of the client on a specific network.
+func (c *Client) EnodeURLNetworkIPv6(network string) (string, error) {
+	return c.test.Sim.ClientEnodeURLNetworkIPv6(c.test.SuiteID, c.test.TestID, c.Container, network)
+}
+
 // RPC returns an RPC client connected to the client's RPC server.
 func (c *Client) RPC() *rpc.Client {
 	c.mu.Lock()

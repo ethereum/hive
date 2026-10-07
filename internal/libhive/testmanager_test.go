@@ -256,6 +256,38 @@ func TestRegisterMultiTestNode(t *testing.T) {
 	}
 }
 
+func TestNetworkAPIAcceptsEmptyChunkedBodies(t *testing.T) {
+	var created, connected bool
+	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+		CreateNetwork: func(name string, options libhive.NetworkOptions) (string, error) {
+			created = true
+			return name + "-id", nil
+		},
+		ConnectContainer: func(containerID, networkID string, options libhive.NetworkEndpointOptions) error {
+			connected = true
+			return nil
+		},
+	})
+	tm := libhive.NewTestManager(libhive.SimEnv{}, backend, nil, libhive.HiveInfo{})
+	srv := httptest.NewServer(tm.API())
+	defer srv.Close()
+	defer tm.Terminate()
+
+	suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+	if err != nil {
+		t.Fatal("StartTestSuite:", err)
+	}
+	postEmptyChunked(t, fmt.Sprintf("%s/testsuite/%d/network/chunked", srv.URL, suiteID))
+	postEmptyChunked(t, fmt.Sprintf("%s/testsuite/%d/network/chunked/container1", srv.URL, suiteID))
+
+	if !created {
+		t.Fatal("network was not created")
+	}
+	if !connected {
+		t.Fatal("container was not connected")
+	}
+}
+
 // startClientHTTP starts a client on the given test via the HTTP API and returns the container ID.
 func startClientHTTP(t *testing.T, baseURL string, suiteID libhive.TestSuiteID, testID libhive.TestID) string {
 	t.Helper()
@@ -289,6 +321,25 @@ func startClientHTTP(t *testing.T, baseURL string, suiteID libhive.TestSuiteID, 
 		t.Fatal("startClient returned empty container ID")
 	}
 	return nodeResp.ID
+}
+
+func postEmptyChunked(t *testing.T, url string) {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(nil))
+	if err != nil {
+		t.Fatal("NewRequest:", err)
+	}
+	req.ContentLength = -1
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal("POST:", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST %s status %d, want %d", url, resp.StatusCode, http.StatusOK)
+	}
 }
 
 // registerMultiTestNodeHTTP registers an existing node with a target test via the HTTP API.
