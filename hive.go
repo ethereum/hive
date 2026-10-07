@@ -57,7 +57,7 @@ Otherwise, it looks for files in the $HOME directory:
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
-		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
+		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run. With --config, it selects simulator entries of the file.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simTestExact          = flag.Bool("sim.limit.exact", false, "Exact `expression` match for tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -77,7 +77,7 @@ Otherwise, it looks for files in the $HOME directory:
 		cleanupOlderThan  = flag.Duration("cleanup.older-than", 0, "Clean up containers older than specified duration (e.g., 1h, 24h)")
 		listContainers    = flag.Bool("list", false, "List Hive containers instead of running simulations")
 
-		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
+		configFile = flag.String("config", "", "YAML `file` containing client and simulator build configurations.")
 
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
@@ -90,6 +90,8 @@ Otherwise, it looks for files in the $HOME directory:
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
 	)
+
+	flag.StringVar(configFile, "client-file", "", "Alias for --config.")
 
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
 	simBuildArgs := make(buildArgs)
@@ -110,21 +112,34 @@ Otherwise, it looks for files in the $HOME directory:
 	if *simTestLimit > 0 {
 		slog.Warn("Option --sim.testlimit is deprecated and will have no effect.")
 	}
+	if flagIsSet("config") && flagIsSet("client-file") {
+		fatal("--config and --client-file are aliases, use only one of them")
+	}
 
-	// Get the list of simulators.
+	// Load the inventory and the client/simulator build configurations.
 	inv, err := libhive.LoadInventory(".")
 	if err != nil {
 		fatal(err)
 	}
-	simList, err := inv.MatchSimulators(*simPattern)
+	var config libhive.Config
+	if *configFile != "" {
+		cfg, err := parseConfigFile(&inv, *configFile)
+		if err != nil {
+			fatal(configFlagName()+":", err)
+		}
+		config = *cfg
+	}
+
+	// Get the list of simulators.
+	simList, err := simulatorList(&inv, config.Simulators, *simPattern)
 	if err != nil {
-		fatal("bad --sim regular expression:", err)
+		fatal(err)
 	}
 	if *simPattern != "" && len(simList) == 0 {
 		fatal("no simulators for pattern", *simPattern)
 	}
-	if *simPattern != "" && *simDevMode {
-		slog.Warn("--sim is ignored when using --dev mode")
+	if (*simPattern != "" || len(config.Simulators) > 0) && *simDevMode {
+		slog.Warn("--sim and configured simulators are ignored when using --dev mode")
 		simList = nil
 	}
 	if *simTestExact && *simTestPattern != "" {
@@ -213,28 +228,27 @@ Otherwise, it looks for files in the $HOME directory:
 	runner := libhive.NewRunner(inv, builder, cb)
 
 	// Parse the client list.
-	// It can be supplied as a comma-separated list, or as a YAML file.
+	// It can be supplied as a comma-separated list, or as client entries of the --config file.
 	var clientList []libhive.ClientDesignator
-	if *clientsFile == "" {
+	if len(config.Clients) == 0 {
 		clientList, err = libhive.ParseClientList(&inv, *clients)
 		if err != nil {
 			fatal("-client:", err)
 		}
 	} else {
-		clientList, err = parseClientsFile(&inv, *clientsFile)
-		if err != nil {
-			fatal("-client-file:", err)
-		}
-		// If YAML file is used, the list can be filtered by the -client flag.
+		clientList = config.Clients
+		// If the config file is used, the list can be filtered by the -client flag.
 		if flagIsSet("client") {
 			filter := strings.Split(*clients, ",")
 			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
 	hiveInfo := libhive.HiveInfo{
-		Command:        os.Args,
-		ClientFile:     clientList,
-		ClientFilePath: *clientsFile,
+		Command:    os.Args,
+		ClientFile: clientList,
+	}
+	if len(config.Clients) > 0 {
+		hiveInfo.ClientFilePath = *configFile
 	}
 
 	// Build clients and simulators.
@@ -249,12 +263,12 @@ Otherwise, it looks for files in the $HOME directory:
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env, hiveInfo)
+		result, err := runner.Run(ctx, sim.Simulator, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}
 		failCount += result.TestsFailed
-		slog.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
+		slog.Info(fmt.Sprintf("simulation %s finished", sim.Simulator), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
 	switch failCount {
@@ -271,13 +285,43 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesignator, error) {
+// parseConfigFile loads the client and simulator build configurations from a YAML file.
+func parseConfigFile(inv *libhive.Inventory, file string) (*libhive.Config, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return libhive.ParseClientListYAML(inv, f)
+	return libhive.ParseConfigYAML(inv, f)
+}
+
+// configFlagName returns the spelling of the config file flag used on the command line.
+func configFlagName() string {
+	if flagIsSet("client-file") {
+		return "--client-file"
+	}
+	return "--config"
+}
+
+// simulatorList selects the simulators to run. Simulators configured in the --config file
+// are filtered by --sim; without configured simulators, --sim selects from the inventory.
+func simulatorList(inv *libhive.Inventory, configured []libhive.SimulatorDesignator, pattern string) ([]libhive.SimulatorDesignator, error) {
+	if len(configured) > 0 {
+		list, err := libhive.FilterSimulators(configured, pattern)
+		if err != nil {
+			return nil, fmt.Errorf("bad --sim regular expression: %w", err)
+		}
+		return list, nil
+	}
+	names, err := inv.MatchSimulators(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("bad --sim regular expression: %w", err)
+	}
+	var list []libhive.SimulatorDesignator
+	for _, name := range names {
+		list = append(list, libhive.SimulatorDesignator{Simulator: name})
+	}
+	return list, nil
 }
 
 func flagIsSet(name string) bool {

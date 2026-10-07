@@ -49,10 +49,10 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 }
 
 // BuildSimulatorImage builds a docker image of a simulator.
-func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArgs map[string]string) (string, error) {
-	dir := b.config.Inventory.SimulatorDirectory(name)
+func (b *Builder) BuildSimulatorImage(ctx context.Context, sim libhive.SimulatorDesignator) (string, error) {
+	dir := b.config.Inventory.SimulatorDirectory(sim.Simulator)
 	buildContextPath := dir
-	buildDockerfile := "Dockerfile"
+	buildDockerfile := sim.Dockerfile()
 
 	// build context dir of simulator can be overridden with "hive_context.txt" file containing the desired build path
 	if contextPathBytes, err := os.ReadFile(filepath.Join(filepath.FromSlash(dir), "hive_context.txt")); err == nil {
@@ -60,14 +60,14 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string, buildArg
 		if strings.HasPrefix(buildContextPath, "../") {
 			return "", fmt.Errorf("cannot access build directory outside of Hive root: %q", buildContextPath)
 		}
-		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), "Dockerfile")); err != nil {
+		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), sim.Dockerfile())); err != nil {
 			return "", fmt.Errorf("failed to derive relative simulator Dockerfile path: %v", err)
 		} else {
 			buildDockerfile = p
 		}
 	}
-	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, buildArgs)
+	tag := fmt.Sprintf("hive/simulators/%s:latest", sim.Simulator)
+	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, sim.BuildArgs)
 	return tag, err
 }
 

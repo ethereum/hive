@@ -132,7 +132,7 @@ func TestClientNaming(t *testing.T) {
 	}
 }
 
-func TestParseClientListYAML(t *testing.T) {
+func TestParseConfigYAMLClients(t *testing.T) {
 	yamlInput := `
 - client: go-ethereum
   dockerfile: git
@@ -159,15 +159,15 @@ func TestParseClientListYAML(t *testing.T) {
 	inv.AddClient("supereth3000", nil)
 
 	r := strings.NewReader(yamlInput)
-	clientInfo, err := ParseClientListYAML(&inv, r)
+	cfg, err := ParseConfigYAML(&inv, r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&clientInfo, &expectedOutput) {
+	if !reflect.DeepEqual(cfg.Clients, expectedOutput) {
 		t.Logf("want: %+v", expectedOutput)
-		t.Errorf(" got: %+v", clientInfo)
+		t.Errorf(" got: %+v", cfg.Clients)
 	}
-	for _, c := range clientInfo {
+	for _, c := range cfg.Clients {
 		t.Logf("name: %v", c.Name())
 	}
 }

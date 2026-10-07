@@ -2,7 +2,6 @@ package libhive
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -62,12 +61,8 @@ func (inv *Inventory) AddSimulator(name string) {
 
 // MatchSimulators returns matching simulator names.
 func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
-	expr = strings.TrimSpace(expr)
-	if expr == "" {
-		return nil, nil
-	}
-	re, err := regexp.Compile(expr + "$")
-	if err != nil {
+	re, err := compileSimulatorPattern(expr)
+	if err != nil || re == nil {
 		return nil, err
 	}
 	var result []string
@@ -78,6 +73,16 @@ func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+// compileSimulatorPattern compiles a --sim expression. The expression is anchored at
+// the end so it matches the simulator name. An empty expression returns a nil pattern.
+func compileSimulatorPattern(expr string) (*regexp.Regexp, error) {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return nil, nil
+	}
+	return regexp.Compile(expr + "$")
 }
 
 // LoadInventory finds all clients and simulators in basedir.
@@ -272,20 +277,6 @@ func parseClientDesignator(fullString string) (ClientDesignator, error) {
 	}
 	if res.Client == "" {
 		return res, fmt.Errorf("invalid client name: %s", fullString)
-	}
-	return res, nil
-}
-
-// ParseClientListYAML reads a YAML document containing a list of clients.
-func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, error) {
-	var res []ClientDesignator
-	dec := yaml.NewDecoder(file)
-	dec.KnownFields(true)
-	if err := dec.Decode(&res); err != nil {
-		return nil, fmt.Errorf("unable to parse clients file: %w", err)
-	}
-	if err := validateClients(inv, res); err != nil {
-		return nil, err
 	}
 	return res, nil
 }
