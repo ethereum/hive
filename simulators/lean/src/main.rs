@@ -13,6 +13,7 @@ use crate::scenarios::spec_assets::{
 };
 use crate::scenarios::sync::run_sync_lean_test_suite;
 use crate::scenarios::validation::run_validation_lean_test_suite;
+use crate::scenarios::validation_block_rules::run_validation_block_rules_lean_test_suite;
 use crate::utils::util::{resolve_selected_lean_devnet, set_selected_lean_devnet};
 use hivesim::{run_suite_with_plan_metadata, PlannedTestSpec, Simulation, Suite};
 
@@ -86,6 +87,22 @@ async fn main() {
         description: "This test launches the client and runs validation scenarios.".to_string(),
         always_run: true,
         run: run_validation_lean_test_suite,
+        client: None,
+    });
+
+    let mut validation_block_rules = Suite {
+        name: "validation-block-rules".to_string(),
+        description: format!(
+            "Runs an additional Lean block gossip-validation rule test (future-slot rejection) against the selected lean clients using the {devnet} profile."
+        ),
+        tests: vec![],
+    };
+
+    validation_block_rules.add(PlannedTestSpec {
+        name: "validation-block-rules: client launch".to_string(),
+        description: "This test launches the client and runs additional block gossip-validation rule scenarios.".to_string(),
+        always_run: true,
+        run: run_validation_block_rules_lean_test_suite,
         client: None,
     });
 
@@ -182,6 +199,7 @@ async fn main() {
             sync,
             client_interop,
             validation,
+            validation_block_rules,
             gossip,
             reqresp,
             spec_assets_fork_choice,
