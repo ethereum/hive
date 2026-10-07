@@ -1,0 +1,26 @@
+# Pure-Python XMSS verifier dependency closure selected from LeanSpec
+# 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8 uv.lock SHA256:
+# 0f7f80e800fdc7bc5d1f09d54b08444d4e9c1761a3c698be79ace1c8888b2167
+# CPython 3.12 manylinux x86_64/aarch64 wheels only; no Rust signature library.
+annotated-types==0.7.0 \
+    --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53
+eth-ssz-specs==0.1.0 \
+    --hash=sha256:466c6cef854cca45022a7cdc3922dd636e30b1a1dd5385845819e3d45ddddf41
+llvmlite==0.46.0 \
+    --hash=sha256:3535bd2bb6a2d7ae4012681ac228e5132cdb75fefb1bcb24e33f2f3e0c865ed4 \
+    --hash=sha256:4cbfd366e60ff87ea6cc62f50bc4cd800ebb13ed4c149466f50cf2163a473d1e
+numba==0.64.0 \
+    --hash=sha256:e0b180b1133f2b5d8b3f09d96b6d7a9e51a7da5dda3c09e998b5bcfac85d222c \
+    --hash=sha256:f13721011f693ba558b8dd4e4db7f2640462bba1b855bdc804be45bbeb55031a
+numpy==2.4.1 \
+    --hash=sha256:0093e85df2960d7e4049664b26afc58b03236e967fb942354deef3208857a04c \
+    --hash=sha256:7ad270f438cbdd402c364980317fb6b117d9ec5e226fff5b4148dd9aa9fc6e02
+pydantic==2.12.5 \
+    --hash=sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d
+pydantic-core==2.41.5 \
+    --hash=sha256:e96cea19e34778f8d59fe40775a7a574d95816eb150850a85a7a4c8f4b94ac69 \
+    --hash=sha256:eceb81a8d74f9267ef4081e246ffd6d129da5d87e37a77c9bde550cb04870c1c
+typing-extensions==4.15.0 \
+    --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
+typing-inspection==0.4.2 \
+    --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7

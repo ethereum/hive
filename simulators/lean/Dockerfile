@@ -73,6 +73,30 @@ RUN git clone https://github.com/${helper_github} . \
 
 RUN uv sync --frozen
 
+FROM python:3.12-slim-bookworm AS builder-signer
+
+# Independent oracle stays pinned even when the other fixture suites track main.
+WORKDIR /app/signer-reference
+ADD --checksum=sha256:e376ee30adb8c65239acbf8f7bbb461c93f644b4cb9c89e65e46851d3f05520a \
+    https://codeload.github.com/leanEthereum/leanSpec/tar.gz/0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8 \
+    /tmp/signer-reference.tar.gz
+COPY ./simulators/lean/tools/signer-requirements.txt /tmp/signer-requirements.txt
+RUN tar -xzf /tmp/signer-reference.tar.gz --strip-components=1 \
+    && printf '%s\n' 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8 > .git-commit \
+    && python -m venv .venv \
+    && .venv/bin/pip install --no-cache-dir --only-binary=:all: --require-hashes -r /tmp/signer-requirements.txt \
+    && rm /tmp/signer-reference.tar.gz
+
+# Independently buildable regression target; it contains public evidence only.
+FROM builder-signer AS signer-verifier
+ENV LEAN_SIGNER_REFERENCE_ROOT=/app/signer-reference
+WORKDIR /workspace
+COPY ./simulators/lean/tools/signer_oracle.py ./simulators/lean/tools/test_signer_oracle.py \
+    /workspace/simulators/lean/tools/
+COPY ./simulators/lean/tools/testdata /workspace/simulators/lean/tools/testdata
+CMD ["/app/signer-reference/.venv/bin/python", "-m", "unittest", "discover", \
+     "-s", "simulators/lean/tools", "-p", "test_signer_oracle.py", "-v"]
+
 FROM python:3.12-slim-bookworm
 
 ARG helper_github=leanEthereum/leanSpec
@@ -113,6 +137,25 @@ COPY --from=builder-devnet5 /app/devnet5/uv.lock /app/devnet5/uv.lock
 COPY --from=builder-devnet5 /app/devnet5/LICENSE /app/devnet5/LICENSE
 COPY --from=builder-devnet5 /app/devnet5/README.md /app/devnet5/README.md
 COPY --from=builder-devnet5 /app/devnet5/.git-commit /app/devnet5/.git-commit
+COPY --from=builder-signer /app/signer-reference/.venv /app/signer-reference/.venv
+COPY --from=builder-signer /app/signer-reference/src /app/signer-reference/src
+COPY --from=builder-signer /app/signer-reference/packages /app/signer-reference/packages
+COPY --from=builder-signer /app/signer-reference/.git-commit /app/signer-reference/.git-commit
+COPY --from=builder-signer /app/signer-reference/uv.lock /app/signer-reference/uv.lock
+COPY --from=builder-signer /app/signer-reference/LICENSE /app/signer-reference/LICENSE
+
+ENV LEAN_SIGNER_REFERENCE_ROOT=/app/signer-reference
+COPY ./simulators/lean/tools/signer_oracle.py /app/hive/signer_oracle.py
+COPY ./simulators/lean/tools/prepare_signer_fixture.py /app/hive/prepare_signer_fixture.py
+# Publicly distributed disposable test keys. Hashes and decoded bounds are checked.
+RUN mkdir -p /app/hive/signer-fixtures \
+    && for role in attestation proposal; do \
+        curl -fL --retry 3 \
+        "https://raw.githubusercontent.com/ReamLabs/ream/5d19570188b5a2b877449e63695c6214db3f7ae9/bin/ream/assets/lean/hash-sig-keys/validator_0_${role}_sk.ssz" \
+        -o "/app/hive/signer-fixtures/validator_0_${role}_sk.ssz"; \
+    done \
+    && /app/signer-reference/.venv/bin/python /app/hive/prepare_signer_fixture.py /app/hive/signer-fixtures \
+       > /app/hive/signer-fixtures/public.json
 
 ENV LEAN_ENV=prod \
     LEAN_SPEC_GITHUB=${helper_github} \
