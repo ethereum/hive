@@ -7,6 +7,7 @@ toolchain go1.22.1
 require (
 	github.com/ethereum/go-ethereum v1.14.5
 	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
 	github.com/open-rpc/meta-schema v0.0.0-20210416041958-626a15d0a618
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
@@ -21,7 +22,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
