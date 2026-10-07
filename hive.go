@@ -57,7 +57,8 @@ Otherwise, it looks for files in the $HOME directory:
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
-		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
+		simFile               = flag.String("sim.file", "", "YAML `file` containing simulator configurations.")
+		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run. With --sim.file, it selects entries of the file.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simTestExact          = flag.Bool("sim.limit.exact", false, "Exact `expression` match for tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -91,6 +92,8 @@ Otherwise, it looks for files in the $HOME directory:
 			"never opens the RPC port.")
 	)
 
+	flag.StringVar(simFile, "sim-file", "", "Alias for --sim.file.")
+
 	// Add the sim.buildarg flag multiple times to allow multiple build arguments.
 	simBuildArgs := make(buildArgs)
 	flag.Var(&simBuildArgs, "sim.buildarg", "Argument to pass to the docker engine when building the simulator image, in the form of ARGNAME=VALUE.")
@@ -116,15 +119,15 @@ Otherwise, it looks for files in the $HOME directory:
 	if err != nil {
 		fatal(err)
 	}
-	simList, err := inv.MatchSimulators(*simPattern)
+	simList, err := simulatorList(&inv, *simFile, *simPattern)
 	if err != nil {
-		fatal("bad --sim regular expression:", err)
+		fatal(err)
 	}
 	if *simPattern != "" && len(simList) == 0 {
 		fatal("no simulators for pattern", *simPattern)
 	}
-	if *simPattern != "" && *simDevMode {
-		slog.Warn("--sim is ignored when using --dev mode")
+	if (*simPattern != "" || *simFile != "") && *simDevMode {
+		slog.Warn("--sim and --sim.file are ignored when using --dev mode")
 		simList = nil
 	}
 	if *simTestExact && *simTestPattern != "" {
@@ -249,12 +252,12 @@ Otherwise, it looks for files in the $HOME directory:
 	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
-		result, err := runner.Run(ctx, sim, env, hiveInfo)
+		result, err := runner.Run(ctx, sim.Simulator, env, hiveInfo)
 		if err != nil {
 			fatal(err)
 		}
 		failCount += result.TestsFailed
-		slog.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
+		slog.Info(fmt.Sprintf("simulation %s finished", sim.Simulator), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
 	switch failCount {
@@ -278,6 +281,35 @@ func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesi
 	}
 	defer f.Close()
 	return libhive.ParseClientListYAML(inv, f)
+}
+
+// simulatorList loads build configurations, optionally filtered by --sim.
+func simulatorList(inv *libhive.Inventory, file, pattern string) ([]libhive.SimulatorDesignator, error) {
+	if file != "" {
+		f, err := os.Open(file)
+		if err != nil {
+			return nil, fmt.Errorf("--sim.file: %w", err)
+		}
+		defer f.Close()
+		list, err := libhive.ParseSimulatorListYAML(inv, f)
+		if err != nil {
+			return nil, fmt.Errorf("--sim.file: %w", err)
+		}
+		list, err = libhive.FilterSimulators(list, pattern)
+		if err != nil {
+			return nil, fmt.Errorf("bad --sim regular expression: %w", err)
+		}
+		return list, nil
+	}
+	names, err := inv.MatchSimulators(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("bad --sim regular expression: %w", err)
+	}
+	var list []libhive.SimulatorDesignator
+	for _, name := range names {
+		list = append(list, libhive.SimulatorDesignator{Simulator: name})
+	}
+	return list, nil
 }
 
 func flagIsSet(name string) bool {
