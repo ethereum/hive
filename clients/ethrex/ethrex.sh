@@ -6,6 +6,12 @@ set -ex
 # no ansi colors
 export RUST_LOG_STYLE=never
 
+# Raise ethrex's reorg depth limit (default 128) for simulators that rewind
+# deeply, e.g. consume-enginex; ethrex without the flag ignores the var.
+if [ "$HIVE_EXPECT_DEEP_REORGS" != "" ]; then
+    export ETHREX_MAX_REORG_DEPTH=512
+fi
+
 ethrex=./ethrex
 
 # Configure the chain.
