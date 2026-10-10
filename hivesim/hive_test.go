@@ -340,6 +340,54 @@ func TestStartClientErrors(t *testing.T) {
 	}
 }
 
+// This test checks that StopClient, PauseClient and UnpauseClient return API errors.
+func TestClientLifecycleErrors(t *testing.T) {
+	tm, srv := newFakeAPI(nil)
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+
+	ops := []struct {
+		name string
+		fn   func(SuiteID, TestID, string) error
+	}{
+		{"PauseClient", sim.PauseClient},
+		{"UnpauseClient", sim.UnpauseClient},
+		{"StopClient", sim.StopClient},
+	}
+
+	// Unknown node.
+	for _, op := range ops {
+		err := op.fn(suiteID, testID, "unknown")
+		if err == nil {
+			t.Fatalf("%s: wanted error for unknown node", op.name)
+		}
+		if !strings.Contains(err.Error(), "no such node") {
+			t.Fatalf("%s: wrong error for unknown node: %q", op.name, err.Error())
+		}
+	}
+
+	// Running node.
+	clientID, _, err := sim.StartClient(suiteID, testID, map[string]string{"CLIENT": "client-1"}, nil)
+	if err != nil {
+		t.Fatal("can't start client:", err)
+	}
+	for _, op := range ops {
+		if err := op.fn(suiteID, testID, clientID); err != nil {
+			t.Fatalf("%s: unexpected error: %v", op.name, err)
+		}
+	}
+}
+
 func TestStartClientInitialNetworks(t *testing.T) {
 	var (
 		connections = make(map[string]net.IP)
