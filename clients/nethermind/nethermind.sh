@@ -38,6 +38,7 @@
 #  - HIVE_MINER                enables mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_LOGLEVEL             Client log level
+#  - HIVE_SYNC_LOOP_INTERVAL_MS  sync mode selector interval in ms (test-only tuning)
 #
 # These variables are not supported by Nethermind:
 #
