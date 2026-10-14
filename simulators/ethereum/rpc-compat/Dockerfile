@@ -5,7 +5,7 @@ ENV GOPROXY=${GOPROXY}
 ARG branch=main
 ENV GIT_REF=${branch}
 
-RUN apk add --update git ca-certificates gcc musl-dev linux-headers make
+RUN apk add --update git ca-certificates make
 
 # Clone the tests repo.
 # Allow the user to specify a branch or commit to checkout
@@ -24,9 +24,9 @@ RUN cd /execution-apis && make build
 # uncomment the line below
 # ADD tests /execution-apis/tests
 
-# To run against a local spec, copy openrpc.json next to the simulator and
+# To run against a local spec, copy refs-openrpc.json next to the simulator and
 # uncomment the line below (overrides the generated spec above).
-# ADD openrpc.json /execution-apis/openrpc.json
+# ADD refs-openrpc.json /execution-apis/refs-openrpc.json
 
 # Build the simulator executable.
 ADD . /source
@@ -40,6 +40,5 @@ WORKDIR /source
 COPY --from=builder /source/rpc-compat .
 COPY --from=builder /execution-apis/tests ./tests
 COPY --from=builder /execution-apis/refs-openrpc.json ./refs-openrpc.json
-COPY --from=builder /execution-apis/openrpc.json ./openrpc.json
 
 ENTRYPOINT ["./rpc-compat"]

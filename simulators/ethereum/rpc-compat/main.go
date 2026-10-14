@@ -8,13 +8,13 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/execution-apis/tools/iofile"
+	"github.com/ethereum/execution-apis/tools/spec"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/nsf/jsondiff"
@@ -27,10 +27,6 @@ var (
 		"genesis.json": "./tests/genesis.json",
 		"chain.rlp":    "./tests/chain.rlp",
 	}
-
-	// specMethods holds the compiled OpenRPC result schema for each method,
-	// used to validate "speconly" tests against the spec.
-	specMethods methodSchemas
 )
 
 func main() {
@@ -43,12 +39,6 @@ func main() {
 	if _, ok := clientEnv["HIVE_TARGET_GAS_LIMIT"]; !ok {
 		// Match execution-apis' Geth default so all clients build the same next-block gas limit.
 		clientEnv["HIVE_TARGET_GAS_LIMIT"] = "60000000"
-	}
-
-	// Load the OpenRPC spec so speconly tests can be validated against the
-	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
-	if specMethods, err = parseSpec("openrpc.json"); err != nil {
-		panic(fmt.Errorf("unable to load openrpc.json: %w", err))
 	}
 
 	// Run the test suite.
@@ -76,10 +66,11 @@ conformance with the execution API specification.`[1:],
 }
 
 func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
-	// load the OpenRPC spec file so it can be accessed by test validation scripts.
-	specJSON, err := os.ReadFile("refs-openrpc.json")
+	// Load the OpenRPC spec so speconly tests can be validated against the
+	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
+	spec, err := spec.Load("refs-openrpc.json")
 	if err != nil {
-		t.Fatal(err)
+		panic(fmt.Errorf("unable to load refs-openrpc.json: %w", err))
 	}
 
 	_, testPattern := t.Sim.TestPattern()
@@ -95,7 +86,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 			Name:        fmt.Sprintf("%s (%s)", test.Name, clientName),
 			Description: test.Comment,
 			Run: func(t *hivesim.T) {
-				scriptConfig := iofile.ScriptConfig{Log: t, OpenRPCSchema: specJSON}
+				scriptConfig := iofile.ScriptConfig{Log: t, OpenRPC: spec}
 				if err := runTest(t, c, &test, scriptConfig); err != nil {
 					t.Fatal(err)
 				}
@@ -110,17 +101,18 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 		err       error
 		respBytes []byte
-		method    string
-		request   string
 		responses []json.RawMessage
+		checker   = spec.NewChecker(scriptConfig.OpenRPC)
 	)
 
 	for _, msg := range test.Messages {
 		if msg.Send {
 			// Send request.
-			request = string(msg.Data)
+			request := string(msg.Data)
 			t.Log(">> ", request)
-			method = gjson.Get(request, "method").String()
+			if err := checker.Request(msg.Data); err != nil {
+				t.Logf("%v", err)
+			}
 			respBytes, err = postHttp(client, url, strings.NewReader(request))
 			if err != nil {
 				return err
@@ -138,24 +130,14 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, the recorded value is just one valid example;
-			// the response is client- or config-specific and must not be matched
-			// exactly. Validate it against the method's OpenRPC result schema so
-			// any spec-valid response passes regardless of which optional fields
-			// the client includes.
+			// Perform spec validation of the response.
+			if err := checker.Response(msg.Data); err != nil {
+				return err
+			}
+
+			// Skip message comparison if test is marked as speconly and there is no error.
 			hasError := gjson.Get(resp, "error").Exists()
-			if !hasError && test.SpecOnly {
-				schema, err := specMethods.forRequest(method, request)
-				if err != nil {
-					return err
-				}
-				if schema == nil {
-					return fmt.Errorf("no result schema for speconly method %s in spec", method)
-				}
-				if err := validateResult(schema, []byte(gjson.Get(resp, "result").Raw)); err != nil {
-					t.Log(err.Error())
-					return fmt.Errorf("response does not conform to %s result schema: %w", method, err)
-				}
+			if test.SpecOnly && !hasError {
 				respBytes = nil
 				continue
 			}
@@ -192,7 +174,13 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 		t.Fatalf("unhandled response in test case")
 	}
 
-	return test.RunScript(scriptConfig, responses)
+	if err := test.RunScript(scriptConfig, responses); err != nil {
+		t.Fatal("validation script:", err)
+	}
+	if len(test.Script) > 0 {
+		t.Log("validation script passed")
+	}
+	return nil
 }
 
 // redactErrorMessages removes the "message" field from every "error" object

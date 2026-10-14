@@ -3,7 +3,7 @@ module github.com/ethereum/hive/simulators/ethereum/rpc-compat
 go 1.26.0
 
 require (
-	github.com/ethereum/execution-apis/tools v0.0.0-20260919093351-64566ec4687a
+	github.com/ethereum/execution-apis/tools v0.0.0-20261014063830-99c070d419d5
 	github.com/ethereum/go-ethereum v1.17.5-0.20260707124025-4d2181aa413d
 	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
@@ -36,6 +36,8 @@ require (
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/open-rpc/spec-types/generated/packages/go v0.1.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tidwall/match v1.1.1 // indirect
