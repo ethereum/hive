@@ -3,7 +3,7 @@ module github.com/ethereum/hive/simulators/ethereum/rpc-compat
 go 1.26.0
 
 require (
-	github.com/ethereum/execution-apis/tools v0.0.0-20261014063830-99c070d419d5
+	github.com/ethereum/execution-apis/tools v0.0.0-20261015030432-fd2ba6a61394
 	github.com/ethereum/go-ethereum v1.17.5-0.20260707124025-4d2181aa413d
 	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
@@ -49,7 +49,7 @@ require (
 	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 )
