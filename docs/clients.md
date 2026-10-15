@@ -143,6 +143,26 @@ may map these to command line flags or use them to generate a config file, for e
 | `HIVE_FORK_BERLIN`         | decimal       | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal       | [London][london-spec] transition block         |
 
+### Synthetic blob schedules
+
+The BPO-capable genesis mappers accept `HIVE_BPO_INCREASE_*` and
+`HIVE_BPO_DECREASE_*` for synthetic blob schedule tests. They map to the client's
+`bpo3` and `bpo4` configuration slots, respectively. Each prefix supports
+`TIMESTAMP`, `BLOB_TARGET`, `BLOB_MAX`, and `BLOB_BASE_FEE_UPDATE_FRACTION`.
+The simulator supplies the activation timestamps and all three blob parameters;
+these names do not prescribe a mainnet schedule.
+
+Existing `HIVE_BPO3_*` and `HIVE_BPO4_*` variables remain supported. A descriptive
+variable takes precedence over its numbered counterpart when both are present;
+otherwise the numbered value and existing client defaults are preserved.
+
+Post-Amsterdam transitions also require client support for scheduling the numbered
+BPO slots after Amsterdam. These aliases do not bypass client fork-order validation;
+clients that require BPO3/BPO4 before Amsterdam will reject such transition configs.
+
+Run the mapper checks with `python3 -m unittest discover -s clients -p 'test_*.py'`
+(requires `jq`).
+
 ## Snap sync roles
 
 Execution-layer clients with an implementation of the [snap] protocol should support the

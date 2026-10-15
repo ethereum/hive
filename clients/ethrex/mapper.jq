@@ -63,8 +63,8 @@ def to_bool:
     "bogotaTime": env.HIVE_BOGOTA_TIMESTAMP|to_int,
     "bpo1Time": env.HIVE_BPO1_TIMESTAMP|to_int,
     "bpo2Time": env.HIVE_BPO2_TIMESTAMP|to_int,
-    "bpo3Time": env.HIVE_BPO3_TIMESTAMP|to_int,
-    "bpo4Time": env.HIVE_BPO4_TIMESTAMP|to_int,
+    "bpo3Time": (env.HIVE_BPO_INCREASE_TIMESTAMP // env.HIVE_BPO3_TIMESTAMP)|to_int,
+    "bpo4Time": (env.HIVE_BPO_DECREASE_TIMESTAMP // env.HIVE_BPO4_TIMESTAMP)|to_int,
     "bpo5Time": env.HIVE_BPO5_TIMESTAMP|to_int,
     "blobSchedule": {
       "cancun": {
@@ -92,15 +92,15 @@ def to_bool:
         "max": (if env.HIVE_BPO2_BLOB_MAX then env.HIVE_BPO2_BLOB_MAX|to_int else 21 end),
         "baseFeeUpdateFraction": (if env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO2_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 11684671 end)
       } else null end),
-      "bpo3": (if env.HIVE_BPO3_TIMESTAMP then {
-        "target": (if env.HIVE_BPO3_BLOB_TARGET then env.HIVE_BPO3_BLOB_TARGET|to_int else 9 end),
-        "max": (if env.HIVE_BPO3_BLOB_MAX then env.HIVE_BPO3_BLOB_MAX|to_int else 14 end),
-        "baseFeeUpdateFraction": (if env.HIVE_BPO3_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO3_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 8832827 end)
+      "bpo3": (if (env.HIVE_BPO_INCREASE_TIMESTAMP // env.HIVE_BPO3_TIMESTAMP) then {
+        "target": ((env.HIVE_BPO_INCREASE_BLOB_TARGET // env.HIVE_BPO3_BLOB_TARGET) | to_int // 9),
+        "max": ((env.HIVE_BPO_INCREASE_BLOB_MAX // env.HIVE_BPO3_BLOB_MAX) | to_int // 14),
+        "baseFeeUpdateFraction": ((env.HIVE_BPO_INCREASE_BLOB_BASE_FEE_UPDATE_FRACTION // env.HIVE_BPO3_BLOB_BASE_FEE_UPDATE_FRACTION) | to_int // 8832827)
       } else null end),
-      "bpo4": (if env.HIVE_BPO4_TIMESTAMP then {
-        "target": (if env.HIVE_BPO4_BLOB_TARGET then env.HIVE_BPO4_BLOB_TARGET|to_int else 9 end),
-        "max": (if env.HIVE_BPO4_BLOB_MAX then env.HIVE_BPO4_BLOB_MAX|to_int else 14 end),
-        "baseFeeUpdateFraction": (if env.HIVE_BPO4_BLOB_BASE_FEE_UPDATE_FRACTION then env.HIVE_BPO4_BLOB_BASE_FEE_UPDATE_FRACTION|to_int else 8832827 end)
+      "bpo4": (if (env.HIVE_BPO_DECREASE_TIMESTAMP // env.HIVE_BPO4_TIMESTAMP) then {
+        "target": ((env.HIVE_BPO_DECREASE_BLOB_TARGET // env.HIVE_BPO4_BLOB_TARGET) | to_int // 9),
+        "max": ((env.HIVE_BPO_DECREASE_BLOB_MAX // env.HIVE_BPO4_BLOB_MAX) | to_int // 14),
+        "baseFeeUpdateFraction": ((env.HIVE_BPO_DECREASE_BLOB_BASE_FEE_UPDATE_FRACTION // env.HIVE_BPO4_BLOB_BASE_FEE_UPDATE_FRACTION) | to_int // 8832827)
       } else null end),
       "bpo5": (if env.HIVE_BPO5_TIMESTAMP then {
         "target": (if env.HIVE_BPO5_BLOB_TARGET then env.HIVE_BPO5_BLOB_TARGET|to_int else 9 end),
