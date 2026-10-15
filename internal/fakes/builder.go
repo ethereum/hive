@@ -10,7 +10,7 @@ import (
 // BuilderHooks can be used to override the behavior of the fake builder.
 type BuilderHooks struct {
 	BuildClientImage    func(context.Context, libhive.ClientDesignator) (string, error)
-	BuildSimulatorImage func(context.Context, string, map[string]string) (string, error)
+	BuildSimulatorImage func(context.Context, libhive.SimulatorDesignator) (string, error)
 	ReadFile            func(ctx context.Context, image string, file string) ([]byte, error)
 }
 
@@ -35,11 +35,11 @@ func (b *fakeBuilder) BuildClientImage(ctx context.Context, client libhive.Clien
 	return "fakebuild/client/" + client.Client + ":latest", nil
 }
 
-func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string, buildArgs map[string]string) (string, error) {
+func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim libhive.SimulatorDesignator) (string, error) {
 	if b.hooks.BuildSimulatorImage != nil {
-		return b.hooks.BuildSimulatorImage(ctx, sim, buildArgs)
+		return b.hooks.BuildSimulatorImage(ctx, sim)
 	}
-	return "fakebuild/simulator/" + sim + ":latest", nil
+	return "fakebuild/simulator/" + sim.Simulator + ":latest", nil
 }
 
 func (b *fakeBuilder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {

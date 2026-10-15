@@ -44,7 +44,7 @@ func TestRunner(t *testing.T) {
 
 	var (
 		runner    = libhive.NewRunner(inv, b, cb)
-		simList   = []string{"sim-1"}
+		simList   = []libhive.SimulatorDesignator{{Simulator: "sim-1"}}
 		simOpt    = libhive.SimEnv{LogDir: t.TempDir(), ClientList: simClients}
 		ctx       = context.Background()
 		buildArgs = map[string]string{"SomeArg": "SomeValue"}
@@ -84,4 +84,35 @@ func clientDesignatorNames(clients []libhive.ClientDesignator) []string {
 		names[i] = c.Client
 	}
 	return names
+}
+
+func TestRunnerSimulatorBuildArgs(t *testing.T) {
+	inv := makeTestInventory()
+	inv.AddSimulator("sim-2")
+	list := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "main", "fixtures": "stable"}},
+		{Simulator: "sim-2", BuildArgs: map[string]string{"tag": "latest"}},
+	}
+	overrides := map[string]string{"branch": "override"}
+	var built []libhive.SimulatorDesignator
+	builder := fakes.NewBuilder(&fakes.BuilderHooks{
+		BuildSimulatorImage: func(ctx context.Context, sim libhive.SimulatorDesignator) (string, error) {
+			built = append(built, sim)
+			return sim.Simulator, nil
+		},
+	})
+	runner := libhive.NewRunner(inv, builder, fakes.NewContainerBackend(nil))
+	if err := runner.Build(context.Background(), []libhive.ClientDesignator{{Client: "client-1"}}, list, overrides); err != nil {
+		t.Fatal(err)
+	}
+	want := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "override", "fixtures": "stable"}},
+		{Simulator: "sim-2", BuildArgs: map[string]string{"branch": "override", "tag": "latest"}},
+	}
+	if !reflect.DeepEqual(built, want) {
+		t.Fatalf("built %+v, want %+v", built, want)
+	}
+	if list[0].BuildArgs["branch"] != "main" || len(overrides) != 1 {
+		t.Fatal("build modified input arguments")
+	}
 }

@@ -62,12 +62,8 @@ func (inv *Inventory) AddSimulator(name string) {
 
 // MatchSimulators returns matching simulator names.
 func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
-	expr = strings.TrimSpace(expr)
-	if expr == "" {
-		return nil, nil
-	}
-	re, err := regexp.Compile(expr + "$")
-	if err != nil {
+	re, err := compileSimulatorPattern(expr)
+	if err != nil || re == nil {
 		return nil, err
 	}
 	var result []string
@@ -78,6 +74,16 @@ func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+// compileSimulatorPattern compiles a --sim expression. The expression is anchored at
+// the end so it matches the simulator name. An empty expression returns a nil pattern.
+func compileSimulatorPattern(expr string) (*regexp.Regexp, error) {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return nil, nil
+	}
+	return regexp.Compile(expr + "$")
 }
 
 // LoadInventory finds all clients and simulators in basedir.

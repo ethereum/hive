@@ -11,7 +11,9 @@ docker.
 Simulators live in the `simulators/` directory of the hive repository. There is a
 dedicated sub-directory for every simulator. When hive runs a simulation, it first builds
 an image using `docker build` in the simulator directory, using the Dockerfile. The image
-must contain all resources needed for testing.
+must contain all resources needed for testing. A simulator directory may also provide
+alternate `Dockerfile.<ext>` files, which are selected through the `--sim.file`
+configuration described in [Hive Commands].
 
 When the simulator container entry point runs, the `HIVE_SIMULATOR` environment variable
 is set to the URL of the API server.
