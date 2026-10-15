@@ -151,15 +151,14 @@ simulations. Build it with:
 
 To generate a chain of a desired length, run the following command:
 
-    ./hivechain generate -genesis ./genesis.json -length 200
+    ./hivechain generate -length 200
 
-hivechain generates empty blocks by default. The chain will contain non-empty blocks if
-the following accounts have balance in genesis state. You can find the corresponding
-private keys in the hivechain source code.
-
-- `0x71562b71999873DB5b286dF957af199Ec94617F7`
-- `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
-- `0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e`
+hivechain creates its own genesis block, so no genesis file needs to be supplied. By
+default, it writes `genesis.json`, `chain.rlp` and `txinfo.json` to the current directory
+(use `-outdir` to change this) and adds transactions every 10 blocks (see `-tx-interval`
+and `-tx-count`). The pre-funded accounts and their private keys can be written to
+`accounts.json` by including `accounts` in `-outputs`. Refer to the [hivechain README]
+for all generator options and output formats.
 
 [Go installation documentation]: https://golang.org/doc/install
 [Install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository
@@ -167,3 +166,4 @@ private keys in the hivechain source code.
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
 [Clients]: ./clients.md
+[hivechain README]: ../cmd/hivechain/README.md

@@ -1,20 +1,14 @@
 // The hivechain command assists with generating blockchain data for testing purposes.
 //
-// The 'generate' subcommand mines a new chain:
+// The 'generate' subcommand creates a new chain, including its genesis block:
 //
-//	hivechain generate -length 10 -genesis ./genesis.json -blocktime 30 -output .
+//	hivechain generate -length 10
 //
 // The 'print' subcommand displays blocks in a chain.rlp file:
 //
 //	hivechain print -v chain.rlp
 //
-// The 'print-genesis' subcommand displays the block header fields of a genesis.json file:
-//
-//	hivechain print-genesis genesis.json
-//
-// The 'trim' subcommand extracts a range of blocks from a chain.rlp file:
-//
-//	hivechain trim -from 10 -to 100 chain.rlp newchain.rlp
+// See README.md for all generator options and output formats.
 package main
 
 import (
