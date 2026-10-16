@@ -22,10 +22,10 @@ type BackendHooks struct {
 	RunProgram       func(containerID string, cmd []string) (*libhive.ExecInfo, error)
 
 	NetworkNameToID     func(string) (string, error)
-	CreateNetwork       func(string) (string, error)
+	CreateNetwork       func(string, libhive.NetworkOptions) (string, error)
 	RemoveNetwork       func(networkID string) error
-	ContainerIP         func(containerID, networkID string) (net.IP, error)
-	ConnectContainer    func(containerID, networkID string) error
+	ContainerIP         func(containerID, networkID string, family libhive.IPFamily) (net.IP, error)
+	ConnectContainer    func(containerID, networkID string, options libhive.NetworkEndpointOptions) error
 	DisconnectContainer func(containerID, networkID string) error
 }
 
@@ -184,9 +184,9 @@ func (b *fakeBackend) NetworkNameToID(name string) (string, error) {
 	return "", errors.New("network not found")
 }
 
-func (b *fakeBackend) CreateNetwork(name string) (string, error) {
+func (b *fakeBackend) CreateNetwork(name string, options libhive.NetworkOptions) (string, error) {
 	if b.hooks.CreateNetwork != nil {
-		return b.hooks.CreateNetwork(name)
+		return b.hooks.CreateNetwork(name, options)
 	}
 	id := fmt.Sprintf("%0.8x", atomic.AddUint64(&b.netCounter, 1))
 	return id, nil
@@ -199,16 +199,16 @@ func (b *fakeBackend) RemoveNetwork(networkID string) error {
 	return nil
 }
 
-func (b *fakeBackend) ContainerIP(containerID, networkID string) (net.IP, error) {
+func (b *fakeBackend) ContainerIP(containerID, networkID string, family libhive.IPFamily) (net.IP, error) {
 	if b.hooks.ContainerIP != nil {
-		return b.hooks.ContainerIP(containerID, networkID)
+		return b.hooks.ContainerIP(containerID, networkID, family)
 	}
 	return net.IP{203, 0, 113, 2}, nil
 }
 
-func (b *fakeBackend) ConnectContainer(containerID, networkID string) error {
+func (b *fakeBackend) ConnectContainer(containerID, networkID string, options libhive.NetworkEndpointOptions) error {
 	if b.hooks.ConnectContainer != nil {
-		return b.hooks.ConnectContainer(containerID, networkID)
+		return b.hooks.ConnectContainer(containerID, networkID, options)
 	}
 	return nil
 }
