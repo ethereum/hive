@@ -33,7 +33,7 @@ RUN rm -f /staged/Dockerfile && \
 
 ## Define `consume engine` entry point using the local fixtures
 # TODO: remove when fixed on nimbus-el side.
-ARG disable_strict_exception_matching=nimbus-el
+ARG disable_strict_exception_matching=nimbus-el,eels
 ENV DISABLE_STRICT_EXCEPTION_MATCHING=${disable_strict_exception_matching}
 ENTRYPOINT if [ "$FIXTURES" = /fixtures ] && [ -f /staged/fixtures.tar.gz ]; then \
         mkdir -p /fixtures && \
