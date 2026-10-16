@@ -86,8 +86,16 @@ same file, so a single `--config` file describes the whole run:
 
     ./hive --config devnet.yaml
 
-For example, the EELS consume simulators currently build from source. A devnet.yaml
-file using supported arguments is:
+Each simulator entry supports:
+
+- `simulator`: A known simulator directory under simulators/. Each simulator may appear once.
+- `dockerfile`: An optional extension, such as `git` for `Dockerfile.git`. The selected
+  file must exist in the simulator directory. If omitted, uses `Dockerfile`.
+- `build_args`: Arguments passed to the simulator's Dockerfile. Supported arguments and
+  their defaults are the `ARG`s declared in that Dockerfile.
+
+For example, this devnet.yaml builds the EELS consume-engine simulator from an
+execution-specs branch:
 
     - client: go-ethereum
       build_args:
@@ -95,34 +103,15 @@ file using supported arguments is:
         tag: latest
     - simulator: ethereum/eels/consume-engine
       build_args:
-        fixtures: stable@latest
-        branch: ""
-        disable_strict_exception_matching: nimbus-el
-
-Check each simulator's Dockerfile for its supported build arguments and defaults.
-The EELS `consume-*` simulators accept `fixtures` (the fixture input, default
-`stable@latest`) and `branch` (the execution-specs Git ref; empty uses the repository's
-default branch). `consume-engine` and `consume-enginex` also accept
-`disable_strict_exception_matching`, which defaults to `nimbus-el` and is passed to
-consume's corresponding option.
-
-Each simulator entry supports:
-
-- `simulator`: A known simulator directory under simulators/. Each simulator may appear once.
-- `dockerfile`: An optional extension, such as `git` for `Dockerfile.git`. The selected
-  file must exist in the simulator directory. If omitted, uses `Dockerfile`.
-- `build_args`: Arguments passed to the simulator's Dockerfile.
+        branch: forks/amsterdam
 
 Configured simulators run in file order unless `--sim` is supplied to filter them using
 its usual regular expression matching. Repeated `--sim.buildarg NAME=VALUE` options apply
 to every selected simulator and override matching arguments from the file. The simulator's
 `hive_context.txt`, if present, still determines its build context. In `--dev` mode,
-simulators are not built or run.
-
-Without simulator entries, simulator selection and builds behave as before: `--sim`
-selects simulators from the simulators/ directory, their default `Dockerfile` is used, and
-`--sim.buildarg` supplies build arguments. Likewise, a file without client entries leaves
-client selection to `--client`.
+simulators are not built or run. A file without simulator entries leaves simulator
+selection to `--sim`, and a file without client entries leaves client selection to
+`--client`.
 
 ### Docker Options
 
