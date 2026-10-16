@@ -31,7 +31,7 @@ func (s SimulatorDesignator) Dockerfile() string {
 	return "Dockerfile." + s.DockerfileExt
 }
 
-// Config holds the client and simulator build configurations of a --config file.
+// Config holds client and simulator build configurations.
 type Config struct {
 	Clients    []ClientDesignator
 	Simulators []SimulatorDesignator
@@ -49,8 +49,8 @@ type configEntry struct {
 }
 
 // ParseConfigYAML reads a YAML list of client and simulator build configurations. Client
-// and simulator entries may be mixed freely, so a file containing only client entries is
-// the format accepted by --client-file. File order is preserved within each kind.
+// and simulator entries may be mixed freely, and a list of only client entries is also
+// valid. File order is preserved within each kind.
 func ParseConfigYAML(inv *Inventory, file io.Reader) (Config, error) {
 	var entries []configEntry
 	dec := yaml.NewDecoder(file)
