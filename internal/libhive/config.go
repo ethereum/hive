@@ -41,11 +41,8 @@ type Config struct {
 // client field is set and a simulator when the simulator field is set. Both kinds share
 // the dockerfile and build_args fields; nametag applies to clients only.
 type configEntry struct {
-	Client        string            `yaml:"client,omitempty"`
-	Simulator     string            `yaml:"simulator,omitempty"`
-	Nametag       string            `yaml:"nametag,omitempty"`
-	DockerfileExt string            `yaml:"dockerfile,omitempty"`
-	BuildArgs     map[string]string `yaml:"build_args,omitempty"`
+	ClientDesignator `yaml:",inline"`
+	Simulator        string `yaml:"simulator,omitempty"`
 }
 
 // ParseConfigYAML reads a YAML list of client and simulator build configurations. Client
@@ -67,12 +64,7 @@ func ParseConfigYAML(inv *Inventory, file io.Reader) (Config, error) {
 		case e.Client != "" && e.Simulator != "":
 			return Config{}, fmt.Errorf("config entry %d: client and simulator are mutually exclusive", i+1)
 		case e.Client != "":
-			cfg.Clients = append(cfg.Clients, ClientDesignator{
-				Client:        e.Client,
-				Nametag:       e.Nametag,
-				DockerfileExt: e.DockerfileExt,
-				BuildArgs:     e.BuildArgs,
-			})
+			cfg.Clients = append(cfg.Clients, e.ClientDesignator)
 		case e.Simulator != "":
 			if e.Nametag != "" {
 				return Config{}, fmt.Errorf("config entry %d: simulator %s doesn't support nametag", i+1, e.Simulator)
