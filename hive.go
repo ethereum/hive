@@ -124,7 +124,7 @@ Otherwise, it looks for files in the $HOME directory:
 	var config libhive.Config
 	if *configFile != "" {
 		if config, err = parseConfigFile(&inv, *configFile); err != nil {
-			fatal(configFlagName()+":", err)
+			fatal("-config:", err)
 		}
 	}
 
@@ -291,14 +291,6 @@ func parseConfigFile(inv *libhive.Inventory, file string) (libhive.Config, error
 	}
 	defer f.Close()
 	return libhive.ParseConfigYAML(inv, f)
-}
-
-// configFlagName returns the spelling of the config file flag used on the command line.
-func configFlagName() string {
-	if flagIsSet("client-file") {
-		return "--client-file"
-	}
-	return "--config"
 }
 
 // simulatorList selects the simulators to run. Simulators configured in the --config file
