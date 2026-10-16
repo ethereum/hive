@@ -123,11 +123,9 @@ Otherwise, it looks for files in the $HOME directory:
 	}
 	var config libhive.Config
 	if *configFile != "" {
-		cfg, err := parseConfigFile(&inv, *configFile)
-		if err != nil {
+		if config, err = parseConfigFile(&inv, *configFile); err != nil {
 			fatal(configFlagName()+":", err)
 		}
-		config = *cfg
 	}
 
 	// Get the list of simulators.
@@ -286,10 +284,10 @@ func fatal(args ...interface{}) {
 }
 
 // parseConfigFile loads the client and simulator build configurations from a YAML file.
-func parseConfigFile(inv *libhive.Inventory, file string) (*libhive.Config, error) {
+func parseConfigFile(inv *libhive.Inventory, file string) (libhive.Config, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, err
+		return libhive.Config{}, err
 	}
 	defer f.Close()
 	return libhive.ParseConfigYAML(inv, f)

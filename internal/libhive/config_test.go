@@ -78,8 +78,8 @@ func TestParseConfigYAML(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(*cfg, tt.want) {
-				t.Fatalf("got %+v, want %+v", *cfg, tt.want)
+			if !reflect.DeepEqual(cfg, tt.want) {
+				t.Fatalf("got %+v, want %+v", cfg, tt.want)
 			}
 		})
 	}
