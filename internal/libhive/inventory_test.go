@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -129,46 +128,6 @@ func TestClientNaming(t *testing.T) {
 				t.Fatal("names:", names)
 			}
 		})
-	}
-}
-
-func TestParseConfigYAMLClients(t *testing.T) {
-	yamlInput := `
-- client: go-ethereum
-  dockerfile: git
-  build_args:
-    tag: custom
-- client: go-ethereum
-  dockerfile: local
-- client: supereth3000
-  build_args:
-    github: org/repository
-- client: supereth3000
-  nametag: thebest
-`
-
-	expectedOutput := []ClientDesignator{
-		{Client: "go-ethereum", Nametag: "custom", DockerfileExt: "git", BuildArgs: map[string]string{"tag": "custom"}},
-		{Client: "go-ethereum", DockerfileExt: "local"},
-		{Client: "supereth3000", Nametag: "github_org/repository", BuildArgs: map[string]string{"github": "org/repository"}},
-		{Client: "supereth3000", Nametag: "thebest"},
-	}
-
-	var inv Inventory
-	inv.AddClient("go-ethereum", &InventoryClient{Dockerfiles: []string{"git", "local"}})
-	inv.AddClient("supereth3000", nil)
-
-	r := strings.NewReader(yamlInput)
-	cfg, err := ParseConfigYAML(&inv, r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(cfg.Clients, expectedOutput) {
-		t.Logf("want: %+v", expectedOutput)
-		t.Errorf(" got: %+v", cfg.Clients)
-	}
-	for _, c := range cfg.Clients {
-		t.Logf("name: %v", c.Name())
 	}
 }
 

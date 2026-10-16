@@ -10,7 +10,8 @@ import (
 
 func TestParseConfigYAML(t *testing.T) {
 	inv := Inventory{BaseDir: t.TempDir()}
-	inv.AddClient("go-ethereum", &InventoryClient{Dockerfiles: []string{"git"}})
+	inv.AddClient("go-ethereum", &InventoryClient{Dockerfiles: []string{"git", "local"}})
+	inv.AddClient("supereth3000", nil)
 	inv.AddSimulator("test")
 	dir := inv.SimulatorDirectory("test")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -42,6 +43,28 @@ func TestParseConfigYAML(t *testing.T) {
 			name: "client",
 			yaml: "- client: go-ethereum\n  dockerfile: git",
 			want: Config{Clients: []ClientDesignator{{Client: "go-ethereum", DockerfileExt: "git"}}},
+		},
+		{
+			name: "client nametags",
+			yaml: `
+- client: go-ethereum
+  dockerfile: git
+  build_args:
+    tag: custom
+- client: go-ethereum
+  dockerfile: local
+- client: supereth3000
+  build_args:
+    github: org/repository
+- client: supereth3000
+  nametag: thebest
+`,
+			want: Config{Clients: []ClientDesignator{
+				{Client: "go-ethereum", Nametag: "custom", DockerfileExt: "git", BuildArgs: map[string]string{"tag": "custom"}},
+				{Client: "go-ethereum", DockerfileExt: "local"},
+				{Client: "supereth3000", Nametag: "github_org/repository", BuildArgs: map[string]string{"github": "org/repository"}},
+				{Client: "supereth3000", Nametag: "thebest"},
+			}},
 		},
 		{
 			name: "mixed",
