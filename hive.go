@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
 	"regexp"
@@ -140,6 +141,7 @@ Otherwise, it looks for files in the $HOME directory:
 		slog.Warn("--sim and configured simulators are ignored when using --dev mode")
 		simList = nil
 	}
+	simList = applySimBuildArgs(simList, simBuildArgs)
 	if *simTestExact && *simTestPattern != "" {
 		pattern := "^" + regexp.QuoteMeta(*simTestPattern) + "$"
 		simTestPattern = &pattern
@@ -250,7 +252,7 @@ Otherwise, it looks for files in the $HOME directory:
 	}
 
 	// Build clients and simulators.
-	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
+	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
@@ -312,6 +314,24 @@ func simulatorList(inv *libhive.Inventory, configured []libhive.SimulatorDesigna
 		list = append(list, libhive.SimulatorDesignator{Simulator: name})
 	}
 	return list, nil
+}
+
+// applySimBuildArgs returns a copy of list in which args, given by --sim.buildarg, override
+// the build arguments of every simulator. The input list and its maps are not modified.
+func applySimBuildArgs(list []libhive.SimulatorDesignator, args map[string]string) []libhive.SimulatorDesignator {
+	if len(args) == 0 {
+		return list
+	}
+	result := make([]libhive.SimulatorDesignator, len(list))
+	for i, sim := range list {
+		sim.BuildArgs = maps.Clone(sim.BuildArgs)
+		if sim.BuildArgs == nil {
+			sim.BuildArgs = make(map[string]string, len(args))
+		}
+		maps.Copy(sim.BuildArgs, args)
+		result[i] = sim
+	}
+	return result
 }
 
 func flagIsSet(name string) bool {

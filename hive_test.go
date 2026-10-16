@@ -43,3 +43,22 @@ func TestSimulatorList(t *testing.T) {
 		})
 	}
 }
+
+func TestApplySimBuildArgs(t *testing.T) {
+	list := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "main", "fixtures": "stable"}},
+		{Simulator: "sim-2"},
+	}
+	overrides := map[string]string{"branch": "override"}
+	got := applySimBuildArgs(list, overrides)
+	want := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "override", "fixtures": "stable"}},
+		{Simulator: "sim-2", BuildArgs: map[string]string{"branch": "override"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	if list[0].BuildArgs["branch"] != "main" || list[1].BuildArgs != nil {
+		t.Fatal("input list was modified")
+	}
+}
