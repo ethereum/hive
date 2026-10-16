@@ -131,6 +131,31 @@ func TestClientNaming(t *testing.T) {
 	}
 }
 
+func TestFilterClients(t *testing.T) {
+	list := []ClientDesignator{
+		{Client: "go-ethereum", Nametag: "main"},
+		{Client: "go-ethereum", Nametag: "stable"},
+		{Client: "besu"},
+	}
+	tests := []struct {
+		filter []string
+		want   []string
+	}{
+		{filter: []string{"go-ethereum"}, want: []string{"go-ethereum_main", "go-ethereum_stable"}},
+		{filter: []string{"go-ethereum_main", " besu"}, want: []string{"go-ethereum_main", "besu"}},
+		{filter: []string{"nethermind"}},
+	}
+	for _, tt := range tests {
+		var names []string
+		for _, c := range FilterClients(list, tt.filter) {
+			names = append(names, c.Name())
+		}
+		if !reflect.DeepEqual(names, tt.want) {
+			t.Errorf("FilterClients(%q) = %v, want %v", tt.filter, names, tt.want)
+		}
+	}
+}
+
 // This test ensures the real hive client definitions can be loaded.
 func TestLoadInventory(t *testing.T) {
 	basedir := filepath.FromSlash("../..")
