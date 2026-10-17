@@ -131,7 +131,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 			}
 
 			// Perform spec validation of the response.
-			if err := checker.Response(msg.Data); err != nil {
+			if err := checker.Response(respBytes); err != nil {
 				return err
 			}
 

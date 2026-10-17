@@ -15,7 +15,7 @@ RUN git init /execution-apis && \
     git fetch --depth 1 origin $GIT_REF && \
     git checkout FETCH_HEAD;
 
-# Generate openrpc.json from the spec source. It is gitignored in
+# Generate refs-openrpc.json from the spec source. It is gitignored in
 # execution-apis (built by `make build`), so it is not present in the clone.
 # speconly tests validate responses against this schema.
 RUN cd /execution-apis && make build
