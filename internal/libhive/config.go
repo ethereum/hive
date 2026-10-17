@@ -31,7 +31,7 @@ func (s SimulatorDesignator) Dockerfile() string {
 	return "Dockerfile." + s.DockerfileExt
 }
 
-// Config holds the client and simulator build configurations of a --config file.
+// Config holds client and simulator build configurations.
 type Config struct {
 	Clients    []ClientDesignator
 	Simulators []SimulatorDesignator
@@ -41,41 +41,33 @@ type Config struct {
 // client field is set and a simulator when the simulator field is set. Both kinds share
 // the dockerfile and build_args fields; nametag applies to clients only.
 type configEntry struct {
-	Client        string            `yaml:"client,omitempty"`
-	Simulator     string            `yaml:"simulator,omitempty"`
-	Nametag       string            `yaml:"nametag,omitempty"`
-	DockerfileExt string            `yaml:"dockerfile,omitempty"`
-	BuildArgs     map[string]string `yaml:"build_args,omitempty"`
+	ClientDesignator `yaml:",inline"`
+	Simulator        string `yaml:"simulator,omitempty"`
 }
 
 // ParseConfigYAML reads a YAML list of client and simulator build configurations. Client
-// and simulator entries may be mixed freely, so a file containing only client entries is
-// the format accepted by --client-file. File order is preserved within each kind.
-func ParseConfigYAML(inv *Inventory, file io.Reader) (*Config, error) {
+// and simulator entries may be mixed freely, and a list of only client entries is also
+// valid. File order is preserved within each kind.
+func ParseConfigYAML(inv *Inventory, file io.Reader) (Config, error) {
 	var entries []configEntry
 	dec := yaml.NewDecoder(file)
 	dec.KnownFields(true)
 	if err := dec.Decode(&entries); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("unable to parse config file: %w", err)
+		return Config{}, fmt.Errorf("unable to parse config file: %w", err)
 	}
 	if len(entries) == 0 {
-		return nil, errors.New("config file is empty")
+		return Config{}, errors.New("config file is empty")
 	}
 	var cfg Config
 	for i, e := range entries {
 		switch {
 		case e.Client != "" && e.Simulator != "":
-			return nil, fmt.Errorf("config entry %d: client and simulator are mutually exclusive", i+1)
+			return Config{}, fmt.Errorf("config entry %d: client and simulator are mutually exclusive", i+1)
 		case e.Client != "":
-			cfg.Clients = append(cfg.Clients, ClientDesignator{
-				Client:        e.Client,
-				Nametag:       e.Nametag,
-				DockerfileExt: e.DockerfileExt,
-				BuildArgs:     e.BuildArgs,
-			})
+			cfg.Clients = append(cfg.Clients, e.ClientDesignator)
 		case e.Simulator != "":
 			if e.Nametag != "" {
-				return nil, fmt.Errorf("config entry %d: simulator %s doesn't support nametag", i+1, e.Simulator)
+				return Config{}, fmt.Errorf("config entry %d: simulator %s doesn't support nametag", i+1, e.Simulator)
 			}
 			cfg.Simulators = append(cfg.Simulators, SimulatorDesignator{
 				Simulator:     e.Simulator,
@@ -83,16 +75,16 @@ func ParseConfigYAML(inv *Inventory, file io.Reader) (*Config, error) {
 				BuildArgs:     e.BuildArgs,
 			})
 		default:
-			return nil, fmt.Errorf("config entry %d: missing client or simulator", i+1)
+			return Config{}, fmt.Errorf("config entry %d: missing client or simulator", i+1)
 		}
 	}
 	if err := validateClients(inv, cfg.Clients); err != nil {
-		return nil, err
+		return Config{}, err
 	}
 	if err := validateSimulators(inv, cfg.Simulators); err != nil {
-		return nil, err
+		return Config{}, err
 	}
-	return &cfg, nil
+	return cfg, nil
 }
 
 // validateSimulators checks that every simulator exists in the inventory, appears once,

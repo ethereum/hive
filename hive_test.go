@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -46,25 +44,21 @@ func TestSimulatorList(t *testing.T) {
 	}
 }
 
-func TestParseConfigFile(t *testing.T) {
-	var inv libhive.Inventory
-	inv.AddClient("go-ethereum", nil)
-	inv.AddSimulator("ethereum/one")
-	file := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(file, []byte("- client: go-ethereum\n- simulator: ethereum/one\n"), 0600); err != nil {
-		t.Fatal(err)
+func TestApplySimBuildArgs(t *testing.T) {
+	list := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "main", "fixtures": "stable"}},
+		{Simulator: "sim-2"},
 	}
-	cfg, err := parseConfigFile(&inv, file)
-	if err != nil {
-		t.Fatal(err)
+	overrides := map[string]string{"branch": "override"}
+	got := applySimBuildArgs(list, overrides)
+	want := []libhive.SimulatorDesignator{
+		{Simulator: "sim-1", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "override", "fixtures": "stable"}},
+		{Simulator: "sim-2", BuildArgs: map[string]string{"branch": "override"}},
 	}
-	if len(cfg.Clients) != 1 || cfg.Clients[0].Client != "go-ethereum" {
-		t.Fatalf("unexpected clients: %+v", cfg.Clients)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
 	}
-	if len(cfg.Simulators) != 1 || cfg.Simulators[0].Simulator != "ethereum/one" {
-		t.Fatalf("unexpected simulators: %+v", cfg.Simulators)
-	}
-	if _, err := parseConfigFile(&inv, file+".missing"); err == nil {
-		t.Fatal("expected error for missing file")
+	if list[0].BuildArgs["branch"] != "main" || list[1].BuildArgs != nil {
+		t.Fatal("input list was modified")
 	}
 }

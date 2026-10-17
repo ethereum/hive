@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
 	"regexp"
@@ -123,11 +124,9 @@ Otherwise, it looks for files in the $HOME directory:
 	}
 	var config libhive.Config
 	if *configFile != "" {
-		cfg, err := parseConfigFile(&inv, *configFile)
-		if err != nil {
-			fatal(configFlagName()+":", err)
+		if config, err = parseConfigFile(&inv, *configFile); err != nil {
+			fatal("-config:", err)
 		}
-		config = *cfg
 	}
 
 	// Get the list of simulators.
@@ -142,6 +141,7 @@ Otherwise, it looks for files in the $HOME directory:
 		slog.Warn("--sim and configured simulators are ignored when using --dev mode")
 		simList = nil
 	}
+	simList = applySimBuildArgs(simList, simBuildArgs)
 	if *simTestExact && *simTestPattern != "" {
 		pattern := "^" + regexp.QuoteMeta(*simTestPattern) + "$"
 		simTestPattern = &pattern
@@ -252,7 +252,7 @@ Otherwise, it looks for files in the $HOME directory:
 	}
 
 	// Build clients and simulators.
-	if err := runner.Build(ctx, clientList, simList, simBuildArgs); err != nil {
+	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
 	if *simDevMode {
@@ -286,21 +286,13 @@ func fatal(args ...interface{}) {
 }
 
 // parseConfigFile loads the client and simulator build configurations from a YAML file.
-func parseConfigFile(inv *libhive.Inventory, file string) (*libhive.Config, error) {
+func parseConfigFile(inv *libhive.Inventory, file string) (libhive.Config, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, err
+		return libhive.Config{}, err
 	}
 	defer f.Close()
 	return libhive.ParseConfigYAML(inv, f)
-}
-
-// configFlagName returns the spelling of the config file flag used on the command line.
-func configFlagName() string {
-	if flagIsSet("client-file") {
-		return "--client-file"
-	}
-	return "--config"
 }
 
 // simulatorList selects the simulators to run. Simulators configured in the --config file
@@ -322,6 +314,24 @@ func simulatorList(inv *libhive.Inventory, configured []libhive.SimulatorDesigna
 		list = append(list, libhive.SimulatorDesignator{Simulator: name})
 	}
 	return list, nil
+}
+
+// applySimBuildArgs returns a copy of list in which args, given by --sim.buildarg, override
+// the build arguments of every simulator. The input list and its maps are not modified.
+func applySimBuildArgs(list []libhive.SimulatorDesignator, args map[string]string) []libhive.SimulatorDesignator {
+	if len(args) == 0 {
+		return list
+	}
+	result := make([]libhive.SimulatorDesignator, len(list))
+	for i, sim := range list {
+		sim.BuildArgs = maps.Clone(sim.BuildArgs)
+		if sim.BuildArgs == nil {
+			sim.BuildArgs = make(map[string]string, len(args))
+		}
+		maps.Copy(sim.BuildArgs, args)
+		result[i] = sim
+	}
+	return result
 }
 
 func flagIsSet(name string) bool {

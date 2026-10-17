@@ -75,8 +75,8 @@ func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
 	return result, nil
 }
 
-// compileSimulatorPattern compiles a --sim expression. The expression is anchored at
-// the end so it matches the simulator name. An empty expression returns a nil pattern.
+// compileSimulatorPattern compiles a simulator name pattern. The expression is anchored
+// at the end so it matches the simulator name. An empty expression returns a nil pattern.
 func compileSimulatorPattern(expr string) (*regexp.Regexp, error) {
 	expr = strings.TrimSpace(expr)
 	if expr == "" {
