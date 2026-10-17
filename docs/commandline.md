@@ -42,10 +42,14 @@ version by appending it to the client name with `_`, for example:
 ### Client Build Parameters
 
 The client list for a run can also be given in a YAML file. This also allows further
-customization of the build arguments of the client. Specify the `--client-file` option to
-use a client list file.
+customization of the build arguments of the client. Specify the `--config` option (or its
+alias `--client-file`) to use a configuration file.
 
-    ./hive --sim my-simulation --client-file clients.yaml
+    ./hive --sim my-simulation --config clients.yaml
+
+When `--client` is also given, it selects entries from the file by client name or by name
+and nametag, for example `go-ethereum_main`. Without it, all client entries in the file
+are used.
 
 Here is an example clients.yaml file:
 
@@ -73,6 +77,41 @@ arguments are:
    and image name. Example `ethereum/client-go`.
 - `github`: For client Dockerfiles building from git, this setting can be used to change
    the source code repository (fork) on GitHub. Example: `ethereum/go-ethereum`.
+
+### Simulator Build Parameters
+
+The configuration file can also carry simulator build configurations. Simulator entries
+use the `simulator` key in place of `client` and can be mixed with client entries in the
+same file, so a single `--config` file describes the whole run:
+
+    ./hive --config devnet.yaml
+
+Each simulator entry supports:
+
+- `simulator`: A known simulator directory under simulators/. Each simulator may appear once.
+- `dockerfile`: An optional extension, such as `git` for `Dockerfile.git`. The selected
+  file must exist in the simulator directory. If omitted, uses `Dockerfile`.
+- `build_args`: Arguments passed to the simulator's Dockerfile. Supported arguments and
+  their defaults are the `ARG`s declared in that Dockerfile.
+
+For example, this devnet.yaml builds the EELS consume-engine simulator from an
+execution-specs branch:
+
+    - client: go-ethereum
+      build_args:
+        baseimage: docker.io/ethereum/client-go
+        tag: latest
+    - simulator: ethereum/eels/consume-engine
+      build_args:
+        branch: forks/amsterdam
+
+Configured simulators run in file order unless `--sim` is supplied to filter them using
+its usual regular expression matching. Repeated `--sim.buildarg NAME=VALUE` options apply
+to every selected simulator and override matching arguments from the file. The simulator's
+`hive_context.txt`, if present, still determines its build context. In `--dev` mode,
+simulators are not built or run. A file without simulator entries leaves simulator
+selection to `--sim`, and a file without client entries leaves client selection to
+`--client`.
 
 ### Docker Options
 
