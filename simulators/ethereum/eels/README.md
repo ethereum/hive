@@ -32,7 +32,7 @@ Nightly images use the tests and framework from the nightly fill's commit.
 | `tag` | `latest` | Selects the tests, see below. `<tag>@sha256:<digest>` pins an exact image. |
 | `image` | the image in the table above | Only needed to use another registry namespace or a locally built image. |
 | `disable_strict_exception_matching` | `nimbus-el` | `consume-engine` and `consume-enginex` only; an empty value exempts no client. |
-| `fork` | the fork the release was filled for | `execute-blobs` only, e.g. `Amsterdam` for `tests@` releases. |
+| `fork` | the fork the release was filled for | `execute-blobs` only. |
 
 ## Tags
 

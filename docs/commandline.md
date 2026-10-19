@@ -151,8 +151,7 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 Both files accept `disable_strict_exception_matching` on `consume-engine` and
 `consume-enginex`, which defaults to `nimbus-el` and is passed to consume's corresponding
 option, and `fork` on `execute-blobs`. `Dockerfile` defaults `fork` to the fork the
-image's release was filled for, for example `Amsterdam` for `tests@` releases;
-`Dockerfile.git` defaults it to `Osaka`.
+image's release was filled for; `Dockerfile.git` has its own default.
 
 Mainnet release tags omit `tests@`; devnet release tags omit `tests-` and replace
 `@` with `-`. Channel tags follow the releases of a line. For consume simulators,
