@@ -12,10 +12,10 @@ builds the simulator from source instead, see
 ## What a tag selects
 
 A tag selects the version of the tests. A `consume` image contains the release's
-generated fixtures; an `execute` image contains its Python test sources. Images
-for the current release of a branch receive framework updates when that branch
-moves. Older releases retain the framework from their last image build. Nightly
-images use the tests and framework from the nightly fill's commit.
+generated fixtures; an `execute` image contains its Python test sources. Release
+tags are immutable. Channel tags pair a branch's highest release with the branch
+head, so they also pick up framework fixes such as client exception mappings.
+Nightly images use the tests and framework from the nightly fill's commit.
 
 | Simulator | Image | Test content in the image |
 | --- | --- | --- |
@@ -43,17 +43,15 @@ Examples: release 8.1.4 of the Glamsterdam devnet, cut from
 
 | Tag | Devnet example | Mainnet example | Meaning |
 | --- | --- | --- | --- |
-| release | `glamsterdam-devnet-v8.1.4` | `v20.0.2` | that release's tests; the framework follows the branch head while the release is the branch's current one |
-| branch channel | `glamsterdam-devnet-8` | `latest` | the branch's highest release with the branch's head; what a dashboard for one devnet follows |
-| series channel | `glamsterdam-devnet-latest` | `latest` | the highest release of the series; moves to devnet 9 with its first release |
-| nightly | | `nightly`, `nightly-<commit>` | the most recent nightly fill of the main line: fixtures, test sources and framework from one commit |
+| release | `glamsterdam-devnet-v8.1.4` | `v20.0.2` | that release's tests with the framework of its release build; never changes |
+| channel | `glamsterdam-devnet-8` | `latest` | the branch's highest release with the branch's head; what a dashboard for one devnet follows |
+| nightly | | `nightly` | the most recent nightly fill of the main line: fixtures, test sources and framework from one commit |
 
 `latest` is what `consume --input tests@latest` resolves, `glamsterdam-devnet-8`
 is to devnet 8 what `latest` is to the default branch, and no tag is named after
-a fork. Release channels are rebuilt whenever their branch moves; a release tag
-keeps the framework of its last build once a newer release of its branch
-exists. Tags name sources, not bytes: to run the exact image of a previous run,
-append its digest to the tag, `tag=latest@sha256:<digest>`. The simulator log
+a fork. Channels and `nightly` are rebuilt whenever their sources move; a release
+tag always runs the same image. To rerun the exact image of a channel or nightly
+run, append its digest to the tag, `tag=latest@sha256:<digest>`. The simulator log
 header names the sources of every run as `consume ref` or `execute ref` and
 `fixtures release` or `tests release`.
 
@@ -62,7 +60,7 @@ header names the sources of every run as `consume ref` or `execute ref` and
 `Dockerfile.git` in each simulator directory is the previous build: it clones
 execution-specs, runs `uv sync` and, for the `consume-*` simulators, downloads a
 fixture release with `consume cache`. Select it with `dockerfile: git` in a
-`--sim.file` configuration. It takes `branch`, an execution-specs Git ref that
+`--config` file. It takes `branch`, an execution-specs Git ref that
 defaults to the repository's default branch, and `fixtures`, the `consume
 --input` value that defaults to `tests@latest`. The release name behind an
 image tag, `tests-glamsterdam-devnet@v8.1.4` for `glamsterdam-devnet-v8.1.4`, is

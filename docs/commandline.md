@@ -134,9 +134,9 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
 
 `Dockerfile` accepts:
 
-- `tag`: The image tag. It selects the tests; the simulator code in the image is the
-  framework revision chosen when the image was published. Defaults to `latest`.
-  `<tag>@sha256:<digest>` pins an exact image.
+- `tag`: The image tag. It selects the tests. A release tag is immutable; a channel
+  such as `latest` pairs the highest release with the head of its branch. Defaults to
+  `latest`. `<tag>@sha256:<digest>` pins an exact image.
 - `image`: The image name, to use another registry namespace or a locally built image.
   Defaults to the published image of the simulator.
 
@@ -162,17 +162,17 @@ release was cut from is its `branch`:
 | `v20.0.2` | `tests@v20.0.2`, mainnet release 20.0.2 | empty, the default branch |
 | `glamsterdam-devnet-v8.1.4` | `tests-glamsterdam-devnet@v8.1.4`, release 8.1.4 of Glamsterdam devnet 8 | `devnets/glamsterdam/8` |
 | `glamsterdam-devnet-8` | the highest `tests-glamsterdam-devnet@v8.*` release | `devnets/glamsterdam/8` |
-| `glamsterdam-devnet-latest` | the highest `tests-glamsterdam-devnet@*` release | the branch of that devnet |
 | `latest` | the highest `tests@v*` release, as `tests@latest`; the default | empty, the default branch |
 | `nightly` | the most recent nightly fill of the default branch; no release | the default branch |
 
-Current-release images receive framework updates on branch pushes; older releases
-retain their last build. Nightly images use the nightly fill's commit.
+Release tags never change. Channels receive framework updates on branch pushes, so
+they also pick up fixes such as client exception mappings. Nightly images use the
+nightly fill's commit.
 `execute-blobs` source builds run the tests from `branch`, while release images
 contain the release's test sources. Existing `branch` and `fixtures` arguments
 require `dockerfile: git`; the default Dockerfiles no longer use them.
 
-Tags name sources, not bytes; `tag=<tag>@sha256:<digest>` runs an exact image. The full
+Channels and `nightly` move; `tag=<tag>@sha256:<digest>` runs an exact image. The full
 tag scheme is described in the [EELS simulators README] and in the execution-specs
 documentation under `docs/running_tests/hive/images/`.
 
