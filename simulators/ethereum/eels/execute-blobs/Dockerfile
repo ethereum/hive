@@ -7,6 +7,7 @@ ARG tag=latest
 
 FROM ${image}:${tag}
 
-## Default fork
-ARG fork=Osaka
+## Fork to execute the tests for. Empty uses the image's default, the fork its
+## release was filled for, e.g. Amsterdam for tests@ releases.
+ARG fork=""
 ENV FORK=${fork}
