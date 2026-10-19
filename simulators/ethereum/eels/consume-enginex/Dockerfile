@@ -3,9 +3,18 @@
 # blockchain_tests_engine_x fixtures it consumes, pre-alloc groups included.
 # Use tag to select the tests; see ../README.md for build arguments.
 ARG image=ghcr.io/ethereum/execution-specs/hive/consume-enginex
-ARG tag=latest
+ARG tag=
 
-FROM ${image}:${tag}
+FROM ${image}:${tag:-latest}
+
+# Deprecated: without a tag, the Dockerfile.git arguments fixtures and branch
+# still select a source build of the fixtures and framework, see
+# ethereum/execution-specs#3866. Pass tag= to use a published image.
+ARG tag
+ARG fixtures
+ARG branch
+COPY Dockerfile fixtures.tar.gz* /staged/
+RUN eels-legacy-build
 
 # TODO: remove when fixed on nimbus-el side.
 ARG disable_strict_exception_matching=nimbus-el

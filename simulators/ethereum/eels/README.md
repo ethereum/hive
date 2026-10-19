@@ -78,10 +78,14 @@ the `fixtures` input that gives consume source builds the same fixtures, and
 The simulator build parameters section of [docs/commandline.md] pairs each tag
 with its release name and branch.
 
-The default Dockerfiles do not accept `branch` or `fixtures`. Existing callers
-must switch to `tag` or select `Dockerfile.git`; Docker does not reject unused
-build arguments. For `execute-blobs`, a source build runs the tests from `branch`,
-whereas a release image contains the release's test sources.
+The `branch` and `fixtures` arguments are deprecated on the default Dockerfiles.
+Until ethereum/execution-specs#3866 removes them, a build that passes them without
+`tag` still gets a source build of the framework and fixtures on top of the
+published image, slower than a plain image and with a deprecation notice in every
+run; with `tag`, they are ignored. Switch to `tag`, or select `Dockerfile.git`.
+Passing `tag` together with the old arguments works before and after this change,
+so callers can migrate first. For `execute-blobs`, a source build runs the tests
+from `branch`, whereas a release image contains the release's test sources.
 
 ## Examples
 
@@ -107,4 +111,4 @@ machine. The tag scheme, how the images are built and how to assemble a
 combination that is not published are documented in the execution-specs
 repository under `docs/running_tests/hive/images/`.
 
-[docs/commandline.md]: ../../../../docs/commandline.md
+[docs/commandline.md]: ../../../docs/commandline.md

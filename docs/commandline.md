@@ -170,8 +170,10 @@ Release tags never change. Channels receive framework updates on branch pushes, 
 they also pick up fixes such as client exception mappings. Nightly images use the
 nightly fill's commit.
 `execute-blobs` source builds run the tests from `branch`, while release images
-contain the release's test sources. Existing `branch` and `fixtures` arguments
-require `dockerfile: git`; the default Dockerfiles no longer use them.
+contain the release's test sources. Existing `branch` and `fixtures` arguments are
+deprecated on the default Dockerfiles: without `tag` they still select a source build
+of the framework and fixtures, with a deprecation notice, until
+ethereum/execution-specs#3866 removes them. Use `tag`, or `dockerfile: git`.
 
 Channels and `nightly` move; `tag=<tag>@sha256:<digest>` runs an exact image. The full
 tag scheme is described in the [EELS simulators README] and in the execution-specs
