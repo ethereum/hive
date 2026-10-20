@@ -6,8 +6,8 @@ ARG image=ghcr.io/ethereum/execution-specs/hive/consume-rlp
 ARG tag=
 # Deprecated: without a tag, the Dockerfile.git arguments fixtures and branch
 # select the image's latest-legacy variant, which applies them during this
-# build as a source build did. Without them, the published image is used
-# directly.
+# build as a source build did. Without
+# them, the published image is used directly.
 ARG fixtures=
 ARG branch=
 ARG legacy=${fixtures}${branch}
