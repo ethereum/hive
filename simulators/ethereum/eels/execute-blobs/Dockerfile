@@ -4,17 +4,15 @@
 # for build arguments.
 ARG image=ghcr.io/ethereum/execution-specs/hive/execute-blobs
 ARG tag=
-
-FROM ${image}:${tag:-latest}
-
 # Deprecated: without a tag, the Dockerfile.git arguments fixtures and branch
-# still select a source build of the fixtures and framework, see
-# ethereum/execution-specs#3866. Pass tag= to use a published image.
-ARG tag
-ARG fixtures
-ARG branch
-COPY Dockerfile fixtures.tar.gz* /staged/
-RUN eels-legacy-build
+# select the image's latest-legacy variant, which applies them during this
+# build as a source build did, see ethereum/execution-specs#3866. Without
+# them, the published image is used directly.
+ARG fixtures=
+ARG branch=
+ARG legacy=${fixtures}${branch}
+
+FROM ${image}:${tag:-latest${legacy:+-legacy}}
 
 ## Fork to execute the tests for. Empty uses the image's default, the fork its
 ## release was filled for.

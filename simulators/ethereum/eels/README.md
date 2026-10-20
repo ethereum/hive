@@ -79,12 +79,13 @@ The simulator build parameters section of [docs/commandline.md] pairs each tag
 with its release name and branch.
 
 The `branch` and `fixtures` arguments are deprecated on the default Dockerfiles.
-Until ethereum/execution-specs#3866 removes them, a build that passes them without
-`tag` still gets a source build of the framework and fixtures on top of the
-published image, slower than a plain image and with a deprecation notice in every
-run; with `tag`, they are ignored. Switch to `tag`, or select `Dockerfile.git`.
-Passing `tag` together with the old arguments works before and after this change,
-so callers can migrate first. For `execute-blobs`, a source build runs the tests
+Until ethereum/execution-specs#3866 removes them, a build that passes them
+without `tag` selects the image's `latest-legacy` variant, which still does a
+source build of the framework and fixtures, slower than a plain image and with a
+deprecation notice in every run; builds without them pay nothing for this; with
+`tag`, they are ignored. Switch to `tag`, or select `Dockerfile.git`. Passing
+`tag` together with the old arguments works before and after this change, so
+callers can migrate first. For `execute-blobs`, a source build runs the tests
 from `branch`, whereas a release image contains the release's test sources.
 
 ## Examples

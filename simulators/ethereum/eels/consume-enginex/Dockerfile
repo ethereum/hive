@@ -4,17 +4,15 @@
 # Use tag to select the tests; see ../README.md for build arguments.
 ARG image=ghcr.io/ethereum/execution-specs/hive/consume-enginex
 ARG tag=
-
-FROM ${image}:${tag:-latest}
-
 # Deprecated: without a tag, the Dockerfile.git arguments fixtures and branch
-# still select a source build of the fixtures and framework, see
-# ethereum/execution-specs#3866. Pass tag= to use a published image.
-ARG tag
-ARG fixtures
-ARG branch
-COPY Dockerfile fixtures.tar.gz* /staged/
-RUN eels-legacy-build
+# select the image's latest-legacy variant, which applies them during this
+# build as a source build did, see ethereum/execution-specs#3866. Without
+# them, the published image is used directly.
+ARG fixtures=
+ARG branch=
+ARG legacy=${fixtures}${branch}
+
+FROM ${image}:${tag:-latest${legacy:+-legacy}}
 
 # TODO: remove when fixed on nimbus-el side.
 ARG disable_strict_exception_matching=nimbus-el
