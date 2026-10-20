@@ -111,13 +111,15 @@ both:
         branch: devnets/glamsterdam/8
         fixtures: tests-glamsterdam-devnet@v8.1.4
 
-Configured simulators run in file order unless `--sim` is supplied to filter them using
-its usual regular expression matching. Repeated `--sim.buildarg NAME=VALUE` options apply
-to every selected simulator and override matching arguments from the file. The simulator's
-`hive_context.txt`, if present, still determines its build context. In `--dev` mode,
-simulators are not built or run. A file without simulator entries leaves simulator
-selection to `--sim`, and a file without client entries leaves client selection to
-`--client`.
+Without `--sim`, the configured simulators run in file order. With `--sim`, it selects
+from all simulators using its usual regular expression matching, as it does without a
+configuration file; a selected simulator that has an entry in the file uses that entry's
+`dockerfile` and `build_args`, any other simulator its defaults. A file therefore only
+needs entries for the simulators whose build it changes. Repeated `--sim.buildarg
+NAME=VALUE` options apply to every selected simulator and override matching arguments from
+the file. The simulator's `hive_context.txt`, if present, still determines its build
+context. In `--dev` mode, simulators are not built or run. A file without client entries
+leaves client selection to `--client`.
 
 ### EELS Simulator Build Parameters
 

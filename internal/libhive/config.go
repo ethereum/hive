@@ -118,22 +118,3 @@ func validateSimulators(inv *Inventory, list []SimulatorDesignator) error {
 	}
 	return nil
 }
-
-// FilterSimulators selects configured simulators using the same regexp semantics as
-// MatchSimulators. An empty pattern keeps all entries. File order is preserved.
-func FilterSimulators(list []SimulatorDesignator, pattern string) ([]SimulatorDesignator, error) {
-	re, err := compileSimulatorPattern(pattern)
-	if err != nil {
-		return nil, err
-	}
-	if re == nil {
-		return list, nil
-	}
-	var result []SimulatorDesignator
-	for _, sim := range list {
-		if re.MatchString(sim.Simulator) {
-			result = append(result, sim)
-		}
-	}
-	return result, nil
-}
