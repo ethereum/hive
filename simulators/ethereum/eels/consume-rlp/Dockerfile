@@ -1,40 +1,15 @@
-# Builds and runs the EELS (execution-specs) consume rlp simulator
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Runs the EELS (execution-specs) consume rlp simulator from the image published by
+# ethereum/execution-specs. The image contains the simulator code and the
+# blockchain_tests fixtures it consumes.
+# Use tag to select the tests; see ../README.md for build arguments.
+ARG image=ghcr.io/ethereum/execution-specs/hive/consume-rlp
+ARG tag=
+# Deprecated: without a tag, the Dockerfile.git arguments fixtures and branch
+# select the image's latest-legacy variant, which applies them during this
+# build as a source build did. Without
+# them, the published image is used directly.
+ARG fixtures=
+ARG branch=
+ARG legacy=${fixtures}${branch}
 
-## Default fixtures/git-ref
-ARG fixtures=stable@latest
-ENV FIXTURES=${fixtures}
-ARG branch=""
-
-## Clone and install EELS
-RUN apt-get update && apt-get install -y git isal
-
-# Clone repo and use the default branch if none specified
-RUN git clone --depth 1 https://github.com/ethereum/execution-specs.git && \
-    cd execution-specs && \
-    if [ -n "$branch" ]; then \
-        git fetch --depth 1 origin "$branch" && \
-        git checkout FETCH_HEAD; \
-    fi
-
-WORKDIR /execution-specs/packages/testing
-RUN uv sync
-
-# Optionally keep pre-staged fixtures compressed in the image. A caller that
-# stages ./fixtures.tar.gz and passes fixtures=/fixtures gets the local fixtures;
-# otherwise FIXTURES stays a release/URL and consume downloads as before. The
-# `Dockerfile` anchor keeps COPY from failing when no tarball is staged.
-COPY Dockerfile fixtures.tar.gz* /staged/
-RUN rm -f /staged/Dockerfile && \
-    if [ "$FIXTURES" != /fixtures ] || [ ! -f /staged/fixtures.tar.gz ]; then \
-        rm -rf /staged && uv run --no-sync consume cache --input "$FIXTURES"; \
-    fi
-
-## Define `consume rlp` entry point using the local fixtures
-ENTRYPOINT if [ "$FIXTURES" = /fixtures ] && [ -f /staged/fixtures.tar.gz ]; then \
-        mkdir -p /fixtures && \
-        igzip -d -c /staged/fixtures.tar.gz | \
-            tar -xf - -C /fixtures --strip-components=1 \
-                fixtures/.meta fixtures/blockchain_tests; \
-    fi && \
-    exec uv run --no-sync consume rlp -v --input "$FIXTURES"
+FROM ${image}:${tag:-latest${legacy:+-legacy}}
