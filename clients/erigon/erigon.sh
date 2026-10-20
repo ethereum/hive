@@ -56,6 +56,9 @@ FLAGS="$FLAGS --fakepow"
 mkdir /erigon-hive-datadir
 FLAGS="$FLAGS --datadir /erigon-hive-datadir"
 FLAGS="$FLAGS --db.size.limit 2GB"
+# Keep commitment history so eth_getProof can serve historical blocks. Erigon
+# stores this setting in the database, so import and the node need the same value.
+FLAGS="$FLAGS --prune.include-commitment-history"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
