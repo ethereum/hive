@@ -58,7 +58,7 @@ Otherwise, it looks for files in the $HOME directory:
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		dockerBuildOutput     = flag.Bool("docker.buildoutput", false, "Relay only docker build output to stderr.")
-		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run. With --config, it selects simulator entries of the file.")
+		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run. Without it, the simulators configured with --config run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simTestExact          = flag.Bool("sim.limit.exact", false, "Exact `expression` match for tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
@@ -295,22 +295,28 @@ func parseConfigFile(inv *libhive.Inventory, file string) (libhive.Config, error
 	return libhive.ParseConfigYAML(inv, f)
 }
 
-// simulatorList selects the simulators to run. Simulators configured in the --config file
-// are filtered by --sim; without configured simulators, --sim selects from the inventory.
+// simulatorList selects the simulators to run. Without --sim, the simulators configured
+// in the --config file run in file order. With --sim, the pattern selects from all known
+// simulators, as it does without a --config file; a selected simulator configured in the
+// file uses that entry's Dockerfile and build arguments, any other its defaults.
 func simulatorList(inv *libhive.Inventory, configured []libhive.SimulatorDesignator, pattern string) ([]libhive.SimulatorDesignator, error) {
-	if len(configured) > 0 {
-		list, err := libhive.FilterSimulators(configured, pattern)
-		if err != nil {
-			return nil, fmt.Errorf("bad --sim regular expression: %w", err)
-		}
-		return list, nil
+	if strings.TrimSpace(pattern) == "" {
+		return configured, nil
 	}
 	names, err := inv.MatchSimulators(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("bad --sim regular expression: %w", err)
 	}
+	settings := make(map[string]libhive.SimulatorDesignator, len(configured))
+	for _, sim := range configured {
+		settings[sim.Simulator] = sim
+	}
 	var list []libhive.SimulatorDesignator
 	for _, name := range names {
+		if sim, ok := settings[name]; ok {
+			list = append(list, sim)
+			continue
+		}
 		list = append(list, libhive.SimulatorDesignator{Simulator: name})
 	}
 	return list, nil
