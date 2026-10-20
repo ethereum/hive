@@ -33,13 +33,11 @@ Fixtures using `engine_*` methods are sent to port 8551 with Hive's test JWT
 secret. Other methods use the public RPC endpoint on port 8545. The ordinary
 `>>` / `<<` fixture format is unchanged.
 
-For `engine_forkchoiceUpdatedV*` responses, a recorded non-null `payloadId`
-requires a non-null 8-byte DATA value, but its client-specific bytes are not
-compared. An expected null stays an exact null check. The rest of the response,
-including `payloadStatus.status` and `latestValidHash`, is compared as usual.
-Successful payload-building fixtures should use exact comparison (not
-`speconly`), so `SYNCING`, `INVALID`, and null payload IDs cannot pass in place
-of the recorded `VALID` response.
+Response checking uses the existing schema, literal comparison, and fixture
+validation-script mechanisms. There is no Engine-specific response rewriting.
+Fixtures with client-specific values such as `payloadId` can use `speconly`
+with a validation script that checks the ID format and all other expected
+fields. Schema validation alone does not establish a successful payload build.
 
 Engine fixtures must use a chain with the corresponding fork activated. This
 routing support alone does not activate forks or supply payload attributes.

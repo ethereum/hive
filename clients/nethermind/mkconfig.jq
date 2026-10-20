@@ -67,6 +67,21 @@ def sync_config:
   }
 ;
 
+# Simulators that start many short syncs (for example a sync from a mock peer
+# per test) may ask for a shorter sync loop interval. Nethermind starts and
+# switches its sync modes only on this timer (default 1000 ms).
+def sync_loop_config:
+  if env.HIVE_SYNC_LOOP_INTERVAL_MS != null then
+    {
+      "Sync": {
+        "MultiSyncModeSelectorLoopTimerMs": (env.HIVE_SYNC_LOOP_INTERVAL_MS | tonumber)
+      }
+    }
+  else
+    {}
+  end
+;
+
 def txpool_config:
   if env.HIVE_CANCUN_TIMESTAMP != null then
     {
@@ -128,4 +143,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config * blocks_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config * sync_loop_config * txpool_config * blocks_config

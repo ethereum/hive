@@ -559,7 +559,38 @@ func (txSender *TransactionSender) SendTransaction(testCtx context.Context, acco
 			return nil, errors.Wrapf(testCtx.Err(), "timeout retrying SendTransaction, last error: %v", err)
 		}
 	}
+	// SendTransaction returns as soon as the tx is admitted to the pool, but its
+	// promotion into the pending view that payload builders read is asynchronous.
+	// Wait for it so a payload built right afterwards is guaranteed to include it
+	// (ethereum/hive#1351).
+	_ = waitForTransactionPending(testCtx, node, tx.Hash())
 	return tx, nil
+}
+
+// txPendingPollInterval is how often the sender polls the recipient's pool while
+// waiting for a sent transaction to become pending.
+const txPendingPollInterval = 50 * time.Millisecond
+
+// txPendingTimeout bounds the best-effort wait for a sent transaction to become
+// pending; on expiry the send still succeeds and the previous timing-dependent
+// payload-building behavior applies.
+const txPendingTimeout = 10 * time.Second
+
+// waitForTransactionPending blocks until node reports txHash as pending in its
+// transaction pool, or txPendingTimeout elapses.
+func waitForTransactionPending(testCtx context.Context, node client.EngineClient, txHash common.Hash) error {
+	ctx, cancel := context.WithTimeout(testCtx, txPendingTimeout)
+	defer cancel()
+	for {
+		if _, isPending, err := node.TransactionByHash(ctx, txHash); err == nil && isPending {
+			return nil
+		}
+		select {
+		case <-time.After(txPendingPollInterval):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func (txSender *TransactionSender) SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {

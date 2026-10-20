@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/execution-apis/tools/iofile"
+	"github.com/ethereum/execution-apis/tools/spec"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/nsf/jsondiff"
@@ -23,10 +25,6 @@ var (
 		"genesis.json": "./tests/genesis.json",
 		"chain.rlp":    "./tests/chain.rlp",
 	}
-
-	// specMethods holds the compiled OpenRPC result schema for each method,
-	// used to validate "speconly" tests against the spec.
-	specMethods methodSchemas
 )
 
 func main() {
@@ -39,12 +37,6 @@ func main() {
 	if _, ok := clientEnv["HIVE_TARGET_GAS_LIMIT"]; !ok {
 		// Match execution-apis' Geth default so all clients build the same next-block gas limit.
 		clientEnv["HIVE_TARGET_GAS_LIMIT"] = "60000000"
-	}
-
-	// Load the OpenRPC spec so speconly tests can be validated against the
-	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
-	if specMethods, err = parseSpec("openrpc.json"); err != nil {
-		panic(fmt.Errorf("unable to load openrpc.json: %w", err))
 	}
 
 	// Run the test suite.
@@ -72,16 +64,28 @@ conformance with the execution API specification.`[1:],
 }
 
 func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
+	// Load the OpenRPC spec so speconly tests can be validated against the
+	// schema. The spec is shipped alongside the fixtures (see Dockerfile).
+	spec, err := spec.Load("refs-openrpc.json")
+	if err != nil {
+		panic(fmt.Errorf("unable to load refs-openrpc.json: %w", err))
+	}
+
 	_, testPattern := t.Sim.TestPattern()
 	re := regexp.MustCompile(testPattern)
-	tests := loadTests(t, "tests", re)
+	tests, err := iofile.LoadDirectory(t, "tests", re)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for _, test := range tests {
 		test := test
 		t.Run(hivesim.TestSpec{
-			Name:        fmt.Sprintf("%s (%s)", test.name, clientName),
-			Description: test.comment,
+			Name:        fmt.Sprintf("%s (%s)", test.Name, clientName),
+			Description: test.Comment,
 			Run: func(t *hivesim.T) {
-				if err := runTest(t, c, &test); err != nil {
+				scriptConfig := iofile.ScriptConfig{Log: t, OpenRPC: spec}
+				if err := runTest(t, c, &test, scriptConfig); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -89,32 +93,35 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	}
 }
 
-func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
+func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig iofile.ScriptConfig) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	url := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 	engineURL := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8551"))
-	return runRPCTest(t, client, url, engineURL, test)
+	return runRPCTest(t, client, url, engineURL, test, scriptConfig)
 }
 
 type testLogger interface {
 	Log(...interface{})
+	Logf(string, ...interface{})
 }
 
-func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *rpcTest) error {
+func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *iofile.Test, scriptConfig iofile.ScriptConfig) error {
 	var (
 		err       error
 		respBytes []byte
-		method    string
-		request   string
+		responses []json.RawMessage
+		checker   = spec.NewChecker(scriptConfig.OpenRPC)
 	)
 
-	for _, msg := range test.messages {
-		if msg.send {
+	for _, msg := range test.Messages {
+		if msg.Send {
 			// Send request.
-			t.Log(">> ", msg.data)
-			method = gjson.Get(msg.data, "method").String()
-			request = msg.data
-			respBytes, err = postRPC(client, url, engineURL, msg.data)
+			request := string(msg.Data)
+			t.Log(">> ", request)
+			if err := checker.Request(msg.Data); err != nil {
+				t.Logf("%v", err)
+			}
+			respBytes, err = postRPC(client, url, engineURL, request)
 			if err != nil {
 				return err
 			}
@@ -123,38 +130,24 @@ func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *
 			if respBytes == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
-			expectedData := msg.data
+			responses = append(responses, respBytes)
+			expectedData := string(msg.Data)
 			resp := string(bytes.TrimSpace(respBytes))
 			t.Log("<< ", resp)
 			if !gjson.Valid(resp) {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// For speconly tests, the recorded value is just one valid example;
-			// the response is client- or config-specific and must not be matched
-			// exactly. Validate it against the method's OpenRPC result schema so
-			// any spec-valid response passes regardless of which optional fields
-			// the client includes.
-			hasError := gjson.Get(resp, "error").Exists()
-			if !hasError && test.speconly {
-				schema, err := specMethods.forRequest(method, request)
-				if err != nil {
-					return err
-				}
-				if schema == nil {
-					return fmt.Errorf("no result schema for speconly method %s in spec", method)
-				}
-				if err := validateResult(schema, []byte(gjson.Get(resp, "result").Raw)); err != nil {
-					t.Log(err.Error())
-					return fmt.Errorf("response does not conform to %s result schema: %w", method, err)
-				}
-				respBytes = nil
-				continue
+			// Perform spec validation of the response.
+			if err := checker.Response(respBytes); err != nil {
+				return err
 			}
 
-			resp, err = normalizePayloadID(method, resp, expectedData)
-			if err != nil {
-				return err
+			// Skip message comparison if test is marked as speconly and there is no error.
+			hasError := gjson.Get(resp, "error").Exists()
+			if test.SpecOnly && !hasError {
+				respBytes = nil
+				continue
 			}
 
 			// Patch JSON to remove error messages wherever both the client and expected
@@ -187,6 +180,13 @@ func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *
 
 	if respBytes != nil {
 		return fmt.Errorf("unhandled response in test case")
+	}
+
+	if err := test.RunScript(scriptConfig, responses); err != nil {
+		return fmt.Errorf("validation script: %w", err)
+	}
+	if len(test.Script) > 0 {
+		t.Log("validation script passed")
 	}
 	return nil
 }
