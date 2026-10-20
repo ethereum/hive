@@ -5,3 +5,4 @@ pub mod rpc_compat;
 pub(crate) mod spec_assets;
 pub mod sync;
 pub(crate) mod validation;
+pub(crate) mod validation_block_rules;
