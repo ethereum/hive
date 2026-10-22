@@ -77,4 +77,8 @@ func TestGenerateListingSkipsMultiTestContext(t *testing.T) {
 	if got := entry.Start.Format("15:04:05"); got != "09:00:00" {
 		t.Errorf("wrong Start: got %s, want 09:00:00", got)
 	}
+	// The context entry ends last, so it defines the end time.
+	if got := entry.End.Format("15:04:05"); got != "10:00:00" {
+		t.Errorf("wrong End: got %s, want 10:00:00", got)
+	}
 }

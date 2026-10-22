@@ -85,3 +85,23 @@ func FormatTime(t time.Time) string {
 		return fmt.Sprintf("%dd ago", days)
 	}
 }
+
+// FormatDuration returns the run time between start and end in at most two
+// units, e.g. "42s", "17m 5s", "4h 12m" or "2d 3h". It returns "-" when the
+// end time is unknown, as in listings written before hiveview recorded it.
+func FormatDuration(start, end time.Time) string {
+	if end.IsZero() || end.Before(start) {
+		return "-"
+	}
+	d := end.Sub(start).Round(time.Second)
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	default:
+		return fmt.Sprintf("%dd %dh", int(d.Hours())/24, int(d.Hours())%24)
+	}
+}
