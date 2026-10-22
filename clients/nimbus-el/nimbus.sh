@@ -43,6 +43,7 @@
 #  - [ ] HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
 #  - [x] HIVE_LOGLEVEL                client loglevel (0-5)
 #  - [x] HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
+#  - [x] HIVE_SYNC_LOOP_INTERVAL_MS   beacon sync loop interval in ms (test-only tuning)
 
 # Immediately abort the script on any error encountered
 set -e
@@ -112,6 +113,16 @@ FLAGS="$FLAGS --ws --ws-api:eth,debug,admin"
 # Configure graphql
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
   FLAGS="$FLAGS --graphql"
+fi
+
+# Configure beacon sync loop interval (test-only tuning). Older builds lack
+# the option and would refuse to start, so only pass it when supported.
+if [ "$HIVE_SYNC_LOOP_INTERVAL_MS" != "" ]; then
+  if grep -qa -- "debug-beacon-sync-loop-interval" /usr/bin/nimbus; then
+    FLAGS="$FLAGS --debug-beacon-sync-loop-interval:$HIVE_SYNC_LOOP_INTERVAL_MS"
+  else
+    echo "HIVE_SYNC_LOOP_INTERVAL_MS ignored: nimbus has no --debug-beacon-sync-loop-interval"
+  fi
 fi
 
 # Configure engine api
