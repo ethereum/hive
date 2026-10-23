@@ -143,8 +143,9 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 			}
 
 			// Patch JSON to remove error messages wherever both the client and expected
-			// response contain an error object. This handles both top-level JSON-RPC
-			// errors and nested errors (e.g. eth_simulateV1 calls[].error.message).
+			// response contain an error object, and error data that the expected error
+			// does not have. This handles both top-level JSON-RPC errors and nested
+			// errors (e.g. eth_simulateV1 calls[].error).
 			var errorRedacted bool
 			resp, expectedData, errorRedacted = redactErrorMessages(resp, expectedData)
 
@@ -162,7 +163,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 			// If there is a discrepancy, return error.
 			if diffStatus != jsondiff.FullMatch {
 				if errorRedacted {
-					t.Log("note: error messages removed from comparison")
+					t.Log("note: error messages or unexpected error data removed from comparison")
 				}
 				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffText)
 			}
@@ -186,8 +187,10 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 // redactErrorMessages removes the "message" field from every "error" object
 // present in both the response and expected JSON. Client-specific wording is
 // thereby excluded from comparison while the shape and other fields of the
-// error are still checked. Returns the modified payloads and whether any
-// redaction occurred.
+// error are still checked. It also removes "data" from a response error when
+// the expected error has none: error data is optional in JSON-RPC, and the
+// spec check of the response has already accepted it. Returns the modified
+// payloads and whether any redaction occurred.
 //
 // Both top-level JSON-RPC errors and nested errors (e.g. eth_simulateV1
 // calls[].error.message) are handled. The walk does not descend into "error"
@@ -198,7 +201,7 @@ func redactErrorMessages(resp, expected string) (string, string, bool) {
 	if len(paths) == 0 {
 		return resp, expected, false
 	}
-	// Deleting "<path>.message" never changes object keys or array indices
+	// Deleting "<path>.message" or "<path>.data" never changes object keys or array indices
 	// elsewhere, so the collected paths remain valid regardless of order.
 	for _, p := range paths {
 		resp, _ = sjson.Delete(resp, p)
@@ -209,7 +212,8 @@ func redactErrorMessages(resp, expected string) (string, string, bool) {
 
 // collectErrorMessagePaths walks the expected tree in parallel with the
 // response tree and appends the sjson path of every "error.message" field
-// present on both sides.
+// present on both sides, and of every response "error.data" field that the
+// expected error does not have.
 func collectErrorMessagePaths(paths []string, path string, respVal, expectedVal gjson.Result) []string {
 	switch {
 	case expectedVal.IsObject():
@@ -223,6 +227,9 @@ func collectErrorMessagePaths(paths []string, path string, respVal, expectedVal 
 			if k == "error" {
 				if val.Get("message").Exists() && respChild.Get("message").Exists() {
 					paths = append(paths, childPath+".message")
+				}
+				if val.IsObject() && !val.Get("data").Exists() && respChild.Get("data").Exists() {
+					paths = append(paths, childPath+".data")
 				}
 				// Do not descend into the error object itself.
 				return true
