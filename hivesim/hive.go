@@ -259,6 +259,15 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 
 // ClientEnodeURLCustomNetwork returns the enode URL of a running client in a custom network.
 func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
+	return sim.clientEnodeURLNetwork(testSuite, test, node, network, 4)
+}
+
+// ClientEnodeURLNetworkIPv6 returns the IPv6 enode URL of a running client in a custom network.
+func (sim *Simulation) ClientEnodeURLNetworkIPv6(testSuite SuiteID, test TestID, node string, network string) (string, error) {
+	return sim.clientEnodeURLNetwork(testSuite, test, node, network, 6)
+}
+
+func (sim *Simulation) clientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string, family int) (string, error) {
 	if sim.docs != nil {
 		return "", errors.New("ClientEnodeURLNetwork is not supported in docs mode")
 	}
@@ -288,7 +297,7 @@ func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, nod
 	}
 
 	// Get the actual IP for the container
-	ip, err := sim.ContainerNetworkIP(testSuite, network, node)
+	ip, err := sim.containerNetworkIP(testSuite, network, node, family)
 	if err != nil {
 		return "", err
 	}
@@ -315,11 +324,15 @@ func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string,
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
 func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
+	return sim.CreateNetworkWithConfig(testSuite, networkName, NetworkConfig{})
+}
+
+func (sim *Simulation) CreateNetworkWithConfig(testSuite SuiteID, networkName string, config NetworkConfig) error {
 	if sim.docs != nil {
 		return errors.New("CreateNetwork is not supported in docs mode")
 	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName)
-	return post(url, nil, nil)
+	return post(url, config, nil)
 }
 
 // RemoveNetwork sends a request to the hive server to remove the given network.
@@ -334,11 +347,15 @@ func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
 // ConnectContainer sends a request to the hive server to connect the given
 // container to the given network.
 func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
+	return sim.ConnectContainerWithConfig(testSuite, network, containerID, NetworkEndpointConfig{})
+}
+
+func (sim *Simulation) ConnectContainerWithConfig(testSuite SuiteID, network, containerID string, config NetworkEndpointConfig) error {
 	if sim.docs != nil {
 		return errors.New("ConnectContainer is not supported in docs mode")
 	}
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
-	return post(url, nil, nil)
+	return post(url, config, nil)
 }
 
 // DisconnectContainer sends a request to the hive server to disconnect the given
@@ -354,6 +371,15 @@ func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, container
 // ContainerNetworkIP returns the IP address of a container on the given network. If the
 // container ID is "simulation", it returns the IP address of the simulator container.
 func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
+	return sim.containerNetworkIP(testSuite, network, containerID, 4)
+}
+
+// ContainerNetworkIPv6 returns the IPv6 address of a container on the given network.
+func (sim *Simulation) ContainerNetworkIPv6(testSuite SuiteID, network, containerID string) (string, error) {
+	return sim.containerNetworkIP(testSuite, network, containerID, 6)
+}
+
+func (sim *Simulation) containerNetworkIP(testSuite SuiteID, network, containerID string, family int) (string, error) {
 	if sim.docs != nil {
 		return "", errors.New("ContainerNetworkIP is not supported in docs mode")
 	}
@@ -361,6 +387,9 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 		url  = fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 		resp string
 	)
+	if family != 4 {
+		url += fmt.Sprintf("?family=%d", family)
+	}
 	err := get(url, &resp)
 	return resp, err
 }
