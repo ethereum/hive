@@ -24,6 +24,7 @@
 #  - HIVE_SHANGHAI_TIMESTAMP   timestamp for Shanghai transition
 #  - HIVE_CANCUN_TIMESTAMP     timestamp for Cancun transition
 #  - HIVE_LOGLEVEL             client log level
+#  - HIVE_SNAP_V2              set to 1 to enable experimental snap/2
 #
 # These flags are NOT supported by reth
 #
@@ -169,6 +170,10 @@ FLAGS="$FLAGS --nat none --block-interval 500000 --debug.startup-sync-state-idle
 
 if [ "$HIVE_DISCV5" != "" ]; then
     FLAGS="$FLAGS --discovery.v5.port=30303"
+fi
+
+if [ "$HIVE_SNAP_V2" = "1" ]; then
+    FLAGS="$FLAGS --snap.v2"
 fi
 
 # Launch the main client.
