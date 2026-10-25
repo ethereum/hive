@@ -59,12 +59,13 @@ type listingEntry struct {
 	Passes   int               `json:"passes"`
 	Fails    int               `json:"fails"`
 	Timeout  bool              `json:"timeout"`
-	Clients  []string          `json:"clients"`  // client names involved in this run
-	Versions map[string]string `json:"versions"` // client versions
-	Start    time.Time         `json:"start"`    // timestamp of test start (ISO 8601 format)
-	FileName string            `json:"fileName"` // hive output file
-	Size     int64             `json:"size"`     // size of hive output file
-	SimLog   string            `json:"simLog"`   // simulator log file
+	Clients  []string          `json:"clients"`      // client names involved in this run
+	Versions map[string]string `json:"versions"`     // client versions
+	Start    time.Time         `json:"start"`        // timestamp of test start (ISO 8601 format)
+	End      time.Time         `json:"end,omitzero"` // timestamp of test end (ISO 8601 format)
+	FileName string            `json:"fileName"`     // hive output file
+	Size     int64             `json:"size"`         // size of hive output file
+	SimLog   string            `json:"simLog"`       // simulator log file
 }
 
 func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
@@ -82,6 +83,9 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 		}
 		if e.Start.IsZero() || test.Start.Before(e.Start) {
 			e.Start = test.Start
+		}
+		if test.End.After(e.End) {
+			e.End = test.End
 		}
 		for _, client := range test.ClientInfo {
 			if !slices.Contains(e.Clients, client.Name) {
