@@ -22,6 +22,7 @@ Nightly images use the tests and framework from the nightly fill's commit.
 | `consume-rlp` | `ghcr.io/ethereum/execution-specs/hive/consume-rlp` | `blockchain_tests` fixtures |
 | `consume-engine` | `ghcr.io/ethereum/execution-specs/hive/consume-engine` | `blockchain_tests_engine` fixtures |
 | `consume-enginex` | `ghcr.io/ethereum/execution-specs/hive/consume-enginex` | `blockchain_tests_engine_x` fixtures |
+| `consume-wirex` | `ghcr.io/ethereum/execution-specs/hive/consume-wirex` | `blockchain_tests_engine_x` fixtures, synced by the client from a mock devp2p peer |
 | `consume-sync` | `ghcr.io/ethereum/execution-specs/hive/consume-sync` | `blockchain_tests_sync` fixtures |
 | `execute-blobs` | `ghcr.io/ethereum/execution-specs/hive/execute-blobs` | the test sources of the release |
 
@@ -31,7 +32,7 @@ Nightly images use the tests and framework from the nightly fill's commit.
 | --- | --- | --- |
 | `tag` | `latest` | Selects the tests, see below. `<tag>@sha256:<digest>` pins an exact image. |
 | `image` | the image in the table above | Only needed to use another registry namespace or a locally built image. |
-| `disable_strict_exception_matching` | `nimbus-el` | `consume-engine` and `consume-enginex` only; an empty value exempts no client. |
+| `disable_strict_exception_matching` | `nimbus-el` | `consume-engine`, `consume-enginex` and `consume-wirex` only; an empty value exempts no client. |
 | `fork` | the fork the release was filled for | `execute-blobs` only. |
 
 ## Tags
