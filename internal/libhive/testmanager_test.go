@@ -121,21 +121,21 @@ func TestStartTestConcurrentWithEndTestSuite(t *testing.T) {
 		}()
 		close(start)
 
-		startResult := <-started
+		result := <-started
 		endErr := <-ended
-		if startResult.err == nil {
+		if result.err == nil {
 			if !errors.Is(endErr, libhive.ErrTestSuiteRunning) {
 				t.Fatalf("iteration %d: EndTestSuite error = %v, want ErrTestSuiteRunning after StartTest succeeds", i, endErr)
 			}
-			if err := tm.EndTest(suiteID, startResult.id, &libhive.TestResult{Pass: true}); err != nil {
+			if err := tm.EndTest(suiteID, result.id, &libhive.TestResult{Pass: true}); err != nil {
 				t.Fatalf("iteration %d: EndTest: %v", i, err)
 			}
 			if err := tm.EndTestSuite(suiteID); err != nil {
 				t.Fatalf("iteration %d: EndTestSuite after cleanup: %v", i, err)
 			}
 		} else {
-			if !errors.Is(startResult.err, libhive.ErrNoSuchTestSuite) {
-				t.Fatalf("iteration %d: StartTest error = %v, want ErrNoSuchTestSuite", i, startResult.err)
+			if !errors.Is(result.err, libhive.ErrNoSuchTestSuite) {
+				t.Fatalf("iteration %d: StartTest error = %v, want ErrNoSuchTestSuite", i, result.err)
 			}
 			if endErr != nil {
 				t.Fatalf("iteration %d: EndTestSuite error = %v, want nil when StartTest loses the race", i, endErr)
