@@ -150,11 +150,10 @@ The `ethereum/eels/*` simulators run the `consume` and `execute` commands of
   `tests@v20.0.2`, or a URL. Defaults to `tests@latest`, the latest mainnet release.
   `consume-*` only.
 
-Both files accept `disable_strict_exception_matching` on `consume-engine`,
-`consume-enginex` and `consume-wirex`, which defaults to `nimbus-el` and is passed to
-consume's corresponding option, and `fork` on `execute-blobs`. `Dockerfile` defaults
-`fork` to the fork the image's release was filled for; `Dockerfile.git` has its own
-default.
+Both files accept `disable_strict_exception_matching` on `consume-engine` and
+`consume-enginex`, which defaults to `nimbus-el` and is passed to consume's corresponding
+option, and `fork` on `execute-blobs`. `Dockerfile` defaults `fork` to the fork the
+image's release was filled for; `Dockerfile.git` has its own default.
 
 Mainnet release tags omit `tests@`; devnet release tags omit `tests-` and replace
 `@` with `-`. Channel tags follow the releases of a line. For consume simulators,
