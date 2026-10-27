@@ -92,6 +92,58 @@ func TestClientTeardownDoesNotBlockOtherTests(t *testing.T) {
 	}
 }
 
+func TestStartTestConcurrentWithEndTestSuite(t *testing.T) {
+	tm := libhive.NewTestManager(libhive.SimEnv{}, fakes.NewContainerBackend(nil), nil, libhive.HiveInfo{})
+	const iterations = 256
+
+	for i := 0; i < iterations; i++ {
+		suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+		if err != nil {
+			t.Fatal("StartTestSuite:", err)
+		}
+
+		start := make(chan struct{})
+		type startResult struct {
+			id  libhive.TestID
+			err error
+		}
+		started := make(chan startResult, 1)
+		ended := make(chan error, 1)
+
+		go func() {
+			<-start
+			id, err := tm.StartTest(suiteID, "test", "test description")
+			started <- startResult{id: id, err: err}
+		}()
+		go func() {
+			<-start
+			ended <- tm.EndTestSuite(suiteID)
+		}()
+		close(start)
+
+		startResult := <-started
+		endErr := <-ended
+		if startResult.err == nil {
+			if !errors.Is(endErr, libhive.ErrTestSuiteRunning) {
+				t.Fatalf("iteration %d: EndTestSuite error = %v, want ErrTestSuiteRunning after StartTest succeeds", i, endErr)
+			}
+			if err := tm.EndTest(suiteID, startResult.id, &libhive.TestResult{Pass: true}); err != nil {
+				t.Fatalf("iteration %d: EndTest: %v", i, err)
+			}
+			if err := tm.EndTestSuite(suiteID); err != nil {
+				t.Fatalf("iteration %d: EndTestSuite after cleanup: %v", i, err)
+			}
+		} else {
+			if !errors.Is(startResult.err, libhive.ErrNoSuchTestSuite) {
+				t.Fatalf("iteration %d: StartTest error = %v, want ErrNoSuchTestSuite", i, startResult.err)
+			}
+			if endErr != nil {
+				t.Fatalf("iteration %d: EndTestSuite error = %v, want nil when StartTest loses the race", i, endErr)
+			}
+		}
+	}
+}
+
 func TestStopNodeRetriesContainerDeletion(t *testing.T) {
 	deleteCalls := 0
 	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
