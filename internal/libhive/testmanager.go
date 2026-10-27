@@ -209,13 +209,18 @@ func (manager *TestManager) Terminate() error {
 
 	for suiteID, suite := range manager.runningTestSuites {
 		for testID := range suite.TestCases {
-			if _, running := manager.IsTestRunning(testID); running {
+			manager.testCaseMutex.Lock()
+			if _, running := manager.runningTestCases[testID]; running {
 				// end any running tests and ensure that the host is notified to clean up
 				// any resources (e.g. docker containers).
-				err := manager.EndTest(suiteID, testID, terminationSummary)
+				stops, err := manager.endTestLocked(suiteID, testID, terminationSummary)
+				manager.testCaseMutex.Unlock()
 				if err != nil {
 					return err
 				}
+				manager.stopClients(stops)
+			} else {
+				manager.testCaseMutex.Unlock()
 			}
 		}
 		// ensure the db is updated with results
@@ -408,18 +413,22 @@ func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {
 	return manager.doEndSuite(testSuite)
 }
 
+// doEndSuite must be called with testSuiteMutex held.
 func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	suite, ok := manager.runningTestSuites[testSuite]
 	if !ok {
 		return ErrNoSuchTestSuite
 	}
 	// Check the suite has no running test cases.
+	manager.testCaseMutex.RLock()
 	for k := range suite.TestCases {
 		_, ok := manager.runningTestCases[k]
 		if ok {
+			manager.testCaseMutex.RUnlock()
 			return ErrTestSuiteRunning
 		}
 	}
+	manager.testCaseMutex.RUnlock()
 	if suite.testDetailsFile != nil {
 		suite.testDetailsFile.Close()
 	}
@@ -506,6 +515,8 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 
 // StartTest starts a new test case, returning the testcase id as a context identifier
 func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, description string) (TestID, error) {
+	manager.testSuiteMutex.Lock()
+	defer manager.testSuiteMutex.Unlock()
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
@@ -548,23 +559,34 @@ type clientStop struct {
 
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
+	// Always acquire the suite lock before the test-case lock. StartTest and
+	// EndTestSuite use the same order to keep the suite and test maps consistent.
+	manager.testSuiteMutex.Lock()
 	manager.testCaseMutex.Lock()
+	stops, err := manager.endTestLocked(suiteID, testID, result)
+	manager.testCaseMutex.Unlock()
+	manager.testSuiteMutex.Unlock()
+	if err != nil {
+		return err
+	}
+	manager.stopClients(stops)
+	return nil
+}
 
+// endTestLocked updates test state while both testSuiteMutex and testCaseMutex are held.
+func (manager *TestManager) endTestLocked(suiteID TestSuiteID, testID TestID, result *TestResult) ([]clientStop, error) {
 	// Check if the test case is running
 	testSuite, ok := manager.runningTestSuites[suiteID]
 	if !ok {
-		manager.testCaseMutex.Unlock()
-		return ErrNoSuchTestCase
+		return nil, ErrNoSuchTestCase
 	}
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
-		manager.testCaseMutex.Unlock()
-		return ErrNoSuchTestCase
+		return nil, ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
 	if result == nil {
-		manager.testCaseMutex.Unlock()
-		return ErrNoSummaryResult
+		return nil, ErrNoSummaryResult
 	}
 
 	// Add the results to the test case
@@ -598,14 +620,15 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
-	manager.testCaseMutex.Unlock()
+	return stops, nil
+}
 
+func (manager *TestManager) stopClients(stops []clientStop) {
 	// Stop the claimed clients.
 	for _, stop := range stops {
 		manager.backend.DeleteContainer(stop.id)
 		stop.wait()
 	}
-	return nil
 }
 
 func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
