@@ -80,9 +80,16 @@ fi
 echo "Command flags till now:"
 echo $FLAGS
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$erigon $FLAGS init /genesis.json
+# Initialize the local testchain with the genesis state. Without a chain to
+# import, an erigon that supports --override.genesis (marked at image build
+# time) loads the genesis itself, which saves starting a separate `erigon init`
+# process.
+if [ ! -f /chain.rlp ] && [ ! -d /blocks ] && [ -f /hive-override-genesis ]; then
+    GENESIS_FLAG="--override.genesis=/genesis.json"
+else
+    echo "Initializing database with genesis state..."
+    $erigon $FLAGS init /genesis.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -164,5 +171,5 @@ FLAGS="$FLAGS --nat=extip:$ip --no-downloader"
 
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
-echo "Running erigon with flags $FLAGS"
-$erigon $FLAGS
+echo "Running erigon with flags $FLAGS $GENESIS_FLAG"
+$erigon $FLAGS $GENESIS_FLAG

@@ -97,9 +97,15 @@ else
     cat /genesis.json
 fi
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$geth $FLAGS init /genesis.json
+# Initialize the local testchain with the genesis state. Without a chain to
+# import, a geth that supports --override.genesis (marked at image build time)
+# loads the genesis itself, which saves starting a separate `geth init` process.
+if [ ! -f /chain.rlp ] && [ ! -d /blocks ] && [ -f /hive-override-genesis ]; then
+    GENESIS_FLAG="--override.genesis=/genesis.json"
+else
+    echo "Initializing database with genesis state..."
+    $geth $FLAGS init /genesis.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -170,5 +176,5 @@ FLAGS="$FLAGS --nat=extip:$ip"
 
 # Disable disk space free monitor
 FLAGS="$FLAGS --datadir.minfreedisk=0"
-echo "Running go-ethereum with flags $FLAGS"
-$geth $FLAGS
+echo "Running go-ethereum with flags $FLAGS $GENESIS_FLAG"
+$geth $FLAGS $GENESIS_FLAG
