@@ -70,9 +70,13 @@ fi
 echo "Command flags till now:"
 echo $FLAGS
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$reth init $FLAGS --chain /genesis.json
+# Initialize the local testchain with the genesis state. reth node writes the
+# genesis itself when it starts with --chain, so the separate `reth init` is
+# only needed before importing a chain.
+if [ -f /chain.rlp ] || [ -d /blocks ]; then
+    echo "Initializing database with genesis state..."
+    $reth init $FLAGS --chain /genesis.json
+fi
 
 # make sure we use the same genesis each time
 FLAGS="$FLAGS --chain /genesis.json"
