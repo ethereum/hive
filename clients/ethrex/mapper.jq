@@ -61,6 +61,7 @@ def to_bool:
     "osakaTime": env.HIVE_OSAKA_TIMESTAMP|to_int,
     "amsterdamTime": env.HIVE_AMSTERDAM_TIMESTAMP|to_int,
     "bogotaTime": env.HIVE_BOGOTA_TIMESTAMP|to_int,
+    "zeroNonceStorageAccounts": (if env.HIVE_ZERO_NONCE_STORAGE_ACCOUNTS then env.HIVE_ZERO_NONCE_STORAGE_ACCOUNTS|split(",") else null end),
     "bpo1Time": env.HIVE_BPO1_TIMESTAMP|to_int,
     "bpo2Time": env.HIVE_BPO2_TIMESTAMP|to_int,
     "bpo3Time": env.HIVE_BPO3_TIMESTAMP|to_int,
