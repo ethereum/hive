@@ -47,7 +47,10 @@ set -e
 besu=/opt/besu/bin/besu
 
 # See https://github.com/besu-eth/besu/issues/1464
-export BESU_OPTS="-Dsecp256k1.randomize=false"
+# -XX:-FlightRecorder: skip the flight recording Besu's launcher starts by
+# default, which costs about 1 s per start. It must follow that flag, which
+# BESU_OPTS does.
+export BESU_OPTS="-Dsecp256k1.randomize=false -XX:-FlightRecorder"
 
 # Use bonsai storage.
 FLAGS="--data-storage-format=BONSAI"
