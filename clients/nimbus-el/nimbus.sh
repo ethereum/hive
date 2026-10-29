@@ -74,7 +74,10 @@ jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --network:/genesis-start.json"
 
 # Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+  echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+  jq '.genesis.alloc |= "\(length) accounts omitted"' /genesis-start.json
+elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
   echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
   jq 'del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis-start.json
 else
