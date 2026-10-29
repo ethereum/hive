@@ -24,7 +24,10 @@ esac
 FLAGS="$FLAGS --log.level=$LOG"
 
 # Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    jq '.alloc |= "\(length) accounts omitted"' /genesis.json
+elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
 else
