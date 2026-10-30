@@ -564,7 +564,7 @@ content-type: application/json
 
 [client interface documentation]: ./clients.md
 [package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
-[launch the simulation]: ./overview.md#running-hive
+[launch the simulation]: ./commandline.md#running-hive
 [hiveview]: ./commandline.md#viewing-simulation-results-hiveview
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
