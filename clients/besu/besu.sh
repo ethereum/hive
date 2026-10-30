@@ -47,7 +47,10 @@ set -e
 besu=/opt/besu/bin/besu
 
 # See https://github.com/besu-eth/besu/issues/1464
-export BESU_OPTS="-Dsecp256k1.randomize=false"
+# -XX:-FlightRecorder: skip the flight recording Besu's launcher starts by
+# default, which costs about 1 s per start. It must follow that flag, which
+# BESU_OPTS does.
+export BESU_OPTS="-Dsecp256k1.randomize=false -XX:-FlightRecorder"
 
 # Use bonsai storage.
 FLAGS="--data-storage-format=BONSAI"
@@ -69,7 +72,10 @@ jq -f /mapper.jq /genesis-input.json > /genesis.json
 FLAGS="$FLAGS --genesis-file=/genesis.json "
 
 # Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    jq '.alloc |= "\(length) accounts omitted"' /genesis.json
+elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
 else
