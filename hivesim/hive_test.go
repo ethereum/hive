@@ -61,7 +61,13 @@ func TestEnodeReplaceIP(t *testing.T) {
 		NetworkNameToID: func(s string) (string, error) {
 			return "bridgeID", nil
 		},
-		ContainerIP: func(string, networkID string) (net.IP, error) {
+		ContainerIP: func(_ string, networkID string, family libhive.IPFamily) (net.IP, error) {
+			if family == libhive.IPFamily6 {
+				return net.ParseIP("fd00:ca7d:3e57::3"), nil
+			}
+			if family != libhive.IPFamily4 {
+				return nil, errors.New("unexpected IP family")
+			}
 			if networkID == "bridgeID" {
 				return net.ParseIP("192.0.1.1"), nil
 			}
@@ -109,6 +115,14 @@ func TestEnodeReplaceIP(t *testing.T) {
 	want = urlBase + "192.0.1.1:8000"
 	if url != want {
 		t.Fatalf("wrong enode URL %q\nwant %q", url, want)
+	}
+	url, err = sim.ClientEnodeURLNetworkIPv6(suiteID, testID, clientID, "network1")
+	if err != nil {
+		t.Fatal("can't get IPv6 enode URL:", err)
+	}
+	want = urlBase + "[fd00:ca7d:3e57::3]:8000"
+	if url != want {
+		t.Fatalf("wrong IPv6 enode URL %q\nwant %q", url, want)
 	}
 }
 
@@ -349,12 +363,18 @@ func TestStartClientInitialNetworks(t *testing.T) {
 		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			return &libhive.ContainerInfo{}, nil
 		},
-		ConnectContainer: func(containerID string, networkID string) error {
+		ConnectContainer: func(containerID string, networkID string, options libhive.NetworkEndpointOptions) error {
+			if options.IPv4Address != "" || options.IPv6Address != "" {
+				t.Fatalf("unexpected endpoint options: %#v", options)
+			}
 			ipcounter++
 			connections[containerID+networkID] = net.IP{203, 0, 113, ipcounter}
 			return nil
 		},
-		ContainerIP: func(containerID string, networkID string) (net.IP, error) {
+		ContainerIP: func(containerID string, networkID string, family libhive.IPFamily) (net.IP, error) {
+			if family != libhive.IPFamily4 {
+				return nil, errors.New("unexpected IP family")
+			}
 			ip, ok := connections[containerID+networkID]
 			if !ok {
 				return nil, errors.New("container not connected")
@@ -397,6 +417,136 @@ func TestStartClientInitialNetworks(t *testing.T) {
 	}
 	if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 3", containerID); ip != "203.0.113.2" {
 		t.Fatalf("network 3 was not connected at start: %v", ip)
+	}
+}
+
+func TestInitialNetworkConfigSurvivesInitialNetworksOption(t *testing.T) {
+	endpoint := NetworkEndpointConfig{
+		IPv4Address: "10.210.0.3",
+		IPv6Address: "fd00:ca7d:3e57::3",
+	}
+	connections := make(map[string]libhive.NetworkEndpointOptions)
+	tm, srv := newFakeAPI(&fakes.BackendHooks{
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			return &libhive.ContainerInfo{}, nil
+		},
+		CreateNetwork: func(name string, options libhive.NetworkOptions) (string, error) {
+			return name + "-id", nil
+		},
+		ConnectContainer: func(containerID string, networkID string, options libhive.NetworkEndpointOptions) error {
+			connections[networkID] = options
+			return nil
+		},
+	})
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+	if err := sim.CreateNetwork(suiteID, "configured"); err != nil {
+		t.Fatal("can't create configured network:", err)
+	}
+	if err := sim.CreateNetwork(suiteID, "plain"); err != nil {
+		t.Fatal("can't create plain network:", err)
+	}
+
+	_, _, err = sim.StartClientWithOptions(
+		suiteID,
+		testID,
+		"client-1",
+		WithInitialNetworkConfig("configured", endpoint),
+		WithInitialNetworks([]string{"plain"}),
+	)
+	if err != nil {
+		t.Fatalf("failed to start client: %v", err)
+	}
+	configuredOptions, ok := findConnectionOptions(connections, "_configured-id")
+	if !ok {
+		t.Fatal("configured network was not connected at start")
+	}
+	if configuredOptions.IPv4Address != endpoint.IPv4Address || configuredOptions.IPv6Address != endpoint.IPv6Address {
+		t.Fatalf("wrong configured endpoint options: %#v", configuredOptions)
+	}
+	if _, ok := findConnectionOptions(connections, "_plain-id"); !ok {
+		t.Fatal("plain network was not connected at start")
+	}
+}
+
+func findConnectionOptions(connections map[string]libhive.NetworkEndpointOptions, suffix string) (libhive.NetworkEndpointOptions, bool) {
+	for networkID, options := range connections {
+		if strings.HasSuffix(networkID, suffix) {
+			return options, true
+		}
+	}
+	return libhive.NetworkEndpointOptions{}, false
+}
+
+func TestNetworkConfigAndIPv6Address(t *testing.T) {
+	var (
+		gotNetworkOptions  libhive.NetworkOptions
+		gotEndpointOptions libhive.NetworkEndpointOptions
+	)
+	tm, srv := newFakeAPI(&fakes.BackendHooks{
+		CreateNetwork: func(name string, options libhive.NetworkOptions) (string, error) {
+			gotNetworkOptions = options
+			return name + "-id", nil
+		},
+		ConnectContainer: func(containerID string, networkID string, options libhive.NetworkEndpointOptions) error {
+			gotEndpointOptions = options
+			return nil
+		},
+		ContainerIP: func(containerID string, networkID string, family libhive.IPFamily) (net.IP, error) {
+			switch family {
+			case libhive.IPFamily4:
+				return net.ParseIP("10.210.0.2"), nil
+			case libhive.IPFamily6:
+				return net.ParseIP("fd00:ca7d:3e57::2"), nil
+			default:
+				return nil, errors.New("unexpected IP family")
+			}
+		},
+	})
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+
+	config := NetworkConfig{
+		IPv4Subnet: "10.210.0.0/24",
+		IPv6Subnet: "fd00:ca7d:3e57::/64",
+	}
+	if err := sim.CreateNetworkWithConfig(suiteID, "dualstack", config); err != nil {
+		t.Fatal("can't create network:", err)
+	}
+	if gotNetworkOptions.IPv4Subnet != config.IPv4Subnet || gotNetworkOptions.IPv6Subnet != config.IPv6Subnet {
+		t.Fatalf("wrong network options: %#v", gotNetworkOptions)
+	}
+	endpoint := NetworkEndpointConfig{
+		IPv4Address: "10.210.0.3",
+		IPv6Address: "fd00:ca7d:3e57::3",
+	}
+	if err := sim.ConnectContainerWithConfig(suiteID, "dualstack", "container1", endpoint); err != nil {
+		t.Fatal("can't connect container:", err)
+	}
+	if gotEndpointOptions.IPv4Address != endpoint.IPv4Address || gotEndpointOptions.IPv6Address != endpoint.IPv6Address {
+		t.Fatalf("wrong endpoint options: %#v", gotEndpointOptions)
+	}
+	if ip, err := sim.ContainerNetworkIP(suiteID, "dualstack", "container1"); err != nil || ip != "10.210.0.2" {
+		t.Fatalf("wrong IPv4 response: ip=%q err=%v", ip, err)
+	}
+	if ip, err := sim.ContainerNetworkIPv6(suiteID, "dualstack", "container1"); err != nil || ip != "fd00:ca7d:3e57::2" {
+		t.Fatalf("wrong IPv6 response: ip=%q err=%v", ip, err)
 	}
 }
 
