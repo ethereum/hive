@@ -1,27 +1,12 @@
-def walk(f):
-  . as $in
-  | if type == "object" then
-      reduce keys_unsorted[] as $key
-        ( {}; . + { ($key):  ($in[$key] | walk(f)) } ) | f
-  elif type == "array" then map( walk(f) ) | f
-  else f
-  end;
-
-# Removes all empty keys and values in input.
+# Removes every object entry whose value is null, "" or [], or whose key is "",
+# at any depth. Dropping entries never turns an object or array into one of
+# those values, so this deletes the same entries as filtering every object
+# bottom-up, but in one pass: the bottom-up walk rebuilt each object key by
+# key, which took about 25 s on a genesis with 23,000 accounts.
 def remove_empty:
-  . | walk(
-    if type == "object" then
-      with_entries(
-        select(
-          .value != null and
-          .value != "" and
-          .value != [] and
-          .key != null and
-          .key != ""
-        )
-      )
-    else .
-    end
+  delpaths(
+    [paths(. == null or . == "" or . == []) | select(.[-1] | type == "string")]
+    + [path(.. | select(type == "object" and has(""))) + [""]]
   )
 ;
 
