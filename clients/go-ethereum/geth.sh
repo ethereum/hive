@@ -102,9 +102,6 @@ mv /genesis.json /genesis-input.json
 if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
     dump='.alloc |= "\(length) accounts omitted"'
-elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    dump='del(.alloc[] | select(.balance == "0x123450000000000000000"))'
 else
     echo "Supplied genesis state:"
     dump='.'
