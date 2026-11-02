@@ -70,20 +70,24 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
 fi
 
 # Configure the chain.
-jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --network:/genesis-start.json"
 
-# Dump genesis.
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis-start.json.
 if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
   echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
-  jq '.genesis.alloc |= "\(length) accounts omitted"' /genesis-start.json
+  dump='.genesis.alloc |= "\(length) accounts omitted"'
 elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
   echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-  jq 'del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis-start.json
+  dump='del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))'
 else
   echo "Supplied genesis state:"
-  cat /genesis-start.json
+  dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis.json \
+    | awk 'w { print > "/genesis-start.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 # Don't immediately abort, some imports are meant to fail
 set +e
