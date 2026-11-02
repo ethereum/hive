@@ -233,9 +233,11 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 }
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
+// Anonymous volumes created for the container, i.e. those declared by VOLUME in its
+// image, are removed with it.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	b.logger.Debug("removing container", "container", containerID[:8])
-	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true, RemoveVolumes: true})
 	if err != nil {
 		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
 	}
