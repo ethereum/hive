@@ -97,7 +97,10 @@ fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
-mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
+BLOCKS=()
+if [ -d /blocks ]; then
+    mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
+fi
 
 if [[ ! -d "/blocks" || ${#BLOCKS[@]} -eq 0 ]]; then
     echo "Warning: No blocks found."
