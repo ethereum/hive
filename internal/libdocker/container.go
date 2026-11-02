@@ -453,6 +453,10 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 	}
 
 	logger.Debug("attaching to container", "stdin", attach.Stdin, "stdout", attach.Stdout, "stderr", attach.Stderr)
+	// Have the attach report when the daemon has accepted it. Starting the
+	// container before then loses its first output.
+	attached := make(chan struct{})
+	attach.Success = attached
 	waiter, err := b.client.AttachToContainerNonBlocking(attach)
 	if err != nil {
 		closer.closeFiles()
@@ -460,6 +464,14 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 		return nil, err
 	}
 	closer.w = waiter
+	select {
+	case <-attached:
+		attached <- struct{}{}
+	case <-ctx.Done():
+		go func() { <-attached; attached <- struct{}{} }()
+		closer.Close()
+		return nil, ctx.Err()
+	}
 
 	logger.Debug("starting container")
 	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
