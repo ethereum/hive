@@ -54,7 +54,7 @@ mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis. 
-if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
     jq '.alloc |= "\(length) accounts omitted"' /genesis.json
 else

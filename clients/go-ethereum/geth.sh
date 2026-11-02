@@ -99,7 +99,7 @@ mv /genesis.json /genesis-input.json
 # Map the genesis and dump it in one jq pass, which saves parsing it twice:
 # jq prints the dump, a marker line, then the mapped genesis, which awk
 # writes to /genesis.json.
-if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
     dump='.alloc |= "\(length) accounts omitted"'
 else
