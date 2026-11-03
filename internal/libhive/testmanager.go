@@ -602,7 +602,12 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 
 	// Stop the claimed clients.
 	for _, stop := range stops {
-		manager.backend.DeleteContainer(stop.id)
+		// If the container can't be removed, it keeps running and wait would
+		// never return, so don't wait for it.
+		if err := manager.backend.DeleteContainer(stop.id); err != nil {
+			slog.Error("unable to stop client", "container", shortContainerID(stop.id), "err", err)
+			continue
+		}
 		stop.wait()
 	}
 	return nil
@@ -750,4 +755,12 @@ func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteFile := filepath.Join(logdir, suiteFileName)
 	// Write it.
 	return os.WriteFile(suiteFile, suiteData, 0644)
+}
+
+// shortContainerID returns the abbreviated form of a container ID, for logs only.
+func shortContainerID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
 }

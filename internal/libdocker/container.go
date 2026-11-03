@@ -120,7 +120,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	if err != nil {
 		return "", err
 	}
-	logger := b.logger.With("image", imageName, "container", c.ID[:8])
+	logger := b.logger.With("image", imageName, "container", shortID(c.ID))
 
 	// Now upload files.
 	if err := b.uploadFiles(ctx, c.ID, opt.Files); err != nil {
@@ -138,8 +138,10 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		panic("attempt to start container with CheckLive, but proxy is not running")
 	}
 
-	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
-	logger := b.logger.With("container", info.ID)
+	// The full ID is kept in ContainerInfo: Docker rejects a prefix shared by
+	// two containers, so removal and other operations need the full ID.
+	info := &libhive.ContainerInfo{ID: containerID, LogFile: opt.LogFile}
+	logger := b.logger.With("container", shortID(containerID))
 
 	// Run the container.
 	var startTime = time.Now()
@@ -236,30 +238,30 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 // Anonymous volumes created for the container, i.e. those declared by VOLUME in its
 // image, are removed with it.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
-	b.logger.Debug("removing container", "container", containerID[:8])
+	b.logger.Debug("removing container", "container", shortID(containerID))
 	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true, RemoveVolumes: true})
 	if err != nil {
-		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't remove container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
 
 // PauseContainer pauses the given container.
 func (b *ContainerBackend) PauseContainer(containerID string) error {
-	b.logger.Debug("pausing container", "container", containerID[:8])
+	b.logger.Debug("pausing container", "container", shortID(containerID))
 	err := b.client.PauseContainer(containerID)
 	if err != nil {
-		b.logger.Error("can't pause container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't pause container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
 
 // UnpauseContainer unpauses the given container.
 func (b *ContainerBackend) UnpauseContainer(containerID string) error {
-	b.logger.Debug("unpausing container", "container", containerID[:8])
+	b.logger.Debug("unpausing container", "container", shortID(containerID))
 	err := b.client.UnpauseContainer(containerID)
 	if err != nil {
-		b.logger.Error("can't unpause container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't unpause container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
@@ -408,7 +410,7 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 
 		// If console logging is requested, dump stderr there.
 		if b.config.ContainerOutput != nil {
-			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
+			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", shortID(id)))
 			closer.addFile(prefixer)
 			errStream = prefixer
 
@@ -429,7 +431,7 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 
 		// If console logging was requested, tee the output and tag it with the container id.
 		if b.config.ContainerOutput != nil {
-			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
+			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", shortID(id)))
 			closer.addFile(prefixer)
 			outStream = io.MultiWriter(log, prefixer)
 		}
@@ -564,4 +566,13 @@ func (w *linePrefixWriter) Close() error {
 	}
 	w.buf = nil
 	return err
+}
+
+// shortID returns the abbreviated form of a container ID, for logs and display only.
+// Never pass the result to Docker, because different containers can share a prefix.
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
 }

@@ -321,14 +321,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		slog.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
+		slog.Error("API: could not start client", "client", clientDef.Name, "container", shortContainerID(containerID), "error", err)
 		err := fmt.Errorf("client did not start: %v", err)
 		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	// It's started.
-	slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+	slog.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", shortContainerID(containerID))
 	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
 }
 
