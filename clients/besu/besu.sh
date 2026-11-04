@@ -37,6 +37,7 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
+#  - HIVE_KZG_FAST_SETUP       set to '1' to load the KZG trusted setup in the background (test-only tuning)
 #
 # These flags are not supported by the Besu hive client
 #
@@ -51,6 +52,15 @@ besu=/opt/besu/bin/besu
 # default, which costs about 1 s per start. It must follow that flag, which
 # BESU_OPTS does.
 export BESU_OPTS="-Dsecp256k1.randomize=false -XX:-FlightRecorder"
+
+# Simulators whose clients need no KZG at start (e.g. execution-specs' consume
+# simulators, where only the point-evaluation precompile verifies KZG proofs)
+# may ask for a fast KZG setup: load the trusted setup on a background thread
+# while the rest of the node starts. Besu reads every option from a BESU_
+# variable, so a Besu without the option ignores it.
+if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
+    export BESU_XKZG_TRUSTED_SETUP_BACKGROUND_LOAD_ENABLED=true
+fi
 
 # Use bonsai storage.
 FLAGS="--data-storage-format=BONSAI"
