@@ -130,6 +130,75 @@ func TestStopNodeRetriesContainerDeletion(t *testing.T) {
 	}
 }
 
+// A container that can't be removed keeps running, so EndTest must report the
+// failure instead of waiting for it to exit. Two distinct full IDs share their
+// first eight characters, as in ethereum/hive#1654.
+func TestEndTestDoesNotWaitWhenDeletionFails(t *testing.T) {
+	const (
+		idA = "e6476c8687d049b96fe0d3e34127b468c7c84616858fba75d253b7b199d5215b"
+		idB = "e6476c868ba2551e7f9f5953bd034016416d7a195ae457178003875ebf505ee1"
+	)
+	ids := []string{idA, idB}
+	neverExits := make(chan struct{})
+	defer close(neverExits)
+
+	var deleted []string
+	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+		CreateContainer: func(string, libhive.ContainerOptions) (string, error) {
+			id := ids[0]
+			ids = ids[1:]
+			return id, nil
+		},
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			return &libhive.ContainerInfo{Wait: func() { <-neverExits }}, nil
+		},
+		DeleteContainer: func(containerID string) error {
+			deleted = append(deleted, containerID)
+			return errors.New("multiple IDs found with provided prefix")
+		},
+	})
+
+	clients := []*libhive.ClientDefinition{{Name: "test-client", Image: "test-client-image"}}
+	tm := libhive.NewTestManager(libhive.SimEnv{}, backend, clients, libhive.HiveInfo{})
+	srv := httptest.NewServer(tm.API())
+	defer srv.Close()
+
+	suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+	if err != nil {
+		t.Fatal("StartTestSuite:", err)
+	}
+	testID, err := tm.StartTest(suiteID, "test", "test description")
+	if err != nil {
+		t.Fatal("StartTest:", err)
+	}
+	nodeA := startClientHTTP(t, srv.URL, suiteID, testID)
+	nodeB := startClientHTTP(t, srv.URL, suiteID, testID)
+	if nodeA != idA || nodeB != idB {
+		t.Fatalf("node IDs are %q and %q, want the full container IDs", nodeA, nodeB)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- tm.EndTest(suiteID, testID, &libhive.TestResult{Pass: true})
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal("EndTest:", err)
+		}
+	case <-time.After(testOperationTimeout):
+		t.Fatal("EndTest still waiting for a container that could not be removed")
+	}
+	if len(deleted) != 2 {
+		t.Fatalf("DeleteContainer called %d times, want 2", len(deleted))
+	}
+	for _, id := range deleted {
+		if len(id) != len(idA) {
+			t.Errorf("DeleteContainer got %q, want a full container ID", id)
+		}
+	}
+}
+
 func TestRegisterMultiTestNode(t *testing.T) {
 	// Track container deletions to verify lifecycle behavior.
 	var deletedContainers []string

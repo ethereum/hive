@@ -189,7 +189,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 	}
 	defer func() {
 		if err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true, RemoveVolumes: true}); err != nil {
-			b.logger.Error("can't remove temporary container", "id", cont.ID[:8], "err", err)
+			b.logger.Error("can't remove temporary container", "id", shortID(cont.ID), "err", err)
 		}
 	}()
 

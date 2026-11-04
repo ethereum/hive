@@ -235,7 +235,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv, hiveInfo HiveI
 	if err != nil {
 		return SimResult{}, err
 	}
-	slogger := slog.With("sim", sim, "container", sc.ID[:8])
+	slogger := slog.With("sim", sim, "container", shortContainerID(sc.ID))
 	slogger.Debug("started simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")

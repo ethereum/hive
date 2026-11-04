@@ -140,7 +140,9 @@ func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, op
 	if info.MAC == "" {
 		info.MAC = "00:80:41:ae:fd:7e"
 	}
-	info.Wait = func() {}
+	if info.Wait == nil {
+		info.Wait = func() {}
+	}
 	return &info, nil
 }
 
