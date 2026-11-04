@@ -42,7 +42,8 @@
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
-#  - HIVE_KZG_FAST_SETUP          if set, initialize the KZG library on first use (test-only tuning)
+#  - HIVE_EXPECT_DEEP_REORGS      set to '1' to raise the engine API reorg depth limit
+#  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
 
 # Immediately abort the script on any error encountered
 set -e
@@ -52,7 +53,7 @@ FLAGS="--state.scheme=path"
 
 # Raise geth's engine API reorg depth limit (default 32) for simulators that
 # rewind deeply, e.g. consume-enginex; geth without the flag ignores the var.
-if [ "$HIVE_EXPECT_DEEP_REORGS" != "" ]; then
+if [ "${HIVE_EXPECT_DEEP_REORGS:-0}" = "1" ]; then
     export GETH_ENGINE_MAXREORGDEPTH=512
 fi
 
@@ -60,7 +61,7 @@ fi
 # simulators, where only the point-evaluation precompile verifies KZG proofs)
 # may ask for a fast KZG setup: initialize the KZG library on first use instead
 # of at startup; geth without the flag ignores the var.
-if [ "$HIVE_KZG_FAST_SETUP" != "" ]; then
+if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
     export GETH_CRYPTO_KZG_LAZY=true
 fi
 
