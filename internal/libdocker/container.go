@@ -233,9 +233,11 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 }
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
+// Anonymous volumes created for the container, i.e. those declared by VOLUME in its
+// image, are removed with it.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	b.logger.Debug("removing container", "container", containerID[:8])
-	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true, RemoveVolumes: true})
 	if err != nil {
 		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
 	}
@@ -453,6 +455,10 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 	}
 
 	logger.Debug("attaching to container", "stdin", attach.Stdin, "stdout", attach.Stdout, "stderr", attach.Stderr)
+	// Have the attach report when the daemon has accepted it. Starting the
+	// container before then loses its first output.
+	attached := make(chan struct{})
+	attach.Success = attached
 	waiter, err := b.client.AttachToContainerNonBlocking(attach)
 	if err != nil {
 		closer.closeFiles()
@@ -460,6 +466,14 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger *slog.Logger
 		return nil, err
 	}
 	closer.w = waiter
+	select {
+	case <-attached:
+		attached <- struct{}{}
+	case <-ctx.Done():
+		go func() { <-attached; attached <- struct{}{} }()
+		closer.Close()
+		return nil, ctx.Err()
+	}
 
 	logger.Debug("starting container")
 	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
