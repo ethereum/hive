@@ -239,6 +239,18 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
 	}
 
+	// by default: check the eth1 port
+	checkLive := uint16(8545)
+	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
+		v, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			slog.Error("API: could not parse check-live port", "error", err)
+			serveError(w, err, http.StatusBadRequest)
+			return
+		}
+		checkLive = uint16(v)
+	}
+
 	// Set up the timeout.
 	timeout := api.env.ClientStartTimeout
 	if timeout == 0 {
@@ -277,24 +289,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	for _, network := range networks {
 		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
 			slog.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+			api.backend.DeleteContainer(containerID)
 			serveError(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
 
-	// by default: check the eth1 port
-	options.CheckLive = 8545
-	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
-		v, err := strconv.ParseUint(portStr, 10, 16)
-		if err != nil {
-			slog.Error("API: could not parse check-live port", "error", err)
-			serveError(w, err, http.StatusBadRequest)
-			return
-		}
-		options.CheckLive = uint16(v)
-	}
-
 	// Start it!
+	options.CheckLive = checkLive
 	info, err := api.backend.StartContainer(ctx, containerID, options)
 	if info != nil {
 		// Capture the current log file size as the starting offset for this test.
