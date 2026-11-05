@@ -64,8 +64,9 @@ func CleanupHiveContainers(ctx context.Context, client *docker.Client, opts Clea
 		}
 
 		err := client.RemoveContainer(docker.RemoveContainerOptions{
-			ID:    container.ID,
-			Force: true,
+			ID:            container.ID,
+			Force:         true,
+			RemoveVolumes: true,
 		})
 		if err != nil {
 			fmt.Printf("Failed to remove container %s: %v\n", container.ID[:12], err)

@@ -37,6 +37,7 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
+#  - HIVE_KZG_FAST_SETUP       set to '1' to load the KZG trusted setup in the background (test-only tuning)
 #
 # These flags are not supported by the Besu hive client
 #
@@ -51,6 +52,15 @@ besu=/opt/besu/bin/besu
 # default, which costs about 1 s per start. It must follow that flag, which
 # BESU_OPTS does.
 export BESU_OPTS="-Dsecp256k1.randomize=false -XX:-FlightRecorder"
+
+# Simulators whose clients need no KZG at start (e.g. execution-specs' consume
+# simulators, where only the point-evaluation precompile verifies KZG proofs)
+# may ask for a fast KZG setup: load the trusted setup on a background thread
+# while the rest of the node starts. Besu reads every option from a BESU_
+# variable, so a Besu without the option ignores it.
+if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
+    export BESU_XKZG_TRUSTED_SETUP_BACKGROUND_LOAD_ENABLED=true
+fi
 
 # Use bonsai storage.
 FLAGS="--data-storage-format=BONSAI"
@@ -68,20 +78,21 @@ FLAGS="$FLAGS --logging=$LOG --color-enabled=false"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
 FLAGS="$FLAGS --genesis-file=/genesis.json "
 
-# Dump genesis.
-if [ -n "$HIVE_OMIT_GENESIS_ALLOC" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
-    jq '.alloc |= "\(length) accounts omitted"' /genesis.json
-elif [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 
 # Enable experimental 'berlin' hard-fork features if configured.
