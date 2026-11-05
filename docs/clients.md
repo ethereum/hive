@@ -139,7 +139,7 @@ may map these to command line flags or use them to generate a config file, for e
 | `HIVE_FORK_CONSTANTINOPLE` | decimal       | [Constantinople][EIP-1013] transition block    |
 | `HIVE_FORK_PETERSBURG`     | decimal       | [Petersburg][EIP-1716] transition block        |
 | `HIVE_FORK_ISTANBUL`       | decimal       | [Istanbul][EIP-1679] transition block          |
-| `HIVE_FORK_MUIRGLACIER`    | decimal       | [Muir Glacier][EIP-2387] transition block      |
+| `HIVE_FORK_MUIR_GLACIER`   | decimal       | [Muir Glacier][EIP-2387] transition block      |
 | `HIVE_FORK_BERLIN`         | decimal       | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal       | [London][london-spec] transition block         |
 
@@ -167,7 +167,7 @@ Execution-layer clients with an implementation of the [snap] protocol should sup
 [EIP-1716]: https://eips.ethereum.org/EIPS/eip-1716
 [EIP-2387]: https://eips.ethereum.org/EIPS/eip-2387
 [EIP-2070]: https://eips.ethereum.org/EIPS/eip-2070
-[london-spec]: https://github.com/ethereum/eth1.0-specs/blob/master/network-upgrades/mainnet-upgrades/london.md
+[london-spec]: https://github.com/ethereum/execution-specs/blob/mainnet/src/ethereum/forks/london/__init__.py
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
