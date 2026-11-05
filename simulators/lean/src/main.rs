@@ -187,6 +187,21 @@ async fn main() {
             spec_assets_fork_choice,
             spec_assets_state_transition,
             spec_assets_verify_signatures,
+            {
+                let mut suite = Suite {
+                    name: "signer-lifecycle".into(),
+                    description: "Live proposal signer containment and recovery with independent verification (Ream devnet5).".into(),
+                    tests: vec![],
+                };
+                suite.add(PlannedTestSpec {
+                    name: "signer-lifecycle: client launch".into(),
+                    description: "Registers production-parameter signer integration gaps.".into(),
+                    always_run: true,
+                    run: scenarios::signer_lifecycle::run_signer_lifecycle_suite,
+                    client: None,
+                });
+                suite
+            },
         ],
         serde_json::json!({ "devnet": devnet.to_string() }),
     )
