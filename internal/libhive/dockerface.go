@@ -37,10 +37,10 @@ type ContainerBackend interface {
 
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)
-	CreateNetwork(name string) (string, error)
+	CreateNetwork(name string, options NetworkOptions) (string, error)
 	RemoveNetwork(id string) error
-	ContainerIP(containerID, networkID string) (net.IP, error)
-	ConnectContainer(containerID, networkID string) error
+	ContainerIP(containerID, networkID string, family IPFamily) (net.IP, error)
+	ConnectContainer(containerID, networkID string, options NetworkEndpointOptions) error
 	DisconnectContainer(containerID, networkID string) error
 }
 
@@ -75,6 +75,23 @@ type ContainerOptions struct {
 
 	// Name: Docker container name (optional)
 	Name string
+}
+
+type IPFamily int
+
+const (
+	IPFamily4 IPFamily = 4
+	IPFamily6 IPFamily = 6
+)
+
+type NetworkOptions struct {
+	IPv4Subnet string
+	IPv6Subnet string
+}
+
+type NetworkEndpointOptions struct {
+	IPv4Address string
+	IPv6Address string
 }
 
 // ContainerInfo is returned by StartContainer.
