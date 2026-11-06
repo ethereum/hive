@@ -75,14 +75,14 @@ struct DriverSnapshot {
     head_slot: u64,
     head_root: String,
     time: u64,
-    justified_checkpoint: DriverCheckpoint,
-    finalized_checkpoint: DriverCheckpoint,
+    justified_checkpoint: Checkpoint,
+    finalized_checkpoint: Checkpoint,
     safe_target: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DriverCheckpoint {
+struct Checkpoint {
     slot: u64,
     root: String,
 }
@@ -109,6 +109,12 @@ struct StateTransitionPost {
     latest_block_header_slot: u64,
     latest_block_header_state_root: String,
     historical_block_hashes_count: usize,
+    post_state_root: Option<String>,
+    latest_justified: Option<Checkpoint>,
+    latest_finalized: Option<Checkpoint>,
+    justified_slots: Option<Vec<bool>>,
+    justifications_roots: Option<Vec<String>>,
+    justifications_validators: Option<Vec<bool>>,
 }
 
 dyn_async! {
@@ -419,11 +425,21 @@ fn assert_fork_choice_checks(step_index: usize, snapshot: &DriverSnapshot, check
     }
 }
 
+fn driver_run_request(case: &Value) -> Value {
+    let mut request = case.clone();
+    if let Some(object) = request.as_object_mut() {
+        object.remove("post");
+        object.remove("postStateRoot");
+    }
+    request
+}
+
 async fn run_state_transition_fixture(client: &Client, fixture: &SpecFixtureCase) {
+    let request = driver_run_request(&fixture.case);
     let response = post_json(
         client,
         "/lean/v0/test_driver/state_transition/run",
-        &fixture.case,
+        &request,
     )
     .await;
     let response: StateTransitionResponse = response
@@ -440,42 +456,154 @@ async fn run_state_transition_fixture(client: &Client, fixture: &SpecFixtureCase
         response.error
     );
 
-    if let Some(expected_post) = fixture.case.get("post") {
+    if fixture.case.get("post").is_some() {
         let post = response
             .post
             .as_ref()
             .expect("successful transition should return post summary");
-        if let Some(expected) = expected_post.get("slot").and_then(Value::as_u64) {
-            assert_eq!(post.slot, expected, "post.slot mismatch");
+        assert_state_transition_post(&fixture.case, post);
+    }
+}
+
+fn assert_state_transition_post(case: &Value, post: &StateTransitionPost) {
+    let expected_post = case.get("post").expect("fixture case missing post");
+
+    let assert_u64 = |key: &str, actual: u64| {
+        if let Some(expected) = expected_post.get(key).and_then(Value::as_u64) {
+            assert_eq!(actual, expected, "post.{key} mismatch");
         }
-        if let Some(expected) = expected_post
-            .get("latestBlockHeaderSlot")
-            .and_then(Value::as_u64)
-        {
+    };
+
+    let assert_root = |key: &str, expected: Option<&Value>, actual: &str| {
+        if let Some(expected) = expected.and_then(Value::as_str) {
             assert_eq!(
-                post.latest_block_header_slot, expected,
-                "post.latestBlockHeaderSlot mismatch"
-            );
-        }
-        if let Some(expected) = expected_post
-            .get("latestBlockHeaderStateRoot")
-            .and_then(Value::as_str)
-        {
-            assert_eq!(
-                normalize_hex(&post.latest_block_header_state_root),
+                normalize_hex(actual),
                 normalize_hex(expected),
-                "post.latestBlockHeaderStateRoot mismatch"
+                "post.{key} mismatch"
             );
         }
-        if let Some(expected) = expected_post
-            .get("historicalBlockHashesCount")
-            .and_then(Value::as_u64)
-        {
-            assert_eq!(
-                post.historical_block_hashes_count as u64, expected,
-                "post.historicalBlockHashesCount mismatch"
-            );
+    };
+    let report_unreported = |key: &str| {
+        eprintln!("post.{key} is pinned by the fixture but not reported by the client; skipping");
+    };
+
+    assert_u64("slot", post.slot);
+    assert_u64("latestBlockHeaderSlot", post.latest_block_header_slot);
+    assert_u64(
+        "historicalBlockHashesCount",
+        post.historical_block_hashes_count as u64,
+    );
+    assert_root(
+        "latestBlockHeaderStateRoot",
+        expected_post.get("latestBlockHeaderStateRoot"),
+        &post.latest_block_header_state_root,
+    );
+
+    // `postStateRoot` is the one tier-1 field that is required rather than skipped when absent.
+    if let Some(expected) = case.get("postStateRoot").and_then(Value::as_str) {
+        let actual = post
+            .post_state_root
+            .as_deref()
+            .expect("postStateRoot is pinned by the fixture but not reported by the client");
+        assert_eq!(
+            normalize_hex(actual),
+            normalize_hex(expected),
+            "postStateRoot mismatch"
+        );
+    }
+
+    for (slot_key, root_key, actual) in [
+        (
+            "latestJustifiedSlot",
+            "latestJustifiedRoot",
+            post.latest_justified.as_ref(),
+        ),
+        (
+            "latestFinalizedSlot",
+            "latestFinalizedRoot",
+            post.latest_finalized.as_ref(),
+        ),
+    ] {
+        let pinned = expected_post.get(slot_key).is_some() || expected_post.get(root_key).is_some();
+        match actual {
+            Some(checkpoint) => {
+                assert_u64(slot_key, checkpoint.slot);
+                assert_root(root_key, expected_post.get(root_key), &checkpoint.root);
+            }
+            None if pinned => report_unreported(slot_key),
+            None => {}
         }
+    }
+
+    // The three list fields are pinned as `{ "data": [...] }` SSZ-style
+    // wrappers in the fixture and reported as plain arrays by the client.
+    let expected_bools = |key: &str| -> Option<Vec<bool>> {
+        expected_post
+            .pointer(&format!("/{key}/data"))
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_bool).collect())
+    };
+    for (key, count_key, actual) in [
+        ("justifiedSlots", None, post.justified_slots.as_ref()),
+        (
+            "justificationsValidators",
+            Some("justificationsValidatorsCount"),
+            post.justifications_validators.as_ref(),
+        ),
+    ] {
+        let expected = expected_bools(key);
+        let expected_count = count_key
+            .and_then(|count_key| expected_post.get(count_key))
+            .and_then(Value::as_u64);
+        match actual {
+            Some(actual) => {
+                if let Some(expected) = expected {
+                    assert_eq!(actual, &expected, "post.{key} mismatch");
+                }
+                if let (Some(count_key), Some(expected_count)) = (count_key, expected_count) {
+                    assert_eq!(
+                        actual.len() as u64,
+                        expected_count,
+                        "post.{count_key} mismatch"
+                    );
+                }
+            }
+            None if expected.is_some() || expected_count.is_some() => report_unreported(key),
+            None => {}
+        }
+    }
+
+    let expected_roots: Option<Vec<String>> = expected_post
+        .pointer("/justificationsRoots/data")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(normalize_hex)
+                .collect()
+        });
+    let expected_roots_count = expected_post
+        .get("justificationsRootsCount")
+        .and_then(Value::as_u64);
+    match post.justifications_roots.as_ref() {
+        Some(actual) => {
+            if let Some(expected) = expected_roots {
+                let actual: Vec<String> = actual.iter().map(|root| normalize_hex(root)).collect();
+                assert_eq!(actual, expected, "post.justificationsRoots mismatch");
+            }
+            if let Some(expected_count) = expected_roots_count {
+                assert_eq!(
+                    actual.len() as u64,
+                    expected_count,
+                    "post.justificationsRootsCount mismatch"
+                );
+            }
+        }
+        None if expected_roots.is_some() || expected_roots_count.is_some() => {
+            report_unreported("justificationsRoots")
+        }
+        None => {}
     }
 }
 
@@ -522,8 +650,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        discover_fixture_cases, expected_case_rejection, expects_fork_choice_init_failure,
-        SpecFixtureKind,
+        assert_state_transition_post, discover_fixture_cases, driver_run_request,
+        expected_case_rejection, expects_fork_choice_init_failure, Checkpoint, SpecFixtureKind,
+        StateTransitionPost,
     };
 
     fn unique_fixture_root(test_name: &str) -> PathBuf {
@@ -630,5 +759,145 @@ mod tests {
             &json!({ "rejectionReason": "LATER_STEP_FAILURE" }),
             &[json!({ "valid": false })]
         ));
+    }
+
+    fn post_fixture() -> StateTransitionPost {
+        StateTransitionPost {
+            slot: 4,
+            latest_block_header_slot: 4,
+            latest_block_header_state_root: "0x00".to_string(),
+            historical_block_hashes_count: 4,
+            post_state_root: Some("0xAB".to_string()),
+            latest_justified: Some(Checkpoint {
+                slot: 3,
+                root: "0xcc".to_string(),
+            }),
+            latest_finalized: Some(Checkpoint {
+                slot: 2,
+                root: "0xdd".to_string(),
+            }),
+            justified_slots: Some(vec![true, true, true, true]),
+            justifications_roots: Some(vec!["0xEE".to_string()]),
+            justifications_validators: Some(vec![true, false, true, true]),
+        }
+    }
+
+    /// A client that reports only the four original fields.
+    fn legacy_post_fixture() -> StateTransitionPost {
+        StateTransitionPost {
+            post_state_root: None,
+            latest_justified: None,
+            latest_finalized: None,
+            justified_slots: None,
+            justifications_roots: None,
+            justifications_validators: None,
+            ..post_fixture()
+        }
+    }
+
+    #[test]
+    fn asserts_post_state_root_from_case_top_level() {
+        let case = json!({ "post": { "slot": 4 }, "postStateRoot": "0xab" });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    #[should_panic(expected = "postStateRoot mismatch")]
+    fn rejects_diverging_post_state_root() {
+        let case = json!({ "post": { "slot": 4 }, "postStateRoot": "0xff" });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    #[should_panic(expected = "postStateRoot is pinned by the fixture but not reported")]
+    fn rejects_unreported_post_state_root() {
+        let case = json!({ "post": { "slot": 4 }, "postStateRoot": "0xab" });
+
+        assert_state_transition_post(&case, &legacy_post_fixture());
+    }
+
+    #[test]
+    fn asserts_justification_and_finalization_checkpoints() {
+        let case = json!({
+            "post": {
+                "slot": 4,
+                "latestJustifiedSlot": 3,
+                "latestJustifiedRoot": "0xCC",
+                "latestFinalizedSlot": 2,
+            }
+        });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    #[should_panic(expected = "post.latestFinalizedSlot mismatch")]
+    fn rejects_diverging_latest_finalized_slot() {
+        let case = json!({ "post": { "slot": 4, "latestFinalizedSlot": 3 } });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    #[should_panic(expected = "post.justifiedSlots mismatch")]
+    fn rejects_diverging_justified_slots() {
+        let case = json!({
+            "post": { "slot": 4, "justifiedSlots": { "data": [true, false, true, true] } }
+        });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    fn asserts_bitlists_and_root_lists_from_data_wrapper() {
+        let case = json!({
+            "post": {
+                "slot": 4,
+                "justifiedSlots": { "data": [true, true, true, true] },
+                "justificationsRoots": { "data": ["0xee"] },
+                "justificationsRootsCount": 1,
+                "justificationsValidators": { "data": [true, false, true, true] },
+                "justificationsValidatorsCount": 4,
+            }
+        });
+
+        assert_state_transition_post(&case, &post_fixture());
+    }
+
+    #[test]
+    fn skips_pinned_tier1_fields_a_legacy_client_does_not_report() {
+        let case = json!({
+            "post": {
+                "slot": 4,
+                "latestJustifiedSlot": 3,
+                "latestFinalizedSlot": 2,
+                "justifiedSlots": { "data": [true, true, true, true] },
+                "justificationsRoots": { "data": ["0xee"] },
+                "justificationsValidators": { "data": [true, false, true, true] },
+            }
+        });
+
+        assert_state_transition_post(&case, &legacy_post_fixture());
+    }
+
+    #[test]
+    fn driver_run_request_omits_fixture_expectations() {
+        let case = json!({
+            "pre": { "slot": 0 },
+            "blocks": [],
+            "post": { "slot": 1 },
+            "postStateRoot": "0xab",
+            "rejectionReason": "WRONG_PROPOSER",
+        });
+
+        let request = driver_run_request(&case);
+
+        assert!(request.get("pre").is_some());
+        assert!(request.get("blocks").is_some());
+        assert!(request.get("rejectionReason").is_some());
+        assert!(request.get("post").is_none());
+        assert!(request.get("postStateRoot").is_none());
     }
 }
