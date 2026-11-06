@@ -47,10 +47,10 @@ continuously on the production hive instance:
   they might not always run the latest tests, and may skip some of them if they take too
   long. Running these tests in a hive simulation ensures that none are skipped.
 
-- `ethereum/rpc`: The RPC simulator configures a client for clique PoA mining and runs
-  various tests against the web3 JSON-RPC interface. These tests ensure that the client is
-  able to receive transactions via RPC, incorporate them into its chain, and report
-  transaction results via the standard APIs.
+- `ethereum/rpc-compat`: This simulator runs JSON-RPC conformance tests against all
+  available clients. Its objective is to ensure clients return the same values over
+  JSON-RPC so they can be treated as a black box by downstream tooling such as wallets
+  and dapps.
 
 - `ethereum/graphql`: This simulator initializes a client with a known test chain and
   enables the GraphQL API endpoint. It then performs certain queries and compares their
