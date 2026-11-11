@@ -5,6 +5,13 @@ FROM $baseimage:$tag AS source
 
 FROM debian:testing-slim AS deploy
 
+ARG parallel_state_root=""
+ENV HIVE_PARALLEL_STATE_ROOT=${parallel_state_root}
+ARG eager_state_root=""
+ENV HIVE_EAGER_STATE_ROOT=${eager_state_root}
+ARG sto_static_lookup_disabled=""
+ENV HIVE_STO_STATIC_LOOKUP_DISABLED=${sto_static_lookup_disabled}
+
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get clean \
