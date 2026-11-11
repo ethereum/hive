@@ -14,6 +14,11 @@ RUN echo "Cloning: $github - $tag" && \
 ## Final stage: Sets up the environment for running nethermind
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.8-resolute@sha256:cceead03c842a491858079ca3046bd9fb598bec0ac14732cb8558c7b32a57c9a
 
+ARG flatdb_disabled=""
+ENV HIVE_FLATDB_DISABLED=${flatdb_disabled}
+ARG statedb_key_scheme=""
+ENV HIVE_STATEDB_KEY_SCHEME=${statedb_key_scheme}
+
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
 WORKDIR /nethermind
