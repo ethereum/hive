@@ -57,17 +57,25 @@ else
 fi
 
 # Load the remainder of the test chain
-# Iterate per file rather than passing the directory: some test fixtures
-# (e.g. EEST consume-rlp fork-transition tests) deliberately include
-# rejected blocks alongside valid ones, and ethrex's `import` aborts the
-# whole chain on the first failure. Looping here keeps `import` strict
-# while still applying later valid blocks. Mirrors erigon/ethereumjs/nimbus.
+# Import the whole directory in one process. One process keeps the recent
+# state in memory between files, where an import per file re-executes up to
+# 128 blocks each time it starts. Some test fixtures (e.g. EEST consume-rlp
+# fork-transition tests) deliberately include rejected blocks; a directory
+# import skips a file that fails, applies the rest, and then exits non-zero
+# with "<n> of <m> files failed to import".
+# ethrex builds that predate that behaviour stop at the first file that
+# fails, or panic on a block they cannot decode, without that message. Fall
+# back to importing one file at a time for them.
 if [ -d /blocks ]; then
     echo "Loading remaining individual blocks..."
-    for file in $(ls /blocks | sort -n); do
-        echo "Importing /blocks/$file..."
-        $ethrex $FLAGS $HIVE_ETHREX_FLAGS import "/blocks/$file"
-    done
+    $ethrex $FLAGS $HIVE_ETHREX_FLAGS import /blocks 2>&1 | tee /tmp/import-blocks.log
+    if [ "${PIPESTATUS[0]}" -ne 0 ] && ! grep -q "files failed to import" /tmp/import-blocks.log; then
+        echo "Directory import stopped early, importing blocks one file at a time..."
+        for file in $(ls /blocks | sort -n); do
+            echo "Importing /blocks/$file..."
+            $ethrex $FLAGS $HIVE_ETHREX_FLAGS import "/blocks/$file"
+        done
+    fi
 else
     echo "Warning: blocks folder not found."
 fi
