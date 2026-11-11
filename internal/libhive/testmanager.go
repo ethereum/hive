@@ -255,6 +255,10 @@ func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, node
 
 // CreateNetwork creates a docker network with the given network name.
 func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) error {
+	return manager.CreateNetworkWithOptions(testSuite, name, NetworkOptions{})
+}
+
+func (manager *TestManager) CreateNetworkWithOptions(testSuite TestSuiteID, name string, options NetworkOptions) error {
 	_, ok := manager.IsTestSuiteRunning(testSuite)
 	if !ok {
 		return ErrNoSuchTestSuite
@@ -264,7 +268,7 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) er
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
-	id, err := manager.backend.CreateNetwork(getUniqueName(testSuite, name))
+	id, err := manager.backend.CreateNetwork(getUniqueName(testSuite, name), options)
 	if err != nil {
 		return err
 	}
@@ -316,6 +320,10 @@ func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 
 // ContainerIP gets the IP address of the given container on the given network.
 func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkName, containerID string) (string, error) {
+	return manager.ContainerIPForFamily(testSuite, networkName, containerID, IPFamily4)
+}
+
+func (manager *TestManager) ContainerIPForFamily(testSuite TestSuiteID, networkName, containerID string, family IPFamily) (string, error) {
 	manager.networkMutex.RLock()
 	defer manager.networkMutex.RUnlock()
 
@@ -344,7 +352,7 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkName, cont
 		}
 	}
 
-	ipAddr, err := manager.backend.ContainerIP(containerID, networkID)
+	ipAddr, err := manager.backend.ContainerIP(containerID, networkID, family)
 	if err != nil {
 		return "", err
 	}
@@ -353,6 +361,10 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkName, cont
 
 // ConnectContainer connects the given container to the given network.
 func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkName, containerID string) error {
+	return manager.ConnectContainerWithOptions(testSuite, networkName, containerID, NetworkEndpointOptions{})
+}
+
+func (manager *TestManager) ConnectContainerWithOptions(testSuite TestSuiteID, networkName, containerID string, options NetworkEndpointOptions) error {
 	manager.networkMutex.RLock()
 	defer manager.networkMutex.RUnlock()
 
@@ -368,7 +380,7 @@ func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkName,
 	if !exists {
 		return ErrNetworkNotFound
 	}
-	return manager.backend.ConnectContainer(containerID, networkID)
+	return manager.backend.ConnectContainer(containerID, networkID, options)
 }
 
 // NetworkExists reports whether a network exists in the current test context.
