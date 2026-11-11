@@ -3,6 +3,13 @@ ARG tag=latest
 
 FROM $baseimage:$tag as builder
 
+ARG state_root_fallback=""
+ENV HIVE_STATE_ROOT_FALLBACK=${state_root_fallback}
+ARG bal_parallel_disabled=""
+ENV HIVE_BAL_PARALLEL_DISABLED=${bal_parallel_disabled}
+ARG share_sparse_trie_with_builder=""
+ENV HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER=${share_sparse_trie_with_builder}
+
 # Install script tools.
 RUN apt-get update -y
 RUN apt-get install -y bash curl jq
