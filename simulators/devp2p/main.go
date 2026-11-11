@@ -137,7 +137,7 @@ Results from the test tool are reported as individual sub-tests.`,
 				Name: "client launch",
 				Description: `This test launches the client and runs the snap/2 test tool.
 Results from the test tool are reported as individual sub-tests.`,
-				Parameters: forkenv,
+				Parameters: forkenv.Set("HIVE_SNAP_V2", "1"),
 				Files: map[string]string{
 					"genesis.json": testChainDir + "/genesis.json",
 					"chain.rlp":    testChainDir + "/chain.rlp",
