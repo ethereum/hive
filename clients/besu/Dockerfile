@@ -3,6 +3,13 @@ ARG baseimage=hyperledger/besu
 ARG tag=develop
 FROM $baseimage:$tag
 
+ARG data_storage_format=""
+ENV HIVE_DATA_STORAGE_FORMAT=${data_storage_format}
+ARG bonsai_parallel_state_root_disabled=""
+ENV HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED=${bonsai_parallel_state_root_disabled}
+ARG bonsai_full_flat_db_disabled=""
+ENV HIVE_BONSAI_FULL_FLAT_DB_DISABLED=${bonsai_full_flat_db_disabled}
+
 USER root
 
 # Update, install curl, download and install jq, and clean up in one step

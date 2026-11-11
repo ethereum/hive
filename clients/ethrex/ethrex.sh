@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# This script can be configured using the following environment variables:
+#
+#  - HIVE_BAL_PARALLEL_DISABLED  set to '1' to disable BAL parallel execution and trie computation
+#
 # Immediately abort the script on any error encountered
 set -ex
 
@@ -18,6 +22,10 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=trace ;;
 esac
 FLAGS="$FLAGS --log.level=$LOG"
+
+if [ "$HIVE_BAL_PARALLEL_DISABLED" = "1" ]; then
+    FLAGS="$FLAGS --no-bal-parallel-exec --no-bal-parallel-trie"
+fi
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json

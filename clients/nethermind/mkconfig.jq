@@ -106,6 +106,30 @@ def blocks_config:
   end
 ;
 
+def statedb_key_scheme_config:
+  if env.HIVE_STATEDB_KEY_SCHEME != null and env.HIVE_STATEDB_KEY_SCHEME != "" then
+    {
+      "Init": {
+        "StateDbKeyScheme": env.HIVE_STATEDB_KEY_SCHEME
+      }
+    }
+  else
+    {}
+  end
+;
+
+def flatdb_config:
+  if env.HIVE_FLATDB_DISABLED == "1" then
+    {
+      "FlatDb": {
+        "Enabled": false
+      }
+    }
+  else
+    {}
+  end
+;
+
 def base_config:
   {
     "Init": {
@@ -143,4 +167,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config * sync_loop_config * txpool_config * blocks_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config * sync_loop_config * txpool_config * blocks_config * statedb_key_scheme_config * flatdb_config

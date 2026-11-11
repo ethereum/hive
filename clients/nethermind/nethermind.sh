@@ -39,6 +39,8 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_SYNC_LOOP_INTERVAL_MS  sync mode selector interval in ms (test-only tuning)
+#  - HIVE_FLATDB_DISABLED      set to '1' to use the Patricia-trie state database
+#  - HIVE_STATEDB_KEY_SCHEME   state database key scheme: Hash or HalfPath (default: client default)
 #
 # These variables are not supported by Nethermind:
 #

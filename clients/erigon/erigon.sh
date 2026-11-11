@@ -23,6 +23,8 @@
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
 #  - HIVE_MINER                address to credit with mining rewards
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_PARALLEL_COMMITMENT_DISABLED  set to '1' to use sequential commitment
+#  - HIVE_SERIAL_EXEC          set to '1' to use serial execution
 #
 # These flags are NOT supported by Erigon
 #
@@ -59,6 +61,13 @@ FLAGS="$FLAGS --db.size.limit 2GB"
 # Keep commitment history so eth_getProof can serve historical blocks. Erigon
 # stores this setting in the database, so import and the node need the same value.
 FLAGS="$FLAGS --prune.include-commitment-history"
+
+if [ "$HIVE_PARALLEL_COMMITMENT_DISABLED" = "1" ]; then
+    FLAGS="$FLAGS --experimental.parallel-commitment=false"
+fi
+if [ "$HIVE_SERIAL_EXEC" = "1" ]; then
+    FLAGS="$FLAGS --exec.serial"
+fi
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then

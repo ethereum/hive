@@ -38,6 +38,9 @@
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
 #  - HIVE_KZG_FAST_SETUP       set to '1' to load the KZG trusted setup in the background (test-only tuning)
+#  - HIVE_DATA_STORAGE_FORMAT  trie storage format: BONSAI, FOREST or X_BONSAI_ARCHIVE (default: BONSAI)
+#  - HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED  set to 'true' to disable parallel state-root computation
+#  - HIVE_BONSAI_FULL_FLAT_DB_DISABLED  set to 'true' to disable the Bonsai full flat database
 #
 # These flags are not supported by the Besu hive client
 #
@@ -62,8 +65,8 @@ if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
     export BESU_XKZG_TRUSTED_SETUP_BACKGROUND_LOAD_ENABLED=true
 fi
 
-# Use bonsai storage.
-FLAGS="--data-storage-format=BONSAI"
+# Configure trie storage.
+FLAGS="--data-storage-format=${HIVE_DATA_STORAGE_FORMAT:-BONSAI}"
 
 # Configure logging.
 LOG=info
@@ -193,6 +196,12 @@ fi
 # Disable parallel transaction processing
 if [ "$HIVE_PARALLEL_TX_PROCESSING_DISABLED" = "true" ]; then
     FLAGS="$FLAGS --bonsai-parallel-tx-processing-enabled=false"
+fi
+if [ "$HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED" = "true" ]; then
+    FLAGS="$FLAGS --bonsai-parallel-state-root-computation-enabled=false"
+fi
+if [ "$HIVE_BONSAI_FULL_FLAT_DB_DISABLED" = "true" ]; then
+    FLAGS="$FLAGS --Xbonsai-full-flat-db-enabled=false"
 fi
 
 # Start Besu.

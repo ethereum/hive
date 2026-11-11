@@ -43,12 +43,25 @@
 #  - [ ] HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
 #  - [x] HIVE_LOGLEVEL                client loglevel (0-5)
 #  - [x] HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
+#  - [x] HIVE_PARALLEL_STATE_ROOT     set to '1' to enable parallel state-root computation
+#  - [x] HIVE_EAGER_STATE_ROOT        set to '1' to enable eager state-root computation
+#  - [x] HIVE_STO_STATIC_LOOKUP_DISABLED  set to '1' to disable static storage lookup
 
 # Immediately abort the script on any error encountered
 set -e
 
 nimbus="/usr/bin/nimbus executionClient"
 FLAGS="--nat:extip:0.0.0.0 --debug-dynamic-batch-size:true"
+
+if [ "$HIVE_PARALLEL_STATE_ROOT" = "1" ]; then
+  FLAGS="$FLAGS --debug-parallel-state-root:true"
+fi
+if [ "$HIVE_EAGER_STATE_ROOT" = "1" ]; then
+  FLAGS="$FLAGS --debug-eager-state-root:true"
+fi
+if [ "$HIVE_STO_STATIC_LOOKUP_DISABLED" = "1" ]; then
+  FLAGS="$FLAGS --debug-sto-static-lookup:false"
+fi
 
 loglevel=DEBUG
 case "$HIVE_LOGLEVEL" in

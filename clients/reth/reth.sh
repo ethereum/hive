@@ -24,6 +24,9 @@
 #  - HIVE_SHANGHAI_TIMESTAMP   timestamp for Shanghai transition
 #  - HIVE_CANCUN_TIMESTAMP     timestamp for Cancun transition
 #  - HIVE_LOGLEVEL             client log level
+#  - HIVE_STATE_ROOT_FALLBACK   set to '1' to use the legacy state-root computation
+#  - HIVE_BAL_PARALLEL_DISABLED  set to '1' to disable BAL parallel execution and state roots
+#  - HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER  set to '1' to share the sparse trie and execution cache with the builder
 #
 # These flags are NOT supported by reth
 #
@@ -182,6 +185,16 @@ FLAGS="$FLAGS --nat none --block-interval 500000 --debug.startup-sync-state-idle
 
 if [ "$HIVE_DISCV5" != "" ]; then
     FLAGS="$FLAGS --discovery.v5.port=30303"
+fi
+
+if [ "$HIVE_STATE_ROOT_FALLBACK" = "1" ]; then
+    FLAGS="$FLAGS --engine.state-root-fallback"
+fi
+if [ "$HIVE_BAL_PARALLEL_DISABLED" = "1" ]; then
+    FLAGS="$FLAGS --engine.disable-bal-parallel-execution --engine.disable-bal-parallel-state-root"
+fi
+if [ "$HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER" = "1" ]; then
+    FLAGS="$FLAGS --engine.share-sparse-trie-with-payload-builder --engine.share-execution-cache-with-payload-builder"
 fi
 
 # Launch the main client.

@@ -17,6 +17,9 @@ RUN make geth
 RUN mv ./build/bin/geth /usr/local/bin/geth
 
 FROM alpine:latest
+ARG state_scheme=""
+ENV HIVE_STATE_SCHEME=${state_scheme}
+
 RUN apk add --update bash curl jq
 COPY --from=builder /usr/local/bin/geth /usr/local/bin/geth
 

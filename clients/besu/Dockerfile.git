@@ -17,6 +17,13 @@ RUN echo "installing java on ubuntu base image" \
 ## Final stage: Sets up the environment for running besu
 FROM ubuntu:24.04
 
+ARG data_storage_format=""
+ENV HIVE_DATA_STORAGE_FORMAT=${data_storage_format}
+ARG bonsai_parallel_state_root_disabled=""
+ENV HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED=${bonsai_parallel_state_root_disabled}
+ARG bonsai_full_flat_db_disabled=""
+ENV HIVE_BONSAI_FULL_FLAT_DB_DISABLED=${bonsai_full_flat_db_disabled}
+
 # Copy compiled binary from builder
 COPY --from=builder /besu/build/install/besu /opt/besu
 
