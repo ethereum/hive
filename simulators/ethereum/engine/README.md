@@ -39,7 +39,7 @@ for each testCase:
 
 ## Engine API Test Cases
 
-General positive and negative test cases based on the description in https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+General positive and negative test cases based on the description in https://github.com/ethereum/execution-apis/blob/main/src/engine/paris.md
 
 ### Engine API Negative Test Cases:
 
