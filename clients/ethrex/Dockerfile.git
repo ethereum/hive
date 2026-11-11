@@ -26,6 +26,9 @@ RUN echo "Cloning: $github - $tag" \
 
 ## Final stage: Sets up the environment for running ethrex
 FROM ubuntu:24.04
+ARG bal_parallel_disabled=""
+ENV HIVE_BAL_PARALLEL_DISABLED=${bal_parallel_disabled}
+
 
 WORKDIR /usr/local/bin
 
