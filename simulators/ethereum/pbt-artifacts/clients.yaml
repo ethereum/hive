@@ -1,0 +1,44 @@
+# The client set this simulator is meant to run against.
+#
+#   ./hive --sim ethereum/pbt-artifacts \
+#          --client-file simulators/ethereum/pbt-artifacts/clients.yaml
+#
+# Every client with artifact code is pinned to the branch that writes
+# EIP-8347's tagged snapshot records (EIPs#12404): geth to pbt, nethermind to
+# pbt-state, erigon to binary-trie and besu to matkt/besu's
+# glamsterdam-devnet-8-pbt. Dockerfile.git clones a branch, not a commit, so a
+# push there moves what runs here. besu's branch needs besu-stateless's, which
+# is not published, so its Dockerfile.git builds that into mavenLocal first.
+#
+# reth is absent on purpose: it has no PBT branch to pin. That gap belongs in
+# the matrix as a missing row, not as a client that fails every case.
+
+- client: go-ethereum
+  nametag: pbt
+  dockerfile: git
+  build_args:
+    github: CPerezz/go-ethereum
+    tag: pbt
+
+- client: nethermind
+  nametag: pbt
+  dockerfile: git
+  build_args:
+    github: NethermindEth/nethermind
+    tag: pbt-state
+
+- client: erigon
+  nametag: pbt
+  dockerfile: git
+  build_args:
+    github: erigontech/erigon
+    tag: binary-trie
+
+- client: besu
+  nametag: pbt
+  dockerfile: git
+  build_args:
+    github: matkt/besu
+    tag: glamsterdam-devnet-8-pbt
+    stateless: besu-eth/besu-stateless
+    stateless_tag: feat/partitioned-binary-trie
