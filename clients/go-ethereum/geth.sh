@@ -44,12 +44,13 @@
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
 #  - HIVE_EXPECT_DEEP_REORGS      set to '1' to raise the engine API reorg depth limit
 #  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
+#  - HIVE_STATE_SCHEME            state storage scheme: hash or path (default: path)
 
 # Immediately abort the script on any error encountered
 set -e
 
 geth=/usr/local/bin/geth
-FLAGS="--state.scheme=path"
+FLAGS="--state.scheme=${HIVE_STATE_SCHEME:-path}"
 
 # Raise geth's engine API reorg depth limit (default 32) for simulators that
 # rewind deeply, e.g. consume-enginex; geth without the flag ignores the var.
