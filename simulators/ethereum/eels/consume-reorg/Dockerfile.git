@@ -1,10 +1,8 @@
-# Builds and runs the EELS (execution-specs) `consume reorg` simulator.
+# Builds and runs the EELS (execution-specs) `consume reorg` simulator from source.
 #
 # Consumes `blockchain_test_engine_reorg` fixtures: a DAG of engine payloads
 # plus an ordered list of Engine API / JSON-RPC steps with expected outcomes.
 # One fresh client per fixture; pass/fail per test; no runtime knobs.
-# The trixie image, as execution-specs' own base image: its uv meets the
-# repository's required-version, which the bookworm image's does not.
 FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim
 
 ## Default fixtures/git-ref
@@ -12,10 +10,8 @@ ARG fixtures=tests@latest
 ENV FIXTURES=${fixtures}
 ARG branch=""
 
-## Source repository. Override to build from a fork, e.g. while the fixture
-## format is still under review:
-##   --sim.buildarg repo=https://github.com/<user>/execution-specs
-##   --sim.buildarg branch=<branch>
+## Source repository. Set `repo` (with `branch`) to build from a fork, e.g.
+## while the fixture format is still under review.
 ARG repo=https://github.com/ethereum/execution-specs
 
 ## Clone and install EELS
@@ -35,9 +31,9 @@ RUN uv sync
 # Optionally keep pre-staged fixtures compressed in the image. A caller that
 # stages ./fixtures.tar.gz and passes fixtures=/fixtures gets the local
 # fixtures; otherwise FIXTURES stays a release/URL and consume downloads it.
-# The `Dockerfile` anchor keeps COPY from failing when no tarball is staged.
-COPY Dockerfile fixtures.tar.gz* /staged/
-RUN rm -f /staged/Dockerfile && \
+# The `Dockerfile.git` anchor keeps COPY from failing when no tarball is staged.
+COPY Dockerfile.git fixtures.tar.gz* /staged/
+RUN rm -f /staged/Dockerfile.git && \
     if [ "$FIXTURES" != /fixtures ] || [ ! -f /staged/fixtures.tar.gz ]; then \
         rm -rf /staged && uv run --no-sync consume cache --input "$FIXTURES"; \
     fi

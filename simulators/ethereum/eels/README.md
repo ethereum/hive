@@ -24,6 +24,7 @@ Nightly images use the tests and framework from the nightly fill's commit.
 | `consume-enginex` | `ghcr.io/ethereum/execution-specs/hive/consume-enginex` | `blockchain_tests_engine_x` fixtures |
 | `consume-wirex` | `ghcr.io/ethereum/execution-specs/hive/consume-wirex` | `blockchain_tests_engine_x` fixtures, synced by the client from a mock devp2p peer |
 | `consume-sync` | `ghcr.io/ethereum/execution-specs/hive/consume-sync` | `blockchain_tests_sync` fixtures |
+| `consume-reorg` | `ghcr.io/ethereum/execution-specs/hive/consume-reorg` | `blockchain_tests_engine_reorg` fixtures, one fresh client per fixture |
 | `execute-blobs` | `ghcr.io/ethereum/execution-specs/hive/execute-blobs` | the test sources of the release |
 
 ## Build arguments
@@ -88,6 +89,9 @@ deprecation notice in every run; builds without them pay nothing for this; with
 `tag` together with the old arguments works before and after this change, so
 callers can migrate first. For `execute-blobs`, a source build runs the tests
 from `branch`, whereas a release image contains the release's test sources.
+`consume-reorg` came after this change and has no `latest-legacy` variant: its
+default Dockerfile takes only `tag` and `image`, and its `Dockerfile.git` also
+takes `repo`, an execution-specs fork to clone.
 
 ## Examples
 
