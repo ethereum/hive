@@ -1,9 +1,9 @@
 #!/bin/sh
 # Fill the reorg fixtures from a local execution-specs checkout and stage them
-# next to this Dockerfile, for use with `--sim.buildarg fixtures=/fixtures`.
-# Only needed until a published fixtures release contains the
-# `blockchain_test_engine_reorg` format; after that, pass a release or URL to
-# `--sim.buildarg fixtures=...` instead.
+# next to Dockerfile.git, for a `--config` entry with `dockerfile: git` and
+# `fixtures: /fixtures`. Only needed until a published fixtures release contains
+# the `blockchain_test_engine_reorg` format; after that, run the default
+# Dockerfile with `--sim.buildarg tag=...` instead.
 #
 #   stage.sh <execution-specs-checkout> [extra fill args...]
 set -eu
