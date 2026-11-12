@@ -27,6 +27,9 @@ RUN apt-get update && apt-get install -y bash curl gcc iproute2 jq libstdc++6 &&
 # Create version.txt
 RUN erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
 
+# Mark whether this erigon can load a genesis at startup (--override.genesis, erigontech/erigon#25386).
+RUN if erigon --help | grep -q -- '--override.genesis'; then touch /hive-override-genesis; fi
+
 # Add genesis mapper script, startup script, and enode URL retriever script
 COPY genesis.json /genesis.json
 COPY mapper.jq /mapper.jq

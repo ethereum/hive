@@ -56,23 +56,31 @@ FLAGS="$FLAGS --datadir $DATADIR"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 echo "Command flags till now:"
 echo $FLAGS
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$reth init $FLAGS --chain /genesis.json
+# Initialize the local testchain with the genesis state. reth node writes the
+# genesis itself when it starts with --chain, so the separate `reth init` is
+# only needed before importing a chain.
+if [ -f /chain.rlp ] || [ -d /blocks ]; then
+    echo "Initializing database with genesis state..."
+    $reth init $FLAGS --chain /genesis.json
+fi
 
 # make sure we use the same genesis each time
 FLAGS="$FLAGS --chain /genesis.json"
@@ -90,7 +98,10 @@ fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
-mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
+BLOCKS=()
+if [ -d /blocks ]; then
+    mapfile -t BLOCKS < <(ls /blocks/*.rlp 2>/dev/null | sort -n)
+fi
 
 if [[ ! -d "/blocks" || ${#BLOCKS[@]} -eq 0 ]]; then
     echo "Warning: No blocks found."
@@ -157,6 +168,8 @@ fi
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,trace,eth,net,txpool,web3,testing"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,trace,eth,net,txpool,web3,testing"
 FLAGS="$FLAGS --rpc.compute-state-root-for-eth-simulate"
+# Serve eth_getProof for historical blocks; reth defaults to the head only.
+FLAGS="$FLAGS --rpc.eth-proof-window=100000"
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"

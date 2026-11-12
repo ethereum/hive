@@ -90,6 +90,8 @@ var (
 		"HIVE_FORK_LONDON":         "0",
 		// Merge related
 		"HIVE_MERGE_BLOCK_ID": "100",
+		// Keep the funded test accounts out of the client's genesis dump
+		"HIVE_OMIT_GENESIS_ALLOC": "1",
 	}
 )
 

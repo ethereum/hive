@@ -10,6 +10,9 @@ COPY --from=builder /usr/local/bin/geth /usr/local/bin/geth
 # Generate the version.txt file.
 RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 
+# Mark whether this geth can load a genesis at startup (--override.genesis, v1.16.6+).
+RUN if /usr/local/bin/geth --help | grep -q -- '--override.genesis'; then touch /hive-override-genesis; fi
+
 # Inject the startup script.
 ADD geth.sh /geth.sh
 ADD mapper.jq /mapper.jq

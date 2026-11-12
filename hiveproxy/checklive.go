@@ -31,16 +31,17 @@ func (pfn *proxyFunctions) CheckLive(ctx context.Context, id uint64, addr string
 	}
 
 	var (
+		start   = time.Now()
 		lastMsg time.Time
-		ticker  = time.NewTicker(100 * time.Millisecond)
+		timer   = time.NewTimer(checkLiveDelay)
 		dialer  net.Dialer
 	)
-	defer ticker.Stop()
+	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return errors.New("canceled")
-		case <-ticker.C:
+		case <-timer.C:
 			if time.Since(lastMsg) >= time.Second {
 				log.Println("checking address:", addr)
 				lastMsg = time.Now()
@@ -48,9 +49,32 @@ func (pfn *proxyFunctions) CheckLive(ctx context.Context, id uint64, addr string
 			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
 				conn.Close()
+				log.Printf("address %s live after %v", addr, time.Since(start).Round(time.Millisecond))
 				return nil
 			}
+			timer.Reset(checkLiveInterval(time.Since(start)))
 		}
+	}
+}
+
+// checkLiveDelay is the wait before the first dial. No client opens its RPC port
+// this quickly, so dialing earlier would only add refused connections.
+const checkLiveDelay = 50 * time.Millisecond
+
+// checkLiveInterval returns the delay before the next dial, given the time spent
+// waiting so far. Most clients open their RPC port within a few hundred
+// milliseconds, so dial often at first to avoid inflating their startup time,
+// and back off in steps for slower clients. The interval never exceeds 100ms.
+func checkLiveInterval(elapsed time.Duration) time.Duration {
+	switch {
+	case elapsed < 200*time.Millisecond:
+		return 5 * time.Millisecond
+	case elapsed < 1500*time.Millisecond:
+		return 10 * time.Millisecond
+	case elapsed < 4500*time.Millisecond:
+		return 50 * time.Millisecond
+	default:
+		return 100 * time.Millisecond
 	}
 }
 

@@ -43,13 +43,12 @@ func TestRunner(t *testing.T) {
 	})
 
 	var (
-		runner    = libhive.NewRunner(inv, b, cb)
-		simList   = []string{"sim-1"}
-		simOpt    = libhive.SimEnv{LogDir: t.TempDir(), ClientList: simClients}
-		ctx       = context.Background()
-		buildArgs = map[string]string{"SomeArg": "SomeValue"}
+		runner  = libhive.NewRunner(inv, b, cb)
+		simList = []libhive.SimulatorDesignator{{Simulator: "sim-1", BuildArgs: map[string]string{"SomeArg": "SomeValue"}}}
+		simOpt  = libhive.SimEnv{LogDir: t.TempDir(), ClientList: simClients}
+		ctx     = context.Background()
 	)
-	if err := runner.Build(ctx, allClients, simList, buildArgs); err != nil {
+	if err := runner.Build(ctx, allClients, simList); err != nil {
 		t.Fatal("Build() failed:", err)
 	}
 	if _, err := runner.Run(context.Background(), "sim-1", simOpt, libhive.HiveInfo{}); err != nil {

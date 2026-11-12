@@ -30,7 +30,7 @@ documentation][hive-client-yaml] for more information.
 
 There can be other Dockerfiles besides the main one. Typically, a client should also
 provide a `Dockerfile.git` that builds the client from source code. Alternative
-Dockerfiles can be selected through hive's `-client-file` YAML configuration.
+Dockerfiles can be selected through hive's `--config` YAML configuration.
 
 ### hive.yaml
 

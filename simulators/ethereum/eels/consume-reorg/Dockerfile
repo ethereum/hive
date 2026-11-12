@@ -6,7 +6,7 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ## Default fixtures/git-ref
-ARG fixtures=stable@latest
+ARG fixtures=tests@latest
 ENV FIXTURES=${fixtures}
 ARG branch=""
 

@@ -43,7 +43,7 @@ func runsCommand(args []string) {
 		entries = entries[:*limit]
 	}
 
-	t := display.NewTable([]string{"Name", "Clients", "Tests", "Pass", "Fail", "When", "File"})
+	t := display.NewTable([]string{"Name", "Clients", "Tests", "Pass", "Fail", "When", "Duration", "File"})
 	for _, e := range entries {
 		t.Append([]string{
 			e.Name,
@@ -52,6 +52,7 @@ func runsCommand(args []string) {
 			fmt.Sprintf("%d", e.Passes),
 			fmt.Sprintf("%d", e.Fails),
 			api.FormatTime(e.Start),
+			api.FormatDuration(e.Start, e.End),
 			e.FileName,
 		})
 	}

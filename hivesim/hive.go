@@ -227,12 +227,8 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 	if sim.docs != nil {
 		return errors.New("StopClient is not supported in docs mode")
 	}
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, nodeid), nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, nodeid)
+	return requestDelete(url)
 }
 
 // PauseClient signals to the host that the node needs to be paused.
@@ -240,12 +236,8 @@ func (sim *Simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string
 	if sim.docs != nil {
 		return errors.New("PauseClient is not supported in docs mode")
 	}
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid)
+	return post(url, nil, nil)
 }
 
 // UnpauseClient signals to the host that the node needs to be unpaused.
@@ -253,12 +245,8 @@ func (sim *Simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid stri
 	if sim.docs != nil {
 		return errors.New("UnpauseClient is not supported in docs mode")
 	}
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid)
+	return requestDelete(url)
 }
 
 // ClientEnodeURL returns the enode URL of a running client.

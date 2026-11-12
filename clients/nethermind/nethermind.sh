@@ -38,6 +38,7 @@
 #  - HIVE_MINER                enables mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_LOGLEVEL             Client log level
+#  - HIVE_SYNC_LOOP_INTERVAL_MS  sync mode selector interval in ms (test-only tuning)
 #
 # These variables are not supported by Nethermind:
 #
@@ -47,6 +48,11 @@
 # Immediately abort the script on any error encountered
 set -e
 
+# Turn off dynamic PGO: profiling methods before re-compiling the hot ones
+# does not pay back in a node that runs for seconds. About 0.4 s less per
+# start and 0.5 s less per test with 4 tests at once.
+export DOTNET_TieredPGO=0
+
 # Generate JWT file if necessary
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
@@ -55,16 +61,20 @@ fi
 
 # Generate a Geth-style genesis file.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis. 
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 # Check sync mode.
 case "$HIVE_NODETYPE" in

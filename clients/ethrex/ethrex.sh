@@ -8,10 +8,6 @@ export RUST_LOG_STYLE=never
 
 ethrex=./ethrex
 
-# Configure the chain.
-mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
-
 # Configure log level
 LOG=info
 case "$HIVE_LOGLEVEL" in
@@ -23,14 +19,22 @@ case "$HIVE_LOGLEVEL" in
 esac
 FLAGS="$FLAGS --log.level=$LOG"
 
-# Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+# Configure the chain.
+mv /genesis.json /genesis-input.json
+
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 echo "Command flags till now:"
 echo $FLAGS
@@ -106,15 +110,9 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Configure RPC.
-# Hive tests exercise admin/debug/txpool namespaces over the public HTTP port.
-# Newer ethrex builds default the HTTP allowlist to eth,net,web3, so we have to
-# opt those namespaces in via --http.api. Older builds don't know that flag, so
-# probe --help to keep this launcher working against both.
-HTTP_API_FLAG=""
-if "$ethrex" --help 2>&1 | grep -q -- '--http.api'; then
-    HTTP_API_FLAG="--http.api=eth,net,web3,debug,admin,txpool"
-fi
-FLAGS="$FLAGS --http.addr=0.0.0.0 --authrpc.addr=0.0.0.0 $HTTP_API_FLAG"
+# Hive tests exercise admin/debug/txpool namespaces over the public HTTP port,
+# which ethrex (v13.0.0 onward) serves only when they are opted in.
+FLAGS="$FLAGS --http.addr=0.0.0.0 --authrpc.addr=0.0.0.0 --http.api=eth,net,web3,debug,admin,txpool"
 
 # We don't support pre merge
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then

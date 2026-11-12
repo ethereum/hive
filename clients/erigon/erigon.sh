@@ -61,6 +61,9 @@ FLAGS="$FLAGS --fakepow"
 mkdir /erigon-hive-datadir
 FLAGS="$FLAGS --datadir /erigon-hive-datadir"
 FLAGS="$FLAGS --db.size.limit 2GB"
+# Keep commitment history so eth_getProof can serve historical blocks. Erigon
+# stores this setting in the database, so import and the node need the same value.
+FLAGS="$FLAGS --prune.include-commitment-history"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
@@ -71,23 +74,34 @@ fi
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis. 
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
 echo "Command flags till now:"
 echo $FLAGS
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$erigon $FLAGS init /genesis.json
+# Initialize the local testchain with the genesis state. Without a chain to
+# import, an erigon that supports --override.genesis (marked at image build
+# time) loads the genesis itself, which saves starting a separate `erigon init`
+# process.
+if [ ! -f /chain.rlp ] && [ ! -d /blocks ] && [ -f /hive-override-genesis ]; then
+    GENESIS_FLAG="--override.genesis=/genesis.json"
+else
+    echo "Initializing database with genesis state..."
+    $erigon $FLAGS init /genesis.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -169,5 +183,5 @@ FLAGS="$FLAGS --nat=extip:$ip --no-downloader"
 
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
-echo "Running erigon with flags $FLAGS"
-$erigon $FLAGS
+echo "Running erigon with flags $FLAGS $GENESIS_FLAG"
+$erigon $FLAGS $GENESIS_FLAG

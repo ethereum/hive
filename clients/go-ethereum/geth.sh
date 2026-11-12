@@ -42,6 +42,9 @@
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
+#  - HIVE_EXPECT_DEEP_REORGS      set to '1' to raise the engine API reorg depth limit
+#  - HIVE_ENGINE_MAX_REORG_DEPTH  engine API reorg depth limit (0 = unlimited)
+#  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
 
 # Immediately abort the script on any error encountered
 set -e
@@ -51,13 +54,21 @@ FLAGS="--state.scheme=path"
 
 # Engine API reorg depth limit (geth default 32, 0 = unlimited).
 #  - HIVE_ENGINE_MAX_REORG_DEPTH sets it explicitly (reorg conformance tests).
-#  - HIVE_EXPECT_DEEP_REORGS raises it to 512 for simulators that rewind
+#  - HIVE_EXPECT_DEEP_REORGS=1 raises it to 512 for simulators that rewind
 #    deeply, e.g. consume-enginex.
 # geth without the flag ignores the var.
 if [ "$HIVE_ENGINE_MAX_REORG_DEPTH" != "" ]; then
     export GETH_ENGINE_MAXREORGDEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
-elif [ "$HIVE_EXPECT_DEEP_REORGS" != "" ]; then
+elif [ "${HIVE_EXPECT_DEEP_REORGS:-0}" = "1" ]; then
     export GETH_ENGINE_MAXREORGDEPTH=512
+fi
+
+# Simulators whose clients need no KZG at start (e.g. execution-specs' consume
+# simulators, where only the point-evaluation precompile verifies KZG proofs)
+# may ask for a fast KZG setup: initialize the KZG library on first use instead
+# of at startup; geth without the flag ignores the var.
+if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
+    export GETH_CRYPTO_KZG_LAZY=true
 fi
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
@@ -91,20 +102,30 @@ esac
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis.
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+# Map the genesis and dump it in one jq pass, which saves parsing it twice:
+# jq prints the dump, a marker line, then the mapped genesis, which awk
+# writes to /genesis.json.
+if [ "${HIVE_OMIT_GENESIS_ALLOC:-0}" = "1" ] && [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (alloc omitted, use --sim.loglevel 4 or 5 for full output):"
+    dump='.alloc |= "\(length) accounts omitted"'
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    dump='.'
 fi
+jq -r -f <(cat /mapper.jq; echo "| ($dump), \"#hive-genesis#\", .") /genesis-input.json \
+    | awk 'w { print > "/genesis.json"; next } $0 == "#hive-genesis#" { w = 1; next } { print }'
+[ "${PIPESTATUS[0]}" -eq 0 ]
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-$geth $FLAGS init /genesis.json
+# Initialize the local testchain with the genesis state. Without a chain to
+# import, a geth that supports --override.genesis (marked at image build time)
+# loads the genesis itself, which saves starting a separate `geth init` process.
+if [ ! -f /chain.rlp ] && [ ! -d /blocks ] && [ -f /hive-override-genesis ]; then
+    GENESIS_FLAG="--override.genesis=/genesis.json"
+else
+    echo "Initializing database with genesis state..."
+    $geth $FLAGS init /genesis.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -175,5 +196,5 @@ FLAGS="$FLAGS --nat=extip:$ip"
 
 # Disable disk space free monitor
 FLAGS="$FLAGS --datadir.minfreedisk=0"
-echo "Running go-ethereum with flags $FLAGS"
-$geth $FLAGS
+echo "Running go-ethereum with flags $FLAGS $GENESIS_FLAG"
+$geth $FLAGS $GENESIS_FLAG

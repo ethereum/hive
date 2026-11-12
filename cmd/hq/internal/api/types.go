@@ -24,6 +24,7 @@ type ListingEntry struct {
 	Clients  []string          `json:"clients"`
 	Versions map[string]string `json:"versions"`
 	Start    time.Time         `json:"start"`
+	End      time.Time         `json:"end"`
 	FileName string            `json:"fileName"`
 	Size     int64             `json:"size"`
 	SimLog   string            `json:"simLog"`
