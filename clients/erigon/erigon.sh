@@ -38,7 +38,12 @@ erigon=/usr/local/bin/erigon
 # consume-enginex reuses one client across tests in same groupings and requires longer reorgs than the default of 96 blocks for some tests
 # TODO can be removed once work is done to support unlimited reorgs based on finalised hash (tracked by https://github.com/erigontech/erigon/issues/17070)
 # will need EELS to also send FCUs with finalised=genesis_hash,justified=genesis_hash too
-export MAX_REORG_DEPTH=512
+# HIVE_ENGINE_MAX_REORG_DEPTH overrides it explicitly (reorg conformance tests).
+if [ "$HIVE_ENGINE_MAX_REORG_DEPTH" != "" ]; then
+    export MAX_REORG_DEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
+else
+    export MAX_REORG_DEPTH=512
+fi
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --log.console.verbosity=$HIVE_LOGLEVEL"

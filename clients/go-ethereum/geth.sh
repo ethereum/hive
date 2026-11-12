@@ -43,6 +43,7 @@
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
 #  - HIVE_EXPECT_DEEP_REORGS      set to '1' to raise the engine API reorg depth limit
+#  - HIVE_ENGINE_MAX_REORG_DEPTH  engine API reorg depth limit (0 = unlimited)
 #  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
 
 # Immediately abort the script on any error encountered
@@ -51,9 +52,14 @@ set -e
 geth=/usr/local/bin/geth
 FLAGS="--state.scheme=path"
 
-# Raise geth's engine API reorg depth limit (default 32) for simulators that
-# rewind deeply, e.g. consume-enginex; geth without the flag ignores the var.
-if [ "${HIVE_EXPECT_DEEP_REORGS:-0}" = "1" ]; then
+# Engine API reorg depth limit (geth default 32, 0 = unlimited).
+#  - HIVE_ENGINE_MAX_REORG_DEPTH sets it explicitly (reorg conformance tests).
+#  - HIVE_EXPECT_DEEP_REORGS=1 raises it to 512 for simulators that rewind
+#    deeply, e.g. consume-enginex.
+# geth without the flag ignores the var.
+if [ "$HIVE_ENGINE_MAX_REORG_DEPTH" != "" ]; then
+    export GETH_ENGINE_MAXREORGDEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
+elif [ "${HIVE_EXPECT_DEEP_REORGS:-0}" = "1" ]; then
     export GETH_ENGINE_MAXREORGDEPTH=512
 fi
 
