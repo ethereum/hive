@@ -3,7 +3,9 @@
 # Consumes `blockchain_test_engine_reorg` fixtures: a DAG of engine payloads
 # plus an ordered list of Engine API / JSON-RPC steps with expected outcomes.
 # One fresh client per fixture; pass/fail per test; no runtime knobs.
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# The trixie image, as execution-specs' own base image: its uv meets the
+# repository's required-version, which the bookworm image's does not.
+FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim
 
 ## Default fixtures/git-ref
 ARG fixtures=tests@latest
