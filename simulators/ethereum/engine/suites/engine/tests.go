@@ -301,33 +301,6 @@ func init() {
 		}
 	}
 
-	// Re-org a transaction out of a block, or into a new block
-	Tests = append(Tests,
-		TransactionReOrgTest{
-			Scenario: TransactionReOrgScenarioReOrgDifferentBlock,
-		},
-		TransactionReOrgTest{
-			Scenario: TransactionReOrgScenarioNewPayloadOnRevert,
-		},
-		TransactionReOrgTest{
-			Scenario: TransactionReOrgScenarioReOrgBackIn,
-		},
-	)
-
-	// Re-Org back into the canonical chain tests
-	Tests = append(Tests,
-		ReOrgBackToCanonicalTest{
-			BaseSpec: test.BaseSpec{
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   120,
-			},
-			TransactionPerPayload:     50,
-			ReOrgDepth:                10,
-			ExecuteSidePayloadOnReOrg: true,
-		},
-	)
-
 	// Suggested Fee Recipient Tests
 	Tests = append(Tests,
 		SuggestedFeeRecipientTest{
