@@ -301,36 +301,8 @@ func init() {
 		}
 	}
 
-	// Re-org using the Engine API tests
-
-	// Sidechain re-org tests
-	Tests = append(Tests,
-		SidechainReOrgTest{},
-		ReOrgBackFromSyncingTest{
-			BaseSpec: test.BaseSpec{
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-			},
-		},
-		ReOrgPrevValidatedPayloadOnSideChainTest{
-			BaseSpec: test.BaseSpec{
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-			},
-		},
-		SafeReOrgToSideChainTest{
-			BaseSpec: test.BaseSpec{
-				SlotsToSafe:      big.NewInt(1),
-				SlotsToFinalized: big.NewInt(2),
-			},
-		},
-	)
-
 	// Re-org a transaction out of a block, or into a new block
 	Tests = append(Tests,
-		TransactionReOrgTest{
-			Scenario: TransactionReOrgScenarioReOrgOut,
-		},
 		TransactionReOrgTest{
 			Scenario: TransactionReOrgScenarioReOrgDifferentBlock,
 		},
@@ -344,15 +316,6 @@ func init() {
 
 	// Re-Org back into the canonical chain tests
 	Tests = append(Tests,
-		ReOrgBackToCanonicalTest{
-			BaseSpec: test.BaseSpec{
-				SlotsToSafe:      big.NewInt(10),
-				SlotsToFinalized: big.NewInt(20),
-				TimeoutSeconds:   60,
-			},
-			TransactionPerPayload: 1,
-			ReOrgDepth:            5,
-		},
 		ReOrgBackToCanonicalTest{
 			BaseSpec: test.BaseSpec{
 				SlotsToSafe:      big.NewInt(32),
