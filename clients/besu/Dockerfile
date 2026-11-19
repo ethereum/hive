@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y curl jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
-RUN /opt/besu/bin/besu --version > /version.txt
+RUN BESU_OPTS="-XX:-FlightRecorder -XX:+DisplayVMOutputToStderr" /opt/besu/bin/besu --version > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
 COPY genesis.json /genesis.json
