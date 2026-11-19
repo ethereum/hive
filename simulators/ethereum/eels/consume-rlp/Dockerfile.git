@@ -1,5 +1,5 @@
 # Builds and runs the EELS (execution-specs) consume rlp simulator
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim
 
 ## Default fixtures/git-ref
 ARG fixtures=tests@latest
