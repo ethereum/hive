@@ -15,7 +15,8 @@ Here is an example command line invocation of the tool:
     hivechain generate -fork-interval 6 -tx-interval 1 -length 500 -outdir chain -outputs genesis,chain,headfcu
 
 The command creates a 500-block chain where a new fork gets enabled every six blocks, and
-every block contains one 'modification' (i.e. transaction). A number of output files will
+every block contains one 'modification' (i.e. transaction). As on mainnet, Petersburg
+activates at the Constantinople block. A number of output files will
 be created in the `chain/` directory:
 
 - `genesis.json` contains the genesis block specification
