@@ -3,6 +3,11 @@ ARG baseimage=erigontech/erigon
 ARG tag=main-latest
 FROM $baseimage:$tag
 
+ARG parallel_commitment_disabled=""
+ENV HIVE_PARALLEL_COMMITMENT_DISABLED=${parallel_commitment_disabled}
+ARG serial_exec=""
+ENV HIVE_SERIAL_EXEC=${serial_exec}
+
 # The upstream erigon container uses a non-root user, but we need
 # to install additional commands, so switch back to root.
 USER root

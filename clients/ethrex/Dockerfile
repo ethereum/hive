@@ -4,6 +4,9 @@ ARG tag=main
 FROM $baseimage:$tag AS builder
 
 FROM ubuntu:24.04
+ARG bal_parallel_disabled=""
+ENV HIVE_BAL_PARALLEL_DISABLED=${bal_parallel_disabled}
+
 
 WORKDIR /usr/local/bin
 COPY --from=builder /usr/local/bin/ethrex .

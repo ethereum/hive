@@ -45,12 +45,13 @@
 #  - HIVE_EXPECT_DEEP_REORGS      set to '1' to raise the engine API reorg depth limit
 #  - HIVE_ENGINE_MAX_REORG_DEPTH  engine API reorg depth limit (0 = unlimited)
 #  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
+#  - HIVE_STATE_SCHEME            state storage scheme: hash or path (default: path)
 
 # Immediately abort the script on any error encountered
 set -e
 
 geth=/usr/local/bin/geth
-FLAGS="--state.scheme=path"
+FLAGS="--state.scheme=${HIVE_STATE_SCHEME:-path}"
 
 # Engine API reorg depth limit (geth default 32, 0 = unlimited).
 #  - HIVE_ENGINE_MAX_REORG_DEPTH sets it explicitly (reorg conformance tests).

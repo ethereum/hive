@@ -13,6 +13,11 @@ RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
 ## Final stage: Sets up the environment for running nethermind
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
 
+ARG flatdb_disabled=""
+ENV HIVE_FLATDB_DISABLED=${flatdb_disabled}
+ARG statedb_key_scheme=""
+ENV HIVE_STATEDB_KEY_SCHEME=${statedb_key_scheme}
+
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
 WORKDIR /nethermind
