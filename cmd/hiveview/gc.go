@@ -62,6 +62,10 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 			return nil // Don't delete directories.
 		}
 		if _, used := usedFiles[path]; !used {
+			// Logs of a running simulation are not referenced by any suite file yet.
+			if info, err := d.Info(); err != nil || info.ModTime().After(cutoff) {
+				return nil
+			}
 			file := filepath.Join(dir, filepath.FromSlash(path))
 			// fmt.Println("rm", file)
 			err := os.Remove(file)
