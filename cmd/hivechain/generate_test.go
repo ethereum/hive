@@ -27,3 +27,14 @@ func TestGenerate(t *testing.T) {
 	names, _ := filepath.Glob(filepath.Join(outdir, "*"))
 	t.Log("output files:", names)
 }
+
+func TestForkBlocksPetersburg(t *testing.T) {
+	cfg := generatorConfig{forkInterval: 3, chainLength: 60}
+	forks := cfg.forkBlocks()
+	if forks["constantinople"] != 12 || forks["petersburg"] != 12 {
+		t.Errorf("constantinople %d, petersburg %d, want 12 for both", forks["constantinople"], forks["petersburg"])
+	}
+	if forks["istanbul"] != 18 {
+		t.Errorf("istanbul %d, want 18", forks["istanbul"])
+	}
+}
