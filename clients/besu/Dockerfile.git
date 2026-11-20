@@ -5,11 +5,18 @@ FROM ubuntu:24.04 AS builder
 
 ARG tag=main
 ARG github=besu-eth/besu
+# Optional: a besu-stateless branch the besu branch needs but that is not
+# published, built into mavenLocal first.
+ARG stateless=
+ARG stateless_tag=main
 
 RUN echo "installing java on ubuntu base image" \
     && apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
     && apt-get install --no-install-recommends -q --assume-yes ca-certificates-java \
     && apt-get install --no-install-recommends -q --assume-yes openjdk-25-jdk-headless libjemalloc-dev \
+    && if [ -n "$stateless" ]; then \
+         git clone --depth 1 --branch $stateless_tag https://github.com/$stateless /besu-stateless \
+         && (cd /besu-stateless && ./gradlew publishToMavenLocal); fi \
     && echo "Cloning: $github - $tag" \
     && git clone --depth 1 --branch $tag https://github.com/$github \
     && cd besu && ./gradlew installDist
