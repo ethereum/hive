@@ -307,3 +307,49 @@ func registerMultiTestNodeHTTP(t *testing.T, baseURL string, suiteID libhive.Tes
 		t.Fatalf("registerMultiTestNode returned status %d", resp.StatusCode)
 	}
 }
+
+func TestEndTestDoesNotHangWhenDeleteFails(t *testing.T) {
+	backend := fakes.NewContainerBackend(&fakes.BackendHooks{
+		DeleteContainer: func(string) error {
+			return errors.New("multiple IDs found with provided prefix: e6476c86")
+		},
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			return &libhive.ContainerInfo{
+				ID: containerID,
+				Wait: func() {
+					// Simulate a container that never exits because deletion failed
+					select {}
+				},
+			}, nil
+		},
+	})
+
+	clients := []*libhive.ClientDefinition{{Name: "test-client", Image: "test-client-image"}}
+	tm := libhive.NewTestManager(libhive.SimEnv{}, backend, clients, libhive.HiveInfo{})
+	srv := httptest.NewServer(tm.API())
+	defer srv.Close()
+
+	suiteID, err := tm.StartTestSuite("test-suite", "test suite description")
+	if err != nil {
+		t.Fatal("StartTestSuite:", err)
+	}
+	testID, err := tm.StartTest(suiteID, "test", "test description")
+	if err != nil {
+		t.Fatal("StartTest:", err)
+	}
+	_ = startClientHTTP(t, srv.URL, suiteID, testID)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- tm.EndTest(suiteID, testID, &libhive.TestResult{Pass: true})
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal("EndTest failed:", err)
+		}
+	case <-time.After(testOperationTimeout):
+		t.Fatal("EndTest hung waiting for container that failed deletion")
+	}
+}

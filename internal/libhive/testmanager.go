@@ -602,7 +602,10 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 
 	// Stop the claimed clients.
 	for _, stop := range stops {
-		manager.backend.DeleteContainer(stop.id)
+		if err := manager.backend.DeleteContainer(stop.id); err != nil {
+			slog.Error("unable to remove container on test end", "container", stop.id, "err", err)
+			continue
+		}
 		stop.wait()
 	}
 	return nil

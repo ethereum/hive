@@ -132,14 +132,21 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	return c.ID, err
 }
 
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
 // StartContainer starts a docker container.
 func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 	if opt.CheckLive != 0 && b.proxy == nil {
 		panic("attempt to start container with CheckLive, but proxy is not running")
 	}
 
-	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
-	logger := b.logger.With("container", info.ID)
+	info := &libhive.ContainerInfo{ID: containerID, LogFile: opt.LogFile}
+	logger := b.logger.With("container", shortID(containerID))
 
 	// Run the container.
 	var startTime = time.Now()
@@ -236,30 +243,30 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 // Anonymous volumes created for the container, i.e. those declared by VOLUME in its
 // image, are removed with it.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
-	b.logger.Debug("removing container", "container", containerID[:8])
+	b.logger.Debug("removing container", "container", shortID(containerID))
 	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true, RemoveVolumes: true})
 	if err != nil {
-		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't remove container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
 
 // PauseContainer pauses the given container.
 func (b *ContainerBackend) PauseContainer(containerID string) error {
-	b.logger.Debug("pausing container", "container", containerID[:8])
+	b.logger.Debug("pausing container", "container", shortID(containerID))
 	err := b.client.PauseContainer(containerID)
 	if err != nil {
-		b.logger.Error("can't pause container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't pause container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
 
 // UnpauseContainer unpauses the given container.
 func (b *ContainerBackend) UnpauseContainer(containerID string) error {
-	b.logger.Debug("unpausing container", "container", containerID[:8])
+	b.logger.Debug("unpausing container", "container", shortID(containerID))
 	err := b.client.UnpauseContainer(containerID)
 	if err != nil {
-		b.logger.Error("can't unpause container", "container", containerID[:8], "err", err)
+		b.logger.Error("can't unpause container", "container", shortID(containerID), "err", err)
 	}
 	return err
 }
