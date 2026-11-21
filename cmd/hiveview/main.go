@@ -41,10 +41,14 @@ func main() {
 		runServer(config)
 	case *listing:
 		fsys := os.DirFS(config.logDir)
-		generateListing(fsys, ".", os.Stdout, listLimit)
+		if err := generateListing(fsys, ".", os.Stdout, listLimit); err != nil {
+			log.Fatalf("Can't generate listing for %s: %v", config.logDir, err)
+		}
 	case *gc:
 		cutoff := time.Now().Add(-*gcKeepInterval)
-		logdirGC(config.logDir, cutoff, *gcKeepMin)
+		if err := logdirGC(config.logDir, cutoff, *gcKeepMin); err != nil {
+			log.Fatalf("Can't clean up %s: %v", config.logDir, err)
+		}
 	case *deploy:
 		doDeploy(&config)
 	default:
