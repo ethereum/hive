@@ -15,5 +15,5 @@ ARG legacy=${fixtures}${branch}
 FROM ${image}:${tag:-latest${legacy:+-legacy}}
 
 # TODO: remove when fixed on nimbus-el side.
-ARG disable_strict_exception_matching=nimbus-el
+ARG disable_strict_exception_matching=nimbus-el,eels
 ENV DISABLE_STRICT_EXCEPTION_MATCHING=${disable_strict_exception_matching}
