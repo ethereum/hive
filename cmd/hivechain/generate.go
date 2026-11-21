@@ -191,8 +191,17 @@ func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
 	g.setDifficulty(gen)
 	g.setParentBeaconRoot(gen)
+	g.setCoinbaseAndExtra(gen)
 	g.runModifiers(i, gen)
 	g.clRequests[gen.Number().Uint64()] = gen.ConsensusLayerRequests()
+}
+
+// setCoinbaseAndExtra gives each block a non-zero coinbase and non-empty extraData that
+// differ from those of its parent, so tests can tell which block a client read them from.
+func (g *generator) setCoinbaseAndExtra(gen *core.BlockGen) {
+	n := gen.Number().Uint64()
+	gen.SetCoinbase(common.Address{0xcb, byte(n % 4)})
+	gen.SetExtra([]byte(fmt.Sprintf("hivechain block %d", n)))
 }
 
 func (g *generator) setDifficulty(gen *core.BlockGen) {
