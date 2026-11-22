@@ -58,9 +58,7 @@ node /usr/app/node_modules/.bin/lodestar \
     --rest.namespace="*" \
     --rest.address=0.0.0.0 \
     --rest.port="${HIVE_ETH2_BN_API_PORT:-4000}" \
-    --eth1 \
     --execution.urls="$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS" \
-    --eth1.depositContractDeployBlock=${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0} \
     --jwt-secret=/jwtsecret \
     $metrics_option \
     $bootnodes_option \
