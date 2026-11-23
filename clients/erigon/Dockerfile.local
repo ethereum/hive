@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y bash build-essential ca-certificates gi
 ## Final stage: Sets up the environment for running erigon
 FROM debian:13-slim
 
+ARG parallel_commitment_disabled=""
+ENV HIVE_PARALLEL_COMMITMENT_DISABLED=${parallel_commitment_disabled}
+ARG serial_exec=""
+ENV HIVE_SERIAL_EXEC=${serial_exec}
+
 # Copy compiled binary from builder
 COPY --from=builder /usr/local/bin/erigon /usr/local/bin/
 

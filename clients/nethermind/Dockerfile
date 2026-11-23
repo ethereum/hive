@@ -3,6 +3,11 @@ ARG baseimage=nethermindeth/nethermind
 ARG tag=master
 FROM $baseimage:$tag
 
+ARG flatdb_disabled=""
+ENV HIVE_FLATDB_DISABLED=${flatdb_disabled}
+ARG statedb_key_scheme=""
+ENV HIVE_STATEDB_KEY_SCHEME=${statedb_key_scheme}
+
 RUN apt-get update && apt-get install -y jq curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
