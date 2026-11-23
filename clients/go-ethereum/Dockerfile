@@ -4,6 +4,9 @@ ARG tag=latest
 FROM $baseimage:$tag as builder
 
 FROM alpine:latest
+ARG state_scheme=""
+ENV HIVE_STATE_SCHEME=${state_scheme}
+
 RUN apk add --update bash curl jq
 COPY --from=builder /usr/local/bin/geth /usr/local/bin/geth
 

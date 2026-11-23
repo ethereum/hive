@@ -162,26 +162,6 @@ commonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		          └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
 ```
 
-### Re-org using Engine API
-- Transaction Reorg:  
-Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block on a different chain than the block where the transaction was included.
-
-- Sidechain Reorg:  
-Send a transaction that modifies the state, ForkchoiceUpdate to the payload containing this transaction. Then send an alternative payload, that produces a different state with the same transaction, and use ForkchoiceUpdated to change into this sidechain.
-
-- Re-Org Back into Canonical Chain:  
-Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain is still capable of progressing.
-
-- Re-Org Back to Canonical Chain From Syncing Chain:
-Build an alternative chain of 10 payloads.
-Perform `newPayload(P10')` + `fcU(P10')`, which should result in client `SYNCING`. Verify that the client can re-org back to the canonical chain after sending `newPayload(P11)` + `fcU(P11)`.
-
-- Re-org to Previously Validated Sidechain Payload:
-Attempt to re-org to one of the sidechain (previously validated) payloads, but not the leaf, and also build a new payload from this sidechain.
-
-- Safe Re-Org to Side Chain:
-Perform a re-org of the safe block (and head block) to a valid sidechain.
-
 ### Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test:  
 Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected. Test using Legacy and EIP-1559 transaction types.
