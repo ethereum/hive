@@ -18,6 +18,13 @@ RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential
 
 ## Final stage: Sets up the environment for running reth
 FROM debian:latest
+ARG state_root_fallback=""
+ENV HIVE_STATE_ROOT_FALLBACK=${state_root_fallback}
+ARG bal_parallel_disabled=""
+ENV HIVE_BAL_PARALLEL_DISABLED=${bal_parallel_disabled}
+ARG share_sparse_trie_with_builder=""
+ENV HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER=${share_sparse_trie_with_builder}
+
 RUN apt-get update && apt-get install -y bash curl jq \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 

@@ -23,6 +23,8 @@
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
 #  - HIVE_MINER                address to credit with mining rewards
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_PARALLEL_COMMITMENT_DISABLED  set to '1' to use sequential commitment
+#  - HIVE_SERIAL_EXEC          set to '1' to use serial execution
 #
 # These flags are NOT supported by Erigon
 #
@@ -38,7 +40,12 @@ erigon=/usr/local/bin/erigon
 # consume-enginex reuses one client across tests in same groupings and requires longer reorgs than the default of 96 blocks for some tests
 # TODO can be removed once work is done to support unlimited reorgs based on finalised hash (tracked by https://github.com/erigontech/erigon/issues/17070)
 # will need EELS to also send FCUs with finalised=genesis_hash,justified=genesis_hash too
-export MAX_REORG_DEPTH=512
+# HIVE_ENGINE_MAX_REORG_DEPTH overrides it explicitly (reorg conformance tests).
+if [ "$HIVE_ENGINE_MAX_REORG_DEPTH" != "" ]; then
+    export MAX_REORG_DEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
+else
+    export MAX_REORG_DEPTH=512
+fi
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --log.console.verbosity=$HIVE_LOGLEVEL"
@@ -59,6 +66,13 @@ FLAGS="$FLAGS --db.size.limit 2GB"
 # Keep commitment history so eth_getProof can serve historical blocks. Erigon
 # stores this setting in the database, so import and the node need the same value.
 FLAGS="$FLAGS --prune.include-commitment-history"
+
+if [ "${HIVE_PARALLEL_COMMITMENT_DISABLED:-0}" = "1" ]; then
+    FLAGS="$FLAGS --experimental.parallel-commitment=false"
+fi
+if [ "${HIVE_SERIAL_EXEC:-0}" = "1" ]; then
+    FLAGS="$FLAGS --exec.serial"
+fi
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
