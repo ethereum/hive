@@ -192,6 +192,18 @@ docker containers.
 rebuild. You can use this option during simulator development to ensure a new image is
 built even when there are no changes to the simulator code.
 
+`--docker.buildoutput`: This enables printing of docker build output to stderr, without the
+container output that `--docker.output` also prints.
+
+`--docker.endpoint <endpoint>`: Address of the Docker daemon. When it is not set, hive
+connects using the standard Docker environment variables, such as `DOCKER_HOST`.
+
+`--docker.auth`: Enables registry authentication with credentials from the Docker
+configuration files. If `DOCKER_CONFIG` is set, hive reads
+`$DOCKER_CONFIG/plaintext-passwords.json` and `$DOCKER_CONFIG/config.json`; otherwise it
+reads `$HOME/.docker/plaintext-passwords.json`, `$HOME/.docker/config.json` and
+`$HOME/.dockercfg`, in that order.
+
 ### Simulation Options
 
 `--sim.limit <pattern>`: Specifies a regular expression to selectively enable suites and
@@ -213,6 +225,10 @@ directory (note the first `/`, matching any suite name):
 
     ./hive --sim ethereum/consensus --sim.limit /stBugs/
 
+`--sim.limit.exact`: Matches the `--sim.limit` value literally instead of as a regular
+expression: hive escapes it and anchors it with `^` and `$` before passing it on in
+`HIVE_TEST_PATTERN`.
+
 `--sim.timelimit <timeout>`: Simulation timeout. Hive aborts the simulator if it exceeds
 this time. There is no default timeout.
 
@@ -232,6 +248,25 @@ to 1.
 `--sim.randomseed <number>`: Sets a fixed number as the randomness seed to be used by all
 simulators. It sets the `HIVE_RANDOM_SEED` environment variable. Defaults to zero, which
 translates being unset and the simulators decide the source of randomness.
+
+### Other Options
+
+`--results-root <directory>`: Directory where hive writes result files and logs. Defaults
+to `workspace/logs`.
+
+`--loglevel <level>`: Log level of hive's own messages. Supports values 0-5, defaults to 3.
+
+`--dev`: Only starts the simulator API endpoint, without building or running any
+simulator. Simulators selected with `--sim` or configured with `--config` are ignored.
+`--dev.addr <addr:port>` sets the API endpoint, `127.0.0.1:3000` by default.
+
+`--list`: Lists the containers started by hive instead of running simulations.
+
+`--cleanup`: Removes the containers started by hive instead of running simulations. It can
+be narrowed with `--cleanup.instance <id>` (one hive instance), `--cleanup.type <type>`
+(`client`, `simulator` or `proxy`) and `--cleanup.older-than <duration>` (for example
+`24h`). `--cleanup.dry-run` shows what would be removed without removing it.
+`--list` also honors `--cleanup.instance`.
 
 ## Viewing simulation results (hiveview)
 
