@@ -26,7 +26,7 @@ var (
 //	hq runs -sim rpc-compat -base-url https://...
 func addGlobalFlags(fs *flag.FlagSet) {
 	fs.StringVar(&baseURL, "base-url", "https://hive.ethpandaops.io", "Hive server base URL")
-	fs.StringVar(&suite, "suite", "generic", "Test suite name")
+	fs.StringVar(&suite, "suite", "generic", "Test suite name (empty for a local hiveview)")
 	fs.BoolVar(&noCache, "no-cache", false, "Bypass cache reads")
 	fs.BoolVar(&noColor, "no-color", false, "Disable colored output")
 	fs.StringVar(&cacheDir, "cache-dir", "", "Cache directory (default ~/.cache/hq)")

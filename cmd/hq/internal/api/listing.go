@@ -13,7 +13,7 @@ import (
 // FetchListing streams the listing.jsonl file and applies filters.
 // It stops early once limit results are collected.
 func (c *Client) FetchListing(sim, client string, limit int) ([]ListingEntry, error) {
-	url := fmt.Sprintf("%s/%s/listing.jsonl", c.BaseURL, c.Suite)
+	url := c.suiteURL("listing.jsonl")
 	data, err := c.fetch(url, volatileTTL)
 	if err != nil {
 		return nil, err

@@ -30,6 +30,16 @@ func NewClient(baseURL, suite string, c *cache.Cache) *Client {
 	}
 }
 
+// suiteURL returns the URL of rel under the suite directory on the server. A
+// local hiveview serves a single suite at its root, so an empty Suite adds no
+// path segment.
+func (c *Client) suiteURL(rel string) string {
+	if c.Suite == "" {
+		return c.BaseURL + "/" + rel
+	}
+	return c.BaseURL + "/" + c.Suite + "/" + rel
+}
+
 // fetch retrieves a URL with optional caching. ttl <= 0 means cache forever (immutable).
 func (c *Client) fetch(url string, ttl time.Duration) ([]byte, error) {
 	if data, ok := c.Cache.Get(url, ttl); ok {
