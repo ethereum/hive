@@ -9,7 +9,7 @@ import (
 
 // FetchResult fetches a test suite result file. These are immutable (content-addressed).
 func (c *Client) FetchResult(fileName string) (*TestSuiteResult, error) {
-	url := fmt.Sprintf("%s/%s/results/%s", c.BaseURL, c.Suite, fileName)
+	url := c.suiteURL("results/" + fileName)
 	data, err := c.fetch(url, 0) // immutable, cache forever
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func (c *Client) FetchTestLog(detailsLog string, begin, end int64) (string, erro
 	if begin == 0 && end == 0 {
 		return "", nil
 	}
-	url := fmt.Sprintf("%s/%s/results/%s", c.BaseURL, c.Suite, detailsLog)
+	url := c.suiteURL("results/" + detailsLog)
 	data, err := c.fetchRange(url, begin, end)
 	if err != nil {
 		return "", err

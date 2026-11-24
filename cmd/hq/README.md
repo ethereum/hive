@@ -108,8 +108,11 @@ currently need `hiveview` as a proxy:
 go run ./cmd/hiveview -serve -logdir workspace/logs
 
 # In another shell, point hq at it:
-hq runs -base-url http://localhost:8080 -no-cache
+hq runs -base-url http://localhost:8080 -suite "" -no-cache
 ```
+
+`hiveview` serves a single suite at the root of the server, so `-suite ""` is
+needed to drop the suite path segment used by the public server.
 
 `-no-cache` is useful when iterating locally: the listing has a 5-minute cache
 TTL, which is awkward when you're kicking off fresh runs. Direct filesystem
@@ -120,7 +123,7 @@ access (no `hiveview` required) is planned.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-base-url` | `https://hive.ethpandaops.io` | Hive server base URL |
-| `-suite` | `generic` | Test suite name |
+| `-suite` | `generic` | Test suite name (empty for a local `hiveview`) |
 | `-cache-dir` | `~/.cache/hq` | Cache directory |
 | `-no-cache` | `false` | Bypass cache reads |
 | `-no-color` | `false` | Disable colored output |
