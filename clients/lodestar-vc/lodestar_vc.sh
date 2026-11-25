@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Immediately abort the script on any error encountered
 set -e
@@ -36,14 +36,13 @@ esac
 
 echo Starting Lodestar Validator Client
 
-node /usr/app/node_modules/.bin/lodestar \
+/usr/app/node_modules/.bin/lodestar \
     validator \
     --logLevel="$LOG" \
     --dataDir=/data/vc \
     --paramsFile=/hive/input/config.yaml \
     --keystoresDir="/data/validators" \
     --secretsDir="/data/secrets" \
-    --useProduceBlockV3 \
     $metrics_option $builder_option \
     --beaconNodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"
 
