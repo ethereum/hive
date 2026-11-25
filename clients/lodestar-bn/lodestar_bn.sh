@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Immediately abort the script on any error encountered
 set -e
@@ -46,7 +46,7 @@ echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /
 
 echo Starting Lodestar Beacon Node
 
-node /usr/app/node_modules/.bin/lodestar \
+/usr/app/node_modules/.bin/lodestar \
     beacon \
     --logLevel="$LOG" \
     --dataDir=/data/beacon \
