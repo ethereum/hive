@@ -247,7 +247,8 @@ func addModContracts(ga types.GenesisAlloc) {
 
 // forkBlocks computes the block numbers where forks occur. Forks get enabled based on the
 // forkInterval. If the total number of requested blocks (chainLength) is lower than
-// necessary, the remaining forks activate on the last chain block.
+// necessary, the remaining forks activate on the last chain block. Petersburg activates
+// at the Constantinople block.
 func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	lastIndex := cfg.lastForkIndex()
 	forks := allForkNames[:lastIndex+1]
@@ -277,6 +278,12 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 	// interval, schedule the remaining forks at the last block.
 	for _, f := range forks {
 		forkBlocks[f] = uint64(cfg.chainLength)
+	}
+	// Mainnet activated Petersburg at the Constantinople block, and the execution
+	// specs define one Constantinople fork without EIP-1283. Petersburg keeps its
+	// slot in the schedule, so later forks do not move.
+	if _, ok := forkBlocks["petersburg"]; ok {
+		forkBlocks["petersburg"] = forkBlocks["constantinople"]
 	}
 	return forkBlocks
 }
