@@ -16,3 +16,6 @@ client on the EIP-8288 test chain in go-ethereum's `cmd/devp2p/internal/ethtest/
 whose fork environment sets `HIVE_EIP8288_TIMESTAMP`, and once more with that fork scheduled
 in the future. Clients map `HIVE_EIP8288_AGGREGATION_PROBABILITY`, the chance that the node
 aggregates a given transaction-hash bucket, where they implement mempool aggregation.
+
+The `eth76` suite tests eth/76 relay and aggregation of EIP-8288 proof wrappers on the
+same chain, once with the client aggregating every bucket and once aggregating none.
