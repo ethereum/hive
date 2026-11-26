@@ -148,11 +148,92 @@ Results from the test tool are reported as individual sub-tests.`,
 		},
 	}
 
-	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap, snap2)
+	eip8288env := loadChainConfig(eip8288ChainDir)
+	// A node that never selects anything to aggregate must still admit and relay wrappers.
+	eip8288NoAggregation := eip8288env.Set("HIVE_EIP8288_AGGREGATION_PROBABILITY", "0")
+	eip8288PreFork := eip8288env.Set("HIVE_EIP8288_TIMESTAMP", eip8288PreForkTimestamp)
+	eth75 := hivesim.Suite{
+		Name:        "eth75",
+		Description: "This suite tests eth/75 (EIP-8437) propagation of EIP-8288 proof wrappers.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch",
+				Description: `This test launches the client on a chain with EIP-8288 active and runs the test tool.
+Results from the test tool are reported as individual sub-tests.`,
+				Parameters: eip8288NoAggregation,
+				Files: map[string]string{
+					"genesis.json": eip8288ChainDir + "/genesis.json",
+					"chain.rlp":    eip8288ChainDir + "/chain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runRLPxTest("eth75-test"),
+			},
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch before fork",
+				Description: `This test launches the client on a chain that schedules EIP-8288 in the future
+and runs the test tool. Results from the test tool are reported as individual sub-tests.`,
+				Parameters: eip8288PreFork,
+				Files: map[string]string{
+					"genesis.json": eip8288ChainDir + "/genesis.json",
+				},
+				AlwaysRun: true,
+				Run:       runRLPxTest("eth75-prefork-test"),
+			},
+		},
+	}
+
+	eth76 := hivesim.Suite{
+		Name:        "eth76",
+		Description: "This suite tests eth/76 relay and aggregation of EIP-8288 proof wrappers.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch",
+				Description: `This test launches the client on a chain with EIP-8288 active, aggregating every
+transaction-hash bucket, and runs the test tool. Results from the test tool are reported
+as individual sub-tests.`,
+				Parameters: eip8288env.Set("HIVE_EIP8288_AGGREGATION_PROBABILITY", "1"),
+				Files: map[string]string{
+					"genesis.json": eip8288ChainDir + "/genesis.json",
+					"chain.rlp":    eip8288ChainDir + "/chain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runRLPxTest("eth76-test"),
+			},
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch without aggregation",
+				Description: `This test launches the client on a chain with EIP-8288 active, aggregating no
+transaction-hash bucket, and checks that it still admits and relays received aggregates.`,
+				Parameters: eip8288NoAggregation,
+				Files: map[string]string{
+					"genesis.json": eip8288ChainDir + "/genesis.json",
+					"chain.rlp":    eip8288ChainDir + "/chain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runRLPxTest("eth76-test", "AggregateRelay"),
+			},
+		},
+	}
+
+	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap, snap2, eth75, eth76)
 }
 
+// The EIP-8288 test chain: a genesis with EIP-8288 active and one block built on it. Its
+// fork environment sets HIVE_EIP8288_TIMESTAMP, which the pre-fork test moves to 2100.
+const (
+	eip8288ChainDir         = testChainDir + "/eip8288"
+	eip8288PreForkTimestamp = "4102444800"
+)
+
 func loadTestChainConfig() hivesim.Params {
-	content, err := os.ReadFile(testChainDir + "/forkenv.json")
+	return loadChainConfig(testChainDir)
+}
+
+func loadChainConfig(dir string) hivesim.Params {
+	content, err := os.ReadFile(dir + "/forkenv.json")
 	if err != nil {
 		panic(err)
 	}
@@ -200,6 +281,32 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 	)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// runRLPxTest returns a test running the given rlpx subcommand of the test tool, limited
+// to the tests matching only, if given.
+func runRLPxTest(command string, only ...string) func(*hivesim.T, *hivesim.Client) {
+	return func(t *hivesim.T, c *hivesim.Client) {
+		enode, err := c.EnodeURL()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, pattern := t.Sim.TestPattern()
+		if len(only) > 0 {
+			pattern = only[0]
+		}
+		cmd := exec.Command("./devp2p", "rlpx", command,
+			"--tap",
+			"--run", pattern,
+			"--node", enode,
+			"--chain", testChainDir,
+			"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+			"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+		)
+		if err := runTAP(t, c.Type, cmd); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

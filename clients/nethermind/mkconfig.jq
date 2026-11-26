@@ -94,6 +94,18 @@ def txpool_config:
   end
 ;
 
+def eip8288_config:
+  if env.HIVE_EIP8288_AGGREGATION_PROBABILITY != null then
+    {
+      "TxPool": {
+        "AggregationProbability": (env.HIVE_EIP8288_AGGREGATION_PROBABILITY | tonumber)
+      }
+    }
+  else
+    {}
+  end
+;
+
 def blocks_config:
   if env.HIVE_TARGET_GAS_LIMIT != null then
     {
@@ -167,4 +179,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config * sync_loop_config * txpool_config * blocks_config * statedb_key_scheme_config * flatdb_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config * sync_loop_config * txpool_config * eip8288_config * blocks_config * statedb_key_scheme_config * flatdb_config
