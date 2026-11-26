@@ -5,7 +5,9 @@ FROM golang:1-alpine as geth-builder
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY}
 RUN apk add --update git gcc musl-dev linux-headers
-RUN git clone --depth 1 https://github.com/ethereum/go-ethereum.git /go-ethereum
+ARG geth_repo=https://github.com/ethereum/go-ethereum.git
+ARG geth_branch=master
+RUN git clone --depth 1 --branch ${geth_branch} ${geth_repo} /go-ethereum
 WORKDIR /go-ethereum
 RUN go build -v ./cmd/devp2p
 
