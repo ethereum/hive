@@ -11,9 +11,20 @@ type TestRequest struct {
 
 // NodeConfig contains the launch parameters for a client container.
 type NodeConfig struct {
-	Client      string            `json:"client"`
-	Networks    []string          `json:"networks"`
-	Environment map[string]string `json:"environment"`
+	Client           string                           `json:"client"`
+	Networks         []string                         `json:"networks"`
+	NetworkEndpoints map[string]NetworkEndpointConfig `json:"network_endpoints,omitempty"`
+	Environment      map[string]string                `json:"environment"`
+}
+
+type NetworkConfig struct {
+	IPv4Subnet string `json:"ipv4_subnet,omitempty"`
+	IPv6Subnet string `json:"ipv6_subnet,omitempty"`
+}
+
+type NetworkEndpointConfig struct {
+	IPv4Address string `json:"ipv4_address,omitempty"`
+	IPv6Address string `json:"ipv6_address,omitempty"`
 }
 
 // StartNodeResponse is returned by the client startup endpoint.
