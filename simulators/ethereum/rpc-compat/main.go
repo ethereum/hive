@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ethereum/execution-apis/tools/iofile"
@@ -96,9 +94,19 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 }
 
 func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig iofile.ScriptConfig) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
+	engineURL := fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8551"))
+	return runRPCTest(t, client, url, engineURL, test, scriptConfig)
+}
+
+type testLogger interface {
+	Log(...interface{})
+	Logf(string, ...interface{})
+}
+
+func runRPCTest(t testLogger, client *http.Client, url, engineURL string, test *iofile.Test, scriptConfig iofile.ScriptConfig) error {
 	var (
-		client    = &http.Client{Timeout: 5 * time.Second}
-		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
 		err       error
 		respBytes []byte
 		responses []json.RawMessage
@@ -113,7 +121,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 			if err := checker.Request(msg.Data); err != nil {
 				t.Logf("%v", err)
 			}
-			respBytes, err = postHttp(client, url, strings.NewReader(request))
+			respBytes, err = postRPC(client, url, engineURL, request)
 			if err != nil {
 				return err
 			}
@@ -171,11 +179,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *iofile.Test, scriptConfig io
 	}
 
 	if respBytes != nil {
-		t.Fatalf("unhandled response in test case")
+		return fmt.Errorf("unhandled response in test case")
 	}
 
 	if err := test.RunScript(scriptConfig, responses); err != nil {
-		t.Fatal("validation script:", err)
+		return fmt.Errorf("validation script: %w", err)
 	}
 	if len(test.Script) > 0 {
 		t.Log("validation script passed")
@@ -260,21 +268,6 @@ func numbersEqual(a, b json.Number) bool {
 		return af == bf || math.IsNaN(af) && math.IsNaN(bf)
 	}
 	return a == b
-}
-
-// sendHttp sends an HTTP POST with the provided json data and reads the
-// response into a byte slice and returns it.
-func postHttp(c *http.Client, url string, d io.Reader) ([]byte, error) {
-	req, err := http.NewRequest("POST", url, d)
-	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("write error: %v", err)
-	}
-	return io.ReadAll(resp.Body)
 }
 
 // sendForkchoiceUpdated delivers the initial FcU request to the client.
