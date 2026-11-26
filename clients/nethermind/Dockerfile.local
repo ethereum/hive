@@ -2,7 +2,7 @@
 ### Requires a copy of nethermind/ -> hive/clients/nethermind/
 
 ## Builder stage: Compiles nethermind from a local directory
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 
 # Default local client path: clients/nethermind/<nethermind>
 ARG local_path=nethermind
@@ -11,7 +11,7 @@ ADD $local_path /nethermind
 RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
 
 ## Final stage: Sets up the environment for running nethermind
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute
 
 ARG flatdb_disabled=""
 ENV HIVE_FLATDB_DISABLED=${flatdb_disabled}
