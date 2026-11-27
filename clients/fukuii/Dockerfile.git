@@ -57,6 +57,10 @@ RUN chmod +x /fukuii.sh /hive-bin/enode.sh
 COPY aot-train.sh aot-train-genesis.json /
 RUN chmod +x /aot-train.sh && /aot-train.sh && rm /aot-train.sh
 
+# Unified state layout guard, off by default: see Dockerfile.
+ARG FUKUII_PATH_LIVE=
+ENV FUKUII_PATH_LIVE=${FUKUII_PATH_LIVE}
+
 EXPOSE 8545 8546 8551 30303 30303/udp
 ENV HIVE_CHECK_LIVE_PORT=8545
 

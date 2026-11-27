@@ -110,6 +110,24 @@ FLAGS="$FLAGS -Dfukuii.blockchains.network=hive"
 # sink node is probed on 8551). StdNode binds this port last. See Dockerfile.
 FLAGS="$FLAGS -Dfukuii.network.readiness-port=${HIVE_CHECK_LIVE_PORT:-8545}"
 
+# Unified state layout guard (spec 018 Track C, B-314). OFF unless the image was built with
+# the build arg FUKUII_PATH_LIVE=1 (Dockerfile ARG -> ENV); hive passes build args to a client
+# only through a --client-file entry (scripts/hive/path-live-clients.sh writes one). Not a
+# HIVE_* name: hive never sets it, and HiveAdapterForkEnvSpec forbids invented HIVE_* names.
+# Unset or empty leaves the command line exactly as without this block. Any value other than
+# 1/true/0/false stops the container: a typo must not run a gate silently without the guard.
+case "${FUKUII_PATH_LIVE:-}" in
+    1|true|TRUE|True)
+        FLAGS="$FLAGS -Dfukuii.state.path-live=true"
+        echo "fukuii.sh: FUKUII_PATH_LIVE set: -Dfukuii.state.path-live=true (unified state layout guard on)" >&2
+        ;;
+    ""|0|false|FALSE|False) ;;
+    *)
+        echo "fukuii.sh: FUKUII_PATH_LIVE='$FUKUII_PATH_LIVE' is not one of 1, true, 0, false" >&2
+        exit 1
+        ;;
+esac
+
 # Unprotected (pre-EIP-155) transactions over RPC are refused by default, as in
 # go-ethereum; the graphql simulator sets HIVE_ALLOW_UNPROTECTED_TX because its
 # sendRawTransaction vectors are unprotected (geth.sh maps it the same way).
