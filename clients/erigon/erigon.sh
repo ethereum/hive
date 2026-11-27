@@ -25,6 +25,8 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_PARALLEL_COMMITMENT_DISABLED  set to '1' to use sequential commitment
 #  - HIVE_SERIAL_EXEC          set to '1' to use serial execution
+#  - HIVE_REORG_RETENTION_WINDOW  EIP-8252 reorg state-retention window in blocks,
+#                                 maps to --prune.distance
 #
 # These flags are NOT supported by Erigon
 #
@@ -66,6 +68,16 @@ FLAGS="$FLAGS --db.size.limit 2GB"
 # Keep commitment history so eth_getProof can serve historical blocks. Erigon
 # stores this setting in the database, so import and the node need the same value.
 FLAGS="$FLAGS --prune.include-commitment-history"
+
+# EIP-8252 reorg state-retention window: keep state history for the latest N
+# blocks, so a reorg forking within the window can be served without a resync.
+# The flag takes a raw block count with no floor. Like the commitment-history
+# setting above it is stored in the database, so it is added before import so
+# both import and the node use the same value. Unset leaves retention to follow
+# --prune.mode (full = DefaultPruneDistance).
+if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
+    FLAGS="$FLAGS --prune.distance=$HIVE_REORG_RETENTION_WINDOW"
+fi
 
 if [ "${HIVE_PARALLEL_COMMITMENT_DISABLED:-0}" = "1" ]; then
     FLAGS="$FLAGS --experimental.parallel-commitment=false"

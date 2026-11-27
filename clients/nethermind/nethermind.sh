@@ -41,6 +41,8 @@
 #  - HIVE_SYNC_LOOP_INTERVAL_MS  sync mode selector interval in ms (test-only tuning)
 #  - HIVE_FLATDB_DISABLED      set to '1' to use the Patricia-trie state database
 #  - HIVE_STATEDB_KEY_SCHEME   state database key scheme: Hash or HalfPath (default: client default)
+#  - HIVE_REORG_RETENTION_WINDOW  EIP-8252 reorg state-retention window in blocks,
+#                                 maps to --FlatDb.LongFinalityMaxReorgDepth
 #
 # These variables are not supported by Nethermind:
 #
@@ -113,5 +115,15 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     LOG_FLAG="--log $LOG"
 fi
 
+# EIP-8252 reorg state-retention window: under stalled finality the flat-state
+# persisted-snapshot tier serves reorgs down to this depth. The effective
+# backstop is max(N, MinReorgDepth + CompactSize) = max(N, 160) and relies on
+# EnableLongFinality, which is on by default. CLI args override the config file,
+# so this is appended last. Unset leaves Nethermind's default.
+REORG_FLAG=""
+if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
+    REORG_FLAG="--FlatDb.LongFinalityMaxReorgDepth $HIVE_REORG_RETENTION_WINDOW"
+fi
+
 echo "Running Nethermind..."
-/nethermind/nethermind --config /configs/test.json $LOG_FLAG
+/nethermind/nethermind --config /configs/test.json $LOG_FLAG $REORG_FLAG

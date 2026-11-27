@@ -46,6 +46,8 @@
 #  - HIVE_ENGINE_MAX_REORG_DEPTH  engine API reorg depth limit (0 = unlimited)
 #  - HIVE_KZG_FAST_SETUP          set to '1' to initialize the KZG library on first use (test-only tuning)
 #  - HIVE_STATE_SCHEME            state storage scheme: hash or path (default: path)
+#  - HIVE_REORG_RETENTION_WINDOW  EIP-8252 reorg state-retention window in blocks,
+#                                 maps to --history.state (path scheme only)
 
 # Immediately abort the script on any error encountered
 set -e
@@ -53,15 +55,25 @@ set -e
 geth=/usr/local/bin/geth
 FLAGS="--state.scheme=${HIVE_STATE_SCHEME:-path}"
 
-# Engine API reorg depth limit (geth default 32, 0 = unlimited).
+# Engine API reorg depth limit (--engine.maxreorgdepth, geth default 32, 0 = unlimited).
 #  - HIVE_ENGINE_MAX_REORG_DEPTH sets it explicitly (reorg conformance tests).
 #  - HIVE_EXPECT_DEEP_REORGS=1 raises it to 512 for simulators that rewind
-#    deeply, e.g. consume-enginex.
-# geth without the flag ignores the var.
+#    deeply, e.g. consume-enginex and reorg-retention.
+# The flag is recent; older geth builds don't have it, so only pass it when
+# present (a value set for a geth that can't honor it would otherwise be lost
+# silently, or abort on an unknown flag).
+REORG_DEPTH=""
 if [ "$HIVE_ENGINE_MAX_REORG_DEPTH" != "" ]; then
-    export GETH_ENGINE_MAXREORGDEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
+    REORG_DEPTH="$HIVE_ENGINE_MAX_REORG_DEPTH"
 elif [ "${HIVE_EXPECT_DEEP_REORGS:-0}" = "1" ]; then
-    export GETH_ENGINE_MAXREORGDEPTH=512
+    REORG_DEPTH=512
+fi
+if [ "$REORG_DEPTH" != "" ]; then
+    if $geth --help 2>/dev/null | grep -q -- '--engine.maxreorgdepth'; then
+        FLAGS="$FLAGS --engine.maxreorgdepth=$REORG_DEPTH"
+    else
+        echo "warning: geth has no --engine.maxreorgdepth flag; reorg depth limit stays at the default" >&2
+    fi
 fi
 
 # Simulators whose clients need no KZG at start (e.g. execution-specs' consume
@@ -70,6 +82,16 @@ fi
 # of at startup; geth without the flag ignores the var.
 if [ "${HIVE_KZG_FAST_SETUP:-0}" = "1" ]; then
     export GETH_CRYPTO_KZG_LAZY=true
+fi
+
+# EIP-8252 reorg state-retention window: number of recent blocks to keep state
+# history for, so a reorg forking within the window can be validated without a
+# resync. Only meaningful under state.scheme=path. Reorgs shallower than the 128
+# in-memory diff layers are served from memory regardless of this value. geth
+# without the flag keeps its default (params.ReorgRetentionWindow); unset here
+# leaves that default untouched.
+if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
+    FLAGS="$FLAGS --history.state=$HIVE_REORG_RETENTION_WINDOW"
 fi
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
