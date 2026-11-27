@@ -1,0 +1,67 @@
+# Hive client adapter for Fukuii, built from source.
+#
+# `github` is the repository and `tag` the branch or tag to build:
+#   - client: fukuii
+#     dockerfile: git
+#     build_args:
+#       github: chippr-robotics/fukuii
+#       tag: main
+
+### Builder: the fukuii distribution and assembly jar.
+FROM eclipse-temurin:25-jdk-noble AS builder
+
+ARG github=chippr-robotics/fukuii
+ARG tag=main
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl git gnupg ca-certificates unzip && \
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
+      | gpg --dearmor -o /usr/share/keyrings/sbt-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/sbt-archive-keyring.gpg] https://repo.scala-sbt.org/scalasbt/debian all main" \
+      > /etc/apt/sources.list.d/sbt.list && \
+    apt-get update && apt-get install -y --no-install-recommends sbt && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN echo "Cloning: $github - $tag" && \
+    git clone --depth 1 --branch $tag https://github.com/$github /build
+WORKDIR /build
+RUN sbt "assembly; dist"
+RUN cd target/universal && \
+    unzip -q fukuii-*.zip && \
+    mv "$(ls -d fukuii-*/ | head -1)" /fukuii-dist && \
+    cp /build/target/scala-*/fukuii-assembly-*.jar /fukuii-dist/lib/
+
+### Runtime: the chipprbots/fukuii layout, then the hive adapter (as in Dockerfile).
+FROM eclipse-temurin:25-jre-noble
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl jq openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /fukuii-dist /app/fukuii
+RUN cd /app/fukuii/lib && \
+    ln -sf "$(ls fukuii-assembly-*.jar | head -1)" fukuii-assembly.jar && \
+    basename "$(readlink -f fukuii-assembly.jar)" \
+      | sed -E 's/^fukuii-assembly-(.*)\.jar$/fukuii-\1/' > /version.txt
+
+# JDK-8385993: C2 ReduceAllocationMerges can silently miscompile field reads on JDK 23+ (fixed in
+# JDK 28). JDK_JAVA_OPTIONS is read by every `java` launch in this container, including the AOT
+# training run; fukuii.sh passes the same flags explicitly.
+ENV JDK_JAVA_OPTIONS="-XX:+UnlockDiagnosticVMOptions -XX:-ReduceAllocationMerges"
+
+COPY fukuii.sh /fukuii.sh
+COPY mapper.jq /mapper.jq
+COPY dao-drain-list.txt /dao-drain-list.txt
+COPY enode.sh /hive-bin/enode.sh
+RUN chmod +x /fukuii.sh /hive-bin/enode.sh
+
+# JDK 25 AOT cache: see Dockerfile.
+COPY aot-train.sh aot-train-genesis.json /
+RUN chmod +x /aot-train.sh && /aot-train.sh && rm /aot-train.sh
+
+# Unified state layout guard, off by default: see Dockerfile.
+ARG FUKUII_PATH_LIVE=
+ENV FUKUII_PATH_LIVE=${FUKUII_PATH_LIVE}
+
+EXPOSE 8545 8546 8551 30303 30303/udp
+ENV HIVE_CHECK_LIVE_PORT=8545
+
+ENTRYPOINT ["/fukuii.sh"]
