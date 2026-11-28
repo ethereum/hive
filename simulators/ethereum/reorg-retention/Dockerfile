@@ -17,6 +17,11 @@ RUN go build -v .
 
 # Build the simulator run container.
 FROM alpine:latest
+# Hive only forwards a fixed set of env vars to the simulator container, not
+# HIVE_REORG_RETENTION_LONG, so the long/gated clients (reth, erigon) can be
+# enabled only by baking it in at build time: `--sim.buildarg reorg_retention_long=1`.
+ARG reorg_retention_long=""
+ENV HIVE_REORG_RETENTION_LONG=${reorg_retention_long}
 ADD . /source
 WORKDIR /source/reorg-retention
 COPY --from=builder /source/reorg-retention/reorg-retention .

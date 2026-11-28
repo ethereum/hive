@@ -115,11 +115,15 @@ func configFor(name string) (clientConfig, bool) {
 			pace:        50 * time.Millisecond,
 		}, true
 	case strings.Contains(name, "besu"):
-		// --bonsai-historical-block-limit; floor MINIMUM_TRIE_LOG_RETENTION_LIMIT = 512.
+		// --bonsai-historical-block-limit (= Bonsai maxLayersToLoad, the historical
+		// layers a reorg/lookup may roll through). Floor and default are both
+		// MINIMUM_TRIE_LOG_RETENTION_LIMIT = 512, so a window of 512 would pass even
+		// with the flag unmapped; use 1024 with withinDepth 896 > 512 so the flag is
+		// actually exercised (a 896-deep reorg needs the limit raised above 512).
 		return clientConfig{
-			window:      512,
-			withinDepth: 448,
-			beyondDepth: 640,
+			window:      1024,
+			withinDepth: 896,
+			beyondDepth: 1152,
 		}, true
 	case strings.Contains(name, "reth"):
 		// --prune.{account,storage}-history.distance. The per-segment serde floor
@@ -187,15 +191,21 @@ func runLoader(t *hivesim.T) {
 			continue
 		}
 		name := ct.Name
+		// Gate long/gated clients here, by not registering their subtests at all.
+		// hivesim has no "skipped" status, so a subtest that merely returns is
+		// recorded as a pass — a false green. Enable them with
+		// `--sim.buildarg reorg_retention_long=1` (hive does not forward
+		// HIVE_REORG_RETENTION_LONG to the simulator container, so it is baked in
+		// at build time; see the Dockerfile).
+		if cfg.long && !longEnabled {
+			t.Logf("skipping %q: window %d needs a long chain; build with --sim.buildarg reorg_retention_long=1 to run it", name, cfg.window)
+			continue
+		}
 		// Each case builds its own stalled chain and client, so they are fully
 		// independent: the reconstruct case moves head to the sidechain, which must
 		// not leak into the engine-reorg case.
-		gated := func(body func(*reorgTest, stalledChain)) func(*hivesim.T) {
+		run := func(body func(*reorgTest, stalledChain)) func(*hivesim.T) {
 			return func(t *hivesim.T) {
-				if cfg.long && !longEnabled {
-					t.Logf("skipping %q: window %d needs a long chain; set HIVE_REORG_RETENTION_LONG=1 to run it", name, cfg.window)
-					return
-				}
 				r, sc, cancel := setupStalledChain(t, name, cfg)
 				defer cancel()
 				defer r.ec.Close()
@@ -205,7 +215,7 @@ func runLoader(t *hivesim.T) {
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("reorg-retention/reconstruct-in-window-state (%s)", name),
 			Description: "Builds a (window+margin)-deep chain under stalled finality, then checks that the post-state of a block forking inside the window is reconstructable from retained history without a network sync (rewind head to the in-window ancestor, which forces reconstruction), while a block forking older than the window degrades gracefully. This is EIP-8252's literal MUST.",
-			Run: gated(func(r *reorgTest, sc stalledChain) {
+			Run: run(func(r *reorgTest, sc stalledChain) {
 				r.assertBeyondWindow(sc.sideBeyond)
 				r.assertReconstructWithinWindow(sc.sideWithin, sc.genesisHash)
 				r.t.Logf("%s: in-window state reconstruction verified (window=%d)", name, cfg.window)
@@ -214,7 +224,7 @@ func runLoader(t *hivesim.T) {
 		t.Run(hivesim.TestSpec{
 			Name:        fmt.Sprintf("reorg-retention/engine-reorg-to-sibling (%s)", name),
 			Description: "Drives the reorg the way a consensus client actually does: newPayload for a block forking inside the window, then forkchoiceUpdated to it, with no prior rewind to the fork point. EIP-8252's motivation is that such a branch, handed in via the engine API, is validated from retained state without a network sync. A client whose engine path routes deep reorgs to network sync instead of reconstructing locally fails this (head never reaches the sidechain with no peers attached), which is the finding, not a test defect.",
-			Run: gated(func(r *reorgTest, sc stalledChain) {
+			Run: run(func(r *reorgTest, sc stalledChain) {
 				r.assertEngineReorgToSibling(sc.sideWithin, sc.genesisHash)
 				r.t.Logf("%s: engine-API reorg to in-window sibling verified (window=%d)", name, cfg.window)
 			}),

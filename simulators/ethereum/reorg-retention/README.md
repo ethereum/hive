@@ -125,7 +125,7 @@ Case B failing for a client is a conformance result on the hive dashboard, not a
 CI gate (no CI job runs simulators against clients).
 
 Per-client depths (window / withinDepth / beyondDepth):
-go-ethereum 192 / 160 / 320, besu 512 / 448 / 640, nethermind 160 / 144 / 256,
+go-ethereum 192 / 160 / 320, besu 1024 / 896 / 1152, nethermind 160 / 144 / 256,
 reth 10064 / 9000 / 10192, erigon 1024 / 896 / 1152.
 
 go-ethereum additionally gets `HIVE_EXPECT_DEEP_REORGS=1` (raises its Engine-API
@@ -134,7 +134,12 @@ reorg-depth limit from 32 to 512), and erigon gets `HIVE_ENGINE_MAX_REORG_DEPTH`
 ## Long / gated clients
 
 `reth` and `erigon` build a long chain and/or rely on behaviour not reproducible
-offline, so they run only when **`HIVE_REORG_RETENTION_LONG=1`**:
+offline, so they are gated. hive forwards only a fixed set of env vars to the
+simulator container (not `HIVE_REORG_RETENTION_LONG`), so the gate is baked in at
+build time — enable it with **`--sim.buildarg reorg_retention_long=1`** (a
+Dockerfile `ARG`/`ENV`). When off, the gated clients are **not registered** (they
+do not appear as false passes, which a bare early-return would be since hivesim
+has no skipped status):
 
 - **reth** — pinned at the documented-flag floor (10064), i.e. a ~10k-block chain.
   A smaller window is reachable with the `--prune.minimum-distance` override that

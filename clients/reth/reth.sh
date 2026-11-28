@@ -212,7 +212,10 @@ if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
     FLAGS="$FLAGS --prune.account-history.distance=$HIVE_REORG_RETENTION_WINDOW"
     FLAGS="$FLAGS --prune.storage-history.distance=$HIVE_REORG_RETENTION_WINDOW"
     FLAGS="$FLAGS --prune.minimum-distance=$HIVE_REORG_RETENTION_WINDOW"
-    FLAGS="$FLAGS --prune.block-interval=1"
+    # --block-interval is reth's clap alias of --prune.block-interval, already set
+    # above to 500000; passing --prune.block-interval again is rejected as a
+    # duplicate, so replace the earlier value rather than appending.
+    FLAGS="${FLAGS/--block-interval 500000/--prune.block-interval=1}"
 fi
 
 # Launch the main client.
