@@ -112,7 +112,12 @@ func configFor(name string) (clientConfig, bool) {
 			window:      160,
 			withinDepth: 144,
 			beyondDepth: 256,
-			pace:        50 * time.Millisecond,
+			// Nethermind's persisted-snapshot tier is built by asynchronous
+			// per-block background persistence; the tier must reach the fork depth
+			// before the reorg. Under the compressed hive timeline the build can
+			// outrun it, so pace generously to keep the tier near head (in
+			// production's 12s slots this is never a concern).
+			pace: 200 * time.Millisecond,
 		}, true
 	case strings.Contains(name, "besu"):
 		// --bonsai-historical-block-limit (= Bonsai maxLayersToLoad, the historical

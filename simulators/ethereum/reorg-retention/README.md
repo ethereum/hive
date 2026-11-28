@@ -118,8 +118,8 @@ Run on this framework against the EIP-8252 branches of each client:
 | Client | Case A (reconstruct) | Case B (engine reorg to sibling) |
 |---|---|---|
 | **go-ethereum** | ✅ | ❌ — `newPayload` drops the in-window sidechain block (`eth/catalyst/api.go`, "State not available, ignoring new payload"), and the subsequent forkchoiceUpdated routes to `BeaconSync` → `SYNCING` with no peers. geth reconstructs on an explicit rewind (Case A) but does not use the retained state to validate a reorg handed in the way a CL does. |
-| **nethermind** | ✅ | ✅ — stores the block and reconstructs+adopts it from the retained state, no sync. |
-| **besu** | ✅ | ✅ — reconstructs+adopts the in-window reorg over the engine API (window 1024, an 896-deep roll). |
+| **nethermind** | ✅ | timing-sensitive — its persisted-snapshot tier is materialized by *asynchronous* per-block persistence, so the cold `newPayload` finds the fork-point state only if the tier has caught up to that depth. Under hive's compressed timeline it usually has not, so this returns `SYNCING`; in production (12s slots) the tier keeps up and the reorg completes. Hive cannot deterministically assert it. |
+| **besu** | ✅ | ✅ — reconstructs+adopts the in-window reorg over the engine API (window 1024, an 896-deep roll). Bonsai writes trie logs synchronously, so this is deterministic here. |
 | reth, erigon | *not yet run* (gated) | *not yet run* (gated) |
 
 Case B failing for a client is a conformance result on the hive dashboard, not a
@@ -162,8 +162,11 @@ independent of the active EL fork, and Shanghai keeps the payload plumbing simpl
 ## Verification status
 
 Executed against the **go-ethereum**, **nethermind** and **besu** EIP-8252 branches
-(see the results table above): geth passes Case A and fails Case B; nethermind and
-besu pass both.
+(see the results table above): all three pass Case A. On Case B, besu passes
+(synchronous trie logs), geth fails (defers the cold reorg to sync), and
+nethermind is timing-sensitive under the compressed timeline (asynchronous
+persisted tier) — it reconstructs in production but hive cannot deterministically
+assert it.
 **reth and erigon have not yet been run** (gated, long chains); their per-client depths, engine
 reorg-depth limits, and pacing needs may require tuning once exercised. The reth
 and erigon cases are gated behind `HIVE_REORG_RETENTION_LONG=1`.
