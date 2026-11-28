@@ -27,6 +27,9 @@
 #  - HIVE_STATE_ROOT_FALLBACK   set to '1' to use the legacy state-root computation
 #  - HIVE_BAL_PARALLEL_DISABLED  set to '1' to disable BAL parallel execution and state roots
 #  - HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER  set to '1' to share the sparse trie and execution cache with the builder
+#  - HIVE_REORG_RETENTION_WINDOW  EIP-8252 reorg state-retention window in blocks,
+#                                 maps to --prune.account-history.distance and
+#                                 --prune.storage-history.distance
 #
 # These flags are NOT supported by reth
 #
@@ -195,6 +198,24 @@ if [ "${HIVE_BAL_PARALLEL_DISABLED:-0}" = "1" ]; then
 fi
 if [ "${HIVE_SHARE_SPARSE_TRIE_WITH_BUILDER:-0}" = "1" ]; then
     FLAGS="$FLAGS --engine.share-sparse-trie-with-payload-builder --engine.share-execution-cache-with-payload-builder"
+fi
+
+# EIP-8252 reorg state-retention window: retain account/storage history for this
+# many recent blocks, so a reorg forking within the window can be unwound without
+# a resync. The per-segment serde floor (MINIMUM_UNWIND_SAFE_DISTANCE = 10064) is
+# bypassed by these CLI flags, but the pruner enforces the same value as a runtime
+# minimum via PruneSegment::min_blocks() unless --prune.minimum-distance is also
+# lowered, so set it too to honour windows below 10064. The default entrypoint
+# sets --block-interval 500000, which defers pruning; override it so the window
+# actually binds. Unset leaves reth's default (archive: no history pruning).
+if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
+    FLAGS="$FLAGS --prune.account-history.distance=$HIVE_REORG_RETENTION_WINDOW"
+    FLAGS="$FLAGS --prune.storage-history.distance=$HIVE_REORG_RETENTION_WINDOW"
+    FLAGS="$FLAGS --prune.minimum-distance=$HIVE_REORG_RETENTION_WINDOW"
+    # --block-interval is reth's clap alias of --prune.block-interval, already set
+    # above to 500000; passing --prune.block-interval again is rejected as a
+    # duplicate, so replace the earlier value rather than appending.
+    FLAGS="${FLAGS/--block-interval 500000/--prune.block-interval=1}"
 fi
 
 # Launch the main client.

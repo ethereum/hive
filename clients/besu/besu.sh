@@ -41,6 +41,8 @@
 #  - HIVE_DATA_STORAGE_FORMAT  trie storage format: BONSAI, FOREST or X_BONSAI_ARCHIVE (default: BONSAI)
 #  - HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED  set to '1' to disable parallel state-root computation
 #  - HIVE_BONSAI_FULL_FLAT_DB_DISABLED  set to '1' to disable the Bonsai full flat database
+#  - HIVE_REORG_RETENTION_WINDOW  EIP-8252 reorg state-retention window in blocks,
+#                                 maps to --bonsai-historical-block-limit (min 512)
 #
 # These flags are not supported by the Besu hive client
 #
@@ -202,6 +204,18 @@ if [ "${HIVE_BONSAI_PARALLEL_STATE_ROOT_DISABLED:-0}" = "1" ]; then
 fi
 if [ "${HIVE_BONSAI_FULL_FLAT_DB_DISABLED:-0}" = "1" ]; then
     FLAGS="$FLAGS --Xbonsai-full-flat-db-enabled=false"
+fi
+
+# EIP-8252 reorg state-retention window: --bonsai-historical-block-limit is
+# Bonsai's maxLayersToLoad, the number of historical layers a reorg or state
+# lookup may roll through, so a reorg forking within the window can be
+# reconstructed without a resync. Besu rejects values below 512, which is also
+# its default. Note: under hive's --sync-mode=FULL, Besu logs "Forcing
+# --bonsai-limit-trie-logs-enabled=false", so trie logs are not pruned to this
+# window; the limit here bounds the roll depth, not trie-log retention. Unset
+# leaves Besu's default.
+if [ "$HIVE_REORG_RETENTION_WINDOW" != "" ]; then
+    FLAGS="$FLAGS --bonsai-historical-block-limit=$HIVE_REORG_RETENTION_WINDOW"
 fi
 
 # Start Besu.
