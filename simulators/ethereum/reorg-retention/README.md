@@ -118,8 +118,9 @@ Run on this framework against the EIP-8252 branches of each client:
 | Client | Case A (reconstruct) | Case B (engine reorg to sibling) |
 |---|---|---|
 | **go-ethereum** | ✅ | ❌ — `newPayload` drops the in-window sidechain block (`eth/catalyst/api.go`, "State not available, ignoring new payload"), and the subsequent forkchoiceUpdated routes to `BeaconSync` → `SYNCING` with no peers. geth reconstructs on an explicit rewind (Case A) but does not use the retained state to validate a reorg handed in the way a CL does. |
-| **nethermind** | ✅ | ✅ — stores the block and reconstructs+adopts it from the retained state, no sync. The reference for Case B being achievable. |
-| besu, reth, erigon | *not yet run* | *not yet run* |
+| **nethermind** | ✅ | ✅ — stores the block and reconstructs+adopts it from the retained state, no sync. |
+| **besu** | ✅ | ✅ — reconstructs+adopts the in-window reorg over the engine API (window 1024, an 896-deep roll). |
+| reth, erigon | *not yet run* (gated) | *not yet run* (gated) |
 
 Case B failing for a client is a conformance result on the hive dashboard, not a
 CI gate (no CI job runs simulators against clients).
@@ -160,8 +161,9 @@ independent of the active EL fork, and Shanghai keeps the payload plumbing simpl
 
 ## Verification status
 
-Executed against the **go-ethereum** and **nethermind** EIP-8252 branches (see the
-results table above): geth passes Case A and fails Case B; nethermind passes both.
-**besu, reth and erigon have not yet been run**; their per-client depths, engine
+Executed against the **go-ethereum**, **nethermind** and **besu** EIP-8252 branches
+(see the results table above): geth passes Case A and fails Case B; nethermind and
+besu pass both.
+**reth and erigon have not yet been run** (gated, long chains); their per-client depths, engine
 reorg-depth limits, and pacing needs may require tuning once exercised. The reth
 and erigon cases are gated behind `HIVE_REORG_RETENTION_LONG=1`.
